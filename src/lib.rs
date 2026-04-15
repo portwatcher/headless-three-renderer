@@ -151,7 +151,7 @@ impl GpuRenderer {
         let required_limits = wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                label: Some("gltf-renderer-rs device"),
+                label: Some("headless-three-renderer device"),
                 required_features: wgpu::Features::empty(),
                 required_limits,
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
@@ -162,12 +162,12 @@ impl GpuRenderer {
             .context("failed to create wgpu device")?;
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("gltf-renderer-rs shader"),
+            label: Some("headless-three-renderer shader"),
             source: wgpu::ShaderSource::Wgsl(SHADER.into()),
         });
 
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("gltf-renderer-rs uniform layout"),
+            label: Some("headless-three-renderer uniform layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::VERTEX,
@@ -181,7 +181,7 @@ impl GpuRenderer {
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("gltf-renderer-rs pipeline layout"),
+            label: Some("headless-three-renderer pipeline layout"),
             bind_group_layouts: &[Some(&uniform_layout)],
             immediate_size: 0,
         });
@@ -194,7 +194,7 @@ impl GpuRenderer {
 
         let vertex_buffers = [Vertex::layout()];
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("gltf-renderer-rs pipeline"),
+            label: Some("headless-three-renderer pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -256,7 +256,7 @@ impl GpuRenderer {
         };
 
         let color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("gltf-renderer-rs color texture"),
+            label: Some("headless-three-renderer color texture"),
             size: texture_size,
             mip_level_count: 1,
             sample_count: 1,
@@ -268,7 +268,7 @@ impl GpuRenderer {
         let color_view = color_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("gltf-renderer-rs depth texture"),
+            label: Some("headless-three-renderer depth texture"),
             size: texture_size,
             mip_level_count: 1,
             sample_count: 1,
@@ -297,7 +297,7 @@ impl GpuRenderer {
         }
 
         let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("gltf-renderer-rs readback buffer"),
+            label: Some("headless-three-renderer readback buffer"),
             size: output_buffer_size,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
@@ -306,7 +306,7 @@ impl GpuRenderer {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("gltf-renderer-rs render encoder"),
+                label: Some("headless-three-renderer render encoder"),
             });
 
         {
@@ -326,7 +326,7 @@ impl GpuRenderer {
             })];
 
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("gltf-renderer-rs render pass"),
+                label: Some("headless-three-renderer render pass"),
                 color_attachments: &color_attachments,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &depth_view,
@@ -411,7 +411,7 @@ impl GpuRenderer {
         let vertex_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("gltf-renderer-rs vertex buffer"),
+                label: Some("headless-three-renderer vertex buffer"),
                 contents: bytemuck::cast_slice(&mesh.vertices),
                 usage: wgpu::BufferUsages::VERTEX,
             });
@@ -419,7 +419,7 @@ impl GpuRenderer {
         let index_buffer = mesh.indices.as_ref().map(|indices| {
             self.device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("gltf-renderer-rs index buffer"),
+                    label: Some("headless-three-renderer index buffer"),
                     contents: bytemuck::cast_slice(indices),
                     usage: wgpu::BufferUsages::INDEX,
                 })
@@ -431,13 +431,13 @@ impl GpuRenderer {
         let uniform_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("gltf-renderer-rs uniform buffer"),
+                label: Some("headless-three-renderer uniform buffer"),
                 contents: bytemuck::bytes_of(&uniforms),
                 usage: wgpu::BufferUsages::UNIFORM,
             });
 
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("gltf-renderer-rs bind group"),
+            label: Some("headless-three-renderer bind group"),
             layout: &self.uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,

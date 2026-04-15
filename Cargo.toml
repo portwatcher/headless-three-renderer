@@ -1,5 +1,5 @@
 [package]
-name = "gltf_renderer_rs"
+name = "headless_three_renderer"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"

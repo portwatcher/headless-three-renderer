@@ -371,21 +371,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gltf_renderer_rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "glam",
- "image",
- "napi",
- "napi-build",
- "napi-derive",
- "pollster",
- "wgpu",
-]
-
-[[package]]
 name = "glutin_wgl_sys"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -465,6 +450,21 @@ name = "hashbrown"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+
+[[package]]
+name = "headless_three_renderer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "glam",
+ "image",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "pollster",
+ "wgpu",
+]
 
 [[package]]
 name = "hexf-parse"

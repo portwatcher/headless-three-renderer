@@ -1,4 +1,4 @@
-# gltf-renderer-rs
+# headless-three-renderer
 
 Headless `wgpu` renderer for Three.js scenes in Node.js.
 

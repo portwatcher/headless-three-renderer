@@ -1,5 +1,5 @@
 {
-  "name": "gltf-renderer-rs",
+  "name": "headless-three-renderer",
   "version": "0.1.0",
   "description": "Headless wgpu renderer for Three.js scenes in Node.js.",
   "main": "index.js",
@@ -21,7 +21,7 @@
     "src"
   ],
   "napi": {
-    "binaryName": "gltf_renderer_rs",
+    "binaryName": "headless_three_renderer",
     "dtsHeader": "/// <reference types=\"node\" />\n",
     "targets": [
       "x86_64-apple-darwin",
