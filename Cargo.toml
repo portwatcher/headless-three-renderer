@@ -1,0 +1,22 @@
+[package]
+name = "gltf_renderer_rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "1.0.100"
+bytemuck = { version = "1.25.0", features = ["derive"] }
+glam = "0.32.1"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+napi = { version = "3.8.4", features = ["napi8"] }
+napi-derive = "3.5.3"
+pollster = "0.4.0"
+wgpu = { version = "29.0.1", default-features = false, features = ["std", "wgsl", "vulkan", "metal", "dx12", "gles"] }
+
+[build-dependencies]
+napi-build = "2.3.1"
