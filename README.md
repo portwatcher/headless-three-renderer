@@ -76,12 +76,18 @@ The public API accepts only Three.js-like objects:
 Current rendering support is intentionally focused on static triangle meshes:
 
 - `THREE.Mesh`
-- `THREE.BufferGeometry` positions and indices
+- `THREE.BufferGeometry` positions, indices, and UV coordinates
 - geometry groups with material arrays
 - mesh world transforms
 - material base color and opacity
+- material color map (`material.map`) — texture support
 - vertex colors
 - scene background color
 - perspective, orthographic, and custom projection matrices
 
-Not yet implemented: textures, lights, shadows, skinning, morph targets, custom shaders, render targets, lines, points, and Three.js material models beyond flat color/vertex color. Those require additional `wgpu` pipeline and shader work.
+Texture support extracts `material.map` from Three.js materials. The texture image data can be:
+
+- Raw RGBA8 pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
+- Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
+
+Not yet implemented: lights, shadows, skinning, morph targets, custom shaders, render targets, lines, points, normal/roughness/emissive maps, and Three.js material models beyond flat color/vertex color. Those require additional `wgpu` pipeline and shader work.

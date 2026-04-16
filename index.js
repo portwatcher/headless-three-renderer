@@ -135,6 +135,8 @@ function appendMesh(object, meshes) {
   if (!position) return
 
   const positions = readVec3Attribute(position)
+  const uvAttribute = getAttribute(geometry, 'uv')
+  const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index) : null
   const groups = effectiveGroups(geometry, index, position.count)
@@ -145,6 +147,8 @@ function appendMesh(object, meshes) {
 
     const color = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
+
+    const textureInfo = extractTextureData(material)
 
     if (index) {
       const indices = index.slice(group.start, group.start + group.count)
@@ -157,6 +161,10 @@ function appendMesh(object, meshes) {
         indices,
         color,
         colors: useVertexColors ? readColorAttribute(vertexColors, color) : undefined,
+        uvs: uvs ?? undefined,
+        texture: textureInfo?.data,
+        textureWidth: textureInfo?.width ?? undefined,
+        textureHeight: textureInfo?.height ?? undefined,
         transform: matrixElements(object.matrixWorld, 'mesh.matrixWorld'),
       })
     } else {
@@ -170,6 +178,10 @@ function appendMesh(object, meshes) {
         colors: useVertexColors
           ? readColorAttribute(vertexColors, color).slice(group.start * 4, (group.start + group.count) * 4)
           : undefined,
+        uvs: uvs ? uvs.slice(group.start * 2, (group.start + group.count) * 2) : undefined,
+        texture: textureInfo?.data,
+        textureWidth: textureInfo?.width ?? undefined,
+        textureHeight: textureInfo?.height ?? undefined,
         transform: matrixElements(object.matrixWorld, 'mesh.matrixWorld'),
       })
     }
@@ -217,6 +229,18 @@ function readVec3Attribute(attribute) {
     values[i * 3] = attributeComponent(attribute, i, 0)
     values[i * 3 + 1] = attributeComponent(attribute, i, 1)
     values[i * 3 + 2] = attributeComponent(attribute, i, 2)
+  }
+  return values
+}
+
+function readVec2Attribute(attribute) {
+  if (attribute.count == null) {
+    throw new TypeError('THREE.BufferGeometry UV attribute must have count')
+  }
+  const values = new Array(attribute.count * 2)
+  for (let i = 0; i < attribute.count; i += 1) {
+    values[i * 2] = attributeComponent(attribute, i, 0)
+    values[i * 2 + 1] = attributeComponent(attribute, i, 1)
   }
   return values
 }
@@ -276,6 +300,92 @@ function materialForGroup(material, materialIndex) {
     return material[materialIndex] ?? material[0]
   }
   return material
+}
+
+function extractTextureData(material) {
+  const map = material?.map
+  if (!map) return null
+
+  const image = map.image ?? map.source?.data
+  if (!image) return null
+
+  // DataTexture style: { data: TypedArray, width, height }
+  if (image.data && image.width > 0 && image.height > 0) {
+    const rgba = toRgba8(image.data, image.width, image.height)
+    if (rgba) {
+      return { data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength), width: image.width, height: image.height }
+    }
+  }
+
+  // Encoded image (PNG/JPEG/WebP Buffer from file loaders)
+  if (Buffer.isBuffer(image)) {
+    return { data: image, width: 0, height: 0 }
+  }
+  if (image instanceof Uint8Array && !(image.width > 0)) {
+    return { data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0 }
+  }
+
+  // ImageData (canvas-based polyfill): { data: Uint8ClampedArray, width, height }
+  if (image.data instanceof Uint8ClampedArray && image.width > 0 && image.height > 0) {
+    return {
+      data: Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength),
+      width: image.width,
+      height: image.height,
+    }
+  }
+
+  return null
+}
+
+function toRgba8(data, width, height) {
+  const pixels = width * height
+
+  if (data instanceof Uint8Array || data instanceof Uint8ClampedArray) {
+    if (data.length === pixels * 4) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+    if (data.length === pixels * 3) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = data[i * 3]
+        out[i * 4 + 1] = data[i * 3 + 1]
+        out[i * 4 + 2] = data[i * 3 + 2]
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    return null
+  }
+
+  if (data instanceof Float32Array || data instanceof Float64Array) {
+    if (data.length === pixels * 4) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels * 4; i++) {
+        out[i] = Math.max(0, Math.min(255, Math.round(data[i] * 255)))
+      }
+      return out
+    }
+    if (data.length === pixels * 3) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = Math.max(0, Math.min(255, Math.round(data[i * 3] * 255)))
+        out[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(data[i * 3 + 1] * 255)))
+        out[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(data[i * 3 + 2] * 255)))
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    return null
+  }
+
+  // Uint16Array or other numeric typed arrays — treat as 8-bit range after clamping
+  if (ArrayBuffer.isView(data) && data.length === pixels * 4) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels * 4; i++) {
+      out[i] = Math.max(0, Math.min(255, data[i]))
+    }
+    return out
+  }
+
+  return null
 }
 
 function materialColor(material) {

@@ -51,4 +51,12 @@ export interface SceneMesh {
   color?: Array<number>
   /** Optional column-major 4x4 model matrix. */
   transform?: Array<number>
+  /** Optional per-vertex UV coordinates: `[u0, v0, u1, v1, ...]`. */
+  uvs?: Array<number>
+  /** Optional texture image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP). */
+  texture?: Buffer
+  /** Texture width in pixels (required when `texture` is raw RGBA8 bytes). */
+  textureWidth?: number
+  /** Texture height in pixels (required when `texture` is raw RGBA8 bytes). */
+  textureHeight?: number
 }

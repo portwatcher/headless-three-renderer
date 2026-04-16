@@ -17,7 +17,7 @@ const DEFAULT_HEIGHT: u32 = 512;
 static SHARED_RENDERER: OnceLock<std::result::Result<GpuRenderer, String>> = OnceLock::new();
 
 #[napi(object)]
-#[derive(Clone, Debug, Default)]
+#[derive(Default)]
 pub struct RenderScene {
     /// Output width in pixels. `camera.width` takes precedence when set.
     pub width: Option<u32>,
@@ -32,7 +32,7 @@ pub struct RenderScene {
 }
 
 #[napi(object)]
-#[derive(Clone, Debug, Default)]
+#[derive(Default)]
 pub struct SceneMesh {
     /// Flat xyz positions: `[x0, y0, z0, x1, y1, z1, ...]`.
     pub positions: Vec<f64>,
@@ -44,6 +44,14 @@ pub struct SceneMesh {
     pub color: Option<Vec<f64>>,
     /// Optional column-major 4x4 model matrix.
     pub transform: Option<Vec<f64>>,
+    /// Optional per-vertex UV coordinates: `[u0, v0, u1, v1, ...]`.
+    pub uvs: Option<Vec<f64>>,
+    /// Optional texture image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
+    pub texture: Option<Buffer>,
+    /// Texture width in pixels (required when `texture` is raw RGBA8 bytes).
+    pub texture_width: Option<u32>,
+    /// Texture height in pixels (required when `texture` is raw RGBA8 bytes).
+    pub texture_height: Option<u32>,
 }
 
 #[napi(object)]
@@ -114,6 +122,9 @@ struct GpuRenderer {
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
     uniform_layout: wgpu::BindGroupLayout,
+    texture_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    default_texture_bind_group: wgpu::BindGroup,
 }
 
 impl GpuRenderer {
@@ -180,9 +191,93 @@ impl GpuRenderer {
             }],
         });
 
+        let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer texture layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("headless-three-renderer sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let default_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("headless-three-renderer default texture"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: COLOR_FORMAT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &default_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &[255u8, 255, 255, 255],
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        let default_texture_view =
+            default_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let default_texture_bind_group =
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("headless-three-renderer default texture bind group"),
+                layout: &texture_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&default_texture_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                ],
+            });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout)],
             immediate_size: 0,
         });
 
@@ -234,6 +329,9 @@ impl GpuRenderer {
             queue,
             pipeline,
             uniform_layout,
+            texture_layout,
+            sampler,
+            default_texture_bind_group,
         })
     }
 
@@ -344,6 +442,7 @@ impl GpuRenderer {
             pass.set_pipeline(&self.pipeline);
             for mesh in &gpu_meshes {
                 pass.set_bind_group(0, &mesh.bind_group, &[]);
+                pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
 
                 if let Some(index_buffer) = &mesh.index_buffer {
@@ -445,16 +544,73 @@ impl GpuRenderer {
             }],
         });
 
+        let (texture_bind_group, _mesh_texture) = match &mesh.texture {
+            Some(tex) => {
+                let tex_size = wgpu::Extent3d {
+                    width: tex.width,
+                    height: tex.height,
+                    depth_or_array_layers: 1,
+                };
+                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("headless-three-renderer mesh texture"),
+                    size: tex_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: COLOR_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+                self.queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &gpu_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &tex.rgba,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * tex.width),
+                        rows_per_image: Some(tex.height),
+                    },
+                    tex_size,
+                );
+                let tex_view =
+                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group =
+                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("headless-three-renderer mesh texture bind group"),
+                        layout: &self.texture_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&tex_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&self.sampler),
+                            },
+                        ],
+                    });
+                (tex_bind_group, Some(gpu_texture))
+            }
+            None => (self.default_texture_bind_group.clone(), None),
+        };
+
         Ok(GpuMesh {
             vertex_buffer,
             index_buffer,
             bind_group,
+            texture_bind_group,
             index_count: mesh
                 .indices
                 .as_ref()
                 .map_or(0, |indices| indices.len() as u32),
             vertex_count: mesh.vertices.len() as u32,
             _uniform_buffer: uniform_buffer,
+            _texture: _mesh_texture,
         })
     }
 }
@@ -463,9 +619,11 @@ struct GpuMesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: Option<wgpu::Buffer>,
     bind_group: wgpu::BindGroup,
+    texture_bind_group: wgpu::BindGroup,
     index_count: u32,
     vertex_count: u32,
     _uniform_buffer: wgpu::Buffer,
+    _texture: Option<wgpu::Texture>,
 }
 
 struct RenderSettings {
@@ -558,11 +716,12 @@ impl OutputFormat {
 struct Vertex {
     position: [f32; 3],
     color: [f32; 4],
+    uv: [f32; 2],
 }
 
 impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x4];
+    const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x4, 2 => Float32x2];
 
     fn layout() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
@@ -583,6 +742,13 @@ struct PreparedMesh {
     vertices: Vec<Vertex>,
     indices: Option<Vec<u32>>,
     transform: Mat4,
+    texture: Option<PreparedTexture>,
+}
+
+struct PreparedTexture {
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
 }
 
 fn prepare_meshes(scene: &RenderScene) -> Result<Vec<PreparedMesh>> {
@@ -612,9 +778,22 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh_index,
     )?;
 
+    let uvs = mesh.uvs.as_deref();
+    let has_uvs = uvs.map_or(false, |u| u.len() == vertex_count * 2);
+    if let Some(u) = uvs {
+        if u.len() != vertex_count * 2 {
+            bail!(
+                "scene.meshes[{mesh_index}].uvs has length {}; expected {}",
+                u.len(),
+                vertex_count * 2,
+            );
+        }
+    }
+
     let mut vertices = Vec::with_capacity(vertex_count);
     for vertex_index in 0..vertex_count {
         let base = vertex_index * 3;
+        let uv_base = vertex_index * 2;
         vertices.push(Vertex {
             position: [
                 finite_f32(mesh.positions[base], "mesh position")?,
@@ -622,6 +801,12 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 finite_f32(mesh.positions[base + 2], "mesh position")?,
             ],
             color: color_mode.color(vertex_index),
+            uv: if has_uvs {
+                let u = uvs.unwrap();
+                [u[uv_base] as f32, u[uv_base + 1] as f32]
+            } else {
+                [0.0, 0.0]
+            },
         });
     }
 
@@ -647,10 +832,49 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         }
     };
 
+    let texture = match &mesh.texture {
+        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
+            tex_data,
+            mesh.texture_width,
+            mesh.texture_height,
+            mesh_index,
+        )?),
+        _ => None,
+    };
+
     Ok(PreparedMesh {
         vertices,
         indices,
         transform: parse_transform(mesh.transform.as_deref(), mesh_index)?,
+        texture,
+    })
+}
+
+fn decode_texture(
+    data: &[u8],
+    width_hint: Option<u32>,
+    height_hint: Option<u32>,
+    mesh_index: usize,
+) -> Result<PreparedTexture> {
+    let w = width_hint.unwrap_or(0);
+    let h = height_hint.unwrap_or(0);
+
+    if w > 0 && h > 0 && data.len() == (w as usize) * (h as usize) * 4 {
+        return Ok(PreparedTexture {
+            rgba: data.to_vec(),
+            width: w,
+            height: h,
+        });
+    }
+
+    let img = image::load_from_memory(data).with_context(|| {
+        format!("scene.meshes[{mesh_index}].texture: failed to decode image ({} bytes)", data.len())
+    })?;
+    let rgba = img.to_rgba8();
+    Ok(PreparedTexture {
+        width: rgba.width(),
+        height: rgba.height(),
+        rgba: rgba.into_raw(),
     })
 }
 
@@ -836,14 +1060,21 @@ struct Uniforms {
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
 
+@group(1) @binding(0)
+var t_diffuse: texture_2d<f32>;
+@group(1) @binding(1)
+var s_diffuse: sampler;
+
 struct VertexInput {
   @location(0) position: vec3<f32>,
   @location(1) color: vec4<f32>,
+  @location(2) uv: vec2<f32>,
 };
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) color: vec4<f32>,
+  @location(1) uv: vec2<f32>,
 };
 
 @vertex
@@ -851,12 +1082,15 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   output.position = uniforms.mvp * vec4<f32>(input.position, 1.0);
   output.color = input.color;
+  output.uv = input.uv;
   return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-  return input.color;
+  let uv = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
+  let tex_color = textureSample(t_diffuse, s_diffuse, uv);
+  return tex_color * input.color;
 }
 "#;
 
@@ -899,5 +1133,45 @@ mod tests {
         let meshes = prepare_meshes(&scene).unwrap();
         assert_eq!(meshes[0].vertices.len(), 4);
         assert_eq!(meshes[0].indices.as_ref().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn accepts_mesh_with_uvs() {
+        let scene = RenderScene {
+            meshes: Some(vec![SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                uvs: Some(vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                ..SceneMesh::default()
+            }]),
+            ..RenderScene::default()
+        };
+
+        let meshes = prepare_meshes(&scene).unwrap();
+        assert_eq!(meshes[0].vertices[0].uv, [0.0, 0.0]);
+        assert_eq!(meshes[0].vertices[1].uv, [1.0, 0.0]);
+        assert_eq!(meshes[0].vertices[2].uv, [0.0, 1.0]);
+    }
+
+    #[test]
+    fn rejects_bad_uv_length() {
+        let scene = RenderScene {
+            meshes: Some(vec![SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                uvs: Some(vec![0.0, 0.0, 1.0]), // wrong length
+                ..SceneMesh::default()
+            }]),
+            ..RenderScene::default()
+        };
+
+        assert!(prepare_meshes(&scene).is_err());
+    }
+
+    #[test]
+    fn decodes_raw_rgba_texture() {
+        let rgba = vec![255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255];
+        let tex = decode_texture(&rgba, Some(2), Some(2), 0).unwrap();
+        assert_eq!(tex.width, 2);
+        assert_eq!(tex.height, 2);
+        assert_eq!(tex.rgba.len(), 16);
     }
 }

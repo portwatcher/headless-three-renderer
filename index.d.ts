@@ -37,11 +37,27 @@ export interface ThreeBufferGeometryLike {
   getAttribute?(name: string): ThreeBufferAttributeLike | undefined
 }
 
+export interface ThreeTextureLike {
+  image?: {
+    data?: ArrayLike<number>
+    width?: number
+    height?: number
+  } | Buffer | Uint8Array
+  source?: {
+    data?: {
+      data?: ArrayLike<number>
+      width?: number
+      height?: number
+    } | Buffer | Uint8Array
+  }
+}
+
 export interface ThreeMaterialLike {
   color?: ThreeColorLike
   opacity?: number
   visible?: boolean
   vertexColors?: boolean
+  map?: ThreeTextureLike | null
 }
 
 export interface ThreeObject3DLike {
