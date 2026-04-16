@@ -48,11 +48,15 @@ function toNativeInput(scene, camera, options) {
     background: resolveBackground(scene, options),
     format: options.format ?? 'png',
     meshes: flattenScene(scene),
+    lights: extractLights(scene),
+    ambientLight: extractAmbientLight(scene) ?? undefined,
+    ambientIntensity: extractAmbientIntensity(scene) ?? undefined,
   }
   const nativeCamera = {
     width: size.width,
     height: size.height,
     viewProjection: cameraViewProjection(camera),
+    cameraPosition: cameraWorldPosition(camera),
   }
 
   return { nativeScene, nativeCamera }
@@ -137,6 +141,8 @@ function appendMesh(object, meshes) {
   const positions = readVec3Attribute(position)
   const uvAttribute = getAttribute(geometry, 'uv')
   const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
+  const normalAttribute = getAttribute(geometry, 'normal')
+  const normals = normalAttribute ? readVec3Attribute(normalAttribute) : null
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index) : null
   const groups = effectiveGroups(geometry, index, position.count)
@@ -147,6 +153,7 @@ function appendMesh(object, meshes) {
 
     const color = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
+    const pbrProps = extractPbrProperties(material)
 
     const textureInfo = extractTextureData(material)
 
@@ -159,6 +166,7 @@ function appendMesh(object, meshes) {
       meshes.push({
         positions,
         indices,
+        normals: normals ?? undefined,
         color,
         colors: useVertexColors ? readColorAttribute(vertexColors, color) : undefined,
         uvs: uvs ?? undefined,
@@ -166,6 +174,7 @@ function appendMesh(object, meshes) {
         textureWidth: textureInfo?.width ?? undefined,
         textureHeight: textureInfo?.height ?? undefined,
         transform: matrixElements(object.matrixWorld, 'mesh.matrixWorld'),
+        ...pbrProps,
       })
     } else {
       if (group.count % 3 !== 0) {
@@ -174,6 +183,7 @@ function appendMesh(object, meshes) {
 
       meshes.push({
         positions: positions.slice(group.start * 3, (group.start + group.count) * 3),
+        normals: normals ? normals.slice(group.start * 3, (group.start + group.count) * 3) : undefined,
         color,
         colors: useVertexColors
           ? readColorAttribute(vertexColors, color).slice(group.start * 4, (group.start + group.count) * 4)
@@ -183,6 +193,7 @@ function appendMesh(object, meshes) {
         textureWidth: textureInfo?.width ?? undefined,
         textureHeight: textureInfo?.height ?? undefined,
         transform: matrixElements(object.matrixWorld, 'mesh.matrixWorld'),
+        ...pbrProps,
       })
     }
   }
@@ -419,6 +430,180 @@ function cameraViewProjection(camera) {
   const projection = matrixElements(camera.projectionMatrix, 'camera.projectionMatrix')
   const view = matrixElements(camera.matrixWorldInverse, 'camera.matrixWorldInverse')
   return multiplyMatrices(OPENGL_TO_WGPU_CLIP, multiplyMatrices(projection, view))
+}
+
+function cameraWorldPosition(camera) {
+  if (camera.matrixWorld?.elements) {
+    const e = camera.matrixWorld.elements
+    return [e[12], e[13], e[14]]
+  }
+  // Fallback: invert matrixWorldInverse
+  if (camera.matrixWorldInverse?.elements) {
+    const e = camera.matrixWorldInverse.elements
+    // Extract translation from inverse of view matrix (column 3 of the inverse)
+    // For a view matrix V, camera position = -(V^T * t) where t is the translation column
+    const tx = e[12], ty = e[13], tz = e[14]
+    return [
+      -(e[0] * tx + e[1] * ty + e[2] * tz),
+      -(e[4] * tx + e[5] * ty + e[6] * tz),
+      -(e[8] * tx + e[9] * ty + e[10] * tz),
+    ]
+  }
+  return [0, 0, 0]
+}
+
+function extractPbrProperties(material) {
+  if (!material) return {}
+  const props = {}
+
+  // MeshStandardMaterial / MeshPhysicalMaterial
+  if (Number.isFinite(material.metalness)) {
+    props.metallic = clamp01(material.metalness)
+  }
+  if (Number.isFinite(material.roughness)) {
+    props.roughness = clamp01(material.roughness)
+  }
+
+  // Emissive
+  const emissive = colorLikeToArray(material.emissive)
+  if (emissive) {
+    props.emissive = [emissive[0], emissive[1], emissive[2]]
+    props.emissiveIntensity = Number.isFinite(material.emissiveIntensity) ? material.emissiveIntensity : 1
+  }
+
+  // MeshBasicMaterial has no lighting
+  if (material.isMeshBasicMaterial === true) {
+    // Force metallic=0, roughness=1, and we'll handle no-light path
+    // The shader handles "no lights" as a fallback ambient mode
+  }
+
+  return props
+}
+
+function extractLights(scene) {
+  const lights = []
+  visitLights(scene, lights)
+  return lights.length > 0 ? lights : undefined
+}
+
+function visitLights(object, lights) {
+  if (!object) return
+  if (object.visible === false) return
+
+  if (object.isLight === true) {
+    const light = extractLight(object)
+    if (light) lights.push(light)
+  }
+
+  const children = Array.isArray(object.children) ? object.children : []
+  for (const child of children) {
+    visitLights(child, lights)
+  }
+}
+
+function extractLight(light) {
+  const color = colorLikeToArray(light.color) ?? [1, 1, 1, 1]
+  const intensity = Number.isFinite(light.intensity) ? light.intensity : 1
+
+  if (light.isDirectionalLight === true) {
+    // Three.js directional light: shines from position to target
+    const pos = light.matrixWorld ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]] : [0, 10, 0]
+    let targetPos = [0, 0, 0]
+    if (light.target?.matrixWorld) {
+      const te = light.target.matrixWorld.elements
+      targetPos = [te[12], te[13], te[14]]
+    }
+    const direction = [
+      targetPos[0] - pos[0],
+      targetPos[1] - pos[1],
+      targetPos[2] - pos[2],
+    ]
+    const len = Math.sqrt(direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2)
+    if (len > 0) {
+      direction[0] /= len
+      direction[1] /= len
+      direction[2] /= len
+    }
+    return {
+      lightType: 'directional',
+      color: [color[0], color[1], color[2]],
+      intensity,
+      direction,
+    }
+  }
+
+  if (light.isPointLight === true) {
+    const pos = light.matrixWorld ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]] : [0, 0, 0]
+    return {
+      lightType: 'point',
+      color: [color[0], color[1], color[2]],
+      intensity,
+      position: pos,
+    }
+  }
+
+  if (light.isSpotLight === true) {
+    const pos = light.matrixWorld ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]] : [0, 0, 0]
+    let targetPos = [0, 0, 0]
+    if (light.target?.matrixWorld) {
+      const te = light.target.matrixWorld.elements
+      targetPos = [te[12], te[13], te[14]]
+    }
+    const direction = [
+      targetPos[0] - pos[0],
+      targetPos[1] - pos[1],
+      targetPos[2] - pos[2],
+    ]
+    const len = Math.sqrt(direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2)
+    if (len > 0) {
+      direction[0] /= len
+      direction[1] /= len
+      direction[2] /= len
+    }
+    return {
+      lightType: 'spot',
+      color: [color[0], color[1], color[2]],
+      intensity,
+      position: pos,
+      direction,
+    }
+  }
+
+  // AmbientLight is handled separately
+  return null
+}
+
+function extractAmbientLight(scene) {
+  let color = null
+  visitForAmbient(scene, (light) => {
+    const c = colorLikeToArray(light.color) ?? [1, 1, 1, 1]
+    if (!color) {
+      color = [c[0], c[1], c[2]]
+    } else {
+      color[0] = Math.min(1, color[0] + c[0])
+      color[1] = Math.min(1, color[1] + c[1])
+      color[2] = Math.min(1, color[2] + c[2])
+    }
+  })
+  return color
+}
+
+function extractAmbientIntensity(scene) {
+  let intensity = 0
+  visitForAmbient(scene, (light) => {
+    intensity += Number.isFinite(light.intensity) ? light.intensity : 1
+  })
+  return intensity > 0 ? intensity : undefined
+}
+
+function visitForAmbient(object, callback) {
+  if (!object) return
+  if (object.visible === false) return
+  if (object.isAmbientLight === true) callback(object)
+  const children = Array.isArray(object.children) ? object.children : []
+  for (const child of children) {
+    visitForAmbient(child, callback)
+  }
 }
 
 function matrixElements(matrix, label) {

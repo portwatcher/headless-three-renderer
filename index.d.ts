@@ -58,6 +58,13 @@ export interface ThreeMaterialLike {
   visible?: boolean
   vertexColors?: boolean
   map?: ThreeTextureLike | null
+  metalness?: number
+  roughness?: number
+  emissive?: ThreeColorLike
+  emissiveIntensity?: number
+  isMeshBasicMaterial?: boolean
+  isMeshStandardMaterial?: boolean
+  isMeshPhysicalMaterial?: boolean
 }
 
 export interface ThreeObject3DLike {
