@@ -32,6 +32,7 @@ pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
+    transparent_pipeline: wgpu::RenderPipeline,
     uniform_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
@@ -450,10 +451,47 @@ impl GpuRenderer {
             cache: None,
         });
 
+        let transparent_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("headless-three-renderer transparent pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &vertex_buffers,
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DEPTH_FORMAT,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &color_targets,
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+
         Ok(Self {
             device,
             queue,
             pipeline,
+            transparent_pipeline,
             uniform_layout,
             texture_layout,
             normal_map_layout,
@@ -515,6 +553,8 @@ impl GpuRenderer {
             .map(|mesh| self.upload_mesh(settings, mesh))
             .collect::<Result<Vec<_>>>()?;
 
+        let (opaque_order, transparent_order) = partition_draw_order(meshes, settings.camera_pos);
+
         let unpadded_bytes_per_row = settings.width * 4;
         let padded_bytes_per_row =
             align_to(unpadded_bytes_per_row, wgpu::COPY_BYTES_PER_ROW_ALIGNMENT);
@@ -572,20 +612,17 @@ impl GpuRenderer {
                 multiview_mask: None,
             });
 
+            // Opaque meshes first (with depth write)
             pass.set_pipeline(&self.pipeline);
-            for mesh in &gpu_meshes {
-                pass.set_bind_group(0, &mesh.bind_group, &[]);
-                pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
-                pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
-                pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
-                pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
-                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            for &i in &opaque_order {
+                draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
+            }
 
-                if let Some(index_buffer) = &mesh.index_buffer {
-                    pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                    pass.draw_indexed(0..mesh.index_count, 0, 0..1);
-                } else {
-                    pass.draw(0..mesh.vertex_count, 0..1);
+            // Transparent meshes second (back-to-front, no depth write)
+            if !transparent_order.is_empty() {
+                pass.set_pipeline(&self.transparent_pipeline);
+                for &i in &transparent_order {
+                    draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
                 }
             }
         }
@@ -691,7 +728,7 @@ impl GpuRenderer {
             normal_matrix: normal_matrix.to_cols_array_2d(),
             camera_pos: [settings.camera_pos.x, settings.camera_pos.y, settings.camera_pos.z, 0.0],
             base_color: mesh.base_color,
-            emissive: [mesh.emissive[0], mesh.emissive[1], mesh.emissive[2], 0.0],
+            emissive: [mesh.emissive[0], mesh.emissive[1], mesh.emissive[2], mesh.alpha_test],
             metallic: mesh.metallic,
             roughness: mesh.roughness,
             ambient_intensity: settings.ambient_intensity,
@@ -962,5 +999,47 @@ impl GpuRenderer {
             _mr_map: _mr_map_texture,
             _emissive_map: _emissive_map_texture,
         })
+    }
+}
+
+fn partition_draw_order(meshes: &[PreparedMesh], camera_pos: glam::Vec3) -> (Vec<usize>, Vec<usize>) {
+    let mut opaque = Vec::new();
+    let mut transparent = Vec::new();
+
+    for (i, mesh) in meshes.iter().enumerate() {
+        if mesh.is_transparent {
+            transparent.push(i);
+        } else {
+            opaque.push(i);
+        }
+    }
+
+    // Sort transparent meshes back-to-front (farthest first)
+    transparent.sort_by(|&a, &b| {
+        let dist_a = mesh_distance_sq(&meshes[a], camera_pos);
+        let dist_b = mesh_distance_sq(&meshes[b], camera_pos);
+        dist_b.partial_cmp(&dist_a).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    (opaque, transparent)
+}
+
+fn mesh_distance_sq(mesh: &PreparedMesh, camera_pos: glam::Vec3) -> f32 {
+    let pos = mesh.transform.w_axis.truncate();
+    (pos - camera_pos).length_squared()
+}
+
+fn draw_gpu_mesh(pass: &mut wgpu::RenderPass, mesh: &GpuMesh) {
+    pass.set_bind_group(0, &mesh.bind_group, &[]);
+    pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
+    pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
+    pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
+    pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
+    pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+    if let Some(index_buffer) = &mesh.index_buffer {
+        pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        pass.draw_indexed(0..mesh.index_count, 0, 0..1);
+    } else {
+        pass.draw(0..mesh.vertex_count, 0..1);
     }
 }

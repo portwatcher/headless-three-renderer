@@ -102,6 +102,10 @@ pub struct SceneMesh {
     pub emissive_map_width: Option<u32>,
     /// Emissive map height in pixels (required when `emissive_map` is raw RGBA8 bytes).
     pub emissive_map_height: Option<u32>,
+    /// Alpha test cutoff threshold (0..1). Fragments with alpha below this are discarded.
+    pub alpha_test: Option<f64>,
+    /// Whether the mesh is transparent (sorted back-to-front, no depth write).
+    pub transparent: Option<bool>,
 }
 
 #[napi(object)]

@@ -46,6 +46,8 @@ pub struct PreparedMesh {
     pub roughness: f32,
     pub emissive: [f32; 3],
     pub base_color: [f32; 4],
+    pub alpha_test: f32,
+    pub is_transparent: bool,
 }
 
 pub struct PreparedTexture {
@@ -254,6 +256,9 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         _ => [0.0, 0.0, 0.0],
     };
 
+    let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
+    let is_transparent = mesh.transparent.unwrap_or(material_color[3] < 0.999);
+
     Ok(PreparedMesh {
         vertices,
         indices,
@@ -267,6 +272,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         roughness,
         emissive,
         base_color: color_to_f32(material_color),
+        alpha_test,
+        is_transparent,
     })
 }
 

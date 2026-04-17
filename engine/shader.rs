@@ -22,7 +22,7 @@ struct Uniforms {
   normal_matrix: mat4x4<f32>,
   camera_pos: vec4<f32>,
   base_color: vec4<f32>,
-  emissive: vec4<f32>,
+  emissive: vec4<f32>,  // xyz = emissive color, w = alpha test cutoff
   metallic: f32,
   roughness: f32,
   ambient_intensity: f32,
@@ -138,6 +138,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let tex_color = textureSample(t_diffuse, s_diffuse, uv);
   let albedo = tex_color.rgb * input.color.rgb * uniforms.base_color.rgb;
   let alpha = tex_color.a * input.color.a * uniforms.base_color.a;
+
+  // Alpha test: discard fragments below the cutoff threshold
+  let alpha_cutoff = uniforms.emissive.w;
+  if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
+    discard;
+  }
 
   let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, uv);
   let metallic = uniforms.metallic * mr_sample.b;
