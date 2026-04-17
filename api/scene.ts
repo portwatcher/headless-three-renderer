@@ -83,6 +83,8 @@ function appendMesh(object: ThreeObject3DLike, meshes: NativeSceneMesh[]): void 
         texture: textureInfo?.data,
         textureWidth: textureInfo?.width ?? undefined,
         textureHeight: textureInfo?.height ?? undefined,
+        textureWrapS: textureInfo?.wrapS,
+        textureWrapT: textureInfo?.wrapT,
         transform: meshTransform,
         ...pbrProps,
       })
@@ -102,6 +104,8 @@ function appendMesh(object: ThreeObject3DLike, meshes: NativeSceneMesh[]): void 
         texture: textureInfo?.data,
         textureWidth: textureInfo?.width ?? undefined,
         textureHeight: textureInfo?.height ?? undefined,
+        textureWrapS: textureInfo?.wrapS,
+        textureWrapT: textureInfo?.wrapT,
         transform: meshTransform,
         ...pbrProps,
       })

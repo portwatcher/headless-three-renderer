@@ -54,6 +54,8 @@ export interface ThreeTextureLike {
       height?: number
     } | Buffer | Uint8Array
   }
+  wrapS?: number
+  wrapT?: number
 }
 
 export interface ThreeMaterialLike {
@@ -66,6 +68,7 @@ export interface ThreeMaterialLike {
   roughness?: number
   emissive?: ThreeColorLike
   emissiveIntensity?: number
+  emissiveMap?: ThreeTextureLike | null
   normalMap?: ThreeTextureLike | null
   normalScale?: { x: number; y: number }
   metalnessMap?: ThreeTextureLike | null
@@ -181,6 +184,8 @@ export interface NativeSceneMesh {
   texture?: Buffer
   textureWidth?: number
   textureHeight?: number
+  textureWrapS?: string
+  textureWrapT?: string
   metallic?: number
   roughness?: number
   emissive?: number[]
@@ -192,6 +197,9 @@ export interface NativeSceneMesh {
   metallicRoughnessTexture?: Buffer
   metallicRoughnessTextureWidth?: number
   metallicRoughnessTextureHeight?: number
+  emissiveMap?: Buffer
+  emissiveMapWidth?: number
+  emissiveMapHeight?: number
 }
 
 export interface NativeRenderScene {
@@ -223,12 +231,17 @@ export interface PbrProperties {
   metallicRoughnessTexture?: Buffer
   metallicRoughnessTextureWidth?: number
   metallicRoughnessTextureHeight?: number
+  emissiveMap?: Buffer
+  emissiveMapWidth?: number
+  emissiveMapHeight?: number
 }
 
 export interface TextureInfo {
   data: Buffer
   width: number
   height: number
+  wrapS?: string
+  wrapT?: string
 }
 
 export interface GeometryGroup {

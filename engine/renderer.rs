@@ -3,7 +3,7 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
 use crate::lights::{GpuLight, MAX_LIGHTS};
-use crate::mesh::{PreparedMesh, Vertex, prepare_meshes};
+use crate::mesh::{PreparedMesh, Vertex, WrapMode, prepare_meshes};
 use crate::settings::{OutputFormat, RenderSettings};
 use crate::shader::SHADER;
 use crate::types::{Camera, RenderScene};
@@ -36,11 +36,13 @@ pub struct GpuRenderer {
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
     mr_map_layout: wgpu::BindGroupLayout,
+    emissive_map_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     default_texture_bind_group: wgpu::BindGroup,
     default_normal_map_bind_group: wgpu::BindGroup,
     default_mr_map_bind_group: wgpu::BindGroup,
+    default_emissive_map_bind_group: wgpu::BindGroup,
 }
 
 struct GpuMesh {
@@ -50,12 +52,14 @@ struct GpuMesh {
     texture_bind_group: wgpu::BindGroup,
     normal_map_bind_group: wgpu::BindGroup,
     mr_map_bind_group: wgpu::BindGroup,
+    emissive_map_bind_group: wgpu::BindGroup,
     index_count: u32,
     vertex_count: u32,
     _uniform_buffer: wgpu::Buffer,
     _texture: Option<wgpu::Texture>,
     _normal_map: Option<wgpu::Texture>,
     _mr_map: Option<wgpu::Texture>,
+    _emissive_map: Option<wgpu::Texture>,
 }
 
 impl GpuRenderer {
@@ -168,6 +172,28 @@ impl GpuRenderer {
 
         let mr_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("headless-three-renderer metallic-roughness map layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let emissive_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer emissive map layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -322,9 +348,62 @@ impl GpuRenderer {
                 ],
             });
 
+        // Default emissive map: black (0,0,0,255) so that emissive contribution is zero
+        // when no emissive map is provided
+        let default_emissive_map = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("headless-three-renderer default emissive map"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: COLOR_FORMAT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &default_emissive_map,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &[255u8, 255, 255, 255],
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        let default_emissive_map_view =
+            default_emissive_map.create_view(&wgpu::TextureViewDescriptor::default());
+        let default_emissive_map_bind_group =
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("headless-three-renderer default emissive map bind group"),
+                layout: &emissive_map_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&default_emissive_map_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                ],
+            });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout)],
             immediate_size: 0,
         });
 
@@ -379,11 +458,13 @@ impl GpuRenderer {
             texture_layout,
             normal_map_layout,
             mr_map_layout,
+            emissive_map_layout,
             sampler,
             _default_texture: default_texture,
             default_texture_bind_group,
             default_normal_map_bind_group,
             default_mr_map_bind_group,
+            default_emissive_map_bind_group,
         })
     }
 
@@ -497,6 +578,7 @@ impl GpuRenderer {
                 pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
                 pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
                 pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
+                pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
 
                 if let Some(index_buffer) = &mesh.index_buffer {
@@ -558,6 +640,22 @@ impl GpuRenderer {
         output_buffer.unmap();
 
         Ok(rgba)
+    }
+
+    fn sampler_for_wrap(&self, wrap_s: WrapMode, wrap_t: WrapMode) -> wgpu::Sampler {
+        if wrap_s == WrapMode::ClampToEdge && wrap_t == WrapMode::ClampToEdge {
+            return self.sampler.clone();
+        }
+        self.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("headless-three-renderer per-mesh sampler"),
+            address_mode_u: wrap_s.to_address_mode(),
+            address_mode_v: wrap_t.to_address_mode(),
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        })
     }
 
     fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
@@ -659,6 +757,7 @@ impl GpuRenderer {
                 );
                 let tex_view =
                     gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let sampler_for_tex = self.sampler_for_wrap(tex.wrap_s, tex.wrap_t);
                 let tex_bind_group =
                     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                         label: Some("headless-three-renderer mesh texture bind group"),
@@ -670,7 +769,7 @@ impl GpuRenderer {
                             },
                             wgpu::BindGroupEntry {
                                 binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.sampler),
+                                resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
                             },
                         ],
                     });
@@ -789,6 +888,61 @@ impl GpuRenderer {
             None => (self.default_mr_map_bind_group.clone(), None),
         };
 
+        let (emissive_map_bind_group, _emissive_map_texture) = match &mesh.emissive_map {
+            Some(tex) => {
+                let tex_size = wgpu::Extent3d {
+                    width: tex.width,
+                    height: tex.height,
+                    depth_or_array_layers: 1,
+                };
+                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("headless-three-renderer emissive map"),
+                    size: tex_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: COLOR_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+                self.queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &gpu_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &tex.rgba,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * tex.width),
+                        rows_per_image: Some(tex.height),
+                    },
+                    tex_size,
+                );
+                let tex_view =
+                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group =
+                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("headless-three-renderer emissive map bind group"),
+                        layout: &self.emissive_map_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&tex_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&self.sampler),
+                            },
+                        ],
+                    });
+                (tex_bind_group, Some(gpu_texture))
+            }
+            None => (self.default_emissive_map_bind_group.clone(), None),
+        };
+
         Ok(GpuMesh {
             vertex_buffer,
             index_buffer,
@@ -796,6 +950,7 @@ impl GpuRenderer {
             texture_bind_group,
             normal_map_bind_group,
             mr_map_bind_group,
+            emissive_map_bind_group,
             index_count: mesh
                 .indices
                 .as_ref()
@@ -805,6 +960,7 @@ impl GpuRenderer {
             _texture: _mesh_texture,
             _normal_map: _normal_map_texture,
             _mr_map: _mr_map_texture,
+            _emissive_map: _emissive_map_texture,
         })
     }
 }

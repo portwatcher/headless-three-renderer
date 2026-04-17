@@ -1,6 +1,10 @@
-import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo } from './types'
+import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike } from './types'
 import { clamp01 } from './math'
 import { colorLikeToArray } from './color'
+
+// Three.js wrapping constants
+const RepeatWrapping = 1000
+const MirroredRepeatWrapping = 1002
 
 export function materialForGroup(
   material: ThreeMaterialLike | ThreeMaterialLike[] | undefined,
@@ -52,11 +56,32 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.metallicRoughnessTextureHeight = mrMapInfo.height
   }
 
+  const emissiveMapInfo = extractTextureFromSlot(material.emissiveMap)
+  if (emissiveMapInfo) {
+    props.emissiveMap = emissiveMapInfo.data
+    props.emissiveMapWidth = emissiveMapInfo.width
+    props.emissiveMapHeight = emissiveMapInfo.height
+  }
+
   return props
 }
 
 export function extractTextureData(material: ThreeMaterialLike | undefined): TextureInfo | null {
-  return extractTextureFromSlot(material?.map)
+  const base = extractTextureFromSlot(material?.map)
+  if (!base) return null
+
+  const map = material!.map as ThreeTextureLike | null | undefined
+  return {
+    ...base,
+    wrapS: wrapModeToString(map?.wrapS),
+    wrapT: wrapModeToString(map?.wrapT),
+  }
+}
+
+function wrapModeToString(mode: number | undefined): string | undefined {
+  if (mode === RepeatWrapping) return 'repeat'
+  if (mode === MirroredRepeatWrapping) return 'mirror'
+  return undefined // default = clamp
 }
 
 function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | null {
