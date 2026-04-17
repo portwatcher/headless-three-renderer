@@ -63,6 +63,13 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.emissiveMapHeight = emissiveMapInfo.height
   }
 
+  if (Number.isFinite(material.alphaTest) && material.alphaTest! > 0) {
+    props.alphaTest = clamp01(material.alphaTest!)
+  }
+  if (typeof material.transparent === 'boolean') {
+    props.transparent = material.transparent
+  }
+
   return props
 }
 

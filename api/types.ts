@@ -73,6 +73,8 @@ export interface ThreeMaterialLike {
   normalScale?: { x: number; y: number }
   metalnessMap?: ThreeTextureLike | null
   roughnessMap?: ThreeTextureLike | null
+  alphaTest?: number
+  transparent?: boolean
   isMeshBasicMaterial?: boolean
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
@@ -200,6 +202,8 @@ export interface NativeSceneMesh {
   emissiveMap?: Buffer
   emissiveMapWidth?: number
   emissiveMapHeight?: number
+  alphaTest?: number
+  transparent?: boolean
 }
 
 export interface NativeRenderScene {
@@ -234,6 +238,8 @@ export interface PbrProperties {
   emissiveMap?: Buffer
   emissiveMapWidth?: number
   emissiveMapHeight?: number
+  alphaTest?: number
+  transparent?: boolean
 }
 
 export interface TextureInfo {
