@@ -1,5 +1,7 @@
 /// <reference types="node" />
 
+// ── Three.js duck-typed interfaces ──────────────────────────────────
+
 export type RenderOutputFormat = 'png' | 'rgba' | 'raw' | 'raw-rgba'
 
 export interface ThreeColorLike {
@@ -116,6 +118,7 @@ export interface ThreeCameraLike {
   isCamera: true
   projectionMatrix: ThreeMatrix4Like
   matrixWorldInverse: ThreeMatrix4Like
+  matrixWorld?: ThreeMatrix4Like
   aspect?: number
   userData?: {
     width?: number
@@ -131,9 +134,83 @@ export interface RenderOptions {
   format?: RenderOutputFormat
 }
 
-export class Renderer {
-  constructor()
-  render(scene: ThreeSceneLike, camera: ThreeCameraLike, options?: RenderOptions): Buffer
+// ── Native (Rust NAPI) types ────────────────────────────────────────
+
+export interface NativeCamera {
+  width?: number
+  height?: number
+  eye?: number[]
+  target?: number[]
+  up?: number[]
+  fovYDegrees?: number
+  near?: number
+  far?: number
+  viewProjection?: number[]
+  cameraPosition?: number[]
 }
 
-export function render(scene: ThreeSceneLike, camera: ThreeCameraLike, options?: RenderOptions): Buffer
+export interface NativeSceneLight {
+  lightType: string
+  color?: number[]
+  intensity?: number
+  position?: number[]
+  direction?: number[]
+  distance?: number
+  decay?: number
+  angle?: number
+  penumbra?: number
+  groundColor?: number[]
+}
+
+export interface NativeSceneMesh {
+  positions: number[]
+  indices?: number[]
+  normals?: number[]
+  colors?: number[]
+  color?: number[]
+  transform?: number[]
+  uvs?: number[]
+  texture?: Buffer
+  textureWidth?: number
+  textureHeight?: number
+  metallic?: number
+  roughness?: number
+  emissive?: number[]
+  emissiveIntensity?: number
+}
+
+export interface NativeRenderScene {
+  width?: number
+  height?: number
+  background?: number[]
+  format?: string
+  meshes?: NativeSceneMesh[]
+  lights?: NativeSceneLight[]
+  ambientLight?: number[]
+  ambientIntensity?: number
+}
+
+// ── Internal helper types ───────────────────────────────────────────
+
+export type Color4 = [number, number, number, number]
+export type Mat4 = number[]
+export type Vec3 = [number, number, number]
+
+export interface PbrProperties {
+  metallic?: number
+  roughness?: number
+  emissive?: number[]
+  emissiveIntensity?: number
+}
+
+export interface TextureInfo {
+  data: Buffer
+  width: number
+  height: number
+}
+
+export interface GeometryGroup {
+  start: number
+  count: number
+  materialIndex: number
+}

@@ -2,23 +2,22 @@
   "name": "headless-three-renderer",
   "version": "0.1.0",
   "description": "Headless wgpu renderer for Three.js scenes in Node.js.",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "license": "MIT",
   "engines": {
     "node": ">=16"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
+    "dist/",
+    "src/",
     "native.js",
     "native.d.ts",
     "*.node",
     "README.md",
     "Cargo.toml",
     "Cargo.lock",
-    "build.rs",
-    "src"
+    "build.rs"
   ],
   "napi": {
     "binaryName": "headless_three_renderer",
@@ -31,14 +30,17 @@
     ]
   },
   "scripts": {
-    "build": "napi build --platform --js native.js --dts native.d.ts --release",
-    "build:debug": "napi build --platform --js native.js --dts native.d.ts",
+    "build": "tsc && napi build --platform --js native.js --dts native.d.ts --release",
+    "build:debug": "tsc && napi build --platform --js native.js --dts native.d.ts",
+    "build:ts": "tsc",
     "test": "cargo test"
   },
   "peerDependencies": {
     "three": ">=0.150.0"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.6.1"
+    "@napi-rs/cli": "^3.6.1",
+    "@types/node": "25.6.0",
+    "typescript": "6.0.3"
   }
 }
