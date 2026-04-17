@@ -70,6 +70,12 @@ pub struct SceneMesh {
     pub texture_width: Option<u32>,
     /// Texture height in pixels (required when `texture` is raw RGBA8 bytes).
     pub texture_height: Option<u32>,
+    /// Optional metallic-roughness texture (glTF convention: G=roughness, B=metallic).
+    pub metallic_roughness_texture: Option<Buffer>,
+    /// Metallic-roughness texture width (required when texture is raw RGBA8 bytes).
+    pub metallic_roughness_texture_width: Option<u32>,
+    /// Metallic-roughness texture height (required when texture is raw RGBA8 bytes).
+    pub metallic_roughness_texture_height: Option<u32>,
     /// Metallic factor (0..1). Defaults to 0.
     pub metallic: Option<f64>,
     /// Roughness factor (0..1). Defaults to 1.

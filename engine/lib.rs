@@ -143,4 +143,26 @@ mod tests {
         assert_eq!(tex.height, 2);
         assert_eq!(tex.rgba.len(), 16);
     }
+
+    #[test]
+    fn accepts_mesh_with_metallic_roughness_texture() {
+        let scene = RenderScene {
+            meshes: Some(vec![SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                uvs: Some(vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                metallic: Some(1.0),
+                roughness: Some(0.5),
+                metallic_roughness_texture: Some(vec![0u8, 128, 255, 255].into()),
+                metallic_roughness_texture_width: Some(1),
+                metallic_roughness_texture_height: Some(1),
+                ..SceneMesh::default()
+            }]),
+            ..RenderScene::default()
+        };
+        let meshes = prepare_meshes(&scene).unwrap();
+        assert!(meshes[0].metallic_roughness_texture.is_some());
+        let mr_tex = meshes[0].metallic_roughness_texture.as_ref().unwrap();
+        assert_eq!(mr_tex.width, 1);
+        assert_eq!(mr_tex.height, 1);
+    }
 }

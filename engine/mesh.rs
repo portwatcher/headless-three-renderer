@@ -40,6 +40,7 @@ pub struct PreparedMesh {
     pub texture: Option<PreparedTexture>,
     pub normal_map: Option<PreparedTexture>,
     pub normal_scale: [f32; 2],
+    pub metallic_roughness_texture: Option<PreparedTexture>,
     pub metallic: f32,
     pub roughness: f32,
     pub emissive: [f32; 3],
@@ -182,6 +183,16 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         _ => [1.0, 1.0],
     };
 
+    let metallic_roughness_texture = match &mesh.metallic_roughness_texture {
+        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
+            tex_data,
+            mesh.metallic_roughness_texture_width,
+            mesh.metallic_roughness_texture_height,
+            mesh_index,
+        )?),
+        _ => None,
+    };
+
     // Compute tangents when we have a normal map and UVs
     if normal_map.is_some() && has_uvs {
         compute_tangents(&mut vertices, mesh.indices.as_deref());
@@ -206,6 +217,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         texture,
         normal_map,
         normal_scale,
+        metallic_roughness_texture,
         metallic,
         roughness,
         emissive,

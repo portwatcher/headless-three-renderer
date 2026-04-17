@@ -35,9 +35,12 @@ pub struct GpuRenderer {
     uniform_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
+    mr_map_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    _default_texture: wgpu::Texture,
     default_texture_bind_group: wgpu::BindGroup,
     default_normal_map_bind_group: wgpu::BindGroup,
+    default_mr_map_bind_group: wgpu::BindGroup,
 }
 
 struct GpuMesh {
@@ -46,11 +49,13 @@ struct GpuMesh {
     bind_group: wgpu::BindGroup,
     texture_bind_group: wgpu::BindGroup,
     normal_map_bind_group: wgpu::BindGroup,
+    mr_map_bind_group: wgpu::BindGroup,
     index_count: u32,
     vertex_count: u32,
     _uniform_buffer: wgpu::Buffer,
     _texture: Option<wgpu::Texture>,
     _normal_map: Option<wgpu::Texture>,
+    _mr_map: Option<wgpu::Texture>,
 }
 
 impl GpuRenderer {
@@ -141,6 +146,28 @@ impl GpuRenderer {
 
         let normal_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("headless-three-renderer normal map layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let mr_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer metallic-roughness map layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -275,9 +302,29 @@ impl GpuRenderer {
                 ],
             });
 
+        // Default metallic-roughness map: white (1,1,1,1) so that
+        // metallic = uniform.metallic * 1.0 and roughness = uniform.roughness * 1.0
+        let default_mr_map_view =
+            default_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let default_mr_map_bind_group =
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("headless-three-renderer default metallic-roughness bind group"),
+                layout: &mr_map_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&default_mr_map_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                ],
+            });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout)],
             immediate_size: 0,
         });
 
@@ -331,9 +378,12 @@ impl GpuRenderer {
             uniform_layout,
             texture_layout,
             normal_map_layout,
+            mr_map_layout,
             sampler,
+            _default_texture: default_texture,
             default_texture_bind_group,
             default_normal_map_bind_group,
+            default_mr_map_bind_group,
         })
     }
 
@@ -446,6 +496,7 @@ impl GpuRenderer {
                 pass.set_bind_group(0, &mesh.bind_group, &[]);
                 pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
                 pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
+                pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
 
                 if let Some(index_buffer) = &mesh.index_buffer {
@@ -683,12 +734,68 @@ impl GpuRenderer {
             None => (self.default_normal_map_bind_group.clone(), None),
         };
 
+        let (mr_map_bind_group, _mr_map_texture) = match &mesh.metallic_roughness_texture {
+            Some(tex) => {
+                let tex_size = wgpu::Extent3d {
+                    width: tex.width,
+                    height: tex.height,
+                    depth_or_array_layers: 1,
+                };
+                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("headless-three-renderer metallic-roughness map"),
+                    size: tex_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: COLOR_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+                self.queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &gpu_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &tex.rgba,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * tex.width),
+                        rows_per_image: Some(tex.height),
+                    },
+                    tex_size,
+                );
+                let tex_view =
+                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group =
+                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("headless-three-renderer metallic-roughness bind group"),
+                        layout: &self.mr_map_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&tex_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&self.sampler),
+                            },
+                        ],
+                    });
+                (tex_bind_group, Some(gpu_texture))
+            }
+            None => (self.default_mr_map_bind_group.clone(), None),
+        };
+
         Ok(GpuMesh {
             vertex_buffer,
             index_buffer,
             bind_group,
             texture_bind_group,
             normal_map_bind_group,
+            mr_map_bind_group,
             index_count: mesh
                 .indices
                 .as_ref()
@@ -697,6 +804,7 @@ impl GpuRenderer {
             _uniform_buffer: uniform_buffer,
             _texture: _mesh_texture,
             _normal_map: _normal_map_texture,
+            _mr_map: _mr_map_texture,
         })
     }
 }

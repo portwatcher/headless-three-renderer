@@ -45,6 +45,13 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.normalScale = [material.normalScale.x ?? 1, material.normalScale.y ?? 1]
   }
 
+  const mrMapInfo = extractTextureFromSlot(material.metalnessMap ?? material.roughnessMap)
+  if (mrMapInfo) {
+    props.metallicRoughnessTexture = mrMapInfo.data
+    props.metallicRoughnessTextureWidth = mrMapInfo.width
+    props.metallicRoughnessTextureHeight = mrMapInfo.height
+  }
+
   return props
 }
 
