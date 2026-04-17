@@ -46,6 +46,11 @@ var t_normal: texture_2d<f32>;
 @group(2) @binding(1)
 var s_normal: sampler;
 
+@group(3) @binding(0)
+var t_metallic_roughness: texture_2d<f32>;
+@group(3) @binding(1)
+var s_metallic_roughness: sampler;
+
 struct VertexInput {
   @location(0) position: vec3<f32>,
   @location(1) normal: vec3<f32>,
@@ -129,8 +134,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let albedo = tex_color.rgb * input.color.rgb * uniforms.base_color.rgb;
   let alpha = tex_color.a * input.color.a * uniforms.base_color.a;
 
-  let metallic = uniforms.metallic;
-  let roughness = max(uniforms.roughness, 0.04);
+  let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, uv);
+  let metallic = uniforms.metallic * mr_sample.b;
+  let roughness = max(uniforms.roughness * mr_sample.g, 0.04);
 
   // Normal mapping via TBN matrix
   var N = normalize(input.world_normal);
