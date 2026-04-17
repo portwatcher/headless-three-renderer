@@ -51,6 +51,11 @@ var t_metallic_roughness: texture_2d<f32>;
 @group(3) @binding(1)
 var s_metallic_roughness: sampler;
 
+@group(4) @binding(0)
+var t_emissive: texture_2d<f32>;
+@group(4) @binding(1)
+var s_emissive: sampler;
+
 struct VertexInput {
   @location(0) position: vec3<f32>,
   @location(1) normal: vec3<f32>,
@@ -229,7 +234,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   }
 
   // Emissive
-  lo = lo + uniforms.emissive.rgb;
+  let emissive_sample = textureSample(t_emissive, s_emissive, uv).rgb;
+  lo = lo + uniforms.emissive.rgb * emissive_sample;
 
   // Tone mapping (Reinhard) and gamma correction
   let mapped = lo / (lo + vec3<f32>(1.0));

@@ -70,6 +70,10 @@ pub struct SceneMesh {
     pub texture_width: Option<u32>,
     /// Texture height in pixels (required when `texture` is raw RGBA8 bytes).
     pub texture_height: Option<u32>,
+    /// Texture horizontal wrap mode: `"repeat"`, `"clamp"`, or `"mirror"`. Defaults to `"clamp"`.
+    pub texture_wrap_s: Option<String>,
+    /// Texture vertical wrap mode: `"repeat"`, `"clamp"`, or `"mirror"`. Defaults to `"clamp"`.
+    pub texture_wrap_t: Option<String>,
     /// Optional metallic-roughness texture (glTF convention: G=roughness, B=metallic).
     pub metallic_roughness_texture: Option<Buffer>,
     /// Metallic-roughness texture width (required when texture is raw RGBA8 bytes).
@@ -92,6 +96,12 @@ pub struct SceneMesh {
     pub normal_map_height: Option<u32>,
     /// Normal map scale `[x, y]`. Defaults to `[1, 1]`.
     pub normal_scale: Option<Vec<f64>>,
+    /// Optional emissive map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
+    pub emissive_map: Option<Buffer>,
+    /// Emissive map width in pixels (required when `emissive_map` is raw RGBA8 bytes).
+    pub emissive_map_width: Option<u32>,
+    /// Emissive map height in pixels (required when `emissive_map` is raw RGBA8 bytes).
+    pub emissive_map_height: Option<u32>,
 }
 
 #[napi(object)]

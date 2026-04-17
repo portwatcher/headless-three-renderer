@@ -41,6 +41,7 @@ pub struct PreparedMesh {
     pub normal_map: Option<PreparedTexture>,
     pub normal_scale: [f32; 2],
     pub metallic_roughness_texture: Option<PreparedTexture>,
+    pub emissive_map: Option<PreparedTexture>,
     pub metallic: f32,
     pub roughness: f32,
     pub emissive: [f32; 3],
@@ -51,6 +52,34 @@ pub struct PreparedTexture {
     pub rgba: Vec<u8>,
     pub width: u32,
     pub height: u32,
+    pub wrap_s: WrapMode,
+    pub wrap_t: WrapMode,
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum WrapMode {
+    #[default]
+    ClampToEdge,
+    Repeat,
+    MirrorRepeat,
+}
+
+impl WrapMode {
+    pub fn from_str_opt(value: Option<&str>) -> Self {
+        match value {
+            Some("repeat") => Self::Repeat,
+            Some("mirror") => Self::MirrorRepeat,
+            _ => Self::ClampToEdge,
+        }
+    }
+
+    pub fn to_address_mode(self) -> wgpu::AddressMode {
+        match self {
+            Self::ClampToEdge => wgpu::AddressMode::ClampToEdge,
+            Self::Repeat => wgpu::AddressMode::Repeat,
+            Self::MirrorRepeat => wgpu::AddressMode::MirrorRepeat,
+        }
+    }
 }
 
 pub fn prepare_meshes(scene: &crate::types::RenderScene) -> Result<Vec<PreparedMesh>> {
@@ -159,12 +188,17 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     };
 
     let texture = match &mesh.texture {
-        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
-            tex_data,
-            mesh.texture_width,
-            mesh.texture_height,
-            mesh_index,
-        )?),
+        Some(tex_data) if !tex_data.is_empty() => {
+            let mut tex = decode_texture(
+                tex_data,
+                mesh.texture_width,
+                mesh.texture_height,
+                mesh_index,
+            )?;
+            tex.wrap_s = WrapMode::from_str_opt(mesh.texture_wrap_s.as_deref());
+            tex.wrap_t = WrapMode::from_str_opt(mesh.texture_wrap_t.as_deref());
+            Some(tex)
+        }
         _ => None,
     };
 
@@ -188,6 +222,16 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             tex_data,
             mesh.metallic_roughness_texture_width,
             mesh.metallic_roughness_texture_height,
+            mesh_index,
+        )?),
+        _ => None,
+    };
+
+    let emissive_map = match &mesh.emissive_map {
+        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
+            tex_data,
+            mesh.emissive_map_width,
+            mesh.emissive_map_height,
             mesh_index,
         )?),
         _ => None,
@@ -218,6 +262,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         normal_map,
         normal_scale,
         metallic_roughness_texture,
+        emissive_map,
         metallic,
         roughness,
         emissive,
@@ -239,6 +284,8 @@ pub fn decode_texture(
             rgba: data.to_vec(),
             width: w,
             height: h,
+            wrap_s: WrapMode::ClampToEdge,
+            wrap_t: WrapMode::ClampToEdge,
         });
     }
 
@@ -250,6 +297,8 @@ pub fn decode_texture(
         width: rgba.width(),
         height: rgba.height(),
         rgba: rgba.into_raw(),
+        wrap_s: WrapMode::ClampToEdge,
+        wrap_t: WrapMode::ClampToEdge,
     })
 }
 
