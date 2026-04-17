@@ -78,6 +78,14 @@ pub struct SceneMesh {
     pub emissive: Option<Vec<f64>>,
     /// Emissive intensity multiplier. Defaults to 1.
     pub emissive_intensity: Option<f64>,
+    /// Optional normal map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
+    pub normal_map: Option<Buffer>,
+    /// Normal map width in pixels (required when `normal_map` is raw RGBA8 bytes).
+    pub normal_map_width: Option<u32>,
+    /// Normal map height in pixels (required when `normal_map` is raw RGBA8 bytes).
+    pub normal_map_height: Option<u32>,
+    /// Normal map scale `[x, y]`. Defaults to `[1, 1]`.
+    pub normal_scale: Option<Vec<f64>>,
 }
 
 #[napi(object)]

@@ -66,6 +66,8 @@ export interface ThreeMaterialLike {
   roughness?: number
   emissive?: ThreeColorLike
   emissiveIntensity?: number
+  normalMap?: ThreeTextureLike | null
+  normalScale?: { x: number; y: number }
   isMeshBasicMaterial?: boolean
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
@@ -181,6 +183,10 @@ export interface NativeSceneMesh {
   roughness?: number
   emissive?: number[]
   emissiveIntensity?: number
+  normalMap?: Buffer
+  normalMapWidth?: number
+  normalMapHeight?: number
+  normalScale?: number[]
 }
 
 export interface NativeRenderScene {
@@ -205,6 +211,10 @@ export interface PbrProperties {
   roughness?: number
   emissive?: number[]
   emissiveIntensity?: number
+  normalMap?: Buffer
+  normalMapWidth?: number
+  normalMapHeight?: number
+  normalScale?: number[]
 }
 
 export interface TextureInfo {
