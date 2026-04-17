@@ -6,6 +6,7 @@ license = "MIT"
 build = "build.rs"
 
 [lib]
+path = "engine/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]

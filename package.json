@@ -10,7 +10,8 @@
   },
   "files": [
     "dist/",
-    "src/",
+    "api/",
+    "engine/",
     "native.js",
     "native.d.ts",
     "*.node",
