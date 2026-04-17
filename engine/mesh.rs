@@ -51,6 +51,33 @@ pub struct PreparedMesh {
     pub alpha_test: f32,
     pub is_transparent: bool,
     pub side: MeshSide,
+    pub shading_model: ShadingModel,
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum ShadingModel {
+    #[default]
+    Standard,
+    Basic,
+    Lambert,
+}
+
+impl ShadingModel {
+    pub fn from_str_opt(value: Option<&str>) -> Self {
+        match value {
+            Some("basic") => Self::Basic,
+            Some("lambert") => Self::Lambert,
+            _ => Self::Standard,
+        }
+    }
+
+    pub fn as_u32(self) -> u32 {
+        match self {
+            Self::Standard => 0,
+            Self::Basic => 1,
+            Self::Lambert => 2,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -299,6 +326,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
     let is_transparent = mesh.transparent.unwrap_or(material_color[3] < 0.999);
     let side = MeshSide::from_str_opt(mesh.side.as_deref());
+    let shading_model = ShadingModel::from_str_opt(mesh.shading_model.as_deref());
 
     Ok(PreparedMesh {
         vertices,
@@ -318,6 +346,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         alpha_test,
         is_transparent,
         side,
+        shading_model,
     })
 }
 

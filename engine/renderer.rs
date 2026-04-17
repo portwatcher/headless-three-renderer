@@ -853,7 +853,12 @@ impl GpuRenderer {
                 if mesh.normal_map.is_some() { 1.0 } else { 0.0 },
                 if settings.ibl.is_some() { 1.0 } else { 0.0 },
             ],
-            ibl_params: [settings.env_intensity, 0.0, 0.0, 0.0],
+            ibl_params: [
+                settings.env_intensity,
+                mesh.shading_model.as_u32() as f32,
+                0.0,
+                0.0,
+            ],
             ao_params: [
                 mesh.ao_map_intensity,
                 if mesh.ao_map.is_some() { 1.0 } else { 0.0 },

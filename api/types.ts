@@ -79,6 +79,7 @@ export interface ThreeMaterialLike {
   transparent?: boolean
   side?: number
   isMeshBasicMaterial?: boolean
+  isMeshLambertMaterial?: boolean
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
 }
@@ -214,6 +215,7 @@ export interface NativeSceneMesh {
   alphaTest?: number
   transparent?: boolean
   side?: string
+  shadingModel?: string
 }
 
 export interface NativeRenderScene {
@@ -259,6 +261,7 @@ export interface PbrProperties {
   alphaTest?: number
   transparent?: boolean
   side?: string
+  shadingModel?: string
 }
 
 export interface TextureInfo {

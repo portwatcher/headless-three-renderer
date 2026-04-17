@@ -179,6 +179,15 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.side = 'front'
   }
 
+  // Shading model: MeshBasicMaterial is unlit, MeshLambertMaterial is diffuse-only.
+  // Everything else (MeshStandardMaterial / MeshPhysicalMaterial / unknown) uses the
+  // default PBR path.
+  if (material.isMeshBasicMaterial) {
+    props.shadingModel = 'basic'
+  } else if (material.isMeshLambertMaterial) {
+    props.shadingModel = 'lambert'
+  }
+
   return props
 }
 

@@ -30,7 +30,7 @@ struct Uniforms {
   ambient_color: vec4<f32>,
   // x = normal_scale.x, y = normal_scale.y, z = has_normal_map (1.0 or 0.0), w = has_ibl (1.0 or 0.0)
   normal_map_params: vec4<f32>,
-  // x = env_intensity
+  // x = env_intensity, y = shading_model (0=standard PBR, 1=basic/unlit, 2=lambert)
   ibl_params: vec4<f32>,
   // x = ao_map_intensity, y = has_ao_map (1.0 or 0.0)
   ao_params: vec4<f32>,
@@ -166,6 +166,28 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     discard;
   }
 
+  let shading_model = u32(uniforms.ibl_params.y);
+
+  // Ambient occlusion: sample red channel, blend toward 1.0 by intensity.
+  // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
+  var ao: f32 = 1.0;
+  if uniforms.ao_params.y > 0.5 {
+    let ao_sample = textureSample(t_ao, s_ao, uv).r;
+    ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
+  }
+
+  // MeshBasicMaterial: unlit. Output = albedo * ao, then emissive + tone map + gamma.
+  if shading_model == 1u {
+    var unlit = albedo * ao;
+    let emissive_basic = textureSample(t_emissive, s_emissive, uv).rgb;
+    unlit = unlit + uniforms.emissive.rgb * emissive_basic;
+    let mapped_basic = aces_filmic_tone_mapping(unlit);
+    let gamma_basic = pow(mapped_basic, vec3<f32>(1.0 / 2.2));
+    return vec4<f32>(gamma_basic, alpha);
+  }
+
+  let use_specular = shading_model == 0u;
+
   let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, uv);
   let metallic = uniforms.metallic * mr_sample.b;
   let roughness = max(uniforms.roughness * mr_sample.g, 0.04);
@@ -195,14 +217,6 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let f0 = mix(vec3<f32>(0.04), albedo, metallic);
 
   var lo = vec3<f32>(0.0);
-
-  // Ambient occlusion: sample red channel, blend toward 1.0 by intensity.
-  // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
-  var ao: f32 = 1.0;
-  if uniforms.ao_params.y > 0.5 {
-    let ao_sample = textureSample(t_ao, s_ao, uv).r;
-    ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
-  }
 
   let has_ibl = uniforms.normal_map_params.w > 0.5;
 
@@ -257,39 +271,51 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       let n_dot_h = max(dot(N, H), 0.0);
       let h_dot_v = max(dot(H, V), 0.0);
 
-      // Cook-Torrance BRDF
-      let D = distribution_ggx(n_dot_h, roughness);
-      let G = geometry_smith(n_dot_v, n_dot_l, roughness);
-      let F = fresnel_schlick(h_dot_v, f0);
-
-      let specular = (D * G * F) / (4.0 * n_dot_v * n_dot_l + 0.0001);
-
-      let k_s = F;
-      let k_d = (vec3<f32>(1.0) - k_s) * (1.0 - metallic);
-
       let radiance = light.color_intensity.rgb * light.color_intensity.w * attenuation;
-      lo = lo + (k_d * albedo / PI + specular) * radiance * n_dot_l;
+
+      if use_specular {
+        // Cook-Torrance BRDF (MeshStandardMaterial / MeshPhysicalMaterial)
+        let D = distribution_ggx(n_dot_h, roughness);
+        let G = geometry_smith(n_dot_v, n_dot_l, roughness);
+        let F = fresnel_schlick(h_dot_v, f0);
+
+        let specular = (D * G * F) / (4.0 * n_dot_v * n_dot_l + 0.0001);
+
+        let k_s = F;
+        let k_d = (vec3<f32>(1.0) - k_s) * (1.0 - metallic);
+
+        lo = lo + (k_d * albedo / PI + specular) * radiance * n_dot_l;
+      } else {
+        // MeshLambertMaterial: diffuse-only
+        lo = lo + albedo / PI * radiance * n_dot_l;
+      }
     }
 
     // Image-Based Lighting (split-sum approximation)
     if has_ibl {
       let env_intensity = uniforms.ibl_params.x;
-      let F_ibl = fresnel_schlick_roughness(n_dot_v, f0, roughness);
-      let k_s_ibl = F_ibl;
-      let k_d_ibl = (vec3<f32>(1.0) - k_s_ibl) * (1.0 - metallic);
 
       // Diffuse IBL: irradiance cubemap
       let irradiance = textureSample(t_irradiance, s_ibl, N).rgb;
-      let diffuse_ibl = k_d_ibl * irradiance * albedo;
 
-      // Specular IBL: prefiltered env map + BRDF LUT
-      let R = reflect(-V, N);
-      let max_lod = 4.0; // PREFILTER_MIP_LEVELS - 1
-      let prefiltered_color = textureSampleLevel(t_prefilter, s_ibl, R, roughness * max_lod).rgb;
-      let brdf_sample = textureSample(t_brdf_lut, s_ibl, vec2<f32>(n_dot_v, roughness)).rg;
-      let specular_ibl = prefiltered_color * (F_ibl * brdf_sample.x + brdf_sample.y);
+      if use_specular {
+        let F_ibl = fresnel_schlick_roughness(n_dot_v, f0, roughness);
+        let k_s_ibl = F_ibl;
+        let k_d_ibl = (vec3<f32>(1.0) - k_s_ibl) * (1.0 - metallic);
+        let diffuse_ibl = k_d_ibl * irradiance * albedo;
 
-      lo = lo + (diffuse_ibl + specular_ibl) * env_intensity * ao;
+        // Specular IBL: prefiltered env map + BRDF LUT
+        let R = reflect(-V, N);
+        let max_lod = 4.0; // PREFILTER_MIP_LEVELS - 1
+        let prefiltered_color = textureSampleLevel(t_prefilter, s_ibl, R, roughness * max_lod).rgb;
+        let brdf_sample = textureSample(t_brdf_lut, s_ibl, vec2<f32>(n_dot_v, roughness)).rg;
+        let specular_ibl = prefiltered_color * (F_ibl * brdf_sample.x + brdf_sample.y);
+
+        lo = lo + (diffuse_ibl + specular_ibl) * env_intensity * ao;
+      } else {
+        // Lambert: diffuse IBL only
+        lo = lo + irradiance * albedo * env_intensity * ao;
+      }
     } else {
       // Ambient (non-IBL fallback when lights are present)
       let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity * albedo;

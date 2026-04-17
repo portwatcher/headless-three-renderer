@@ -125,6 +125,9 @@ pub struct SceneMesh {
     pub transparent: Option<bool>,
     /// Which faces to render: `"front"` (default), `"back"`, or `"double"`.
     pub side: Option<String>,
+    /// Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
+    /// or `"lambert"` (diffuse-only / MeshLambertMaterial).
+    pub shading_model: Option<String>,
 }
 
 #[napi(object)]
