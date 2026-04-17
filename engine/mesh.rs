@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
 
@@ -10,16 +10,18 @@ use crate::util::{clamp01, color_to_f32, finite_f32, parse_color, parse_transfor
 pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
+    pub tangent: [f32; 4],
     pub color: [f32; 4],
     pub uv: [f32; 2],
 }
 
 impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    const ATTRIBUTES: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
         0 => Float32x3,
         1 => Float32x3,
         2 => Float32x4,
-        3 => Float32x2,
+        3 => Float32x4,
+        4 => Float32x2,
     ];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
@@ -36,6 +38,8 @@ pub struct PreparedMesh {
     pub indices: Option<Vec<u32>>,
     pub transform: Mat4,
     pub texture: Option<PreparedTexture>,
+    pub normal_map: Option<PreparedTexture>,
+    pub normal_scale: [f32; 2],
     pub metallic: f32,
     pub roughness: f32,
     pub emissive: [f32; 3],
@@ -115,6 +119,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             } else {
                 [0.0, 0.0, 0.0]
             },
+            tangent: [0.0, 0.0, 0.0, 0.0],
             color: color_mode.color(vertex_index),
             uv: if has_uvs {
                 let u = uvs.unwrap();
@@ -162,6 +167,26 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         _ => None,
     };
 
+    let normal_map = match &mesh.normal_map {
+        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
+            tex_data,
+            mesh.normal_map_width,
+            mesh.normal_map_height,
+            mesh_index,
+        )?),
+        _ => None,
+    };
+
+    let normal_scale = match mesh.normal_scale.as_deref() {
+        Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
+        _ => [1.0, 1.0],
+    };
+
+    // Compute tangents when we have a normal map and UVs
+    if normal_map.is_some() && has_uvs {
+        compute_tangents(&mut vertices, mesh.indices.as_deref());
+    }
+
     let metallic = clamp01(mesh.metallic.unwrap_or(0.0)) as f32;
     let roughness = clamp01(mesh.roughness.unwrap_or(1.0)) as f32;
     let emissive_intensity = mesh.emissive_intensity.unwrap_or(1.0) as f32;
@@ -179,6 +204,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         indices,
         transform: parse_transform(mesh.transform.as_deref(), mesh_index)?,
         texture,
+        normal_map,
+        normal_scale,
         metallic,
         roughness,
         emissive,
@@ -322,4 +349,76 @@ fn compute_flat_normals(vertices: &mut [Vertex], indices: Option<&[u32]>) {
     }
 }
 
-use anyhow::Context;
+/// Compute per-vertex tangents from positions, normals, and UVs.
+/// Uses the standard MikkTSpace-like per-triangle method:
+///   tangent = (dp1 * duv2.y - dp2 * duv1.y) / det
+/// Tangent.w stores the handedness sign for the bitangent.
+fn compute_tangents(vertices: &mut [Vertex], indices: Option<&[u32]>) {
+    let vertex_count = vertices.len();
+    let mut tan1 = vec![Vec3::ZERO; vertex_count];
+    let mut tan2 = vec![Vec3::ZERO; vertex_count];
+
+    let process_triangle = |i0: usize, i1: usize, i2: usize, tan1: &mut [Vec3], tan2: &mut [Vec3]| {
+        let p0 = Vec3::from(vertices[i0].position);
+        let p1 = Vec3::from(vertices[i1].position);
+        let p2 = Vec3::from(vertices[i2].position);
+
+        let uv0 = vertices[i0].uv;
+        let uv1 = vertices[i1].uv;
+        let uv2 = vertices[i2].uv;
+
+        let dp1 = p1 - p0;
+        let dp2 = p2 - p0;
+        let duv1 = [uv1[0] - uv0[0], uv1[1] - uv0[1]];
+        let duv2 = [uv2[0] - uv0[0], uv2[1] - uv0[1]];
+
+        let det = duv1[0] * duv2[1] - duv1[1] * duv2[0];
+        if det.abs() < 1e-8 {
+            return;
+        }
+        let inv_det = 1.0 / det;
+
+        let t = (dp1 * duv2[1] - dp2 * duv1[1]) * inv_det;
+        let b = (dp2 * duv1[0] - dp1 * duv2[0]) * inv_det;
+
+        tan1[i0] += t;
+        tan1[i1] += t;
+        tan1[i2] += t;
+        tan2[i0] += b;
+        tan2[i1] += b;
+        tan2[i2] += b;
+    };
+
+    match indices {
+        Some(idx) => {
+            for tri in idx.chunks_exact(3) {
+                process_triangle(tri[0] as usize, tri[1] as usize, tri[2] as usize, &mut tan1, &mut tan2);
+            }
+        }
+        None => {
+            for i in (0..vertex_count).step_by(3) {
+                if i + 2 < vertex_count {
+                    process_triangle(i, i + 1, i + 2, &mut tan1, &mut tan2);
+                }
+            }
+        }
+    }
+
+    // Gram-Schmidt orthogonalize and compute handedness
+    for i in 0..vertex_count {
+        let n = Vec3::from(vertices[i].normal);
+        let t = tan1[i];
+
+        // Orthogonalize: t' = normalize(t - n * dot(n, t))
+        let tangent = t - n * n.dot(t);
+        if tangent.length_squared() > 1e-8 {
+            let tangent = tangent.normalize();
+            // Handedness: sign of dot(cross(n, t), tan2)
+            let w = if n.cross(t).dot(tan2[i]) < 0.0 { -1.0 } else { 1.0 };
+            vertices[i].tangent = [tangent.x, tangent.y, tangent.z, w];
+        } else {
+            // Fallback tangent
+            vertices[i].tangent = [1.0, 0.0, 0.0, 1.0];
+        }
+    }
+}

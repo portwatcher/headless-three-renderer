@@ -35,11 +35,24 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.emissiveIntensity = Number.isFinite(material.emissiveIntensity) ? material.emissiveIntensity! : 1
   }
 
+  const normalMapInfo = extractTextureFromSlot(material.normalMap)
+  if (normalMapInfo) {
+    props.normalMap = normalMapInfo.data
+    props.normalMapWidth = normalMapInfo.width
+    props.normalMapHeight = normalMapInfo.height
+  }
+  if (material.normalScale) {
+    props.normalScale = [material.normalScale.x ?? 1, material.normalScale.y ?? 1]
+  }
+
   return props
 }
 
 export function extractTextureData(material: ThreeMaterialLike | undefined): TextureInfo | null {
-  const map = material?.map
+  return extractTextureFromSlot(material?.map)
+}
+
+function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | null {
   if (!map) return null
 
   const image = (map as any).image ?? (map as any).source?.data

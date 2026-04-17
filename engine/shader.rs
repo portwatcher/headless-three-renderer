@@ -28,6 +28,8 @@ struct Uniforms {
   ambient_intensity: f32,
   num_lights: u32,
   ambient_color: vec4<f32>,
+  // x = normal_scale.x, y = normal_scale.y, z = has_normal_map (1.0 or 0.0)
+  normal_map_params: vec4<f32>,
   lights: array<GpuLight, 16>,
 };
 
@@ -39,19 +41,27 @@ var t_diffuse: texture_2d<f32>;
 @group(1) @binding(1)
 var s_diffuse: sampler;
 
+@group(2) @binding(0)
+var t_normal: texture_2d<f32>;
+@group(2) @binding(1)
+var s_normal: sampler;
+
 struct VertexInput {
   @location(0) position: vec3<f32>,
   @location(1) normal: vec3<f32>,
-  @location(2) color: vec4<f32>,
-  @location(3) uv: vec2<f32>,
+  @location(2) tangent: vec4<f32>,
+  @location(3) color: vec4<f32>,
+  @location(4) uv: vec2<f32>,
 };
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) world_pos: vec3<f32>,
   @location(1) world_normal: vec3<f32>,
-  @location(2) color: vec4<f32>,
-  @location(3) uv: vec2<f32>,
+  @location(2) world_tangent: vec3<f32>,
+  @location(3) tangent_w: f32,
+  @location(4) color: vec4<f32>,
+  @location(5) uv: vec2<f32>,
 };
 
 @vertex
@@ -61,6 +71,8 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   output.position = uniforms.mvp * vec4<f32>(input.position, 1.0);
   output.world_pos = world_pos.xyz;
   output.world_normal = normalize((uniforms.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz);
+  output.world_tangent = normalize((uniforms.model * vec4<f32>(input.tangent.xyz, 0.0)).xyz);
+  output.tangent_w = input.tangent.w;
   output.color = input.color;
   output.uv = input.uv;
   return output;
@@ -120,7 +132,19 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let metallic = uniforms.metallic;
   let roughness = max(uniforms.roughness, 0.04);
 
-  let N = normalize(input.world_normal);
+  // Normal mapping via TBN matrix
+  var N = normalize(input.world_normal);
+  if uniforms.normal_map_params.z > 0.5 {
+    let T = normalize(input.world_tangent);
+    let B = normalize(cross(N, T) * input.tangent_w);
+    let tbn = mat3x3<f32>(T, B, N);
+    let normal_sample = textureSample(t_normal, s_normal, uv).rgb;
+    var tangent_normal = normal_sample * 2.0 - vec3<f32>(1.0);
+    tangent_normal.x *= uniforms.normal_map_params.x;
+    tangent_normal.y *= uniforms.normal_map_params.y;
+    N = normalize(tbn * tangent_normal);
+  }
+
   let V = normalize(uniforms.camera_pos.xyz - input.world_pos);
   let n_dot_v = max(dot(N, V), 0.0);
 
