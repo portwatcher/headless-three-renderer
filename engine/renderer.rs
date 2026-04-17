@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, anyhow, bail};
 use bytemuck::{Pod, Zeroable};
+use glam::Mat4;
 use wgpu::util::DeviceExt;
 
 use crate::ibl::IblMaps;
@@ -31,6 +32,11 @@ pub struct Uniforms {
     pub ibl_params: [f32; 4],
     /// x = ao_map_intensity, y = has_ao_map (1.0 or 0.0), z/w = reserved
     pub ao_params: [f32; 4],
+    pub light_space_matrix: [[f32; 4]; 4],
+    /// x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
+    pub shadow_params: [f32; 4],
+    /// x = shadow light index (as f32), y = 1/map_size, z/w = reserved
+    pub shadow_params2: [f32; 4],
     pub lights: [GpuLight; MAX_LIGHTS],
 }
 
@@ -51,7 +57,11 @@ pub struct GpuRenderer {
     emissive_map_layout: wgpu::BindGroupLayout,
     ibl_layout: wgpu::BindGroupLayout,
     ao_map_layout: wgpu::BindGroupLayout,
+    shadow_layout: wgpu::BindGroupLayout,
+    /// Depth-only pipeline used to render the shadow map.
+    shadow_pipeline: wgpu::RenderPipeline,
     sampler: wgpu::Sampler,
+    shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     default_texture_bind_group: wgpu::BindGroup,
     default_normal_map_bind_group: wgpu::BindGroup,
@@ -59,6 +69,8 @@ pub struct GpuRenderer {
     default_emissive_map_bind_group: wgpu::BindGroup,
     default_ibl_bind_group: wgpu::BindGroup,
     default_ao_map_bind_group: wgpu::BindGroup,
+    default_shadow_bind_group: wgpu::BindGroup,
+    _default_shadow_texture: wgpu::Texture,
 }
 
 struct GpuMesh {
@@ -74,6 +86,7 @@ struct GpuMesh {
     vertex_count: u32,
     side: MeshSide,
     topology: Topology,
+    cast_shadow: bool,
     _uniform_buffer: wgpu::Buffer,
     _texture: Option<wgpu::Texture>,
     _normal_map: Option<wgpu::Texture>,
@@ -115,6 +128,12 @@ impl GpuRenderer {
         };
 
         let required_limits = wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
+        // Raise the bind group count: we use 8 (uniforms + 5 texture slots +
+        // IBL + shadow map), which is the WebGPU spec default.
+        let required_limits = wgpu::Limits {
+            max_bind_groups: 8,
+            ..required_limits
+        };
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("headless-three-renderer device"),
@@ -256,6 +275,29 @@ impl GpuRenderer {
             ],
         });
 
+        // Shadow map bind group: depth texture + comparison sampler.
+        let shadow_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer shadow layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Depth,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                    count: None,
+                },
+            ],
+        });
+
         // IBL bind group: irradiance cubemap, prefiltered cubemap, BRDF LUT, sampler
         let ibl_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("headless-three-renderer ibl layout"),
@@ -307,6 +349,18 @@ impl GpuRenderer {
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+
+        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("headless-three-renderer shadow sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            compare: Some(wgpu::CompareFunction::LessEqual),
             ..Default::default()
         });
 
@@ -516,8 +570,73 @@ impl GpuRenderer {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout), Some(&ibl_layout), Some(&ao_map_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout), Some(&ibl_layout), Some(&ao_map_layout), Some(&shadow_layout)],
             immediate_size: 0,
+        });
+
+        // 1x1 depth texture used as a "no shadow" default binding.
+        let default_shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("headless-three-renderer default shadow texture"),
+            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let default_shadow_view = default_shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let default_shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer default shadow bind group"),
+            layout: &shadow_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&default_shadow_view) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&shadow_sampler) },
+            ],
+        });
+
+        // Dedicated pipeline layout for the depth-only shadow pass (uniforms only).
+        let shadow_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("headless-three-renderer shadow pipeline layout"),
+            bind_group_layouts: &[Some(&uniform_layout)],
+            immediate_size: 0,
+        });
+        let shadow_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("headless-three-renderer shadow pipeline"),
+            layout: Some(&shadow_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_shadow"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[Vertex::layout()],
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                // No culling: captures shadows from any side, including DoubleSide materials.
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: wgpu::StencilState::default(),
+                // Slight slope-scaled bias to reduce acne (in addition to the
+                // per-fragment bias we apply during shadow sampling).
+                bias: wgpu::DepthBiasState {
+                    constant: 2,
+                    slope_scale: 2.0,
+                    clamp: 0.0,
+                },
+            }),
+            multisample: wgpu::MultisampleState::default(),
+            fragment: None,
+            multiview_mask: None,
+            cache: None,
         });
 
         let color_targets = [Some(wgpu::ColorTargetState {
@@ -616,7 +735,10 @@ impl GpuRenderer {
             emissive_map_layout,
             ibl_layout,
             ao_map_layout,
+            shadow_layout,
+            shadow_pipeline,
             sampler,
+            shadow_sampler,
             _default_texture: default_texture,
             default_texture_bind_group,
             default_normal_map_bind_group,
@@ -624,6 +746,8 @@ impl GpuRenderer {
             default_emissive_map_bind_group,
             default_ibl_bind_group,
             default_ao_map_bind_group,
+            default_shadow_bind_group,
+            _default_shadow_texture: default_shadow_texture,
         })
     }
 
@@ -677,6 +801,17 @@ impl GpuRenderer {
         let ibl_bind_group = match &settings.ibl {
             Some(ibl) => create_ibl_bind_group(&self.device, &self.queue, &self.ibl_layout, &self.sampler, ibl),
             None => self.default_ibl_bind_group.clone(),
+        };
+
+        // Optional shadow map pass: render a depth-only view from the
+        // directional light's POV into a Depth32Float texture, then bind it
+        // to the main pass.
+        let (shadow_bind_group, _shadow_texture) = match &settings.shadow {
+            Some(_shadow) => {
+                let (bg, tex) = self.render_shadow_pass(settings, &gpu_meshes);
+                (bg, Some(tex))
+            }
+            None => (self.default_shadow_bind_group.clone(), None),
         };
 
         let (opaque_order, transparent_order) = partition_draw_order(meshes, settings.camera_pos);
@@ -740,6 +875,7 @@ impl GpuRenderer {
 
             // Opaque meshes first (with depth write)
             pass.set_bind_group(5, &ibl_bind_group, &[]);
+            pass.set_bind_group(7, &shadow_bind_group, &[]);
             let mut current_pipeline: Option<PipelineKey> = None;
             for &i in &opaque_order {
                 let key = pipeline_key(&gpu_meshes[i]);
@@ -816,6 +952,84 @@ impl GpuRenderer {
         Ok(rgba)
     }
 
+    /// Render the scene's shadow casters into a depth-only texture from the
+    /// directional light's POV and return a bind group referencing it.
+    fn render_shadow_pass(
+        &self,
+        settings: &RenderSettings,
+        gpu_meshes: &[GpuMesh],
+    ) -> (wgpu::BindGroup, wgpu::Texture) {
+        let shadow = settings
+            .shadow
+            .as_ref()
+            .expect("render_shadow_pass requires a configured shadow caster");
+        let size = shadow.map_size;
+
+        let shadow_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("headless-three-renderer shadow map"),
+            size: wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 1 },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("headless-three-renderer shadow encoder"),
+            });
+
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("headless-three-renderer shadow pass"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &shadow_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.shadow_pipeline);
+            for mesh in gpu_meshes.iter() {
+                // Only triangle meshes flagged as shadow casters contribute.
+                if !mesh.cast_shadow || mesh.topology != Topology::Triangles {
+                    continue;
+                }
+                pass.set_bind_group(0, &mesh.bind_group, &[]);
+                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                if let Some(index_buffer) = &mesh.index_buffer {
+                    pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                    pass.draw_indexed(0..mesh.index_count, 0, 0..1);
+                } else {
+                    pass.draw(0..mesh.vertex_count, 0..1);
+                }
+            }
+        }
+
+        self.queue.submit([encoder.finish()]);
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer shadow bind group"),
+            layout: &self.shadow_layout,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&shadow_view) },
+                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.shadow_sampler) },
+            ],
+        });
+        let _ = &shadow.light_dir; // silence unused warning; direction baked into light_vp
+        (bind_group, shadow_texture)
+    }
+
     fn sampler_for_wrap(&self, wrap_s: WrapMode, wrap_t: WrapMode) -> wgpu::Sampler {
         if wrap_s == WrapMode::ClampToEdge && wrap_t == WrapMode::ClampToEdge {
             return self.sampler.clone();
@@ -889,6 +1103,24 @@ impl GpuRenderer {
                 0.0,
                 0.0,
             ],
+            light_space_matrix: settings
+                .shadow
+                .as_ref()
+                .map(|s| s.light_vp.to_cols_array_2d())
+                .unwrap_or_else(|| Mat4::IDENTITY.to_cols_array_2d()),
+            shadow_params: match &settings.shadow {
+                Some(s) => [
+                    1.0,
+                    s.bias,
+                    s.normal_bias,
+                    if mesh.receive_shadow { 1.0 } else { 0.0 },
+                ],
+                None => [0.0, 0.0, 0.0, 0.0],
+            },
+            shadow_params2: match &settings.shadow {
+                Some(s) => [s.light_index as f32, 1.0 / s.map_size as f32, 0.0, 0.0],
+                None => [0.0, 0.0, 0.0, 0.0],
+            },
             lights,
         };
         let uniform_buffer = self
@@ -1200,6 +1432,7 @@ impl GpuRenderer {
             vertex_count: mesh.vertices.len() as u32,
             side: mesh.side,
             topology: mesh.topology,
+            cast_shadow: mesh.cast_shadow,
             _uniform_buffer: uniform_buffer,
             _texture: _mesh_texture,
             _normal_map: _normal_map_texture,

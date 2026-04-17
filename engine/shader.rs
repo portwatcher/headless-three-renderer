@@ -34,6 +34,11 @@ struct Uniforms {
   ibl_params: vec4<f32>,
   // x = ao_map_intensity, y = has_ao_map (1.0 or 0.0)
   ao_params: vec4<f32>,
+  light_space_matrix: mat4x4<f32>,
+  // x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
+  shadow_params: vec4<f32>,
+  // x = shadow light index (as f32), y = 1/map_size
+  shadow_params2: vec4<f32>,
   lights: array<GpuLight, 16>,
 };
 
@@ -74,6 +79,11 @@ var t_ao: texture_2d<f32>;
 @group(6) @binding(1)
 var s_ao: sampler;
 
+@group(7) @binding(0)
+var t_shadow: texture_depth_2d;
+@group(7) @binding(1)
+var s_shadow: sampler_comparison;
+
 struct VertexInput {
   @location(0) position: vec3<f32>,
   @location(1) normal: vec3<f32>,
@@ -104,6 +114,54 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   output.color = input.color;
   output.uv = input.uv;
   return output;
+}
+
+// Depth-only vertex shader used for the directional shadow map pass.
+// Transforms the vertex by `light_space_matrix * model` so only the
+// (orthographic) light-view depth is rasterized.
+@vertex
+fn vs_shadow(input: VertexInput) -> @builtin(position) vec4<f32> {
+  let world_pos = uniforms.model * vec4<f32>(input.position, 1.0);
+  return uniforms.light_space_matrix * world_pos;
+}
+
+// 3x3 PCF shadow sampling. Returns the fraction of samples NOT in shadow
+// (i.e. 1.0 = fully lit, 0.0 = fully occluded).
+fn sample_shadow(world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
+  if uniforms.shadow_params.x < 0.5 || uniforms.shadow_params.w < 0.5 {
+    return 1.0;
+  }
+
+  // Normal-offset bias: push the receiver position slightly along its normal
+  // before transforming to light space to reduce shadow acne / peter-panning.
+  let normal_bias = uniforms.shadow_params.z;
+  let biased_pos = world_pos + world_normal * normal_bias;
+  let light_ndc = uniforms.light_space_matrix * vec4<f32>(biased_pos, 1.0);
+  // Orthographic projection: w is effectively 1.0, but divide anyway.
+  let proj = light_ndc.xyz / light_ndc.w;
+
+  // Outside the light's frustum: treat as fully lit.
+  if proj.z > 1.0 || proj.z < 0.0 {
+    return 1.0;
+  }
+  // Light space NDC [-1,1] to texture UV [0,1]; flip Y for texture coords.
+  let uv = vec2<f32>(proj.x * 0.5 + 0.5, -proj.y * 0.5 + 0.5);
+  if uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 {
+    return 1.0;
+  }
+
+  let reference = proj.z - uniforms.shadow_params.y;
+  let texel = uniforms.shadow_params2.y;
+
+  // 3x3 PCF.
+  var sum: f32 = 0.0;
+  for (var dy = -1; dy <= 1; dy = dy + 1) {
+    for (var dx = -1; dx <= 1; dx = dx + 1) {
+      let offset = vec2<f32>(f32(dx), f32(dy)) * texel;
+      sum = sum + textureSampleCompareLevel(t_shadow, s_shadow, uv + offset, reference);
+    }
+  }
+  return sum / 9.0;
 }
 
 // GGX/Trowbridge-Reitz normal distribution
@@ -229,6 +287,8 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     lo = albedo * total_ambient * ao;
   } else {
     // Direct lighting from scene lights
+    let shadow_factor = sample_shadow(input.world_pos, N);
+    let shadow_light_index = u32(uniforms.shadow_params2.x);
     for (var i = 0u; i < uniforms.num_lights && i < MAX_LIGHTS; i = i + 1u) {
       let light = uniforms.lights[i];
 
@@ -248,6 +308,9 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       if light.light_type == 0u {
         // Directional
         L = normalize(-light.direction.xyz);
+        if i == shadow_light_index {
+          attenuation *= shadow_factor;
+        }
       } else {
         // Point or Spot
         let light_vec = light.position.xyz - input.world_pos;

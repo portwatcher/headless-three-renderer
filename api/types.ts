@@ -130,6 +130,23 @@ export interface ThreeObject3DLike {
   target?: ThreeObject3DLike & { matrixWorld?: ThreeMatrix4Like }
   name?: string
   uuid?: string
+  castShadow?: boolean
+  receiveShadow?: boolean
+  /** DirectionalLight.shadow (three.js). */
+  shadow?: {
+    mapSize?: { x?: number; y?: number; width?: number; height?: number }
+    bias?: number
+    normalBias?: number
+    radius?: number
+    camera?: {
+      left?: number
+      right?: number
+      top?: number
+      bottom?: number
+      near?: number
+      far?: number
+    }
+  }
 }
 
 export interface ThreeSceneLike extends ThreeObject3DLike {
@@ -186,6 +203,21 @@ export interface NativeSceneLight {
   angle?: number
   penumbra?: number
   groundColor?: number[]
+  /** Whether this light casts shadows (directional only for now). */
+  castShadow?: boolean
+  /** Shadow map resolution (square). Defaults to 512. */
+  shadowMapSize?: number
+  /** Depth bias applied when sampling the shadow map. */
+  shadowBias?: number
+  /** Normal-offset bias (world space units) applied at receivers. */
+  shadowNormalBias?: number
+  /** Orthographic shadow-camera frustum bounds. */
+  shadowCameraLeft?: number
+  shadowCameraRight?: number
+  shadowCameraTop?: number
+  shadowCameraBottom?: number
+  shadowCameraNear?: number
+  shadowCameraFar?: number
 }
 
 export interface NativeSceneMesh {
@@ -224,6 +256,10 @@ export interface NativeSceneMesh {
   side?: string
   shadingModel?: string
   topology?: string
+  /** Whether this mesh casts shadows in the shadow pass. Defaults to false. */
+  castShadow?: boolean
+  /** Whether this mesh receives shadows in the main pass. Defaults to false. */
+  receiveShadow?: boolean
 }
 
 export interface NativeRenderScene {

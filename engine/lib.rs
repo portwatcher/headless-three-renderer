@@ -66,7 +66,8 @@ fn to_napi_error(error: anyhow::Error) -> napi::Error {
 #[cfg(test)]
 mod tests {
     use super::mesh::{decode_texture, prepare_meshes};
-    use super::types::{RenderScene, SceneMesh};
+    use super::renderer::GpuRenderer;
+    use super::types::{Camera, RenderScene, SceneLight, SceneMesh};
 
     #[test]
     fn empty_scene_prepares_no_meshes() {
@@ -165,5 +166,90 @@ mod tests {
         let mr_tex = meshes[0].metallic_roughness_texture.as_ref().unwrap();
         assert_eq!(mr_tex.width, 1);
         assert_eq!(mr_tex.height, 1);
+    }
+
+    /// End-to-end smoke test for directional shadow maps. Renders a ground
+    /// quad that receives shadows from a box above it under a downward-
+    /// pointing directional light. We can't pixel-match without a reference,
+    /// but this exercises the shadow pipeline, WGSL compilation, and PCF
+    /// sampling path end-to-end.
+    #[test]
+    fn renders_scene_with_directional_shadow() {
+        let renderer = match GpuRenderer::new() {
+            Ok(r) => r,
+            Err(err) => {
+                eprintln!("skipping: no wgpu adapter available ({err})");
+                return;
+            }
+        };
+
+        // Ground plane (receives shadow)
+        let ground = SceneMesh {
+            positions: vec![
+                -5.0, 0.0, -5.0,
+                 5.0, 0.0, -5.0,
+                 5.0, 0.0,  5.0,
+                -5.0, 0.0,  5.0,
+            ],
+            indices: Some(vec![0, 1, 2, 0, 2, 3]),
+            normals: Some(vec![0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0]),
+            color: Some(vec![0.8, 0.8, 0.8, 1.0]),
+            receive_shadow: Some(true),
+            ..SceneMesh::default()
+        };
+        // Occluder box (casts shadow)
+        let occluder = SceneMesh {
+            positions: vec![
+                -0.5, 1.0, -0.5,   0.5, 1.0, -0.5,   0.5, 2.0, -0.5,  -0.5, 2.0, -0.5,
+                -0.5, 1.0,  0.5,   0.5, 1.0,  0.5,   0.5, 2.0,  0.5,  -0.5, 2.0,  0.5,
+            ],
+            indices: Some(vec![
+                0,1,2, 0,2,3,
+                4,6,5, 4,7,6,
+                0,3,7, 0,7,4,
+                1,5,6, 1,6,2,
+                3,2,6, 3,6,7,
+                0,4,5, 0,5,1,
+            ]),
+            color: Some(vec![0.9, 0.2, 0.2, 1.0]),
+            cast_shadow: Some(true),
+            ..SceneMesh::default()
+        };
+
+        let light = SceneLight {
+            light_type: "directional".into(),
+            color: Some(vec![1.0, 1.0, 1.0]),
+            intensity: Some(1.0),
+            position: Some(vec![3.0, 5.0, 3.0]),
+            direction: Some(vec![-3.0, -5.0, -3.0]),
+            cast_shadow: Some(true),
+            shadow_map_size: Some(256),
+            shadow_bias: Some(-0.0005),
+            shadow_normal_bias: Some(0.02),
+            shadow_camera_left: Some(-5.0),
+            shadow_camera_right: Some(5.0),
+            shadow_camera_top: Some(5.0),
+            shadow_camera_bottom: Some(-5.0),
+            shadow_camera_near: Some(0.1),
+            shadow_camera_far: Some(20.0),
+            ..SceneLight::default()
+        };
+
+        let scene = RenderScene {
+            width: Some(64),
+            height: Some(64),
+            format: Some("rgba".into()),
+            meshes: Some(vec![ground, occluder]),
+            lights: Some(vec![light]),
+            ..RenderScene::default()
+        };
+        let camera = Camera {
+            eye: Some(vec![4.0, 3.0, 6.0]),
+            target: Some(vec![0.0, 0.5, 0.0]),
+            ..Camera::default()
+        };
+
+        let rgba = renderer.render(&scene, &camera).expect("render should succeed");
+        assert_eq!(rgba.len(), 64 * 64 * 4);
     }
 }

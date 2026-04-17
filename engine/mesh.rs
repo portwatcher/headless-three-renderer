@@ -53,6 +53,8 @@ pub struct PreparedMesh {
     pub side: MeshSide,
     pub shading_model: ShadingModel,
     pub topology: Topology,
+    pub cast_shadow: bool,
+    pub receive_shadow: bool,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -404,6 +406,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         side,
         shading_model,
         topology,
+        cast_shadow: mesh.cast_shadow.unwrap_or(false),
+        receive_shadow: mesh.receive_shadow.unwrap_or(false),
     })
 }
 

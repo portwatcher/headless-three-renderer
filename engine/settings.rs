@@ -2,10 +2,27 @@ use anyhow::{Result, bail};
 use glam::{Mat4, Vec3};
 
 use crate::ibl::{EnvMap, IblMaps, compute_ibl};
-use crate::lights::{GpuLight, prepare_lights};
+use crate::lights::{GpuLight, MAX_LIGHTS, prepare_lights};
 use crate::types::{Camera, RenderScene};
 use crate::util::{finite_positive, parse_color, parse_mat4, parse_vec3, validate_dimension};
 use crate::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
+
+/// Directional shadow caster resolved from the first directional light with
+/// `castShadow = true`. We only support a single directional shadow map.
+pub struct ShadowCaster {
+    /// Orthographic light-space matrix (proj * view) in WebGPU clip space.
+    pub light_vp: Mat4,
+    /// Normalized light direction (from light toward scene).
+    pub light_dir: Vec3,
+    /// Index of the shadow-casting light in `RenderSettings::lights`.
+    pub light_index: u32,
+    /// Shadow map resolution (square, pixels).
+    pub map_size: u32,
+    /// Depth bias applied when comparing against the shadow map.
+    pub bias: f32,
+    /// World-space normal offset applied at the receiver.
+    pub normal_bias: f32,
+}
 
 pub struct RenderSettings {
     pub width: u32,
@@ -19,6 +36,7 @@ pub struct RenderSettings {
     pub ambient_intensity: f32,
     pub ibl: Option<IblMaps>,
     pub env_intensity: f32,
+    pub shadow: Option<ShadowCaster>,
 }
 
 impl RenderSettings {
@@ -96,6 +114,8 @@ impl RenderSettings {
         };
         let env_intensity = scene.environment_map_intensity.unwrap_or(1.0) as f32;
 
+        let shadow = resolve_shadow_caster(scene)?;
+
         Ok(Self {
             width,
             height,
@@ -108,6 +128,7 @@ impl RenderSettings {
             ambient_intensity,
             ibl,
             env_intensity,
+            shadow,
         })
     }
 }
@@ -130,4 +151,61 @@ impl OutputFormat {
             other => bail!("unsupported scene.format `{other}`; expected `png` or `rgba`"),
         }
     }
+}
+
+/// Resolve the (optional) directional shadow caster from the scene.
+/// We pick the first directional light with `castShadow = true`.
+fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
+    let Some(lights) = scene.lights.as_deref() else {
+        return Ok(None);
+    };
+    for (i, light) in lights.iter().take(MAX_LIGHTS).enumerate() {
+        if light.light_type.to_ascii_lowercase() != "directional" {
+            continue;
+        }
+        if !light.cast_shadow.unwrap_or(false) {
+            continue;
+        }
+        let prefix = format!("scene.lights[{i}]");
+
+        let pos = parse_vec3(light.position.as_deref(), [0.0, 10.0, 0.0], &format!("{prefix}.position"))?;
+        let dir = parse_vec3(
+            light.direction.as_deref(),
+            [0.0, -1.0, 0.0],
+            &format!("{prefix}.direction"),
+        )?;
+        let dir = if dir.length_squared() > 0.0 { dir.normalize() } else { Vec3::new(0.0, -1.0, 0.0) };
+
+        // Orthographic bounds (three.js defaults: ±5, near=0.5, far=500)
+        let left = light.shadow_camera_left.unwrap_or(-5.0) as f32;
+        let right = light.shadow_camera_right.unwrap_or(5.0) as f32;
+        let top = light.shadow_camera_top.unwrap_or(5.0) as f32;
+        let bottom = light.shadow_camera_bottom.unwrap_or(-5.0) as f32;
+        let near = light.shadow_camera_near.unwrap_or(0.5) as f32;
+        let far = light.shadow_camera_far.unwrap_or(500.0) as f32;
+        if right <= left || top <= bottom || far <= near {
+            bail!("{prefix}.shadow.camera has invalid frustum bounds");
+        }
+
+        // View: look from light position along the light's direction. Pick an
+        // up vector that is not collinear with `dir`.
+        let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+        let view = Mat4::look_at_rh(pos, pos + dir, up);
+        let proj = Mat4::orthographic_rh(left, right, bottom, top, near, far);
+        let light_vp = proj * view;
+
+        let map_size = light.shadow_map_size.unwrap_or(512).clamp(32, 4096);
+        let bias = light.shadow_bias.unwrap_or(0.0) as f32;
+        let normal_bias = light.shadow_normal_bias.unwrap_or(0.0) as f32;
+
+        return Ok(Some(ShadowCaster {
+            light_vp,
+            light_dir: dir,
+            light_index: i as u32,
+            map_size,
+            bias,
+            normal_bias,
+        }));
+    }
+    Ok(None)
 }

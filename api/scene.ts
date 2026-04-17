@@ -70,6 +70,8 @@ function appendMesh(object: ThreeObject3DLike, meshes: NativeSceneMesh[]): void 
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material)
     const textureInfo = extractTextureData(material)
+    const castShadow = object.castShadow === true ? true : undefined
+    const receiveShadow = object.receiveShadow === true ? true : undefined
 
     if (index) {
       const indices = index.slice(group.start, group.start + group.count)
@@ -90,6 +92,8 @@ function appendMesh(object: ThreeObject3DLike, meshes: NativeSceneMesh[]): void 
         textureWrapS: textureInfo?.wrapS,
         textureWrapT: textureInfo?.wrapT,
         transform: meshTransform,
+        castShadow,
+        receiveShadow,
         ...pbrProps,
       })
     } else {
@@ -111,6 +115,8 @@ function appendMesh(object: ThreeObject3DLike, meshes: NativeSceneMesh[]): void 
         textureWrapS: textureInfo?.wrapS,
         textureWrapT: textureInfo?.wrapT,
         transform: meshTransform,
+        castShadow,
+        receiveShadow,
         ...pbrProps,
       })
     }

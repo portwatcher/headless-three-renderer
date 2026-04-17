@@ -46,12 +46,35 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       direction[1] /= len
       direction[2] /= len
     }
-    return {
+    const out: NativeSceneLight = {
       lightType: 'directional',
       color: [color[0], color[1], color[2]],
       intensity,
+      position: pos,
       direction,
     }
+    if (light.castShadow === true) {
+      const shadow = light.shadow
+      const mapSize = shadow?.mapSize
+      const size = Math.max(
+        32,
+        Math.floor(mapSize?.x ?? mapSize?.width ?? 512),
+      )
+      const cam = shadow?.camera
+      out.castShadow = true
+      out.shadowMapSize = size
+      if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
+      if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
+      if (cam) {
+        if (Number.isFinite(cam.left)) out.shadowCameraLeft = cam.left!
+        if (Number.isFinite(cam.right)) out.shadowCameraRight = cam.right!
+        if (Number.isFinite(cam.top)) out.shadowCameraTop = cam.top!
+        if (Number.isFinite(cam.bottom)) out.shadowCameraBottom = cam.bottom!
+        if (Number.isFinite(cam.near)) out.shadowCameraNear = cam.near!
+        if (Number.isFinite(cam.far)) out.shadowCameraFar = cam.far!
+      }
+    }
+    return out
   }
 
   if (light.isPointLight === true) {

@@ -53,6 +53,21 @@ pub struct SceneLight {
     pub penumbra: Option<f64>,
     /// Hemisphere light ground color `[r, g, b]` in 0..1 range.
     pub ground_color: Option<Vec<f64>>,
+    /// Whether this light casts shadows (directional lights only).
+    pub cast_shadow: Option<bool>,
+    /// Shadow map resolution (square, pixels). Defaults to 512.
+    pub shadow_map_size: Option<u32>,
+    /// Depth bias in shadow-map NDC.
+    pub shadow_bias: Option<f64>,
+    /// Normal-offset bias in world space at the receiver.
+    pub shadow_normal_bias: Option<f64>,
+    /// Orthographic shadow-camera frustum bounds.
+    pub shadow_camera_left: Option<f64>,
+    pub shadow_camera_right: Option<f64>,
+    pub shadow_camera_top: Option<f64>,
+    pub shadow_camera_bottom: Option<f64>,
+    pub shadow_camera_near: Option<f64>,
+    pub shadow_camera_far: Option<f64>,
 }
 
 #[napi(object)]
@@ -130,6 +145,10 @@ pub struct SceneMesh {
     pub shading_model: Option<String>,
     /// Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`.
     pub topology: Option<String>,
+    /// Whether this mesh casts shadows in the shadow pass. Defaults to false.
+    pub cast_shadow: Option<bool>,
+    /// Whether this mesh receives shadows in the main pass. Defaults to false.
+    pub receive_shadow: Option<bool>,
 }
 
 #[napi(object)]
