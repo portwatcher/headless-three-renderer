@@ -2,7 +2,7 @@ name: CI
 
 env:
   DEBUG: 'napi:*'
-  APP_NAME: headless-three-renderer
+  APP_NAME: headless_three_renderer
   MACOSX_DEPLOYMENT_TARGET: '10.13'
 
 permissions:
