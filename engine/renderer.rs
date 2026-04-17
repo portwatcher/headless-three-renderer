@@ -2,6 +2,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
+use crate::ibl::IblMaps;
 use crate::lights::{GpuLight, MAX_LIGHTS};
 use crate::mesh::{PreparedMesh, Vertex, WrapMode, prepare_meshes};
 use crate::settings::{OutputFormat, RenderSettings};
@@ -24,7 +25,10 @@ pub struct Uniforms {
     pub ambient_intensity: f32,
     pub num_lights: u32,
     pub ambient_color: [f32; 4],
+    // x = normal_scale.x, y = normal_scale.y, z = has_normal_map (1.0 or 0.0), w = has_ibl (1.0 or 0.0)
     pub normal_map_params: [f32; 4],
+    /// x = env_intensity, y/z/w = reserved
+    pub ibl_params: [f32; 4],
     pub lights: [GpuLight; MAX_LIGHTS],
 }
 
@@ -38,12 +42,14 @@ pub struct GpuRenderer {
     normal_map_layout: wgpu::BindGroupLayout,
     mr_map_layout: wgpu::BindGroupLayout,
     emissive_map_layout: wgpu::BindGroupLayout,
+    ibl_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     default_texture_bind_group: wgpu::BindGroup,
     default_normal_map_bind_group: wgpu::BindGroup,
     default_mr_map_bind_group: wgpu::BindGroup,
     default_emissive_map_bind_group: wgpu::BindGroup,
+    default_ibl_bind_group: wgpu::BindGroup,
 }
 
 struct GpuMesh {
@@ -208,6 +214,49 @@ impl GpuRenderer {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        // IBL bind group: irradiance cubemap, prefiltered cubemap, BRDF LUT, sampler
+        let ibl_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer ibl layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::Cube,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::Cube,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -402,9 +451,17 @@ impl GpuRenderer {
                 ],
             });
 
+        // Default IBL: 1x1 black cubemaps (no env map contribution)
+        let default_ibl_bind_group = create_default_ibl_bind_group(
+            &device,
+            &queue,
+            &ibl_layout,
+            &sampler,
+        );
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout), Some(&ibl_layout)],
             immediate_size: 0,
         });
 
@@ -497,12 +554,14 @@ impl GpuRenderer {
             normal_map_layout,
             mr_map_layout,
             emissive_map_layout,
+            ibl_layout,
             sampler,
             _default_texture: default_texture,
             default_texture_bind_group,
             default_normal_map_bind_group,
             default_mr_map_bind_group,
             default_emissive_map_bind_group,
+            default_ibl_bind_group,
         })
     }
 
@@ -552,6 +611,11 @@ impl GpuRenderer {
             .iter()
             .map(|mesh| self.upload_mesh(settings, mesh))
             .collect::<Result<Vec<_>>>()?;
+
+        let ibl_bind_group = match &settings.ibl {
+            Some(ibl) => create_ibl_bind_group(&self.device, &self.queue, &self.ibl_layout, &self.sampler, ibl),
+            None => self.default_ibl_bind_group.clone(),
+        };
 
         let (opaque_order, transparent_order) = partition_draw_order(meshes, settings.camera_pos);
 
@@ -614,6 +678,7 @@ impl GpuRenderer {
 
             // Opaque meshes first (with depth write)
             pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(5, &ibl_bind_group, &[]);
             for &i in &opaque_order {
                 draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
             }
@@ -621,6 +686,7 @@ impl GpuRenderer {
             // Transparent meshes second (back-to-front, no depth write)
             if !transparent_order.is_empty() {
                 pass.set_pipeline(&self.transparent_pipeline);
+                pass.set_bind_group(5, &ibl_bind_group, &[]);
                 for &i in &transparent_order {
                     draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
                 }
@@ -738,8 +804,9 @@ impl GpuRenderer {
                 mesh.normal_scale[0],
                 mesh.normal_scale[1],
                 if mesh.normal_map.is_some() { 1.0 } else { 0.0 },
-                0.0,
+                if settings.ibl.is_some() { 1.0 } else { 0.0 },
             ],
+            ibl_params: [settings.env_intensity, 0.0, 0.0, 0.0],
             lights,
         };
         let uniform_buffer = self
@@ -1035,6 +1102,7 @@ fn draw_gpu_mesh(pass: &mut wgpu::RenderPass, mesh: &GpuMesh) {
     pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
     pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
     pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
+    // bind group 5 (IBL) is set once per pass, not per mesh
     pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
     if let Some(index_buffer) = &mesh.index_buffer {
         pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
@@ -1042,4 +1110,189 @@ fn draw_gpu_mesh(pass: &mut wgpu::RenderPass, mesh: &GpuMesh) {
     } else {
         pass.draw(0..mesh.vertex_count, 0..1);
     }
+}
+
+fn create_default_ibl_bind_group(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    // 1x1 black cubemap for irradiance and prefilter
+    let black_cube = create_cubemap(device, queue, 1, 1, &[&[0u8, 0, 0, 255] as &[u8]; 6]);
+    let irradiance_view = black_cube.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::Cube),
+        ..Default::default()
+    });
+    let prefilter_view = black_cube.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::Cube),
+        ..Default::default()
+    });
+
+    // 1x1 BRDF LUT with (0, 0, 0, 255)
+    let brdf_tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("default brdf lut"),
+        size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: COLOR_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &brdf_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &[0u8, 0, 0, 255],
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) },
+        wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+    );
+    let brdf_view = brdf_tex.create_view(&wgpu::TextureViewDescriptor::default());
+
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("default ibl bind group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&irradiance_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&prefilter_view) },
+            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&brdf_view) },
+            wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(sampler) },
+        ],
+    })
+}
+
+fn create_ibl_bind_group(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    ibl: &IblMaps,
+) -> wgpu::BindGroup {
+    // Irradiance cubemap
+    let irradiance_tex = create_cubemap(
+        device, queue, ibl.irradiance_size, 1,
+        &ibl.irradiance_faces.iter().map(|f| f.as_slice()).collect::<Vec<_>>(),
+    );
+    let irradiance_view = irradiance_tex.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::Cube),
+        ..Default::default()
+    });
+
+    // Prefiltered specular cubemap with mip levels
+    let prefilter_tex = create_cubemap_with_mips(
+        device, queue, ibl.prefilter_base_size, ibl.prefilter_mip_levels, &ibl.prefilter_faces,
+    );
+    let prefilter_view = prefilter_tex.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::Cube),
+        ..Default::default()
+    });
+
+    // BRDF LUT
+    let brdf_tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("brdf lut"),
+        size: wgpu::Extent3d { width: ibl.brdf_lut_size, height: ibl.brdf_lut_size, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: COLOR_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo { texture: &brdf_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        &ibl.brdf_lut,
+        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4 * ibl.brdf_lut_size), rows_per_image: Some(ibl.brdf_lut_size) },
+        wgpu::Extent3d { width: ibl.brdf_lut_size, height: ibl.brdf_lut_size, depth_or_array_layers: 1 },
+    );
+    let brdf_view = brdf_tex.create_view(&wgpu::TextureViewDescriptor::default());
+
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("ibl bind group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&irradiance_view) },
+            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&prefilter_view) },
+            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&brdf_view) },
+            wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(sampler) },
+        ],
+    })
+}
+
+fn create_cubemap(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    size: u32,
+    mip_levels: u32,
+    faces: &[&[u8]],
+) -> wgpu::Texture {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("cubemap"),
+        size: wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 6 },
+        mip_level_count: mip_levels,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: COLOR_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    for (face, data) in faces.iter().enumerate() {
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d { x: 0, y: 0, z: face as u32 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            data,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * size),
+                rows_per_image: Some(size),
+            },
+            wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 1 },
+        );
+    }
+    texture
+}
+
+fn create_cubemap_with_mips(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    base_size: u32,
+    mip_levels: u32,
+    faces: &[Vec<u8>],
+) -> wgpu::Texture {
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("prefiltered cubemap"),
+        size: wgpu::Extent3d { width: base_size, height: base_size, depth_or_array_layers: 6 },
+        mip_level_count: mip_levels,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: COLOR_FORMAT,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    for mip in 0..mip_levels {
+        let mip_size = (base_size >> mip).max(1);
+        for face in 0..6u32 {
+            let idx = (mip * 6 + face) as usize;
+            if idx < faces.len() {
+                queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &texture,
+                        mip_level: mip,
+                        origin: wgpu::Origin3d { x: 0, y: 0, z: face },
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &faces[idx],
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * mip_size),
+                        rows_per_image: Some(mip_size),
+                    },
+                    wgpu::Extent3d { width: mip_size, height: mip_size, depth_or_array_layers: 1 },
+                );
+            }
+        }
+    }
+    texture
 }

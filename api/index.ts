@@ -13,6 +13,7 @@ import { resolveSize, cameraViewProjection, cameraWorldPosition } from './camera
 import { resolveBackground } from './color'
 import { flattenScene } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity } from './lights'
+import { extractEnvironmentMap } from './materials'
 
 export type {
   RenderOutputFormat,
@@ -64,6 +65,7 @@ function toNativeInput(
   }
 
   const size = resolveSize(camera, options)
+  const envMap = extractEnvironmentMap(scene)
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
@@ -73,6 +75,10 @@ function toNativeInput(
     lights: extractLights(scene),
     ambientLight: extractAmbientLight(scene) ?? undefined,
     ambientIntensity: extractAmbientIntensity(scene) ?? undefined,
+    environmentMap: envMap?.data,
+    environmentMapWidth: envMap?.width,
+    environmentMapHeight: envMap?.height,
+    environmentMapIntensity: envMap?.intensity,
   }
   const nativeCamera: NativeCamera = {
     width: size.width,

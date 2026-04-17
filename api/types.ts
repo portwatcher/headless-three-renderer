@@ -124,6 +124,8 @@ export interface ThreeObject3DLike {
 export interface ThreeSceneLike extends ThreeObject3DLike {
   isScene: true
   background?: ThreeColorLike | null
+  environment?: ThreeTextureLike | null
+  environmentIntensity?: number
   updateMatrixWorld?(force?: boolean): void
 }
 
@@ -215,6 +217,10 @@ export interface NativeRenderScene {
   lights?: NativeSceneLight[]
   ambientLight?: number[]
   ambientIntensity?: number
+  environmentMap?: Buffer
+  environmentMapWidth?: number
+  environmentMapHeight?: number
+  environmentMapIntensity?: number
 }
 
 // ── Internal helper types ───────────────────────────────────────────
