@@ -29,6 +29,8 @@ pub struct Uniforms {
     pub normal_map_params: [f32; 4],
     /// x = env_intensity, y/z/w = reserved
     pub ibl_params: [f32; 4],
+    /// x = ao_map_intensity, y = has_ao_map (1.0 or 0.0), z/w = reserved
+    pub ao_params: [f32; 4],
     pub lights: [GpuLight; MAX_LIGHTS],
 }
 
@@ -43,6 +45,7 @@ pub struct GpuRenderer {
     mr_map_layout: wgpu::BindGroupLayout,
     emissive_map_layout: wgpu::BindGroupLayout,
     ibl_layout: wgpu::BindGroupLayout,
+    ao_map_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     default_texture_bind_group: wgpu::BindGroup,
@@ -50,6 +53,7 @@ pub struct GpuRenderer {
     default_mr_map_bind_group: wgpu::BindGroup,
     default_emissive_map_bind_group: wgpu::BindGroup,
     default_ibl_bind_group: wgpu::BindGroup,
+    default_ao_map_bind_group: wgpu::BindGroup,
 }
 
 struct GpuMesh {
@@ -60,6 +64,7 @@ struct GpuMesh {
     normal_map_bind_group: wgpu::BindGroup,
     mr_map_bind_group: wgpu::BindGroup,
     emissive_map_bind_group: wgpu::BindGroup,
+    ao_map_bind_group: wgpu::BindGroup,
     index_count: u32,
     vertex_count: u32,
     _uniform_buffer: wgpu::Buffer,
@@ -67,6 +72,7 @@ struct GpuMesh {
     _normal_map: Option<wgpu::Texture>,
     _mr_map: Option<wgpu::Texture>,
     _emissive_map: Option<wgpu::Texture>,
+    _ao_map: Option<wgpu::Texture>,
 }
 
 impl GpuRenderer {
@@ -201,6 +207,28 @@ impl GpuRenderer {
 
         let emissive_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("headless-three-renderer emissive map layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let ao_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer ao map layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -459,9 +487,29 @@ impl GpuRenderer {
             &sampler,
         );
 
+        // Default AO map: reuse the 1x1 white default texture; red channel = 1.0
+        // means full illumination (no occlusion).
+        let default_ao_map_view =
+            default_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let default_ao_map_bind_group =
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("headless-three-renderer default ao map bind group"),
+                layout: &ao_map_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&default_ao_map_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&sampler),
+                    },
+                ],
+            });
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout), Some(&ibl_layout)],
+            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout), Some(&ibl_layout), Some(&ao_map_layout)],
             immediate_size: 0,
         });
 
@@ -555,6 +603,7 @@ impl GpuRenderer {
             mr_map_layout,
             emissive_map_layout,
             ibl_layout,
+            ao_map_layout,
             sampler,
             _default_texture: default_texture,
             default_texture_bind_group,
@@ -562,6 +611,7 @@ impl GpuRenderer {
             default_mr_map_bind_group,
             default_emissive_map_bind_group,
             default_ibl_bind_group,
+            default_ao_map_bind_group,
         })
     }
 
@@ -807,6 +857,12 @@ impl GpuRenderer {
                 if settings.ibl.is_some() { 1.0 } else { 0.0 },
             ],
             ibl_params: [settings.env_intensity, 0.0, 0.0, 0.0],
+            ao_params: [
+                mesh.ao_map_intensity,
+                if mesh.ao_map.is_some() { 1.0 } else { 0.0 },
+                0.0,
+                0.0,
+            ],
             lights,
         };
         let uniform_buffer = self
@@ -1047,6 +1103,61 @@ impl GpuRenderer {
             None => (self.default_emissive_map_bind_group.clone(), None),
         };
 
+        let (ao_map_bind_group, _ao_map_texture) = match &mesh.ao_map {
+            Some(tex) => {
+                let tex_size = wgpu::Extent3d {
+                    width: tex.width,
+                    height: tex.height,
+                    depth_or_array_layers: 1,
+                };
+                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("headless-three-renderer ao map"),
+                    size: tex_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: COLOR_FORMAT,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+                self.queue.write_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &gpu_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &tex.rgba,
+                    wgpu::TexelCopyBufferLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * tex.width),
+                        rows_per_image: Some(tex.height),
+                    },
+                    tex_size,
+                );
+                let tex_view =
+                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group =
+                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("headless-three-renderer ao map bind group"),
+                        layout: &self.ao_map_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&tex_view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&self.sampler),
+                            },
+                        ],
+                    });
+                (tex_bind_group, Some(gpu_texture))
+            }
+            None => (self.default_ao_map_bind_group.clone(), None),
+        };
+
         Ok(GpuMesh {
             vertex_buffer,
             index_buffer,
@@ -1055,6 +1166,7 @@ impl GpuRenderer {
             normal_map_bind_group,
             mr_map_bind_group,
             emissive_map_bind_group,
+            ao_map_bind_group,
             index_count: mesh
                 .indices
                 .as_ref()
@@ -1065,6 +1177,7 @@ impl GpuRenderer {
             _normal_map: _normal_map_texture,
             _mr_map: _mr_map_texture,
             _emissive_map: _emissive_map_texture,
+            _ao_map: _ao_map_texture,
         })
     }
 }
@@ -1103,6 +1216,7 @@ fn draw_gpu_mesh(pass: &mut wgpu::RenderPass, mesh: &GpuMesh) {
     pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
     pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
     // bind group 5 (IBL) is set once per pass, not per mesh
+    pass.set_bind_group(6, &mesh.ao_map_bind_group, &[]);
     pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
     if let Some(index_buffer) = &mesh.index_buffer {
         pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);

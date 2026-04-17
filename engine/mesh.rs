@@ -42,6 +42,8 @@ pub struct PreparedMesh {
     pub normal_scale: [f32; 2],
     pub metallic_roughness_texture: Option<PreparedTexture>,
     pub emissive_map: Option<PreparedTexture>,
+    pub ao_map: Option<PreparedTexture>,
+    pub ao_map_intensity: f32,
     pub metallic: f32,
     pub roughness: f32,
     pub emissive: [f32; 3],
@@ -239,6 +241,17 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         _ => None,
     };
 
+    let ao_map = match &mesh.ao_map {
+        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
+            tex_data,
+            mesh.ao_map_width,
+            mesh.ao_map_height,
+            mesh_index,
+        )?),
+        _ => None,
+    };
+    let ao_map_intensity = clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32;
+
     // Compute tangents when we have a normal map and UVs
     if normal_map.is_some() && has_uvs {
         compute_tangents(&mut vertices, mesh.indices.as_deref());
@@ -268,6 +281,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         normal_scale,
         metallic_roughness_texture,
         emissive_map,
+        ao_map,
+        ao_map_intensity,
         metallic,
         roughness,
         emissive,

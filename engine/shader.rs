@@ -32,6 +32,8 @@ struct Uniforms {
   normal_map_params: vec4<f32>,
   // x = env_intensity
   ibl_params: vec4<f32>,
+  // x = ao_map_intensity, y = has_ao_map (1.0 or 0.0)
+  ao_params: vec4<f32>,
   lights: array<GpuLight, 16>,
 };
 
@@ -66,6 +68,11 @@ var t_prefilter: texture_cube<f32>;
 var t_brdf_lut: texture_2d<f32>;
 @group(5) @binding(3)
 var s_ibl: sampler;
+
+@group(6) @binding(0)
+var t_ao: texture_2d<f32>;
+@group(6) @binding(1)
+var s_ao: sampler;
 
 struct VertexInput {
   @location(0) position: vec3<f32>,
@@ -184,6 +191,14 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
   var lo = vec3<f32>(0.0);
 
+  // Ambient occlusion: sample red channel, blend toward 1.0 by intensity.
+  // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
+  var ao: f32 = 1.0;
+  if uniforms.ao_params.y > 0.5 {
+    let ao_sample = textureSample(t_ao, s_ao, uv).r;
+    ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
+  }
+
   let has_ibl = uniforms.normal_map_params.w > 0.5;
 
   if uniforms.num_lights == 0u && !has_ibl {
@@ -192,7 +207,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let sky_factor = 0.5 + 0.5 * N.y;
     let fallback_ambient = mix(vec3<f32>(0.1, 0.1, 0.12), vec3<f32>(0.4, 0.45, 0.5), sky_factor);
     let total_ambient = max(ambient, fallback_ambient);
-    lo = albedo * total_ambient;
+    lo = albedo * total_ambient * ao;
   } else {
     // Direct lighting from scene lights
     for (var i = 0u; i < uniforms.num_lights && i < MAX_LIGHTS; i = i + 1u) {
@@ -269,11 +284,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
       let brdf_sample = textureSample(t_brdf_lut, s_ibl, vec2<f32>(n_dot_v, roughness)).rg;
       let specular_ibl = prefiltered_color * (F_ibl * brdf_sample.x + brdf_sample.y);
 
-      lo = lo + (diffuse_ibl + specular_ibl) * env_intensity;
+      lo = lo + (diffuse_ibl + specular_ibl) * env_intensity * ao;
     } else {
       // Ambient (non-IBL fallback when lights are present)
       let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity * albedo;
-      lo = lo + ambient;
+      lo = lo + ambient * ao;
     }
   }
 
@@ -281,10 +296,38 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let emissive_sample = textureSample(t_emissive, s_emissive, uv).rgb;
   lo = lo + uniforms.emissive.rgb * emissive_sample;
 
-  // Tone mapping (Reinhard) and gamma correction
-  let mapped = lo / (lo + vec3<f32>(1.0));
+  // Tone mapping (ACES Filmic, matches three.js) and gamma correction
+  let mapped = aces_filmic_tone_mapping(lo);
   let gamma_corrected = pow(mapped, vec3<f32>(1.0 / 2.2));
 
   return vec4<f32>(gamma_corrected, alpha);
+}
+
+// ACES Filmic tone mapping, ported from three.js (Narkowicz fit with
+// input/output matrices). Includes the 1/0.6 exposure pre-scale that
+// three.js applies so output matches ACESFilmicToneMapping there.
+fn rrt_and_odt_fit(v: vec3<f32>) -> vec3<f32> {
+  let a = v * (v + vec3<f32>(0.0245786)) - vec3<f32>(0.000090537);
+  let b = v * (0.983729 * v + vec3<f32>(0.4329510)) + vec3<f32>(0.238081);
+  return a / b;
+}
+
+fn aces_filmic_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
+  // WGSL mat3x3 constructor takes columns.
+  let aces_input = mat3x3<f32>(
+    vec3<f32>(0.59719, 0.07600, 0.02840),
+    vec3<f32>(0.35458, 0.90834, 0.13383),
+    vec3<f32>(0.04823, 0.01566, 0.83777),
+  );
+  let aces_output = mat3x3<f32>(
+    vec3<f32>( 1.60475, -0.10208, -0.00327),
+    vec3<f32>(-0.53108,  1.10813, -0.07276),
+    vec3<f32>(-0.07367, -0.00605,  1.07602),
+  );
+  var color = color_in * (1.0 / 0.6);
+  color = aces_input * color;
+  color = rrt_and_odt_fit(color);
+  color = aces_output * color;
+  return clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 "#;

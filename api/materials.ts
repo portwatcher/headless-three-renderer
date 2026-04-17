@@ -152,6 +152,14 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.emissiveMapHeight = emissiveMapInfo.height
   }
 
+  const aoMapInfo = extractTextureFromSlot(material.aoMap)
+  if (aoMapInfo) {
+    props.aoMap = aoMapInfo.data
+    props.aoMapWidth = aoMapInfo.width
+    props.aoMapHeight = aoMapInfo.height
+    props.aoMapIntensity = Number.isFinite(material.aoMapIntensity) ? material.aoMapIntensity! : 1
+  }
+
   if (Number.isFinite(material.alphaTest) && material.alphaTest! > 0) {
     props.alphaTest = clamp01(material.alphaTest!)
   }
