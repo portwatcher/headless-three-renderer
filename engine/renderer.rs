@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 
 use crate::ibl::IblMaps;
 use crate::lights::{GpuLight, MAX_LIGHTS};
-use crate::mesh::{MeshSide, PreparedMesh, Vertex, WrapMode, prepare_meshes};
+use crate::mesh::{MeshSide, PreparedMesh, Topology, Vertex, WrapMode, prepare_meshes};
 use crate::settings::{OutputFormat, RenderSettings};
 use crate::shader::SHADER;
 use crate::types::{Camera, RenderScene};
@@ -41,6 +41,9 @@ pub struct GpuRenderer {
     pipelines: [wgpu::RenderPipeline; 3],
     /// Transparent pipelines (no depth write) keyed by `MeshSide`.
     transparent_pipelines: [wgpu::RenderPipeline; 3],
+    /// Line / point pipelines: [opaque, transparent] for each.
+    line_pipelines: [wgpu::RenderPipeline; 2],
+    point_pipelines: [wgpu::RenderPipeline; 2],
     uniform_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
@@ -70,6 +73,7 @@ struct GpuMesh {
     index_count: u32,
     vertex_count: u32,
     side: MeshSide,
+    topology: Topology,
     _uniform_buffer: wgpu::Buffer,
     _texture: Option<wgpu::Texture>,
     _normal_map: Option<wgpu::Texture>,
@@ -523,14 +527,24 @@ impl GpuRenderer {
         })];
 
         let vertex_buffers = [Vertex::layout()];
-        let make_pipeline = |side: MeshSide, transparent: bool| {
-            let (label, depth_write) = match (side, transparent) {
-                (MeshSide::Front, false) => ("headless-three-renderer pipeline (front)", true),
-                (MeshSide::Back, false) => ("headless-three-renderer pipeline (back)", true),
-                (MeshSide::Double, false) => ("headless-three-renderer pipeline (double)", true),
-                (MeshSide::Front, true) => ("headless-three-renderer transparent pipeline (front)", false),
-                (MeshSide::Back, true) => ("headless-three-renderer transparent pipeline (back)", false),
-                (MeshSide::Double, true) => ("headless-three-renderer transparent pipeline (double)", false),
+        let make_pipeline = |topology: Topology, side: MeshSide, transparent: bool| {
+            let label = match (topology, side, transparent) {
+                (Topology::Triangles, MeshSide::Front, false) => "pipeline (tri front)",
+                (Topology::Triangles, MeshSide::Back, false) => "pipeline (tri back)",
+                (Topology::Triangles, MeshSide::Double, false) => "pipeline (tri double)",
+                (Topology::Triangles, MeshSide::Front, true) => "pipeline (tri front, transparent)",
+                (Topology::Triangles, MeshSide::Back, true) => "pipeline (tri back, transparent)",
+                (Topology::Triangles, MeshSide::Double, true) => "pipeline (tri double, transparent)",
+                (Topology::Lines, _, false) => "pipeline (lines)",
+                (Topology::Lines, _, true) => "pipeline (lines, transparent)",
+                (Topology::Points, _, false) => "pipeline (points)",
+                (Topology::Points, _, true) => "pipeline (points, transparent)",
+            };
+            let depth_write = !transparent;
+            // Lines and points have no faces to cull.
+            let cull_mode = match topology {
+                Topology::Triangles => side.cull_mode(),
+                Topology::Lines | Topology::Points => None,
             };
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some(label),
@@ -542,10 +556,10 @@ impl GpuRenderer {
                     buffers: &vertex_buffers,
                 },
                 primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    topology: topology.primitive(),
                     strip_index_format: None,
                     front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: side.cull_mode(),
+                    cull_mode,
                     unclipped_depth: false,
                     polygon_mode: wgpu::PolygonMode::Fill,
                     conservative: false,
@@ -570,14 +584,22 @@ impl GpuRenderer {
         };
 
         let pipelines = [
-            make_pipeline(MeshSide::Front, false),
-            make_pipeline(MeshSide::Back, false),
-            make_pipeline(MeshSide::Double, false),
+            make_pipeline(Topology::Triangles, MeshSide::Front, false),
+            make_pipeline(Topology::Triangles, MeshSide::Back, false),
+            make_pipeline(Topology::Triangles, MeshSide::Double, false),
         ];
         let transparent_pipelines = [
-            make_pipeline(MeshSide::Front, true),
-            make_pipeline(MeshSide::Back, true),
-            make_pipeline(MeshSide::Double, true),
+            make_pipeline(Topology::Triangles, MeshSide::Front, true),
+            make_pipeline(Topology::Triangles, MeshSide::Back, true),
+            make_pipeline(Topology::Triangles, MeshSide::Double, true),
+        ];
+        let line_pipelines = [
+            make_pipeline(Topology::Lines, MeshSide::Front, false),
+            make_pipeline(Topology::Lines, MeshSide::Front, true),
+        ];
+        let point_pipelines = [
+            make_pipeline(Topology::Points, MeshSide::Front, false),
+            make_pipeline(Topology::Points, MeshSide::Front, true),
         ];
 
         Ok(Self {
@@ -585,6 +607,8 @@ impl GpuRenderer {
             queue,
             pipelines,
             transparent_pipelines,
+            line_pipelines,
+            point_pipelines,
             uniform_layout,
             texture_layout,
             normal_map_layout,
@@ -716,24 +740,24 @@ impl GpuRenderer {
 
             // Opaque meshes first (with depth write)
             pass.set_bind_group(5, &ibl_bind_group, &[]);
-            let mut current_pipeline: Option<usize> = None;
+            let mut current_pipeline: Option<PipelineKey> = None;
             for &i in &opaque_order {
-                let idx = side_index(gpu_meshes[i].side);
-                if current_pipeline != Some(idx) {
-                    pass.set_pipeline(&self.pipelines[idx]);
-                    current_pipeline = Some(idx);
+                let key = pipeline_key(&gpu_meshes[i]);
+                if current_pipeline != Some(key) {
+                    pass.set_pipeline(self.pipeline_for(key, false));
+                    current_pipeline = Some(key);
                 }
                 draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
             }
 
             // Transparent meshes second (back-to-front, no depth write)
             if !transparent_order.is_empty() {
-                let mut current_pipeline: Option<usize> = None;
+                let mut current_pipeline: Option<PipelineKey> = None;
                 for &i in &transparent_order {
-                    let idx = side_index(gpu_meshes[i].side);
-                    if current_pipeline != Some(idx) {
-                        pass.set_pipeline(&self.transparent_pipelines[idx]);
-                        current_pipeline = Some(idx);
+                    let key = pipeline_key(&gpu_meshes[i]);
+                    if current_pipeline != Some(key) {
+                        pass.set_pipeline(self.pipeline_for(key, true));
+                        current_pipeline = Some(key);
                     }
                     draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
                 }
@@ -1175,6 +1199,7 @@ impl GpuRenderer {
                 .map_or(0, |indices| indices.len() as u32),
             vertex_count: mesh.vertices.len() as u32,
             side: mesh.side,
+            topology: mesh.topology,
             _uniform_buffer: uniform_buffer,
             _texture: _mesh_texture,
             _normal_map: _normal_map_texture,
@@ -1190,6 +1215,38 @@ fn side_index(side: MeshSide) -> usize {
         MeshSide::Front => 0,
         MeshSide::Back => 1,
         MeshSide::Double => 2,
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum PipelineKey {
+    Tri(MeshSide),
+    Line,
+    Point,
+}
+
+fn pipeline_key(mesh: &GpuMesh) -> PipelineKey {
+    match mesh.topology {
+        Topology::Triangles => PipelineKey::Tri(mesh.side),
+        Topology::Lines => PipelineKey::Line,
+        Topology::Points => PipelineKey::Point,
+    }
+}
+
+impl GpuRenderer {
+    fn pipeline_for(&self, key: PipelineKey, transparent: bool) -> &wgpu::RenderPipeline {
+        match key {
+            PipelineKey::Tri(side) => {
+                let idx = side_index(side);
+                if transparent {
+                    &self.transparent_pipelines[idx]
+                } else {
+                    &self.pipelines[idx]
+                }
+            }
+            PipelineKey::Line => &self.line_pipelines[if transparent { 1 } else { 0 }],
+            PipelineKey::Point => &self.point_pipelines[if transparent { 1 } else { 0 }],
+        }
     }
 }
 

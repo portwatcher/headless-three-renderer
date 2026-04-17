@@ -52,6 +52,33 @@ pub struct PreparedMesh {
     pub is_transparent: bool,
     pub side: MeshSide,
     pub shading_model: ShadingModel,
+    pub topology: Topology,
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum Topology {
+    #[default]
+    Triangles,
+    Lines,
+    Points,
+}
+
+impl Topology {
+    pub fn from_str_opt(value: Option<&str>) -> Self {
+        match value {
+            Some("lines") => Self::Lines,
+            Some("points") => Self::Points,
+            _ => Self::Triangles,
+        }
+    }
+
+    pub fn primitive(self) -> wgpu::PrimitiveTopology {
+        match self {
+            Self::Triangles => wgpu::PrimitiveTopology::TriangleList,
+            Self::Lines => wgpu::PrimitiveTopology::LineList,
+            Self::Points => wgpu::PrimitiveTopology::PointList,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -149,8 +176,18 @@ pub fn prepare_meshes(scene: &crate::types::RenderScene) -> Result<Vec<PreparedM
 }
 
 fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh> {
-    if mesh.positions.len() < 9 || mesh.positions.len() % 3 != 0 {
-        bail!("scene.meshes[{mesh_index}].positions must contain at least 3 xyz vertices");
+    let topology = Topology::from_str_opt(mesh.topology.as_deref());
+
+    let min_positions = match topology {
+        Topology::Triangles => 9, // at least 3 xyz
+        Topology::Lines => 6,     // at least 2 xyz
+        Topology::Points => 3,    // at least 1 xyz
+    };
+    if mesh.positions.len() < min_positions || mesh.positions.len() % 3 != 0 {
+        bail!(
+            "scene.meshes[{mesh_index}].positions must contain at least {} xyz vertices",
+            min_positions / 3
+        );
     }
 
     let vertex_count = mesh.positions.len() / 3;
@@ -218,15 +255,25 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         });
     }
 
-    // If no normals were provided, compute flat normals from triangle faces
-    if !has_normals {
+    // If no normals were provided, compute flat normals from triangle faces.
+    // Lines and points have no meaningful normals; leave them zeroed (they
+    // are rendered with unlit shading regardless).
+    if !has_normals && topology == Topology::Triangles {
         compute_flat_normals(&mut vertices, mesh.indices.as_deref());
     }
 
     let indices = match &mesh.indices {
         Some(indices) => {
-            if indices.len() < 3 || indices.len() % 3 != 0 {
-                bail!("scene.meshes[{mesh_index}].indices must contain triangle-list indices");
+            let stride = match topology {
+                Topology::Triangles => 3,
+                Topology::Lines => 2,
+                Topology::Points => 1,
+            };
+            if indices.len() < stride || indices.len() % stride != 0 {
+                bail!(
+                    "scene.meshes[{mesh_index}].indices must contain {} index/indices per primitive",
+                    stride
+                );
             }
             for &index in indices {
                 if index as usize >= vertex_count {
@@ -236,9 +283,14 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             Some(indices.clone())
         }
         None => {
-            if vertex_count % 3 != 0 {
+            let stride = match topology {
+                Topology::Triangles => 3,
+                Topology::Lines => 2,
+                Topology::Points => 1,
+            };
+            if vertex_count % stride != 0 {
                 bail!(
-                    "scene.meshes[{mesh_index}] has no indices, so positions must define complete triangles"
+                    "scene.meshes[{mesh_index}] has no indices, so positions must define complete primitives ({stride} vertices per primitive)"
                 );
             }
             None
@@ -306,8 +358,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     };
     let ao_map_intensity = clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32;
 
-    // Compute tangents when we have a normal map and UVs
-    if normal_map.is_some() && has_uvs {
+    // Compute tangents when we have a normal map and UVs (triangle meshes only).
+    if normal_map.is_some() && has_uvs && topology == Topology::Triangles {
         compute_tangents(&mut vertices, mesh.indices.as_deref());
     }
 
@@ -326,7 +378,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
     let is_transparent = mesh.transparent.unwrap_or(material_color[3] < 0.999);
     let side = MeshSide::from_str_opt(mesh.side.as_deref());
-    let shading_model = ShadingModel::from_str_opt(mesh.shading_model.as_deref());
+    // Lines and points are always unlit (no meaningful normals).
+    let shading_model = match topology {
+        Topology::Lines | Topology::Points => ShadingModel::Basic,
+        Topology::Triangles => ShadingModel::from_str_opt(mesh.shading_model.as_deref()),
+    };
 
     Ok(PreparedMesh {
         vertices,
@@ -347,6 +403,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         is_transparent,
         side,
         shading_model,
+        topology,
     })
 }
 

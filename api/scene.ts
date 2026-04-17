@@ -16,6 +16,10 @@ function visitObject(object: ThreeObject3DLike, parentVisible: boolean, meshes: 
 
   if (object.isMesh === true && object.geometry) {
     appendMesh(object, meshes)
+  } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
+    appendLineOrPoints(object, meshes, 'lines')
+  } else if (object.isPoints === true && object.geometry) {
+    appendLineOrPoints(object, meshes, 'points')
   }
 
   const children = Array.isArray(object.children) ? object.children : []
@@ -140,4 +144,95 @@ function effectiveGroups(
     }
   }
   return groups
+}
+
+/**
+ * Emit a `NativeSceneMesh` with `topology: 'lines'` or `'points'` for
+ * `THREE.Line` / `THREE.LineSegments` / `THREE.LineLoop` / `THREE.Points`.
+ * Lines are always expanded to a LineList (pairs of vertex indices) so the
+ * Rust side only has to deal with one line topology.
+ */
+function appendLineOrPoints(
+  object: ThreeObject3DLike,
+  meshes: NativeSceneMesh[],
+  topology: 'lines' | 'points',
+): void {
+  const geometry = object.geometry!
+  const position = getAttribute(geometry, 'position')
+  if (!position) return
+
+  const material = materialForGroup(object.material, 0)
+  if (material?.visible === false) return
+
+  const positions = readVec3Attribute(position)
+  const vertexColors = getAttribute(geometry, 'color')
+  const indexAttr = geometry.index ? readIndexAttribute(geometry.index) : null
+  const vertexCount = position.count
+
+  const range = geometry.drawRange ?? {}
+  const sourceCount = indexAttr ? indexAttr.length : vertexCount
+  const drawStart = clampInteger(range.start ?? 0, 0, sourceCount)
+  const requestedCount = range.count == null || range.count === Infinity ? sourceCount : range.count
+  const drawEnd = clampInteger(drawStart + requestedCount, drawStart, sourceCount)
+
+  let indices: number[] | null = null
+  if (topology === 'lines') {
+    const source = indexAttr ?? rangeIndices(vertexCount)
+    indices = expandLineIndices(source, drawStart, drawEnd, object)
+    if (indices.length < 2) return
+  } else if (indexAttr) {
+    indices = indexAttr.slice(drawStart, drawEnd)
+    if (indices.length === 0) return
+  }
+
+  const color = materialColor(material)
+  const useVertexColors = vertexColors && material?.vertexColors !== false
+  const colors = useVertexColors ? readColorAttribute(vertexColors!, color) : undefined
+
+  meshes.push({
+    positions,
+    indices: indices ?? undefined,
+    color,
+    colors,
+    transform: matrixElements(object.matrixWorld!, 'object.matrixWorld'),
+    transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
+    alphaTest: material && Number.isFinite(material.alphaTest) && material.alphaTest! > 0 ? material.alphaTest : undefined,
+    shadingModel: 'basic',
+    topology,
+  })
+}
+
+function rangeIndices(count: number): number[] {
+  const out = new Array<number>(count)
+  for (let i = 0; i < count; i++) out[i] = i
+  return out
+}
+
+/**
+ * Convert a LineStrip / LineSegments / LineLoop index stream into a flat
+ * LineList `[a, b, b, c, ...]` array.
+ */
+function expandLineIndices(
+  source: number[],
+  start: number,
+  end: number,
+  object: ThreeObject3DLike,
+): number[] {
+  const count = end - start
+  if (count < 2) return []
+
+  if (object.isLineSegments === true) {
+    // already pairs; just validate alignment
+    const aligned = count - (count % 2)
+    return source.slice(start, start + aligned)
+  }
+
+  const out: number[] = []
+  for (let i = 0; i < count - 1; i++) {
+    out.push(source[start + i], source[start + i + 1])
+  }
+  if (object.isLineLoop === true && count >= 2) {
+    out.push(source[start + count - 1], source[start])
+  }
+  return out
 }

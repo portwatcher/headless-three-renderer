@@ -82,6 +82,9 @@ export interface ThreeMaterialLike {
   isMeshLambertMaterial?: boolean
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
+  isLineBasicMaterial?: boolean
+  isPointsMaterial?: boolean
+  size?: number
 }
 
 export interface ThreeBoneLike {
@@ -99,6 +102,10 @@ export interface ThreeObject3DLike {
   children?: ThreeObject3DLike[]
   isMesh?: boolean
   isSkinnedMesh?: boolean
+  isLine?: boolean
+  isLineSegments?: boolean
+  isLineLoop?: boolean
+  isPoints?: boolean
   isLight?: boolean
   isDirectionalLight?: boolean
   isPointLight?: boolean
@@ -216,6 +223,7 @@ export interface NativeSceneMesh {
   transparent?: boolean
   side?: string
   shadingModel?: string
+  topology?: string
 }
 
 export interface NativeRenderScene {

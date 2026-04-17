@@ -128,6 +128,8 @@ pub struct SceneMesh {
     /// Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
     /// or `"lambert"` (diffuse-only / MeshLambertMaterial).
     pub shading_model: Option<String>,
+    /// Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`.
+    pub topology: Option<String>,
 }
 
 #[napi(object)]
