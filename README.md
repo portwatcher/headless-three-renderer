@@ -91,6 +91,9 @@ The public API accepts only Three.js-like objects:
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`)
 - normal map with configurable `normalScale`
 - emissive color, intensity, and emissive map
+- occlusion map (`material.aoMap`) applied to indirect lighting
+- `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
+- `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with separate no-depth-write pipeline
 - texture wrap modes: repeat, mirror, clamp-to-edge
@@ -182,6 +185,18 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 - VRM blend shapes / expressions from `@pixiv/three-vrm`
 - Blender shape keys exported to glTF
 
+### Shadows
+
+Directional shadow maps are supported. Set `light.castShadow = true` on a `THREE.DirectionalLight`, configure `light.shadow.camera` (orthographic bounds), and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. The renderer picks the first shadow-casting directional light, renders a depth-only pass, and samples it with 3×3 PCF and a normal-offset bias.
+
+### Tone Mapping
+
+Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatible `1/0.6` exposure pre-scale, matching `THREE.ACESFilmicToneMapping`.
+
+### Lines and Points
+
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals.
+
 ### Not Yet Implemented
 
-Shadows, custom shaders, render targets, occlusion maps, lines, points, `MeshBasicMaterial`/`MeshLambertMaterial` unlit paths, back-face culling per `material.side`, and ACES Filmic tone mapping (currently uses Reinhard).
+Custom shaders, render targets, point/spot-light shadows, cascaded shadow maps, reflection probes, transmission / refraction, clearcoat / sheen, anisotropy, and post-processing effects.

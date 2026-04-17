@@ -1,24 +1,42 @@
 {
   "name": "headless-three-renderer",
   "version": "0.1.0",
-  "description": "Headless wgpu renderer for Three.js scenes in Node.js.",
+  "description": "Headless wgpu renderer for Three.js scenes in Node.js. Produces PNG or raw RGBA from a THREE.Scene + THREE.Camera without a browser or WebGL.",
+  "keywords": [
+    "three",
+    "three.js",
+    "wgpu",
+    "renderer",
+    "headless",
+    "server-side",
+    "ssr",
+    "pbr",
+    "gltf",
+    "vrm",
+    "napi",
+    "native"
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/portwatcher/headless-three-renderer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/portwatcher/headless-three-renderer/issues"
+  },
+  "homepage": "https://github.com/portwatcher/headless-three-renderer#readme",
   "engines": {
     "node": ">=16"
   },
   "files": [
     "dist/",
-    "api/",
-    "engine/",
     "native.js",
     "native.d.ts",
-    "*.node",
     "README.md",
-    "Cargo.toml",
-    "Cargo.lock",
-    "build.rs"
+    "LICENSE"
   ],
   "napi": {
     "binaryName": "headless_three_renderer",
@@ -27,14 +45,20 @@
       "x86_64-apple-darwin",
       "aarch64-apple-darwin",
       "x86_64-pc-windows-msvc",
-      "x86_64-unknown-linux-gnu"
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
     ]
   },
   "scripts": {
+    "artifacts": "napi artifacts",
     "build": "tsc && napi build --platform --js native.js --dts native.d.ts --release",
     "build:debug": "tsc && napi build --platform --js native.js --dts native.d.ts",
     "build:ts": "tsc",
-    "test": "cargo test"
+    "create-npm-dirs": "napi create-npm-dirs",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "node --test --test-reporter=spec test/",
+    "test:update": "UPDATE_SNAPSHOTS=1 node --test test/",
+    "test:rust": "cargo test"
   },
   "peerDependencies": {
     "three": ">=0.150.0"
@@ -42,6 +66,8 @@
   "devDependencies": {
     "@napi-rs/cli": "^3.6.1",
     "@types/node": "25.6.0",
+    "three": "^0.172.0",
     "typescript": "6.0.3"
   }
 }
+
