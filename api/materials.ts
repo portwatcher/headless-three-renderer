@@ -6,6 +6,11 @@ import { colorLikeToArray } from './color'
 const RepeatWrapping = 1000
 const MirroredRepeatWrapping = 1002
 
+// Three.js side constants
+const FrontSide = 0
+const BackSide = 1
+const DoubleSide = 2
+
 // Three.js texture type constants
 const UnsignedByteType = 1009
 const HalfFloatType = 1016
@@ -165,6 +170,13 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
   }
   if (typeof material.transparent === 'boolean') {
     props.transparent = material.transparent
+  }
+  if (material.side === BackSide) {
+    props.side = 'back'
+  } else if (material.side === DoubleSide) {
+    props.side = 'double'
+  } else if (material.side === FrontSide) {
+    props.side = 'front'
   }
 
   return props

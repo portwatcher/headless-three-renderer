@@ -77,6 +77,7 @@ export interface ThreeMaterialLike {
   aoMapIntensity?: number
   alphaTest?: number
   transparent?: boolean
+  side?: number
   isMeshBasicMaterial?: boolean
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
@@ -212,6 +213,7 @@ export interface NativeSceneMesh {
   aoMapIntensity?: number
   alphaTest?: number
   transparent?: boolean
+  side?: string
 }
 
 export interface NativeRenderScene {
@@ -256,6 +258,7 @@ export interface PbrProperties {
   aoMapIntensity?: number
   alphaTest?: number
   transparent?: boolean
+  side?: string
 }
 
 export interface TextureInfo {

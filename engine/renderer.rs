@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 
 use crate::ibl::IblMaps;
 use crate::lights::{GpuLight, MAX_LIGHTS};
-use crate::mesh::{PreparedMesh, Vertex, WrapMode, prepare_meshes};
+use crate::mesh::{MeshSide, PreparedMesh, Vertex, WrapMode, prepare_meshes};
 use crate::settings::{OutputFormat, RenderSettings};
 use crate::shader::SHADER;
 use crate::types::{Camera, RenderScene};
@@ -37,8 +37,10 @@ pub struct Uniforms {
 pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
-    pipeline: wgpu::RenderPipeline,
-    transparent_pipeline: wgpu::RenderPipeline,
+    /// Opaque pipelines keyed by `MeshSide` (Front, Back, Double).
+    pipelines: [wgpu::RenderPipeline; 3],
+    /// Transparent pipelines (no depth write) keyed by `MeshSide`.
+    transparent_pipelines: [wgpu::RenderPipeline; 3],
     uniform_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
@@ -67,6 +69,7 @@ struct GpuMesh {
     ao_map_bind_group: wgpu::BindGroup,
     index_count: u32,
     vertex_count: u32,
+    side: MeshSide,
     _uniform_buffer: wgpu::Buffer,
     _texture: Option<wgpu::Texture>,
     _normal_map: Option<wgpu::Texture>,
@@ -520,83 +523,68 @@ impl GpuRenderer {
         })];
 
         let vertex_buffers = [Vertex::layout()];
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("headless-three-renderer pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &vertex_buffers,
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &color_targets,
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        let make_pipeline = |side: MeshSide, transparent: bool| {
+            let (label, depth_write) = match (side, transparent) {
+                (MeshSide::Front, false) => ("headless-three-renderer pipeline (front)", true),
+                (MeshSide::Back, false) => ("headless-three-renderer pipeline (back)", true),
+                (MeshSide::Double, false) => ("headless-three-renderer pipeline (double)", true),
+                (MeshSide::Front, true) => ("headless-three-renderer transparent pipeline (front)", false),
+                (MeshSide::Back, true) => ("headless-three-renderer transparent pipeline (back)", false),
+                (MeshSide::Double, true) => ("headless-three-renderer transparent pipeline (double)", false),
+            };
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &vertex_buffers,
+                },
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: side.cull_mode(),
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DEPTH_FORMAT,
+                    depth_write_enabled: Some(depth_write),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &color_targets,
+                }),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
 
-        let transparent_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("headless-three-renderer transparent pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &vertex_buffers,
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: DEPTH_FORMAT,
-                depth_write_enabled: Some(false),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &color_targets,
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        let pipelines = [
+            make_pipeline(MeshSide::Front, false),
+            make_pipeline(MeshSide::Back, false),
+            make_pipeline(MeshSide::Double, false),
+        ];
+        let transparent_pipelines = [
+            make_pipeline(MeshSide::Front, true),
+            make_pipeline(MeshSide::Back, true),
+            make_pipeline(MeshSide::Double, true),
+        ];
 
         Ok(Self {
             device,
             queue,
-            pipeline,
-            transparent_pipeline,
+            pipelines,
+            transparent_pipelines,
             uniform_layout,
             texture_layout,
             normal_map_layout,
@@ -727,17 +715,26 @@ impl GpuRenderer {
             });
 
             // Opaque meshes first (with depth write)
-            pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(5, &ibl_bind_group, &[]);
+            let mut current_pipeline: Option<usize> = None;
             for &i in &opaque_order {
+                let idx = side_index(gpu_meshes[i].side);
+                if current_pipeline != Some(idx) {
+                    pass.set_pipeline(&self.pipelines[idx]);
+                    current_pipeline = Some(idx);
+                }
                 draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
             }
 
             // Transparent meshes second (back-to-front, no depth write)
             if !transparent_order.is_empty() {
-                pass.set_pipeline(&self.transparent_pipeline);
-                pass.set_bind_group(5, &ibl_bind_group, &[]);
+                let mut current_pipeline: Option<usize> = None;
                 for &i in &transparent_order {
+                    let idx = side_index(gpu_meshes[i].side);
+                    if current_pipeline != Some(idx) {
+                        pass.set_pipeline(&self.transparent_pipelines[idx]);
+                        current_pipeline = Some(idx);
+                    }
                     draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
                 }
             }
@@ -1172,6 +1169,7 @@ impl GpuRenderer {
                 .as_ref()
                 .map_or(0, |indices| indices.len() as u32),
             vertex_count: mesh.vertices.len() as u32,
+            side: mesh.side,
             _uniform_buffer: uniform_buffer,
             _texture: _mesh_texture,
             _normal_map: _normal_map_texture,
@@ -1179,6 +1177,14 @@ impl GpuRenderer {
             _emissive_map: _emissive_map_texture,
             _ao_map: _ao_map_texture,
         })
+    }
+}
+
+fn side_index(side: MeshSide) -> usize {
+    match side {
+        MeshSide::Front => 0,
+        MeshSide::Back => 1,
+        MeshSide::Double => 2,
     }
 }
 

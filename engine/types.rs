@@ -123,6 +123,8 @@ pub struct SceneMesh {
     pub alpha_test: Option<f64>,
     /// Whether the mesh is transparent (sorted back-to-front, no depth write).
     pub transparent: Option<bool>,
+    /// Which faces to render: `"front"` (default), `"back"`, or `"double"`.
+    pub side: Option<String>,
 }
 
 #[napi(object)]

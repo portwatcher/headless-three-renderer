@@ -154,7 +154,7 @@ fn get_spot_attenuation(cone_cos: f32, penumbra_cos: f32, angle_cos: f32) -> f32
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
   let uv = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
   let tex_color = textureSample(t_diffuse, s_diffuse, uv);
   let albedo = tex_color.rgb * input.color.rgb * uniforms.base_color.rgb;
@@ -172,6 +172,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
   // Normal mapping via TBN matrix
   var N = normalize(input.world_normal);
+  // Flip normal when shading back-facing fragments (BackSide / DoubleSide).
+  // For FrontSide meshes, back faces are culled so front_facing is always true.
+  if !front_facing {
+    N = -N;
+  }
   if uniforms.normal_map_params.z > 0.5 {
     let T = normalize(input.world_tangent);
     let B = normalize(cross(N, T) * input.tangent_w);

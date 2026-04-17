@@ -50,6 +50,33 @@ pub struct PreparedMesh {
     pub base_color: [f32; 4],
     pub alpha_test: f32,
     pub is_transparent: bool,
+    pub side: MeshSide,
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum MeshSide {
+    #[default]
+    Front,
+    Back,
+    Double,
+}
+
+impl MeshSide {
+    pub fn from_str_opt(value: Option<&str>) -> Self {
+        match value {
+            Some("back") => Self::Back,
+            Some("double") => Self::Double,
+            _ => Self::Front,
+        }
+    }
+
+    pub fn cull_mode(self) -> Option<wgpu::Face> {
+        match self {
+            Self::Front => Some(wgpu::Face::Back),
+            Self::Back => Some(wgpu::Face::Front),
+            Self::Double => None,
+        }
+    }
 }
 
 pub struct PreparedTexture {
@@ -271,6 +298,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
 
     let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
     let is_transparent = mesh.transparent.unwrap_or(material_color[3] < 0.999);
+    let side = MeshSide::from_str_opt(mesh.side.as_deref());
 
     Ok(PreparedMesh {
         vertices,
@@ -289,6 +317,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         base_color: color_to_f32(material_color),
         alpha_test,
         is_transparent,
+        side,
     })
 }
 
