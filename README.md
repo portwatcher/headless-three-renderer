@@ -76,6 +76,7 @@ The public API accepts only Three.js-like objects:
 Current rendering support is intentionally focused on static triangle meshes:
 
 - `THREE.Mesh`
+- `THREE.SkinnedMesh` with skeletal animation (CPU skinning)
 - `THREE.BufferGeometry` positions, indices, and UV coordinates
 - geometry groups with material arrays
 - mesh world transforms
@@ -104,4 +105,58 @@ The renderer supports the standard Three.js light types:
 
 Lights are automatically extracted from the scene. The shader uses a Cook-Torrance PBR BRDF with GGX distribution, matching Three.js physically-based attenuation (distance falloff and spot cone). Up to 16 lights per scene. When no lights are present, meshes render with a hemispherical ambient fallback.
 
-Not yet implemented: shadows, skinning, morph targets, custom shaders, render targets, lines, points, normal/roughness/emissive maps, and environment maps. Those require additional `wgpu` pipeline and shader work.
+### Skinning / Skeletal Animation
+
+`THREE.SkinnedMesh` objects are automatically detected and skinned on the CPU. The renderer reads `skinIndex` and `skinWeight` attributes from the geometry, computes bone matrices from `skeleton.bones` and `skeleton.boneInverses`, and transforms vertex positions and normals before sending them to the GPU.
+
+This works with any library that produces standard Three.js `SkinnedMesh` objects:
+
+- **Three.js** `SkinnedMesh` + `Skeleton` + `AnimationMixer`
+- **@pixiv/three-vrm** — VRM humanoid avatars
+- **VRMA** — VRM Animation files applied via `VRMAnimationLoaderPlugin` + `createVRMAnimationClip`
+
+Call `mixer.update(dt)` and `scene.updateMatrixWorld(true)` before `render()` to bake the current pose:
+
+```js
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
+import renderer from './index.js'
+
+const gltfLoader = new GLTFLoader()
+gltfLoader.register((parser) => new VRMLoaderPlugin(parser))
+gltfLoader.register((parser) => new VRMAnimationLoaderPlugin(parser))
+
+// Load VRM model
+const modelGltf = await gltfLoader.loadAsync('./avatar.vrm')
+const vrm = modelGltf.userData.vrm
+VRMUtils.removeUnnecessaryVertices(vrm.scene)
+VRMUtils.removeUnnecessaryJoints(vrm.scene)
+vrm.scene.rotation.y = Math.PI
+
+// Load VRMA animation
+const animGltf = await gltfLoader.loadAsync('./dance.vrma')
+const vrmAnimation = animGltf.userData.vrmAnimations[0]
+const clip = createVRMAnimationClip(vrmAnimation, vrm)
+
+// Animate to a specific time
+const mixer = new THREE.AnimationMixer(vrm.scene)
+mixer.clipAction(clip).play()
+mixer.update(1.5) // seek to 1.5 seconds
+
+// Update world matrices then render
+vrm.update(0)
+vrm.scene.updateMatrixWorld(true)
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20)
+camera.position.set(0, 1.2, 3)
+camera.lookAt(0, 1, 0)
+
+const imageBuffer = renderer.render(vrm.scene, camera, {
+  width: 1024,
+  height: 1024,
+})
+```
+
+Not yet implemented: shadows, morph targets, custom shaders, render targets, lines, points, normal/roughness/emissive maps, and environment maps. Those require additional `wgpu` pipeline and shader work.

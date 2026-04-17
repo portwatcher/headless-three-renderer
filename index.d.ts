@@ -67,10 +67,21 @@ export interface ThreeMaterialLike {
   isMeshPhysicalMaterial?: boolean
 }
 
+export interface ThreeBoneLike {
+  matrixWorld?: ThreeMatrix4Like
+}
+
+export interface ThreeSkeletonLike {
+  bones?: ThreeBoneLike[]
+  boneInverses?: ThreeMatrix4Like[]
+  update?(): void
+}
+
 export interface ThreeObject3DLike {
   visible?: boolean
   children?: ThreeObject3DLike[]
   isMesh?: boolean
+  isSkinnedMesh?: boolean
   isLight?: boolean
   isDirectionalLight?: boolean
   isPointLight?: boolean
@@ -80,6 +91,9 @@ export interface ThreeObject3DLike {
   geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike | ThreeMaterialLike[]
   matrixWorld?: ThreeMatrix4Like
+  skeleton?: ThreeSkeletonLike
+  bindMatrix?: ThreeMatrix4Like
+  bindMatrixInverse?: ThreeMatrix4Like
   color?: ThreeColorLike
   groundColor?: ThreeColorLike
   intensity?: number

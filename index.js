@@ -138,14 +138,28 @@ function appendMesh(object, meshes) {
   const position = getAttribute(geometry, 'position')
   if (!position) return
 
-  const positions = readVec3Attribute(position)
+  let positions = readVec3Attribute(position)
   const uvAttribute = getAttribute(geometry, 'uv')
   const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
   const normalAttribute = getAttribute(geometry, 'normal')
-  const normals = normalAttribute ? readVec3Attribute(normalAttribute) : null
+  let normals = normalAttribute ? readVec3Attribute(normalAttribute) : null
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index) : null
   const groups = effectiveGroups(geometry, index, position.count)
+
+  // CPU-side skinning for SkinnedMesh (Three.js, VRM, VRMA)
+  if (object.isSkinnedMesh === true && object.skeleton) {
+    const skinned = applyCpuSkinning(object, positions, normals)
+    positions = skinned.positions
+    normals = skinned.normals
+  }
+
+  // For skinned meshes, positions are already in world space after CPU skinning.
+  // Use identity transform instead of matrixWorld.
+  const isSkinned = object.isSkinnedMesh === true && object.skeleton
+  const meshTransform = isSkinned
+    ? IDENTITY_4X4.slice()
+    : matrixElements(object.matrixWorld, 'mesh.matrixWorld')
 
   for (const group of groups) {
     const material = materialForGroup(object.material, group.materialIndex)
@@ -173,7 +187,7 @@ function appendMesh(object, meshes) {
         texture: textureInfo?.data,
         textureWidth: textureInfo?.width ?? undefined,
         textureHeight: textureInfo?.height ?? undefined,
-        transform: matrixElements(object.matrixWorld, 'mesh.matrixWorld'),
+        transform: meshTransform,
         ...pbrProps,
       })
     } else {
@@ -192,7 +206,7 @@ function appendMesh(object, meshes) {
         texture: textureInfo?.data,
         textureWidth: textureInfo?.width ?? undefined,
         textureHeight: textureInfo?.height ?? undefined,
-        transform: matrixElements(object.matrixWorld, 'mesh.matrixWorld'),
+        transform: meshTransform,
         ...pbrProps,
       })
     }
@@ -204,6 +218,210 @@ function getAttribute(geometry, name) {
     return geometry.getAttribute(name)
   }
   return geometry.attributes?.[name]
+}
+
+function getAttribute(geometry, name) {
+  if (typeof geometry.getAttribute === 'function') {
+    return geometry.getAttribute(name)
+  }
+  return geometry.attributes?.[name]
+}
+
+/**
+ * CPU-side skeletal skinning for SkinnedMesh.
+ * Supports Three.js SkinnedMesh, @pixiv/three-vrm, and VRMA animations.
+ *
+ * Three.js bone transform formula per vertex:
+ *   skinnedPosition = sum_i(weight_i * (bone_i.matrixWorld * bindMatrixInverse * bindMatrix^{-1} ... ))
+ * Simplified using boneMatrices[i] = bone.matrixWorld * skeleton.boneInverses[i]:
+ *   skinMatrix = sum_i(weight_i * boneMatrices[index_i])
+ *   skinnedPos = bindMatrixInverse * skinMatrix * bindMatrix * localPos
+ *
+ * Actually Three.js computes:
+ *   boneMatrix[i] = skeleton.bones[i].matrixWorld * skeleton.boneInverses[i]
+ *   skinMatrix = sum(weight[i] * boneMatrix[skinIndex[i]])
+ *   worldPos = mesh.bindMatrixInverse * skinMatrix * mesh.bindMatrix * localPos
+ *
+ * Then we output the world-space position (multiplied by mesh.matrixWorld is NOT needed
+ * because Three.js boneMatrices already include world transforms).
+ */
+function applyCpuSkinning(mesh, positions, normals) {
+  const geometry = mesh.geometry
+  const skeleton = mesh.skeleton
+
+  const skinIndexAttr = getAttribute(geometry, 'skinIndex')
+  const skinWeightAttr = getAttribute(geometry, 'skinWeight')
+
+  if (!skinIndexAttr || !skinWeightAttr || !skeleton) {
+    return { positions, normals }
+  }
+
+  // Ensure skeleton matrices are up to date
+  if (typeof skeleton.update === 'function') {
+    skeleton.update()
+  }
+
+  const bones = skeleton.bones
+  const boneInverses = skeleton.boneInverses
+  if (!bones || !boneInverses || bones.length === 0) {
+    return { positions, normals }
+  }
+
+  // Compute bone matrices: bones[i].matrixWorld * boneInverses[i]
+  const boneCount = bones.length
+  // Each bone matrix is a flat 16-element column-major array
+  const boneMatrices = new Array(boneCount)
+  for (let i = 0; i < boneCount; i++) {
+    const boneWorld = bones[i]?.matrixWorld?.elements
+    const boneInv = boneInverses[i]?.elements
+    if (!boneWorld || !boneInv) {
+      boneMatrices[i] = IDENTITY_4X4
+      continue
+    }
+    boneMatrices[i] = multiplyMatrices(Array.from(boneWorld), Array.from(boneInv))
+  }
+
+  // Get bind matrix and its inverse
+  const bindMatrix = mesh.bindMatrix?.elements
+    ? Array.from(mesh.bindMatrix.elements)
+    : IDENTITY_4X4
+  const bindMatrixInverse = mesh.bindMatrixInverse?.elements
+    ? Array.from(mesh.bindMatrixInverse.elements)
+    : invertMatrix4(bindMatrix)
+
+  const vertexCount = positions.length / 3
+  const skinnedPositions = new Array(positions.length)
+  const skinnedNormals = normals ? new Array(normals.length) : null
+
+  for (let vi = 0; vi < vertexCount; vi++) {
+    // Read 4 joint indices and weights
+    const ji0 = Math.floor(attributeComponent(skinIndexAttr, vi, 0))
+    const ji1 = Math.floor(attributeComponent(skinIndexAttr, vi, 1))
+    const ji2 = Math.floor(attributeComponent(skinIndexAttr, vi, 2))
+    const ji3 = Math.floor(attributeComponent(skinIndexAttr, vi, 3))
+    const jw0 = attributeComponent(skinWeightAttr, vi, 0)
+    const jw1 = attributeComponent(skinWeightAttr, vi, 1)
+    const jw2 = attributeComponent(skinWeightAttr, vi, 2)
+    const jw3 = attributeComponent(skinWeightAttr, vi, 3)
+
+    // Build the blended skin matrix
+    const skinMatrix = blendBoneMatrices(
+      boneMatrices, boneCount,
+      ji0, ji1, ji2, ji3,
+      jw0, jw1, jw2, jw3,
+    )
+
+    // finalMatrix = bindMatrixInverse * skinMatrix * bindMatrix
+    const finalMatrix = multiplyMatrices(bindMatrixInverse, multiplyMatrices(skinMatrix, bindMatrix))
+
+    // Transform position
+    const px = positions[vi * 3]
+    const py = positions[vi * 3 + 1]
+    const pz = positions[vi * 3 + 2]
+    skinnedPositions[vi * 3] = finalMatrix[0] * px + finalMatrix[4] * py + finalMatrix[8] * pz + finalMatrix[12]
+    skinnedPositions[vi * 3 + 1] = finalMatrix[1] * px + finalMatrix[5] * py + finalMatrix[9] * pz + finalMatrix[13]
+    skinnedPositions[vi * 3 + 2] = finalMatrix[2] * px + finalMatrix[6] * py + finalMatrix[10] * pz + finalMatrix[14]
+
+    // Transform normal (using upper-left 3x3, no translation)
+    if (normals && skinnedNormals) {
+      const nx = normals[vi * 3]
+      const ny = normals[vi * 3 + 1]
+      const nz = normals[vi * 3 + 2]
+      let snx = finalMatrix[0] * nx + finalMatrix[4] * ny + finalMatrix[8] * nz
+      let sny = finalMatrix[1] * nx + finalMatrix[5] * ny + finalMatrix[9] * nz
+      let snz = finalMatrix[2] * nx + finalMatrix[6] * ny + finalMatrix[10] * nz
+      // Re-normalize
+      const len = Math.sqrt(snx * snx + sny * sny + snz * snz)
+      if (len > 1e-8) {
+        snx /= len
+        sny /= len
+        snz /= len
+      }
+      skinnedNormals[vi * 3] = snx
+      skinnedNormals[vi * 3 + 1] = sny
+      skinnedNormals[vi * 3 + 2] = snz
+    }
+  }
+
+  return { positions: skinnedPositions, normals: skinnedNormals }
+}
+
+const IDENTITY_4X4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+
+function blendBoneMatrices(boneMatrices, boneCount, ji0, ji1, ji2, ji3, jw0, jw1, jw2, jw3) {
+  const out = new Array(16)
+  for (let k = 0; k < 16; k++) {
+    out[k] = 0
+  }
+
+  if (jw0 > 0 && ji0 >= 0 && ji0 < boneCount) {
+    const m = boneMatrices[ji0]
+    for (let k = 0; k < 16; k++) out[k] += jw0 * m[k]
+  }
+  if (jw1 > 0 && ji1 >= 0 && ji1 < boneCount) {
+    const m = boneMatrices[ji1]
+    for (let k = 0; k < 16; k++) out[k] += jw1 * m[k]
+  }
+  if (jw2 > 0 && ji2 >= 0 && ji2 < boneCount) {
+    const m = boneMatrices[ji2]
+    for (let k = 0; k < 16; k++) out[k] += jw2 * m[k]
+  }
+  if (jw3 > 0 && ji3 >= 0 && ji3 < boneCount) {
+    const m = boneMatrices[ji3]
+    for (let k = 0; k < 16; k++) out[k] += jw3 * m[k]
+  }
+
+  // If all weights were zero, return identity
+  const sum = jw0 + jw1 + jw2 + jw3
+  if (sum < 1e-8) {
+    return IDENTITY_4X4
+  }
+
+  return out
+}
+
+function invertMatrix4(m) {
+  // Column-major 4x4 matrix inverse
+  const a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3]
+  const a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7]
+  const a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11]
+  const a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15]
+
+  const b00 = a00 * a11 - a01 * a10
+  const b01 = a00 * a12 - a02 * a10
+  const b02 = a00 * a13 - a03 * a10
+  const b03 = a01 * a12 - a02 * a11
+  const b04 = a01 * a13 - a03 * a11
+  const b05 = a02 * a13 - a03 * a12
+  const b06 = a20 * a31 - a21 * a30
+  const b07 = a20 * a32 - a22 * a30
+  const b08 = a20 * a33 - a23 * a30
+  const b09 = a21 * a32 - a22 * a31
+  const b10 = a21 * a33 - a23 * a31
+  const b11 = a22 * a33 - a23 * a32
+
+  let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06
+  if (Math.abs(det) < 1e-12) return IDENTITY_4X4.slice()
+  det = 1.0 / det
+
+  return [
+    (a11 * b11 - a12 * b10 + a13 * b09) * det,
+    (a02 * b10 - a01 * b11 - a03 * b09) * det,
+    (a31 * b05 - a32 * b04 + a33 * b03) * det,
+    (a22 * b04 - a21 * b05 - a23 * b03) * det,
+    (a12 * b08 - a10 * b11 - a13 * b07) * det,
+    (a00 * b11 - a02 * b08 + a03 * b07) * det,
+    (a32 * b02 - a30 * b05 - a33 * b01) * det,
+    (a20 * b05 - a22 * b02 + a23 * b01) * det,
+    (a10 * b10 - a11 * b08 + a13 * b06) * det,
+    (a01 * b08 - a00 * b10 - a03 * b06) * det,
+    (a30 * b04 - a31 * b02 + a33 * b00) * det,
+    (a21 * b02 - a20 * b04 - a23 * b00) * det,
+    (a11 * b07 - a10 * b09 - a12 * b06) * det,
+    (a00 * b09 - a01 * b07 + a02 * b06) * det,
+    (a31 * b01 - a30 * b03 - a32 * b00) * det,
+    (a20 * b03 - a21 * b01 + a22 * b00) * det,
+  ]
 }
 
 function effectiveGroups(geometry, index, vertexCount) {
