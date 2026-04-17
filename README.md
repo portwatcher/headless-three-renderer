@@ -5,14 +5,13 @@ Headless `wgpu` renderer for Three.js scenes in Node.js.
 This package exists for Node.js environments where WebGL is not available. You build or load a normal Three.js scene, pass the `THREE.Scene` and `THREE.Camera` to this package, and the native addon renders it with `wgpu`.
 
 ```bash
-npm install
-npm run build
+npm install headless-three-renderer three
 ```
 
 ```js
-const fs = require('node:fs')
-const THREE = require('three')
-const renderer = require('./')
+import fs from 'node:fs'
+import * as THREE from 'three'
+import { render } from 'headless-three-renderer'
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0.04, 0.045, 0.05)
@@ -25,7 +24,7 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
 camera.position.set(2.5, 1.8, 3.2)
 camera.lookAt(0, 0, 0)
 
-const imageBuffer = renderer.render(scene, camera, {
+const imageBuffer = render(scene, camera, {
   width: 512,
   height: 512,
 })
@@ -39,7 +38,7 @@ With `GLTFLoader`, render the loaded Three.js scene directly:
 import fs from 'node:fs'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import renderer from './index.js'
+import { render } from 'headless-three-renderer'
 
 const gltf = await new GLTFLoader().loadAsync('./model.glb')
 
@@ -47,7 +46,7 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
 camera.position.set(2, 1.5, 4)
 camera.lookAt(0, 0, 0)
 
-const imageBuffer = renderer.render(gltf.scene, camera, {
+const imageBuffer = render(gltf.scene, camera, {
   width: 1024,
   height: 1024,
 })
@@ -58,7 +57,7 @@ fs.writeFileSync('render.png', imageBuffer)
 The module exports a convenience `render(scene, camera, options)` function and a reusable `Renderer` class:
 
 ```js
-const { Renderer } = require('./')
+import { Renderer } from 'headless-three-renderer'
 const renderer = new Renderer()
 const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 ```
@@ -140,7 +139,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import renderer from './index.js'
+import { render } from 'headless-three-renderer'
 
 const gltfLoader = new GLTFLoader()
 gltfLoader.register((parser) => new VRMLoaderPlugin(parser))
@@ -171,7 +170,7 @@ const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20)
 camera.position.set(0, 1.2, 3)
 camera.lookAt(0, 1, 0)
 
-const imageBuffer = renderer.render(vrm.scene, camera, {
+const imageBuffer = render(vrm.scene, camera, {
   width: 1024,
   height: 1024,
 })

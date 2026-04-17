@@ -12,7 +12,7 @@ permissions:
 on:
   push:
     branches: [main]
-    tags-ignore: ['**']
+    tags: ['v*']
     paths-ignore: ['**/*.md', 'LICENSE', '.gitignore']
   pull_request: null
 
@@ -150,16 +150,15 @@ jobs:
       - name: Publish
         run: |
           npm config set provenance true
-          if git log -1 --pretty=%B | grep "^v\?[0-9]\+\.[0-9]\+\.[0-9]\+$";
-          then
-            echo "Publishing stable"
+          TAG="${GITHUB_REF_NAME}"
+          if echo "$TAG" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Publishing stable ($TAG)"
             npm publish --access public
-          elif git log -1 --pretty=%B | grep "^v\?[0-9]\+\.[0-9]\+\.[0-9]\+-";
-          then
-            echo "Publishing prerelease"
+          elif echo "$TAG" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+-'; then
+            echo "Publishing prerelease ($TAG)"
             npm publish --tag next --access public
           else
-            echo "Not a release commit, skipping publish"
+            echo "Tag '$TAG' is not a release tag, skipping publish"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
