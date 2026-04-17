@@ -1,3 +1,4 @@
+mod ibl;
 mod lights;
 mod mesh;
 mod renderer;

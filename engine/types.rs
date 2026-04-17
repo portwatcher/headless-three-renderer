@@ -20,6 +20,14 @@ pub struct RenderScene {
     pub ambient_light: Option<Vec<f64>>,
     /// Ambient light intensity. Defaults to 0.
     pub ambient_intensity: Option<f64>,
+    /// Optional environment map image data (equirectangular HDR/LDR, encoded or raw RGBA/Float).
+    pub environment_map: Option<Buffer>,
+    /// Environment map width in pixels (required when data is raw typed-array bytes).
+    pub environment_map_width: Option<u32>,
+    /// Environment map height in pixels (required when data is raw typed-array bytes).
+    pub environment_map_height: Option<u32>,
+    /// Environment map intensity multiplier. Defaults to 1.
+    pub environment_map_intensity: Option<f64>,
 }
 
 #[napi(object)]

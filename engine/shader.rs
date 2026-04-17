@@ -28,8 +28,10 @@ struct Uniforms {
   ambient_intensity: f32,
   num_lights: u32,
   ambient_color: vec4<f32>,
-  // x = normal_scale.x, y = normal_scale.y, z = has_normal_map (1.0 or 0.0)
+  // x = normal_scale.x, y = normal_scale.y, z = has_normal_map (1.0 or 0.0), w = has_ibl (1.0 or 0.0)
   normal_map_params: vec4<f32>,
+  // x = env_intensity
+  ibl_params: vec4<f32>,
   lights: array<GpuLight, 16>,
 };
 
@@ -55,6 +57,15 @@ var s_metallic_roughness: sampler;
 var t_emissive: texture_2d<f32>;
 @group(4) @binding(1)
 var s_emissive: sampler;
+
+@group(5) @binding(0)
+var t_irradiance: texture_cube<f32>;
+@group(5) @binding(1)
+var t_prefilter: texture_cube<f32>;
+@group(5) @binding(2)
+var t_brdf_lut: texture_2d<f32>;
+@group(5) @binding(3)
+var s_ibl: sampler;
 
 struct VertexInput {
   @location(0) position: vec3<f32>,
@@ -112,9 +123,12 @@ fn fresnel_schlick(cos_theta: f32, f0: vec3<f32>) -> vec3<f32> {
   return f0 + (vec3<f32>(1.0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
+// Schlick Fresnel with roughness for IBL
+fn fresnel_schlick_roughness(cos_theta: f32, f0: vec3<f32>, roughness: f32) -> vec3<f32> {
+  return f0 + (max(vec3<f32>(1.0 - roughness), f0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
 // Three.js-compatible distance attenuation
-// distance = cutoff distance (0 = infinite range)
-// decay = decay exponent (default 2, physically correct)
 fn get_distance_attenuation(light_distance: f32, cutoff_distance: f32, decay_exponent: f32) -> f32 {
   var falloff = 1.0 / max(pow(light_distance, decay_exponent), 0.01);
   if cutoff_distance > 0.0 {
@@ -170,14 +184,17 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
   var lo = vec3<f32>(0.0);
 
-  if uniforms.num_lights == 0u {
-    // No lights: render with a basic hemispherical ambient
+  let has_ibl = uniforms.normal_map_params.w > 0.5;
+
+  if uniforms.num_lights == 0u && !has_ibl {
+    // No lights or IBL: render with a basic hemispherical ambient
     let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity;
     let sky_factor = 0.5 + 0.5 * N.y;
     let fallback_ambient = mix(vec3<f32>(0.1, 0.1, 0.12), vec3<f32>(0.4, 0.45, 0.5), sky_factor);
     let total_ambient = max(ambient, fallback_ambient);
     lo = albedo * total_ambient;
   } else {
+    // Direct lighting from scene lights
     for (var i = 0u; i < uniforms.num_lights && i < MAX_LIGHTS; i = i + 1u) {
       let light = uniforms.lights[i];
 
@@ -234,9 +251,30 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
       lo = lo + (k_d * albedo / PI + specular) * radiance * n_dot_l;
     }
 
-    // Ambient
-    let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity * albedo;
-    lo = lo + ambient;
+    // Image-Based Lighting (split-sum approximation)
+    if has_ibl {
+      let env_intensity = uniforms.ibl_params.x;
+      let F_ibl = fresnel_schlick_roughness(n_dot_v, f0, roughness);
+      let k_s_ibl = F_ibl;
+      let k_d_ibl = (vec3<f32>(1.0) - k_s_ibl) * (1.0 - metallic);
+
+      // Diffuse IBL: irradiance cubemap
+      let irradiance = textureSample(t_irradiance, s_ibl, N).rgb;
+      let diffuse_ibl = k_d_ibl * irradiance * albedo;
+
+      // Specular IBL: prefiltered env map + BRDF LUT
+      let R = reflect(-V, N);
+      let max_lod = 4.0; // PREFILTER_MIP_LEVELS - 1
+      let prefiltered_color = textureSampleLevel(t_prefilter, s_ibl, R, roughness * max_lod).rgb;
+      let brdf_sample = textureSample(t_brdf_lut, s_ibl, vec2<f32>(n_dot_v, roughness)).rg;
+      let specular_ibl = prefiltered_color * (F_ibl * brdf_sample.x + brdf_sample.y);
+
+      lo = lo + (diffuse_ibl + specular_ibl) * env_intensity;
+    } else {
+      // Ambient (non-IBL fallback when lights are present)
+      let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity * albedo;
+      lo = lo + ambient;
+    }
   }
 
   // Emissive

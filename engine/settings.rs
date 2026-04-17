@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use glam::{Mat4, Vec3};
 
+use crate::ibl::{EnvMap, IblMaps, compute_ibl};
 use crate::lights::{GpuLight, prepare_lights};
 use crate::types::{Camera, RenderScene};
 use crate::util::{finite_positive, parse_color, parse_mat4, parse_vec3, validate_dimension};
@@ -16,6 +17,8 @@ pub struct RenderSettings {
     pub lights: Vec<GpuLight>,
     pub ambient_color: [f32; 3],
     pub ambient_intensity: f32,
+    pub ibl: Option<IblMaps>,
+    pub env_intensity: f32,
 }
 
 impl RenderSettings {
@@ -80,6 +83,19 @@ impl RenderSettings {
         )?;
         let ambient_intensity = scene.ambient_intensity.unwrap_or(0.0) as f32;
 
+        let ibl = match &scene.environment_map {
+            Some(data) if !data.is_empty() => {
+                let env_map = EnvMap::from_bytes(
+                    data,
+                    scene.environment_map_width,
+                    scene.environment_map_height,
+                )?;
+                Some(compute_ibl(&env_map))
+            }
+            _ => None,
+        };
+        let env_intensity = scene.environment_map_intensity.unwrap_or(1.0) as f32;
+
         Ok(Self {
             width,
             height,
@@ -90,6 +106,8 @@ impl RenderSettings {
             lights,
             ambient_color: [ambient_color[0] as f32, ambient_color[1] as f32, ambient_color[2] as f32],
             ambient_intensity,
+            ibl,
+            env_intensity,
         })
     }
 }

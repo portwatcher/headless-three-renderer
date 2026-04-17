@@ -1,10 +1,99 @@
-import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike } from './types'
+import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneLike } from './types'
 import { clamp01 } from './math'
 import { colorLikeToArray } from './color'
 
 // Three.js wrapping constants
 const RepeatWrapping = 1000
 const MirroredRepeatWrapping = 1002
+
+// Three.js texture type constants
+const UnsignedByteType = 1009
+const HalfFloatType = 1016
+const FloatType = 1015
+
+export interface EnvironmentMapInfo {
+  data: Buffer
+  width: number
+  height: number
+  intensity: number
+}
+
+/**
+ * Extract environment map data from scene.environment.
+ * Supports DataTexture (equirectangular) with Uint8, Float16, Float32 pixel data.
+ * Passes raw typed-array bytes to Rust which handles format detection.
+ */
+export function extractEnvironmentMap(scene: ThreeSceneLike): EnvironmentMapInfo | null {
+  const envTex = scene.environment
+  if (!envTex) return null
+
+  const image = (envTex as any).image ?? (envTex as any).source?.data
+  if (!image) return null
+
+  const intensity = (scene as any).environmentIntensity ?? 1.0
+
+  // DataTexture: { data, width, height }
+  if (image.data && image.width > 0 && image.height > 0) {
+    const texType = (envTex as any).type ?? UnsignedByteType
+    const rawData = image.data as ArrayBufferView & { buffer: ArrayBuffer; byteOffset: number; byteLength: number }
+
+    if (texType === HalfFloatType && rawData instanceof Uint16Array) {
+      // Pass raw half-float bytes — Rust ibl.rs decodes them
+      const channels = rawData.length / (image.width * image.height)
+      let buf: Buffer
+      if (channels === 3) {
+        // Expand RGB16F → RGBA16F (half=0x3C00 is 1.0 for alpha)
+        const pixels = image.width * image.height
+        const out = new Uint16Array(pixels * 4)
+        for (let i = 0; i < pixels; i++) {
+          out[i * 4] = rawData[i * 3]
+          out[i * 4 + 1] = rawData[i * 3 + 1]
+          out[i * 4 + 2] = rawData[i * 3 + 2]
+          out[i * 4 + 3] = 0x3C00 // 1.0 in half-float
+        }
+        buf = Buffer.from(out.buffer, out.byteOffset, out.byteLength)
+      } else {
+        buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+      }
+      return { data: buf, width: image.width, height: image.height, intensity }
+    }
+
+    if (texType === FloatType && rawData instanceof Float32Array) {
+      const channels = rawData.length / (image.width * image.height)
+      let buf: Buffer
+      if (channels === 3) {
+        const pixels = image.width * image.height
+        const out = new Float32Array(pixels * 4)
+        for (let i = 0; i < pixels; i++) {
+          out[i * 4] = rawData[i * 3]
+          out[i * 4 + 1] = rawData[i * 3 + 1]
+          out[i * 4 + 2] = rawData[i * 3 + 2]
+          out[i * 4 + 3] = 1.0
+        }
+        buf = Buffer.from(out.buffer, out.byteOffset, out.byteLength)
+      } else {
+        buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+      }
+      return { data: buf, width: image.width, height: image.height, intensity }
+    }
+
+    // UnsignedByteType / default: convert to RGBA8
+    const rgba = toRgba8(rawData as any, image.width, image.height)
+    if (rgba) {
+      return { data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength), width: image.width, height: image.height, intensity }
+    }
+  }
+
+  // Encoded image buffer (e.g. loaded HDR encoded as PNG/EXR)
+  if (Buffer.isBuffer(image)) {
+    return { data: image, width: 0, height: 0, intensity }
+  }
+  if (image instanceof Uint8Array && !((image as any).width > 0)) {
+    return { data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0, intensity }
+  }
+
+  return null
+}
 
 export function materialForGroup(
   material: ThreeMaterialLike | ThreeMaterialLike[] | undefined,
