@@ -3,6 +3,7 @@ import { IDENTITY_4X4, matrixElements, clampInteger } from './math'
 import { getAttribute, readVec3Attribute, readVec2Attribute, readColorAttribute, readIndexAttribute } from './attributes'
 import { materialForGroup, materialColor, extractPbrProperties, extractTextureData } from './materials'
 import { applyCpuSkinning } from './skinning'
+import { applyMorphTargets } from './morphs'
 
 export function flattenScene(scene: ThreeObject3DLike): NativeSceneMesh[] {
   const meshes: NativeSceneMesh[] = []
@@ -36,6 +37,13 @@ function appendMesh(object: ThreeObject3DLike, meshes: NativeSceneMesh[]): void 
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index) : null
   const groups = effectiveGroups(geometry, index, position.count)
+
+  // CPU-side morph targets (blend shapes / shape keys / VRM blendshapes)
+  if (object.morphTargetInfluences && object.morphTargetInfluences.length > 0) {
+    const morphed = applyMorphTargets(object, positions, normals)
+    positions = morphed.positions
+    normals = morphed.normals
+  }
 
   // CPU-side skinning for SkinnedMesh (Three.js, VRM, VRMA)
   if (object.isSkinnedMesh === true && object.skeleton) {
