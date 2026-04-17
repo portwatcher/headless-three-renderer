@@ -37,6 +37,8 @@ export interface ThreeBufferGeometryLike {
   groups?: Array<{ start: number; count: number; materialIndex?: number }>
   drawRange?: { start?: number; count?: number }
   getAttribute?(name: string): ThreeBufferAttributeLike | undefined
+  morphAttributes?: Record<string, ThreeBufferAttributeLike[] | undefined>
+  morphTargetsRelative?: boolean
 }
 
 export interface ThreeTextureLike {
@@ -96,6 +98,8 @@ export interface ThreeObject3DLike {
   skeleton?: ThreeSkeletonLike
   bindMatrix?: ThreeMatrix4Like
   bindMatrixInverse?: ThreeMatrix4Like
+  morphTargetInfluences?: number[]
+  morphTargetDictionary?: Record<string, number>
   color?: ThreeColorLike
   groundColor?: ThreeColorLike
   intensity?: number
