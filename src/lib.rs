@@ -40,7 +40,7 @@ pub struct RenderScene {
 #[napi(object)]
 #[derive(Default)]
 pub struct SceneLight {
-    /// Light type: `"directional"`, `"point"`, or `"spot"`.
+    /// Light type: `"directional"`, `"point"`, `"spot"`, or `"hemisphere"`.
     pub light_type: String,
     /// Light color `[r, g, b]` in 0..1 range.
     pub color: Option<Vec<f64>>,
@@ -48,8 +48,18 @@ pub struct SceneLight {
     pub intensity: Option<f64>,
     /// World-space position `[x, y, z]` (point and spot lights).
     pub position: Option<Vec<f64>>,
-    /// Direction `[x, y, z]` (directional and spot lights).
+    /// Direction `[x, y, z]` (directional and spot lights, up for hemisphere).
     pub direction: Option<Vec<f64>>,
+    /// Maximum range. 0 = infinite (point and spot).
+    pub distance: Option<f64>,
+    /// Decay exponent for distance falloff (point and spot). Defaults to 2.
+    pub decay: Option<f64>,
+    /// Spotlight half-angle in radians. Defaults to π/3.
+    pub angle: Option<f64>,
+    /// Spotlight penumbra 0..1. Defaults to 0.
+    pub penumbra: Option<f64>,
+    /// Hemisphere light ground color `[r, g, b]` in 0..1 range.
+    pub ground_color: Option<Vec<f64>>,
 }
 
 #[napi(object)]
@@ -835,12 +845,16 @@ struct Uniforms {
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
 struct GpuLight {
-    /// 0 = directional, 1 = point, 2 = spot
+    /// 0 = directional, 1 = point, 2 = spot, 3 = hemisphere
     light_type: u32,
     _pad0: [u32; 3],
     color_intensity: [f32; 4],
+    /// xyz = position (point/spot) or ground_color (hemisphere), w = distance
     position: [f32; 4],
+    /// xyz = direction, w = decay
     direction: [f32; 4],
+    /// spot: [cos_outer_angle, cos_inner_angle, 0, 0]
+    params: [f32; 4],
 }
 
 struct PreparedMesh {
@@ -871,6 +885,7 @@ fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
             "directional" => 0u32,
             "point" => 1,
             "spot" => 2,
+            "hemisphere" => 3,
             other => bail!("scene.lights[{i}].lightType `{other}` is not supported"),
         };
         let color = parse_color(
@@ -879,23 +894,51 @@ fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
             &format!("scene.lights[{i}].color"),
         )?;
         let intensity = light.intensity.unwrap_or(1.0) as f32;
-        let position = parse_vec3(
-            light.position.as_deref(),
-            [0.0, 0.0, 0.0],
-            &format!("scene.lights[{i}].position"),
-        )?;
+
+        let distance = light.distance.unwrap_or(0.0).max(0.0) as f32;
+        let decay = light.decay.unwrap_or(2.0) as f32;
+
+        let position = if light_type == 3 {
+            // Hemisphere: pack ground color into position.xyz
+            let ground = parse_color(
+                light.ground_color.as_deref(),
+                [0.04, 0.02, 0.0, 1.0],
+                &format!("scene.lights[{i}].groundColor"),
+            )?;
+            [ground[0] as f32, ground[1] as f32, ground[2] as f32, 0.0]
+        } else {
+            let pos = parse_vec3(
+                light.position.as_deref(),
+                [0.0, 0.0, 0.0],
+                &format!("scene.lights[{i}].position"),
+            )?;
+            [pos.x, pos.y, pos.z, distance]
+        };
+
         let direction = parse_vec3(
             light.direction.as_deref(),
-            [0.0, -1.0, 0.0],
+            if light_type == 3 { [0.0, 1.0, 0.0] } else { [0.0, -1.0, 0.0] },
             &format!("scene.lights[{i}].direction"),
         )?;
+
+        // Spot light cone parameters
+        let params = if light_type == 2 {
+            let angle = light.angle.unwrap_or(std::f64::consts::FRAC_PI_3).clamp(0.0, std::f64::consts::FRAC_PI_2) as f32;
+            let penumbra = light.penumbra.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+            let cos_outer = angle.cos();
+            let cos_inner = (angle * (1.0 - penumbra)).cos();
+            [cos_outer, cos_inner, 0.0, 0.0]
+        } else {
+            [0.0; 4]
+        };
 
         gpu_lights.push(GpuLight {
             light_type,
             _pad0: [0; 3],
             color_intensity: [color[0] as f32, color[1] as f32, color[2] as f32, intensity],
-            position: [position.x, position.y, position.z, 0.0],
-            direction: [direction.x, direction.y, direction.z, 0.0],
+            position,
+            direction: [direction.x, direction.y, direction.z, decay],
+            params,
         });
     }
     Ok(gpu_lights)
@@ -1303,8 +1346,12 @@ struct GpuLight {
   _pad1: u32,
   _pad2: u32,
   color_intensity: vec4<f32>,
+  // xyz = position (point/spot) or ground_color (hemisphere), w = distance
   position: vec4<f32>,
+  // xyz = direction, w = decay
   direction: vec4<f32>,
+  // spot: x = cos(outer_angle), y = cos(inner_angle)
+  params: vec4<f32>,
 };
 
 struct Uniforms {
@@ -1381,6 +1428,26 @@ fn fresnel_schlick(cos_theta: f32, f0: vec3<f32>) -> vec3<f32> {
   return f0 + (vec3<f32>(1.0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
+// Three.js-compatible distance attenuation
+// distance = cutoff distance (0 = infinite range)
+// decay = decay exponent (default 2, physically correct)
+fn get_distance_attenuation(light_distance: f32, cutoff_distance: f32, decay_exponent: f32) -> f32 {
+  var falloff = 1.0 / max(pow(light_distance, decay_exponent), 0.01);
+  if cutoff_distance > 0.0 {
+    let ratio = light_distance / cutoff_distance;
+    let ratio2 = ratio * ratio;
+    let ratio4 = ratio2 * ratio2;
+    let window = saturate(1.0 - ratio4);
+    falloff *= window * window;
+  }
+  return falloff;
+}
+
+// Three.js-compatible spot attenuation
+fn get_spot_attenuation(cone_cos: f32, penumbra_cos: f32, angle_cos: f32) -> f32 {
+  return smoothstep(cone_cos, penumbra_cos, angle_cos);
+}
+
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   let uv = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
@@ -1398,7 +1465,6 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   // Dielectric F0 = 0.04, metallic F0 = albedo
   let f0 = mix(vec3<f32>(0.04), albedo, metallic);
 
-  // If no lights, use a simple unlit/ambient fallback
   var lo = vec3<f32>(0.0);
 
   if uniforms.num_lights == 0u {
@@ -1411,24 +1477,39 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
   } else {
     for (var i = 0u; i < uniforms.num_lights && i < MAX_LIGHTS; i = i + 1u) {
       let light = uniforms.lights[i];
+
+      if light.light_type == 3u {
+        // Hemisphere light
+        let up = normalize(light.direction.xyz);
+        let sky_color = light.color_intensity.rgb * light.color_intensity.w;
+        let ground_color = light.position.xyz * light.color_intensity.w;
+        let hemi_factor = 0.5 + 0.5 * dot(N, up);
+        lo = lo + albedo * mix(ground_color, sky_color, hemi_factor);
+        continue;
+      }
+
       var L: vec3<f32>;
       var attenuation: f32 = 1.0;
 
       if light.light_type == 0u {
         // Directional
         L = normalize(-light.direction.xyz);
-      } else if light.light_type == 1u {
-        // Point
-        let light_vec = light.position.xyz - input.world_pos;
-        let dist = length(light_vec);
-        L = light_vec / max(dist, 0.0001);
-        attenuation = 1.0 / max(dist * dist, 0.0001);
       } else {
-        // Spot (treat as point for now)
+        // Point or Spot
         let light_vec = light.position.xyz - input.world_pos;
         let dist = length(light_vec);
         L = light_vec / max(dist, 0.0001);
-        attenuation = 1.0 / max(dist * dist, 0.0001);
+        let cutoff_distance = light.position.w;
+        let decay_exponent = light.direction.w;
+        attenuation = get_distance_attenuation(dist, cutoff_distance, decay_exponent);
+
+        // Spot cone attenuation
+        if light.light_type == 2u {
+          let cos_angle = dot(normalize(-light_vec), normalize(light.direction.xyz));
+          let cone_cos = light.params.x;
+          let penumbra_cos = light.params.y;
+          attenuation *= get_spot_attenuation(cone_cos, penumbra_cos, cos_angle);
+        }
       }
 
       let H = normalize(V + L);

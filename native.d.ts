@@ -49,7 +49,7 @@ export interface RenderScene {
 }
 
 export interface SceneLight {
-  /** Light type: `"directional"`, `"point"`, or `"spot"`. */
+  /** Light type: `"directional"`, `"point"`, `"spot"`, or `"hemisphere"`. */
   lightType: string
   /** Light color `[r, g, b]` in 0..1 range. */
   color?: Array<number>
@@ -57,8 +57,18 @@ export interface SceneLight {
   intensity?: number
   /** World-space position `[x, y, z]` (point and spot lights). */
   position?: Array<number>
-  /** Direction `[x, y, z]` (directional and spot lights). */
+  /** Direction `[x, y, z]` (directional and spot lights, up for hemisphere). */
   direction?: Array<number>
+  /** Maximum range. 0 = infinite (point and spot). */
+  distance?: number
+  /** Decay exponent for distance falloff (point and spot). Defaults to 2. */
+  decay?: number
+  /** Spotlight half-angle in radians. Defaults to π/3. */
+  angle?: number
+  /** Spotlight penumbra 0..1. Defaults to 0. */
+  penumbra?: number
+  /** Hemisphere light ground color `[r, g, b]` in 0..1 range. */
+  groundColor?: Array<number>
 }
 
 export interface SceneMesh {

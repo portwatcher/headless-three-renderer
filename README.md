@@ -81,6 +81,8 @@ Current rendering support is intentionally focused on static triangle meshes:
 - mesh world transforms
 - material base color and opacity
 - material color map (`material.map`) — texture support
+- PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
+- emissive color and intensity
 - vertex colors
 - scene background color
 - perspective, orthographic, and custom projection matrices
@@ -90,4 +92,16 @@ Texture support extracts `material.map` from Three.js materials. The texture ima
 - Raw RGBA8 pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
 
-Not yet implemented: lights, shadows, skinning, morph targets, custom shaders, render targets, lines, points, normal/roughness/emissive maps, and Three.js material models beyond flat color/vertex color. Those require additional `wgpu` pipeline and shader work.
+### Lights
+
+The renderer supports the standard Three.js light types:
+
+- `THREE.AmbientLight` — uniform ambient illumination
+- `THREE.DirectionalLight` — sun-like parallel light with position/target
+- `THREE.PointLight` — omnidirectional light with distance/decay attenuation
+- `THREE.SpotLight` — cone light with angle, penumbra, distance, and decay
+- `THREE.HemisphereLight` — sky/ground gradient ambient light
+
+Lights are automatically extracted from the scene. The shader uses a Cook-Torrance PBR BRDF with GGX distribution, matching Three.js physically-based attenuation (distance falloff and spot cone). Up to 16 lights per scene. When no lights are present, meshes render with a hemispherical ambient fallback.
+
+Not yet implemented: shadows, skinning, morph targets, custom shaders, render targets, lines, points, normal/roughness/emissive maps, and environment maps. Those require additional `wgpu` pipeline and shader work.

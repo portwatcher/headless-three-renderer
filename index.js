@@ -539,6 +539,8 @@ function extractLight(light) {
       color: [color[0], color[1], color[2]],
       intensity,
       position: pos,
+      distance: Number.isFinite(light.distance) ? light.distance : 0,
+      decay: Number.isFinite(light.decay) ? light.decay : 2,
     }
   }
 
@@ -566,6 +568,32 @@ function extractLight(light) {
       intensity,
       position: pos,
       direction,
+      distance: Number.isFinite(light.distance) ? light.distance : 0,
+      decay: Number.isFinite(light.decay) ? light.decay : 2,
+      angle: Number.isFinite(light.angle) ? light.angle : Math.PI / 3,
+      penumbra: Number.isFinite(light.penumbra) ? light.penumbra : 0,
+    }
+  }
+
+  if (light.isHemisphereLight === true) {
+    const groundColor = colorLikeToArray(light.groundColor) ?? [0.04, 0.02, 0.0, 1]
+    // Hemisphere up direction from the light's local Y axis in world space
+    let direction = [0, 1, 0]
+    if (light.matrixWorld) {
+      const e = light.matrixWorld.elements
+      // Extract the local Y axis (column 1) normalized
+      const ux = e[4], uy = e[5], uz = e[6]
+      const ulen = Math.sqrt(ux * ux + uy * uy + uz * uz)
+      if (ulen > 0) {
+        direction = [ux / ulen, uy / ulen, uz / ulen]
+      }
+    }
+    return {
+      lightType: 'hemisphere',
+      color: [color[0], color[1], color[2]],
+      intensity,
+      direction,
+      groundColor: [groundColor[0], groundColor[1], groundColor[2]],
     }
   }
 

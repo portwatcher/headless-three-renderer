@@ -71,9 +71,23 @@ export interface ThreeObject3DLike {
   visible?: boolean
   children?: ThreeObject3DLike[]
   isMesh?: boolean
+  isLight?: boolean
+  isDirectionalLight?: boolean
+  isPointLight?: boolean
+  isSpotLight?: boolean
+  isHemisphereLight?: boolean
+  isAmbientLight?: boolean
   geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike | ThreeMaterialLike[]
   matrixWorld?: ThreeMatrix4Like
+  color?: ThreeColorLike
+  groundColor?: ThreeColorLike
+  intensity?: number
+  distance?: number
+  decay?: number
+  angle?: number
+  penumbra?: number
+  target?: ThreeObject3DLike & { matrixWorld?: ThreeMatrix4Like }
   name?: string
   uuid?: string
 }
