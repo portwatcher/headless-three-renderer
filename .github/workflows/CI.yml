@@ -140,6 +140,13 @@ jobs:
       - name: Upgrade npm (Trusted Publishing requires >= 11.5.1)
         run: npm install -g npm@latest
 
+      - name: Configure npmrc for OIDC trusted publishing
+        run: |
+          cat > ~/.npmrc <<'EOF'
+          registry=https://registry.npmjs.org/
+          //registry.npmjs.org/:provenance=true
+          EOF
+
       - name: Verify npm version
         run: npm --version
 
