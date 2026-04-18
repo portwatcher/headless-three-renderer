@@ -1,6 +1,6 @@
 {
   "name": "@headless-three/renderer",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Headless wgpu renderer for Three.js scenes in Node.js. Produces PNG or raw RGBA from a THREE.Scene + THREE.Camera without a browser or WebGL.",
   "keywords": [
     "three",
