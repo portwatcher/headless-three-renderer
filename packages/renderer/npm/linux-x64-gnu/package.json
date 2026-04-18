@@ -1,12 +1,12 @@
 {
-  "name": "headless-three-renderer-win32-x64-msvc",
-  "version": "0.1.1",
+  "name": "@headless-three/renderer-linux-x64-gnu",
+  "version": "0.1.0",
   "cpu": [
     "x64"
   ],
-  "main": "headless_three_renderer.win32-x64-msvc.node",
+  "main": "headless_three_renderer.linux-x64-gnu.node",
   "files": [
-    "headless_three_renderer.win32-x64-msvc.node"
+    "headless_three_renderer.linux-x64-gnu.node"
   ],
   "description": "Headless wgpu renderer for Three.js scenes in Node.js. Produces PNG or raw RGBA from a THREE.Scene + THREE.Camera without a browser or WebGL.",
   "keywords": [
@@ -31,12 +31,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/portwatcher/headless-three-renderer.git"
+    "url": "git+https://github.com/portwatcher/headless-three-renderer.git",
+    "directory": "packages/renderer"
   },
   "bugs": {
     "url": "https://github.com/portwatcher/headless-three-renderer/issues"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "os": [
-    "win32"
+    "linux"
+  ],
+  "libc": [
+    "glibc"
   ]
 }

@@ -1,6 +1,6 @@
 # Tests
 
-Test suite for `headless-three-renderer`, using Node's built-in test runner (`node --test`).
+Test suite for `@headless-three/renderer`, using Node's built-in test runner (`node --test`).
 
 ## Running
 

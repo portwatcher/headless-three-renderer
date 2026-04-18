@@ -1,7 +1,12 @@
 /target
 /dist
 node_modules
+**/node_modules
+**/dist
+**/target
 *.node
 *.d.ts.map
 npm-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+.pnpm-store

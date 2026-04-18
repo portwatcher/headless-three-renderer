@@ -1,80 +1,21 @@
 {
-  "name": "headless-three-renderer",
-  "version": "0.1.1",
-  "description": "Headless wgpu renderer for Three.js scenes in Node.js. Produces PNG or raw RGBA from a THREE.Scene + THREE.Camera without a browser or WebGL.",
-  "keywords": [
-    "three",
-    "three.js",
-    "wgpu",
-    "renderer",
-    "headless",
-    "server-side",
-    "ssr",
-    "pbr",
-    "gltf",
-    "vrm",
-    "napi",
-    "native"
-  ],
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "name": "headless-three",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Headless Three.js ecosystem — monorepo root",
   "license": "MIT",
-  "author": "PortWatcher <jury@skyquakers.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/portwatcher/headless-three-renderer.git"
   },
-  "bugs": {
-    "url": "https://github.com/portwatcher/headless-three-renderer/issues"
-  },
-  "homepage": "https://github.com/portwatcher/headless-three-renderer#readme",
   "engines": {
-    "node": ">=16"
+    "node": ">=20",
+    "pnpm": ">=9"
   },
-  "files": [
-    "dist/",
-    "native.js",
-    "native.d.ts",
-    "README.md",
-    "LICENSE"
-  ],
-  "napi": {
-    "binaryName": "headless_three_renderer",
-    "dtsHeader": "/// <reference types=\"node\" />\n",
-    "targets": [
-      "x86_64-apple-darwin",
-      "aarch64-apple-darwin",
-      "x86_64-pc-windows-msvc",
-      "x86_64-unknown-linux-gnu",
-      "aarch64-unknown-linux-gnu"
-    ]
-  },
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "artifacts": "napi artifacts",
-    "build": "tsc && napi build --platform --js native.js --dts native.d.ts --release",
-    "build:debug": "tsc && napi build --platform --js native.js --dts native.d.ts",
-    "build:ts": "tsc",
-    "create-npm-dirs": "napi create-npm-dirs",
-    "prepublishOnly": "napi prepublish -t npm",
-    "pretest": "npm run build:ts",
-    "test": "node --test --test-reporter=spec 'test/**/*.test.mjs'",
-    "test:update": "UPDATE_SNAPSHOTS=1 node --test 'test/**/*.test.mjs'",
-    "test:rust": "cargo test"
-  },
-  "peerDependencies": {
-    "three": ">=0.150.0"
-  },
-  "devDependencies": {
-    "@napi-rs/cli": "^3.6.1",
-    "@types/node": "25.6.0",
-    "three": "^0.172.0",
-    "typescript": "6.0.3"
-  },
-  "optionalDependencies": {
-    "headless-three-renderer-darwin-x64": "0.1.1",
-    "headless-three-renderer-darwin-arm64": "0.1.1",
-    "headless-three-renderer-win32-x64-msvc": "0.1.1",
-    "headless-three-renderer-linux-x64-gnu": "0.1.1",
-    "headless-three-renderer-linux-arm64-gnu": "0.1.1"
+    "build": "pnpm -r --stream build",
+    "build:ts": "pnpm -r --stream build:ts",
+    "test": "pnpm -r --stream test"
   }
 }

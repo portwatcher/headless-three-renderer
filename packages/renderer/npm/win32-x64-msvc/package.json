@@ -1,12 +1,12 @@
 {
-  "name": "headless-three-renderer-darwin-arm64",
-  "version": "0.1.1",
+  "name": "@headless-three/renderer-win32-x64-msvc",
+  "version": "0.1.0",
   "cpu": [
-    "arm64"
+    "x64"
   ],
-  "main": "headless_three_renderer.darwin-arm64.node",
+  "main": "headless_three_renderer.win32-x64-msvc.node",
   "files": [
-    "headless_three_renderer.darwin-arm64.node"
+    "headless_three_renderer.win32-x64-msvc.node"
   ],
   "description": "Headless wgpu renderer for Three.js scenes in Node.js. Produces PNG or raw RGBA from a THREE.Scene + THREE.Camera without a browser or WebGL.",
   "keywords": [
@@ -31,12 +31,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/portwatcher/headless-three-renderer.git"
+    "url": "git+https://github.com/portwatcher/headless-three-renderer.git",
+    "directory": "packages/renderer"
   },
   "bugs": {
     "url": "https://github.com/portwatcher/headless-three-renderer/issues"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "os": [
-    "darwin"
+    "win32"
   ]
 }

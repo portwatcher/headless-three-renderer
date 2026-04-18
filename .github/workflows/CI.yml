@@ -28,28 +28,27 @@ jobs:
         settings:
           - host: macos-latest
             target: x86_64-apple-darwin
-            build: npm run build -- --target x86_64-apple-darwin
           - host: macos-latest
             target: aarch64-apple-darwin
-            build: npm run build -- --target aarch64-apple-darwin
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-            build: npm run build -- --target x86_64-pc-windows-msvc
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: npm run build -- --target x86_64-unknown-linux-gnu
           - host: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
-            build: npm run build -- --target aarch64-unknown-linux-gnu
     name: Build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
+          cache: 'pnpm'
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -57,20 +56,22 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
+          workspaces: packages/renderer
           key: ${{ matrix.settings.target }}
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: ${{ matrix.settings.build }}
+        working-directory: packages/renderer
+        run: pnpm exec napi build --platform --js native.js --dts native.d.ts --release --target ${{ matrix.settings.target }}
         shell: bash
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: ${{ env.APP_NAME }}.*.node
+          path: packages/renderer/${{ env.APP_NAME }}.*.node
           if-no-files-found: error
 
   test:
@@ -90,13 +91,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Mesa / Vulkan (Linux software renderer)
         if: runner.os == 'Linux'
@@ -105,16 +110,18 @@ jobs:
           sudo apt-get install -y mesa-vulkan-drivers libvulkan1 vulkan-tools libgl1 libegl1
 
       - name: Build TypeScript
-        run: npm run build:ts
+        working-directory: packages/renderer
+        run: pnpm run build:ts
 
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: .
+          path: packages/renderer
 
       - name: Smoke tests
-        run: npm test
+        working-directory: packages/renderer
+        run: pnpm test
 
   publish:
     name: Publish to npm
@@ -126,20 +133,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - name: Verify npm version (>= 11.5.1 needed for trusted publishing)
+      - name: Verify npm version
         run: npm --version
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build TypeScript
-        run: npm run build:ts
+        working-directory: packages/renderer
+        run: pnpm run build:ts
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -147,12 +159,17 @@ jobs:
           path: artifacts
 
       - name: Move artifacts into npm/ dirs
-        run: npm run artifacts
+        working-directory: packages/renderer
+        run: |
+          mkdir -p artifacts
+          cp -r ../../artifacts/* artifacts/
+          pnpm exec napi artifacts
 
       - name: List packages
-        run: ls -R ./npm
+        run: ls -R packages/renderer/npm
 
       - name: Publish
+        working-directory: packages/renderer
         run: |
           TAG="${GITHUB_REF_NAME}"
           if echo "$TAG" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
