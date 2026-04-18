@@ -126,6 +126,7 @@ jobs:
     needs: [build, test]
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -136,6 +137,9 @@ jobs:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
+
+      - name: Upgrade npm (Trusted Publishing requires >= 11.5.1)
+        run: npm install -g npm@latest
 
       - name: Verify npm version
         run: npm --version
@@ -168,14 +172,10 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           if echo "$TAG" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Publishing stable ($TAG)"
-            npm publish --access public
+            npm publish --access public --provenance
           elif echo "$TAG" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+-'; then
             echo "Publishing prerelease ($TAG)"
-            npm publish --tag next --access public
+            npm publish --tag next --access public --provenance
           else
             echo "Tag '$TAG' is not a release tag, skipping publish"
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
