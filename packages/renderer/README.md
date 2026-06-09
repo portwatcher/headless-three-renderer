@@ -1,36 +1,17 @@
-# headless-three
-
-Headless Three.js ecosystem — pnpm monorepo.
-
-## Packages
-
-| Package | Description |
-|---|---|
-| [`@headless-three/renderer`](./packages/renderer) | Headless wgpu renderer for Three.js scenes in Node.js |
-
-## Development
-
-```bash
-pnpm install
-pnpm -r build
-pnpm -r test
-```
-
-Releases are tag-driven: push `v<semver>` to trigger the publish workflow.
-# headless-three-renderer
+# @headless-three/renderer
 
 Headless `wgpu` renderer for Three.js scenes in Node.js.
 
 This package exists for Node.js environments where WebGL is not available. You build or load a normal Three.js scene, pass the `THREE.Scene` and `THREE.Camera` to this package, and the native addon renders it with `wgpu`.
 
 ```bash
-npm install headless-three-renderer three
+npm install @headless-three/renderer three
 ```
 
 ```js
 import fs from 'node:fs'
 import * as THREE from 'three'
-import { render } from 'headless-three-renderer'
+import { render } from '@headless-three/renderer'
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0.04, 0.045, 0.05)
@@ -57,7 +38,7 @@ With `GLTFLoader`, render the loaded Three.js scene directly:
 import fs from 'node:fs'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { render } from 'headless-three-renderer'
+import { render } from '@headless-three/renderer'
 
 const gltf = await new GLTFLoader().loadAsync('./model.glb')
 
@@ -76,7 +57,7 @@ fs.writeFileSync('render.png', imageBuffer)
 The module exports a convenience `render(scene, camera, options)` function and a reusable `Renderer` class:
 
 ```js
-import { Renderer } from 'headless-three-renderer'
+import { Renderer } from '@headless-three/renderer'
 const renderer = new Renderer()
 const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 ```
@@ -158,7 +139,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { render } from 'headless-three-renderer'
+import { render } from '@headless-three/renderer'
 
 const gltfLoader = new GLTFLoader()
 gltfLoader.register((parser) => new VRMLoaderPlugin(parser))

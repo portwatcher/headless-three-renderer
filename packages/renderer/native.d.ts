@@ -46,6 +46,14 @@ export interface RenderScene {
   ambientLight?: Array<number>
   /** Ambient light intensity. Defaults to 0. */
   ambientIntensity?: number
+  /** Optional environment map image data (equirectangular HDR/LDR, encoded or raw RGBA/Float). */
+  environmentMap?: Buffer
+  /** Environment map width in pixels (required when data is raw typed-array bytes). */
+  environmentMapWidth?: number
+  /** Environment map height in pixels (required when data is raw typed-array bytes). */
+  environmentMapHeight?: number
+  /** Environment map intensity multiplier. Defaults to 1. */
+  environmentMapIntensity?: number
 }
 
 export interface SceneLight {
@@ -69,6 +77,21 @@ export interface SceneLight {
   penumbra?: number
   /** Hemisphere light ground color `[r, g, b]` in 0..1 range. */
   groundColor?: Array<number>
+  /** Whether this light casts shadows (directional lights only). */
+  castShadow?: boolean
+  /** Shadow map resolution (square, pixels). Defaults to 512. */
+  shadowMapSize?: number
+  /** Depth bias in shadow-map NDC. */
+  shadowBias?: number
+  /** Normal-offset bias in world space at the receiver. */
+  shadowNormalBias?: number
+  /** Orthographic shadow-camera frustum bounds. */
+  shadowCameraLeft?: number
+  shadowCameraRight?: number
+  shadowCameraTop?: number
+  shadowCameraBottom?: number
+  shadowCameraNear?: number
+  shadowCameraFar?: number
 }
 
 export interface SceneMesh {
@@ -92,6 +115,16 @@ export interface SceneMesh {
   textureWidth?: number
   /** Texture height in pixels (required when `texture` is raw RGBA8 bytes). */
   textureHeight?: number
+  /** Texture horizontal wrap mode: `"repeat"`, `"clamp"`, or `"mirror"`. Defaults to `"clamp"`. */
+  textureWrapS?: string
+  /** Texture vertical wrap mode: `"repeat"`, `"clamp"`, or `"mirror"`. Defaults to `"clamp"`. */
+  textureWrapT?: string
+  /** Optional metallic-roughness texture (glTF convention: G=roughness, B=metallic). */
+  metallicRoughnessTexture?: Buffer
+  /** Metallic-roughness texture width (required when texture is raw RGBA8 bytes). */
+  metallicRoughnessTextureWidth?: number
+  /** Metallic-roughness texture height (required when texture is raw RGBA8 bytes). */
+  metallicRoughnessTextureHeight?: number
   /** Metallic factor (0..1). Defaults to 0. */
   metallic?: number
   /** Roughness factor (0..1). Defaults to 1. */
@@ -100,4 +133,46 @@ export interface SceneMesh {
   emissive?: Array<number>
   /** Emissive intensity multiplier. Defaults to 1. */
   emissiveIntensity?: number
+  /** Optional normal map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP). */
+  normalMap?: Buffer
+  /** Normal map width in pixels (required when `normal_map` is raw RGBA8 bytes). */
+  normalMapWidth?: number
+  /** Normal map height in pixels (required when `normal_map` is raw RGBA8 bytes). */
+  normalMapHeight?: number
+  /** Normal map scale `[x, y]`. Defaults to `[1, 1]`. */
+  normalScale?: Array<number>
+  /** Optional emissive map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP). */
+  emissiveMap?: Buffer
+  /** Emissive map width in pixels (required when `emissive_map` is raw RGBA8 bytes). */
+  emissiveMapWidth?: number
+  /** Emissive map height in pixels (required when `emissive_map` is raw RGBA8 bytes). */
+  emissiveMapHeight?: number
+  /**
+   * Optional ambient occlusion map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
+   * Red channel is used as the occlusion factor (Three.js / glTF convention).
+   */
+  aoMap?: Buffer
+  /** AO map width in pixels (required when `ao_map` is raw RGBA8 bytes). */
+  aoMapWidth?: number
+  /** AO map height in pixels (required when `ao_map` is raw RGBA8 bytes). */
+  aoMapHeight?: number
+  /** AO map intensity multiplier (0..1). Defaults to 1. */
+  aoMapIntensity?: number
+  /** Alpha test cutoff threshold (0..1). Fragments with alpha below this are discarded. */
+  alphaTest?: number
+  /** Whether the mesh is transparent (sorted back-to-front, no depth write). */
+  transparent?: boolean
+  /** Which faces to render: `"front"` (default), `"back"`, or `"double"`. */
+  side?: string
+  /**
+   * Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
+   * or `"lambert"` (diffuse-only / MeshLambertMaterial).
+   */
+  shadingModel?: string
+  /** Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`. */
+  topology?: string
+  /** Whether this mesh casts shadows in the shadow pass. Defaults to false. */
+  castShadow?: boolean
+  /** Whether this mesh receives shadows in the main pass. Defaults to false. */
+  receiveShadow?: boolean
 }
