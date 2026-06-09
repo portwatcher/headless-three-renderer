@@ -7,15 +7,29 @@ use crate::types::{Camera, RenderScene};
 use crate::util::{finite_positive, parse_color, parse_mat4, parse_vec3, validate_dimension};
 use crate::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
 
-/// Directional shadow caster resolved from the first directional light with
-/// `castShadow = true`. We only support a single directional shadow map.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ShadowKind {
+    DirectionalOrSpot,
+    Point,
+    Cascaded,
+}
+
+/// Shadow caster resolved from the first directional, spot, or point light
+/// with `castShadow = true`. We only support a single shadow map.
 pub struct ShadowCaster {
-    /// Orthographic light-space matrix (proj * view) in WebGPU clip space.
-    pub light_vp: Mat4,
+    /// Light-space matrices (proj * view) in WebGPU clip space. Directional
+    /// and spot shadows use layer 0; point shadows use six cube-face layers.
+    pub light_vps: [Mat4; 6],
     /// Normalized light direction (from light toward scene).
     pub light_dir: Vec3,
+    /// Shadow projection kind.
+    pub kind: ShadowKind,
     /// Index of the shadow-casting light in `RenderSettings::lights`.
     pub light_index: u32,
+    /// Number of array layers in the shadow depth texture.
+    pub layer_count: u32,
+    /// Camera-distance split points for cascaded directional shadows.
+    pub cascade_splits: [f32; 4],
     /// Shadow map resolution (square, pixels).
     pub map_size: u32,
     /// Depth bias applied when comparing against the shadow map.
@@ -37,6 +51,18 @@ pub struct RenderSettings {
     pub ibl: Option<IblMaps>,
     pub env_intensity: f32,
     pub shadow: Option<ShadowCaster>,
+    pub post_processing: PostProcessingSettings,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct PostProcessingSettings {
+    pub active: bool,
+    pub exposure: f32,
+    pub contrast: f32,
+    pub saturation: f32,
+    pub vignette: f32,
+    pub grayscale: f32,
+    pub invert: f32,
 }
 
 impl RenderSettings {
@@ -115,6 +141,7 @@ impl RenderSettings {
         let env_intensity = scene.environment_map_intensity.unwrap_or(1.0) as f32;
 
         let shadow = resolve_shadow_caster(scene)?;
+        let post_processing = PostProcessingSettings::from_scene(scene);
 
         Ok(Self {
             width,
@@ -124,12 +151,44 @@ impl RenderSettings {
             view_projection,
             camera_pos,
             lights,
-            ambient_color: [ambient_color[0] as f32, ambient_color[1] as f32, ambient_color[2] as f32],
+            ambient_color: [
+                ambient_color[0] as f32,
+                ambient_color[1] as f32,
+                ambient_color[2] as f32,
+            ],
             ambient_intensity,
             ibl,
             env_intensity,
             shadow,
+            post_processing,
         })
+    }
+}
+
+impl PostProcessingSettings {
+    fn from_scene(scene: &RenderScene) -> Self {
+        let exposure = scene.post_exposure.unwrap_or(0.0).clamp(-16.0, 16.0) as f32;
+        let contrast = scene.post_contrast.unwrap_or(1.0).clamp(0.0, 8.0) as f32;
+        let saturation = scene.post_saturation.unwrap_or(1.0).clamp(0.0, 8.0) as f32;
+        let vignette = scene.post_vignette.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+        let grayscale = scene.post_grayscale.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+        let invert = scene.post_invert.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+        let active = exposure.abs() > 0.0001
+            || (contrast - 1.0).abs() > 0.0001
+            || (saturation - 1.0).abs() > 0.0001
+            || vignette > 0.0001
+            || grayscale > 0.0001
+            || invert > 0.0001;
+
+        Self {
+            active,
+            exposure,
+            contrast,
+            saturation,
+            vignette,
+            grayscale,
+            invert,
+        }
     }
 }
 
@@ -153,14 +212,15 @@ impl OutputFormat {
     }
 }
 
-/// Resolve the (optional) directional shadow caster from the scene.
-/// We pick the first directional light with `castShadow = true`.
+/// Resolve the (optional) shadow caster from the scene.
+/// We pick the first directional, spot, or point light with `castShadow = true`.
 fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
     let Some(lights) = scene.lights.as_deref() else {
         return Ok(None);
     };
     for (i, light) in lights.iter().take(MAX_LIGHTS).enumerate() {
-        if light.light_type.to_ascii_lowercase() != "directional" {
+        let light_type = light.light_type.to_ascii_lowercase();
+        if light_type != "directional" && light_type != "spot" && light_type != "point" {
             continue;
         }
         if !light.cast_shadow.unwrap_or(false) {
@@ -168,40 +228,139 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
         }
         let prefix = format!("scene.lights[{i}]");
 
-        let pos = parse_vec3(light.position.as_deref(), [0.0, 10.0, 0.0], &format!("{prefix}.position"))?;
+        let pos = parse_vec3(
+            light.position.as_deref(),
+            [0.0, 10.0, 0.0],
+            &format!("{prefix}.position"),
+        )?;
         let dir = parse_vec3(
             light.direction.as_deref(),
             [0.0, -1.0, 0.0],
             &format!("{prefix}.direction"),
         )?;
-        let dir = if dir.length_squared() > 0.0 { dir.normalize() } else { Vec3::new(0.0, -1.0, 0.0) };
+        let dir = if dir.length_squared() > 0.0 {
+            dir.normalize()
+        } else {
+            Vec3::new(0.0, -1.0, 0.0)
+        };
 
-        // Orthographic bounds (three.js defaults: ±5, near=0.5, far=500)
-        let left = light.shadow_camera_left.unwrap_or(-5.0) as f32;
-        let right = light.shadow_camera_right.unwrap_or(5.0) as f32;
-        let top = light.shadow_camera_top.unwrap_or(5.0) as f32;
-        let bottom = light.shadow_camera_bottom.unwrap_or(-5.0) as f32;
         let near = light.shadow_camera_near.unwrap_or(0.5) as f32;
-        let far = light.shadow_camera_far.unwrap_or(500.0) as f32;
-        if right <= left || top <= bottom || far <= near {
-            bail!("{prefix}.shadow.camera has invalid frustum bounds");
+        let default_far = if light_type == "point" {
+            let distance = light.distance.unwrap_or(0.0);
+            if distance > 0.0 { distance } else { 500.0 }
+        } else {
+            500.0
+        };
+        let far = light.shadow_camera_far.unwrap_or(default_far) as f32;
+        if far <= near {
+            bail!("{prefix}.shadow.camera has invalid near/far bounds");
         }
 
-        // View: look from light position along the light's direction. Pick an
-        // up vector that is not collinear with `dir`.
-        let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
-        let view = Mat4::look_at_rh(pos, pos + dir, up);
-        let proj = Mat4::orthographic_rh(left, right, bottom, top, near, far);
-        let light_vp = proj * view;
+        let mut light_vps = [Mat4::IDENTITY; 6];
+        let mut cascade_splits = [f32::MAX; 4];
+        let mut layer_count = 1u32;
+        let kind = if light_type == "point" {
+            let proj = Mat4::perspective_rh(std::f32::consts::FRAC_PI_2, 1.0, near, far);
+            let faces = [
+                (Vec3::X, -Vec3::Y),
+                (-Vec3::X, -Vec3::Y),
+                (Vec3::Y, Vec3::Z),
+                (-Vec3::Y, -Vec3::Z),
+                (Vec3::Z, -Vec3::Y),
+                (-Vec3::Z, -Vec3::Y),
+            ];
+            for (face, (face_dir, up)) in faces.into_iter().enumerate() {
+                light_vps[face] = proj * Mat4::look_at_rh(pos, pos + face_dir, up);
+            }
+            layer_count = 6;
+            ShadowKind::Point
+        } else if light_type == "spot" {
+            // View: look from light position along the light's direction. Pick an
+            // up vector that is not collinear with `dir`.
+            let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+            let view = Mat4::look_at_rh(pos, pos + dir, up);
+            let angle = light
+                .angle
+                .unwrap_or(std::f64::consts::FRAC_PI_3)
+                .clamp(0.001, std::f64::consts::FRAC_PI_2) as f32;
+            let proj = Mat4::perspective_rh(
+                (angle * 2.0).min(std::f32::consts::PI - 0.001),
+                1.0,
+                near,
+                far,
+            );
+            light_vps[0] = proj * view;
+            ShadowKind::DirectionalOrSpot
+        } else {
+            // View: look from light position along the light's direction. Pick an
+            // up vector that is not collinear with `dir`.
+            let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+            let view = Mat4::look_at_rh(pos, pos + dir, up);
+            if let Some(bounds) = light.shadow_cascade_bounds.as_deref() {
+                let cascade_count = (bounds.len() / 6).min(4);
+                if cascade_count >= 2 {
+                    for cascade in 0..cascade_count {
+                        let base = cascade * 6;
+                        let left = bounds[base] as f32;
+                        let right = bounds[base + 1] as f32;
+                        let top = bounds[base + 2] as f32;
+                        let bottom = bounds[base + 3] as f32;
+                        let cascade_near = bounds[base + 4] as f32;
+                        let cascade_far = bounds[base + 5] as f32;
+                        if right <= left || top <= bottom || cascade_far <= cascade_near {
+                            bail!("{prefix}.shadow.cascades[{cascade}] has invalid bounds");
+                        }
+                        light_vps[cascade] = Mat4::orthographic_rh(
+                            left,
+                            right,
+                            bottom,
+                            top,
+                            cascade_near,
+                            cascade_far,
+                        ) * view;
+                    }
+                    if let Some(splits) = light.shadow_cascade_splits.as_deref() {
+                        for (slot, value) in splits.iter().take(cascade_count - 1).enumerate() {
+                            cascade_splits[slot] = (*value as f32).max(0.0);
+                        }
+                    }
+                    layer_count = cascade_count as u32;
+                    return Ok(Some(ShadowCaster {
+                        light_vps,
+                        light_dir: dir,
+                        kind: ShadowKind::Cascaded,
+                        light_index: i as u32,
+                        layer_count,
+                        cascade_splits,
+                        map_size: light.shadow_map_size.unwrap_or(512).clamp(32, 4096),
+                        bias: light.shadow_bias.unwrap_or(0.0) as f32,
+                        normal_bias: light.shadow_normal_bias.unwrap_or(0.0) as f32,
+                    }));
+                }
+            }
+            // Orthographic bounds (three.js DirectionalLightShadow defaults: ±5).
+            let left = light.shadow_camera_left.unwrap_or(-5.0) as f32;
+            let right = light.shadow_camera_right.unwrap_or(5.0) as f32;
+            let top = light.shadow_camera_top.unwrap_or(5.0) as f32;
+            let bottom = light.shadow_camera_bottom.unwrap_or(-5.0) as f32;
+            if right <= left || top <= bottom {
+                bail!("{prefix}.shadow.camera has invalid orthographic bounds");
+            }
+            light_vps[0] = Mat4::orthographic_rh(left, right, bottom, top, near, far) * view;
+            ShadowKind::DirectionalOrSpot
+        };
 
         let map_size = light.shadow_map_size.unwrap_or(512).clamp(32, 4096);
         let bias = light.shadow_bias.unwrap_or(0.0) as f32;
         let normal_bias = light.shadow_normal_bias.unwrap_or(0.0) as f32;
 
         return Ok(Some(ShadowCaster {
-            light_vp,
+            light_vps,
             light_dir: dir,
+            kind,
             light_index: i as u32,
+            layer_count,
+            cascade_splits,
             map_size,
             bias,
             normal_bias,

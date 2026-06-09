@@ -54,25 +54,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       direction,
     }
     if (light.castShadow === true) {
-      const shadow = light.shadow
-      const mapSize = shadow?.mapSize
-      const size = Math.max(
-        32,
-        Math.floor(mapSize?.x ?? mapSize?.width ?? 512),
-      )
-      const cam = shadow?.camera
       out.castShadow = true
-      out.shadowMapSize = size
-      if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
-      if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
-      if (cam) {
-        if (Number.isFinite(cam.left)) out.shadowCameraLeft = cam.left!
-        if (Number.isFinite(cam.right)) out.shadowCameraRight = cam.right!
-        if (Number.isFinite(cam.top)) out.shadowCameraTop = cam.top!
-        if (Number.isFinite(cam.bottom)) out.shadowCameraBottom = cam.bottom!
-        if (Number.isFinite(cam.near)) out.shadowCameraNear = cam.near!
-        if (Number.isFinite(cam.far)) out.shadowCameraFar = cam.far!
-      }
+      applyShadowOptions(out, light)
     }
     return out
   }
@@ -81,7 +64,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
     const pos = light.matrixWorld
       ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]]
       : [0, 0, 0]
-    return {
+    const out: NativeSceneLight = {
       lightType: 'point',
       color: [color[0], color[1], color[2]],
       intensity,
@@ -89,6 +72,11 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       distance: Number.isFinite(light.distance) ? light.distance! : 0,
       decay: Number.isFinite(light.decay) ? light.decay! : 2,
     }
+    if (light.castShadow === true) {
+      out.castShadow = true
+      applyShadowOptions(out, light)
+    }
+    return out
   }
 
   if (light.isSpotLight === true) {
@@ -111,7 +99,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       direction[1] /= len
       direction[2] /= len
     }
-    return {
+    const out: NativeSceneLight = {
       lightType: 'spot',
       color: [color[0], color[1], color[2]],
       intensity,
@@ -122,6 +110,11 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       angle: Number.isFinite(light.angle) ? light.angle! : Math.PI / 3,
       penumbra: Number.isFinite(light.penumbra) ? light.penumbra! : 0,
     }
+    if (light.castShadow === true) {
+      out.castShadow = true
+      applyShadowOptions(out, light)
+    }
+    return out
   }
 
   if (light.isHemisphereLight === true) {
@@ -146,6 +139,64 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
   // AmbientLight is handled separately
   return null
+}
+
+function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
+  const shadow = light.shadow
+  const mapSize = shadow?.mapSize
+  out.shadowMapSize = Math.max(
+    32,
+    Math.floor(mapSize?.x ?? mapSize?.width ?? 512),
+  )
+  if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
+  if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
+
+  const cam = shadow?.camera
+  if (cam) {
+    if (Number.isFinite(cam.left)) out.shadowCameraLeft = cam.left!
+    if (Number.isFinite(cam.right)) out.shadowCameraRight = cam.right!
+    if (Number.isFinite(cam.top)) out.shadowCameraTop = cam.top!
+    if (Number.isFinite(cam.bottom)) out.shadowCameraBottom = cam.bottom!
+    if (Number.isFinite(cam.near)) out.shadowCameraNear = cam.near!
+    if (Number.isFinite(cam.far)) out.shadowCameraFar = cam.far!
+  }
+
+  applyShadowCascadeOptions(out, light)
+}
+
+function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
+  const hints = light.userData?.headlessThreeRenderer ?? light.userData?.headlessRenderer ?? {}
+  const cascades = hints.shadowCascades ?? hints.cascades ?? (light.shadow as any)?.cascades
+  if (!Array.isArray(cascades) || cascades.length < 2) return
+
+  const splits: number[] = []
+  const bounds: number[] = []
+
+  for (const cascade of cascades.slice(0, 4)) {
+    if (!cascade || typeof cascade !== 'object') continue
+    const left = numberOrNull(cascade.left)
+    const right = numberOrNull(cascade.right)
+    const top = numberOrNull(cascade.top)
+    const bottom = numberOrNull(cascade.bottom)
+    const near = numberOrNull(cascade.near)
+    const far = numberOrNull(cascade.far)
+    if (left == null || right == null || top == null || bottom == null || near == null || far == null) {
+      continue
+    }
+    bounds.push(left, right, top, bottom, near, far)
+    const split = numberOrNull(cascade.split ?? cascade.distance ?? cascade.farDistance)
+    if (split != null) splits.push(split)
+  }
+
+  const count = bounds.length / 6
+  if (count >= 2) {
+    out.shadowCascadeBounds = bounds
+    out.shadowCascadeSplits = splits.slice(0, count - 1)
+  }
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 export function extractAmbientLight(scene: ThreeObject3DLike): number[] | null {

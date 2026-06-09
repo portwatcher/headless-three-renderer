@@ -6,8 +6,8 @@ use wgpu::util::DeviceExt;
 use crate::ibl::IblMaps;
 use crate::lights::{GpuLight, MAX_LIGHTS};
 use crate::mesh::{MeshSide, PreparedMesh, Topology, Vertex, WrapMode, prepare_meshes};
-use crate::settings::{OutputFormat, RenderSettings};
-use crate::shader::SHADER;
+use crate::settings::{OutputFormat, PostProcessingSettings, RenderSettings, ShadowKind};
+use crate::shader::{POST_SHADER, SHADER, custom_shader_source};
 use crate::types::{Camera, RenderScene};
 use crate::util::{align_to, encode_png};
 use crate::{COLOR_FORMAT, DEPTH_FORMAT};
@@ -32,12 +32,33 @@ pub struct Uniforms {
     pub ibl_params: [f32; 4],
     /// x = ao_map_intensity, y = has_ao_map (1.0 or 0.0), z/w = reserved
     pub ao_params: [f32; 4],
-    pub light_space_matrix: [[f32; 4]; 4],
+    /// x = 1/width, y = 1/height, z = width, w = height
+    pub render_params: [f32; 4],
+    pub light_space_matrices: [[[f32; 4]; 4]; 6],
     /// x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
     pub shadow_params: [f32; 4],
-    /// x = shadow light index (as f32), y = 1/map_size, z/w = reserved
+    /// x = shadow light index (as f32), y = 1/map_size, z = shadow kind, w = reserved
     pub shadow_params2: [f32; 4],
+    /// x/y/z/w = cascade split distances
+    pub shadow_params3: [f32; 4],
+    /// x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
+    pub physical_params1: [f32; 4],
+    /// xyz = sheen color, w = sheen roughness
+    pub physical_params2: [f32; 4],
+    /// x = anisotropy, y = anisotropy rotation, z = thickness, w = attenuation distance
+    pub physical_params3: [f32; 4],
+    /// x/y = clearcoat normal scale, z/w = reserved
+    pub physical_params4: [f32; 4],
+    /// xyz = attenuation color, w = reserved
+    pub attenuation_color: [f32; 4],
     pub lights: [GpuLight; MAX_LIGHTS],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+pub struct PostUniforms {
+    pub params1: [f32; 4],
+    pub params2: [f32; 4],
 }
 
 pub struct GpuRenderer {
@@ -50,6 +71,9 @@ pub struct GpuRenderer {
     /// Line / point pipelines: [opaque, transparent] for each.
     line_pipelines: [wgpu::RenderPipeline; 2],
     point_pipelines: [wgpu::RenderPipeline; 2],
+    pipeline_layout: wgpu::PipelineLayout,
+    post_layout: wgpu::BindGroupLayout,
+    post_pipeline: wgpu::RenderPipeline,
     uniform_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
@@ -59,16 +83,18 @@ pub struct GpuRenderer {
     ao_map_layout: wgpu::BindGroupLayout,
     shadow_layout: wgpu::BindGroupLayout,
     /// Depth-only pipeline used to render the shadow map.
-    shadow_pipeline: wgpu::RenderPipeline,
+    shadow_pipelines: [wgpu::RenderPipeline; 6],
     sampler: wgpu::Sampler,
     shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
+    _default_normal_map_texture: wgpu::Texture,
     default_texture_bind_group: wgpu::BindGroup,
     default_normal_map_bind_group: wgpu::BindGroup,
     default_mr_map_bind_group: wgpu::BindGroup,
     default_emissive_map_bind_group: wgpu::BindGroup,
     default_ibl_bind_group: wgpu::BindGroup,
     default_ao_map_bind_group: wgpu::BindGroup,
+    _default_physical_anisotropy_texture: wgpu::Texture,
     default_shadow_bind_group: wgpu::BindGroup,
     _default_shadow_texture: wgpu::Texture,
 }
@@ -82,6 +108,7 @@ struct GpuMesh {
     mr_map_bind_group: wgpu::BindGroup,
     emissive_map_bind_group: wgpu::BindGroup,
     ao_map_bind_group: wgpu::BindGroup,
+    custom_pipeline: Option<wgpu::RenderPipeline>,
     index_count: u32,
     vertex_count: u32,
     side: MeshSide,
@@ -93,6 +120,10 @@ struct GpuMesh {
     _mr_map: Option<wgpu::Texture>,
     _emissive_map: Option<wgpu::Texture>,
     _ao_map: Option<wgpu::Texture>,
+    _physical_scalar_map: Option<wgpu::Texture>,
+    _physical_sheen_map: Option<wgpu::Texture>,
+    _physical_anisotropy_map: Option<wgpu::Texture>,
+    _clearcoat_normal_map: Option<wgpu::Texture>,
 }
 
 impl GpuRenderer {
@@ -149,6 +180,10 @@ impl GpuRenderer {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("headless-three-renderer shader"),
             source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+        });
+        let post_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("headless-three-renderer post shader"),
+            source: wgpu::ShaderSource::Wgsl(POST_SHADER.into()),
         });
 
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -231,30 +266,31 @@ impl GpuRenderer {
             ],
         });
 
-        let emissive_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("headless-three-renderer emissive map layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        let emissive_map_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("headless-three-renderer emissive map layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
         let ao_map_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("headless-three-renderer ao map layout"),
+            label: Some("headless-three-renderer ao and physical map layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -268,6 +304,46 @@ impl GpuRenderer {
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -284,7 +360,7 @@ impl GpuRenderer {
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
+                        view_dimension: wgpu::TextureViewDimension::D2Array,
                         sample_type: wgpu::TextureSampleType::Depth,
                     },
                     count: None,
@@ -293,6 +369,22 @@ impl GpuRenderer {
                     binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -336,6 +428,40 @@ impl GpuRenderer {
                     binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let post_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer post layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<PostUniforms>() as u64,
+                        ),
+                    },
                     count: None,
                 },
             ],
@@ -399,21 +525,20 @@ impl GpuRenderer {
         );
         let default_texture_view =
             default_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let default_texture_bind_group =
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("headless-three-renderer default texture bind group"),
-                layout: &texture_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&default_texture_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
-            });
+        let default_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer default texture bind group"),
+            layout: &texture_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&default_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
 
         // Default normal map: flat normal (0, 0, 1) encoded as (128, 128, 255)
         let default_normal_map = device.create_texture(&wgpu::TextureDescriptor {
@@ -451,41 +576,39 @@ impl GpuRenderer {
         );
         let default_normal_map_view =
             default_normal_map.create_view(&wgpu::TextureViewDescriptor::default());
-        let default_normal_map_bind_group =
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("headless-three-renderer default normal map bind group"),
-                layout: &normal_map_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&default_normal_map_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
-            });
+        let default_normal_map_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer default normal map bind group"),
+            layout: &normal_map_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&default_normal_map_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
 
         // Default metallic-roughness map: white (1,1,1,1) so that
         // metallic = uniform.metallic * 1.0 and roughness = uniform.roughness * 1.0
         let default_mr_map_view =
             default_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let default_mr_map_bind_group =
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("headless-three-renderer default metallic-roughness bind group"),
-                layout: &mr_map_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&default_mr_map_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
-            });
+        let default_mr_map_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer default metallic-roughness bind group"),
+            layout: &mr_map_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&default_mr_map_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
 
         // Default emissive map: black (0,0,0,255) so that emissive contribution is zero
         // when no emissive map is provided
@@ -541,43 +664,104 @@ impl GpuRenderer {
             });
 
         // Default IBL: 1x1 black cubemaps (no env map contribution)
-        let default_ibl_bind_group = create_default_ibl_bind_group(
-            &device,
-            &queue,
-            &ibl_layout,
-            &sampler,
+        let default_ibl_bind_group =
+            create_default_ibl_bind_group(&device, &queue, &ibl_layout, &sampler);
+
+        // Default anisotropy map: +X tangent direction with full strength.
+        let default_physical_anisotropy_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("headless-three-renderer default physical anisotropy map"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: COLOR_FORMAT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &default_physical_anisotropy_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &[255u8, 128, 255, 255],
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
         );
+        let default_physical_anisotropy_view = default_physical_anisotropy_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
         // Default AO map: reuse the 1x1 white default texture; red channel = 1.0
         // means full illumination (no occlusion).
         let default_ao_map_view =
             default_texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let default_ao_map_bind_group =
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("headless-three-renderer default ao map bind group"),
-                layout: &ao_map_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&default_ao_map_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
-            });
+        let default_ao_map_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer default ao and physical maps bind group"),
+            layout: &ao_map_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&default_ao_map_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&default_ao_map_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&default_ao_map_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&default_physical_anisotropy_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(&default_normal_map_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("headless-three-renderer pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout), Some(&texture_layout), Some(&normal_map_layout), Some(&mr_map_layout), Some(&emissive_map_layout), Some(&ibl_layout), Some(&ao_map_layout), Some(&shadow_layout)],
+            bind_group_layouts: &[
+                Some(&uniform_layout),
+                Some(&texture_layout),
+                Some(&normal_map_layout),
+                Some(&mr_map_layout),
+                Some(&emissive_map_layout),
+                Some(&ibl_layout),
+                Some(&ao_map_layout),
+                Some(&shadow_layout),
+            ],
             immediate_size: 0,
         });
 
         // 1x1 depth texture used as a "no shadow" default binding.
         let default_shadow_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("headless-three-renderer default shadow texture"),
-            size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -585,59 +769,88 @@ impl GpuRenderer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
-        let default_shadow_view = default_shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let default_shadow_view =
+            default_shadow_texture.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::D2Array),
+                ..Default::default()
+            });
         let default_shadow_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("headless-three-renderer default shadow bind group"),
             layout: &shadow_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&default_shadow_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&shadow_sampler) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&default_shadow_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&shadow_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&default_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
             ],
         });
 
         // Dedicated pipeline layout for the depth-only shadow pass (uniforms only).
-        let shadow_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("headless-three-renderer shadow pipeline layout"),
-            bind_group_layouts: &[Some(&uniform_layout)],
-            immediate_size: 0,
-        });
-        let shadow_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("headless-three-renderer shadow pipeline"),
-            layout: Some(&shadow_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_shadow"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[Vertex::layout()],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                // No culling: captures shadows from any side, including DoubleSide materials.
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth32Float,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: wgpu::StencilState::default(),
-                // Slight slope-scaled bias to reduce acne (in addition to the
-                // per-fragment bias we apply during shadow sampling).
-                bias: wgpu::DepthBiasState {
-                    constant: 2,
-                    slope_scale: 2.0,
-                    clamp: 0.0,
+        let shadow_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("headless-three-renderer shadow pipeline layout"),
+                bind_group_layouts: &[Some(&uniform_layout)],
+                immediate_size: 0,
+            });
+        let make_shadow_pipeline = |entry_point: &'static str, label: &'static str| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&shadow_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some(entry_point),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &[Vertex::layout()],
                 },
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            fragment: None,
-            multiview_mask: None,
-            cache: None,
-        });
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    // No culling: captures shadows from any side, including DoubleSide materials.
+                    cull_mode: None,
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: wgpu::StencilState::default(),
+                    // Slight slope-scaled bias to reduce acne (in addition to the
+                    // per-fragment bias we apply during shadow sampling).
+                    bias: wgpu::DepthBiasState {
+                        constant: 2,
+                        slope_scale: 2.0,
+                        clamp: 0.0,
+                    },
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                fragment: None,
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        let shadow_pipelines = [
+            make_shadow_pipeline("vs_shadow0", "headless-three-renderer shadow pipeline 0"),
+            make_shadow_pipeline("vs_shadow1", "headless-three-renderer shadow pipeline 1"),
+            make_shadow_pipeline("vs_shadow2", "headless-three-renderer shadow pipeline 2"),
+            make_shadow_pipeline("vs_shadow3", "headless-three-renderer shadow pipeline 3"),
+            make_shadow_pipeline("vs_shadow4", "headless-three-renderer shadow pipeline 4"),
+            make_shadow_pipeline("vs_shadow5", "headless-three-renderer shadow pipeline 5"),
+        ];
 
         let color_targets = [Some(wgpu::ColorTargetState {
             format: COLOR_FORMAT,
@@ -653,7 +866,9 @@ impl GpuRenderer {
                 (Topology::Triangles, MeshSide::Double, false) => "pipeline (tri double)",
                 (Topology::Triangles, MeshSide::Front, true) => "pipeline (tri front, transparent)",
                 (Topology::Triangles, MeshSide::Back, true) => "pipeline (tri back, transparent)",
-                (Topology::Triangles, MeshSide::Double, true) => "pipeline (tri double, transparent)",
+                (Topology::Triangles, MeshSide::Double, true) => {
+                    "pipeline (tri double, transparent)"
+                }
                 (Topology::Lines, _, false) => "pipeline (lines)",
                 (Topology::Lines, _, true) => "pipeline (lines, transparent)",
                 (Topology::Points, _, false) => "pipeline (points)",
@@ -721,6 +936,41 @@ impl GpuRenderer {
             make_pipeline(Topology::Points, MeshSide::Front, true),
         ];
 
+        let post_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("headless-three-renderer post pipeline layout"),
+            bind_group_layouts: &[Some(&post_layout)],
+            immediate_size: 0,
+        });
+        let post_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("headless-three-renderer post pipeline"),
+            layout: Some(&post_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &post_shader,
+                entry_point: Some("vs_post"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &post_shader,
+                entry_point: Some("fs_post"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &color_targets,
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+
         Ok(Self {
             device,
             queue,
@@ -728,6 +978,9 @@ impl GpuRenderer {
             transparent_pipelines,
             line_pipelines,
             point_pipelines,
+            pipeline_layout,
+            post_layout,
+            post_pipeline,
             uniform_layout,
             texture_layout,
             normal_map_layout,
@@ -736,16 +989,18 @@ impl GpuRenderer {
             ibl_layout,
             ao_map_layout,
             shadow_layout,
-            shadow_pipeline,
+            shadow_pipelines,
             sampler,
             shadow_sampler,
             _default_texture: default_texture,
+            _default_normal_map_texture: default_normal_map,
             default_texture_bind_group,
             default_normal_map_bind_group,
             default_mr_map_bind_group,
             default_emissive_map_bind_group,
             default_ibl_bind_group,
             default_ao_map_bind_group,
+            _default_physical_anisotropy_texture: default_physical_anisotropy_texture,
             default_shadow_bind_group,
             _default_shadow_texture: default_shadow_texture,
         })
@@ -776,7 +1031,9 @@ impl GpuRenderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: COLOR_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
         let color_view = color_texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -799,7 +1056,13 @@ impl GpuRenderer {
             .collect::<Result<Vec<_>>>()?;
 
         let ibl_bind_group = match &settings.ibl {
-            Some(ibl) => create_ibl_bind_group(&self.device, &self.queue, &self.ibl_layout, &self.sampler, ibl),
+            Some(ibl) => create_ibl_bind_group(
+                &self.device,
+                &self.queue,
+                &self.ibl_layout,
+                &self.sampler,
+                ibl,
+            ),
             None => self.default_ibl_bind_group.clone(),
         };
 
@@ -878,45 +1141,188 @@ impl GpuRenderer {
             pass.set_bind_group(7, &shadow_bind_group, &[]);
             let mut current_pipeline: Option<PipelineKey> = None;
             for &i in &opaque_order {
-                let key = pipeline_key(&gpu_meshes[i]);
-                if current_pipeline != Some(key) {
-                    pass.set_pipeline(self.pipeline_for(key, false));
-                    current_pipeline = Some(key);
+                let mesh = &gpu_meshes[i];
+                if let Some(pipeline) = &mesh.custom_pipeline {
+                    pass.set_pipeline(pipeline);
+                    current_pipeline = None;
+                } else {
+                    let key = pipeline_key(mesh);
+                    if current_pipeline != Some(key) {
+                        pass.set_pipeline(self.pipeline_for(key, false));
+                        current_pipeline = Some(key);
+                    }
                 }
-                draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
+                draw_gpu_mesh(&mut pass, mesh);
             }
+        }
 
-            // Transparent meshes second (back-to-front, no depth write)
-            if !transparent_order.is_empty() {
-                let mut current_pipeline: Option<PipelineKey> = None;
-                for &i in &transparent_order {
-                    let key = pipeline_key(&gpu_meshes[i]);
+        if !transparent_order.is_empty() {
+            let scene_color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("headless-three-renderer scene color texture"),
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: COLOR_FORMAT,
+                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            });
+            encoder.copy_texture_to_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &color_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyTextureInfo {
+                    texture: &scene_color_texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                texture_size,
+            );
+            let scene_color_view =
+                scene_color_texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let shadow_view = match &_shadow_texture {
+                Some(texture) => texture.create_view(&wgpu::TextureViewDescriptor {
+                    dimension: Some(wgpu::TextureViewDimension::D2Array),
+                    array_layer_count: settings.shadow.as_ref().map(|s| s.layer_count),
+                    ..Default::default()
+                }),
+                None => self
+                    ._default_shadow_texture
+                    .create_view(&wgpu::TextureViewDescriptor {
+                        dimension: Some(wgpu::TextureViewDimension::D2Array),
+                        ..Default::default()
+                    }),
+            };
+            let scene_shadow_bind_group =
+                self.create_shadow_scene_bind_group(&shadow_view, &scene_color_view);
+
+            let color_attachments = [Some(wgpu::RenderPassColorAttachment {
+                view: &color_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })];
+
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("headless-three-renderer transparent render pass"),
+                color_attachments: &color_attachments,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &depth_view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+
+            pass.set_bind_group(5, &ibl_bind_group, &[]);
+            pass.set_bind_group(7, &scene_shadow_bind_group, &[]);
+            let mut current_pipeline: Option<PipelineKey> = None;
+            for &i in &transparent_order {
+                let mesh = &gpu_meshes[i];
+                if let Some(pipeline) = &mesh.custom_pipeline {
+                    pass.set_pipeline(pipeline);
+                    current_pipeline = None;
+                } else {
+                    let key = pipeline_key(mesh);
                     if current_pipeline != Some(key) {
                         pass.set_pipeline(self.pipeline_for(key, true));
                         current_pipeline = Some(key);
                     }
-                    draw_gpu_mesh(&mut pass, &gpu_meshes[i]);
                 }
+                draw_gpu_mesh(&mut pass, mesh);
             }
         }
 
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: &color_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &output_buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(padded_bytes_per_row),
-                    rows_per_image: Some(settings.height),
+        if settings.post_processing.active {
+            let post_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("headless-three-renderer post color texture"),
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: COLOR_FORMAT,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            });
+            let post_view = post_texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let post_uniforms = post_uniforms(settings.post_processing);
+            let post_uniform_buffer =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("headless-three-renderer post uniform buffer"),
+                        contents: bytemuck::bytes_of(&post_uniforms),
+                        usage: wgpu::BufferUsages::UNIFORM,
+                    });
+            let post_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("headless-three-renderer post bind group"),
+                layout: &self.post_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&color_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: post_uniform_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+            let color_attachments = [Some(wgpu::RenderPassColorAttachment {
+                view: &post_view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    store: wgpu::StoreOp::Store,
                 },
-            },
-            texture_size,
-        );
+            })];
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("headless-three-renderer post pass"),
+                color_attachments: &color_attachments,
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.post_pipeline);
+            pass.set_bind_group(0, &post_bind_group, &[]);
+            pass.draw(0..3, 0..1);
+            drop(pass);
+
+            copy_texture_to_output(
+                &mut encoder,
+                &post_texture,
+                &output_buffer,
+                padded_bytes_per_row,
+                settings.height,
+                texture_size,
+            );
+        } else {
+            copy_texture_to_output(
+                &mut encoder,
+                &color_texture,
+                &output_buffer,
+                padded_bytes_per_row,
+                settings.height,
+                texture_size,
+            );
+        }
 
         self.queue.submit([encoder.finish()]);
 
@@ -952,8 +1358,8 @@ impl GpuRenderer {
         Ok(rgba)
     }
 
-    /// Render the scene's shadow casters into a depth-only texture from the
-    /// directional light's POV and return a bind group referencing it.
+    /// Render the scene's shadow casters into a depth-only texture array from
+    /// the shadow light's POV and return a bind group referencing it.
     fn render_shadow_pass(
         &self,
         settings: &RenderSettings,
@@ -967,7 +1373,11 @@ impl GpuRenderer {
 
         let shadow_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("headless-three-renderer shadow map"),
-            size: wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: shadow.layer_count,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -975,7 +1385,11 @@ impl GpuRenderer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
-        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2Array),
+            array_layer_count: Some(shadow.layer_count),
+            ..Default::default()
+        });
 
         let mut encoder = self
             .device
@@ -983,12 +1397,18 @@ impl GpuRenderer {
                 label: Some("headless-three-renderer shadow encoder"),
             });
 
-        {
+        for layer in 0..shadow.layer_count {
+            let layer_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::D2),
+                base_array_layer: layer,
+                array_layer_count: Some(1),
+                ..Default::default()
+            });
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("headless-three-renderer shadow pass"),
                 color_attachments: &[],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &shadow_view,
+                    view: &layer_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -999,7 +1419,7 @@ impl GpuRenderer {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(&self.shadow_pipeline);
+            pass.set_pipeline(&self.shadow_pipelines[layer as usize]);
             for mesh in gpu_meshes.iter() {
                 // Only triangle meshes flagged as shadow casters contribute.
                 if !mesh.cast_shadow || mesh.topology != Topology::Triangles {
@@ -1018,16 +1438,62 @@ impl GpuRenderer {
 
         self.queue.submit([encoder.finish()]);
 
+        let default_scene_view = self
+            ._default_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("headless-three-renderer shadow bind group"),
             layout: &self.shadow_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&shadow_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.shadow_sampler) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&shadow_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.shadow_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&default_scene_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
             ],
         });
         let _ = &shadow.light_dir; // silence unused warning; direction baked into light_vp
         (bind_group, shadow_texture)
+    }
+
+    fn create_shadow_scene_bind_group(
+        &self,
+        shadow_view: &wgpu::TextureView,
+        scene_color_view: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer shadow scene-color bind group"),
+            layout: &self.shadow_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(shadow_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.shadow_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(scene_color_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+        })
     }
 
     fn sampler_for_wrap(&self, wrap_s: WrapMode, wrap_t: WrapMode) -> wgpu::Sampler {
@@ -1044,6 +1510,103 @@ impl GpuRenderer {
             mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         })
+    }
+
+    fn upload_texture(
+        &self,
+        label: &'static str,
+        tex: &crate::mesh::PreparedTexture,
+    ) -> wgpu::Texture {
+        let tex_size = wgpu::Extent3d {
+            width: tex.width,
+            height: tex.height,
+            depth_or_array_layers: 1,
+        };
+        let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(label),
+            size: tex_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: COLOR_FORMAT,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &gpu_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &tex.rgba,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * tex.width),
+                rows_per_image: Some(tex.height),
+            },
+            tex_size,
+        );
+        gpu_texture
+    }
+
+    fn create_custom_pipeline(
+        &self,
+        mesh: &PreparedMesh,
+        fragment_body: &str,
+    ) -> Result<wgpu::RenderPipeline> {
+        let source = custom_shader_source(fragment_body);
+        let shader = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("headless-three-renderer custom material shader"),
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            });
+        let color_targets = [Some(wgpu::ColorTargetState {
+            format: COLOR_FORMAT,
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+            write_mask: wgpu::ColorWrites::ALL,
+        })];
+        Ok(self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("headless-three-renderer custom material pipeline"),
+                layout: Some(&self.pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &[Vertex::layout()],
+                },
+                primitive: wgpu::PrimitiveState {
+                    topology: mesh.topology.primitive(),
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: match mesh.topology {
+                        Topology::Triangles => mesh.side.cull_mode(),
+                        Topology::Lines | Topology::Points => None,
+                    },
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DEPTH_FORMAT,
+                    depth_write_enabled: Some(!mesh.is_transparent),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &color_targets,
+                }),
+                multiview_mask: None,
+                cache: None,
+            }))
     }
 
     fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
@@ -1077,14 +1640,29 @@ impl GpuRenderer {
             mvp: mvp.to_cols_array_2d(),
             model: model.to_cols_array_2d(),
             normal_matrix: normal_matrix.to_cols_array_2d(),
-            camera_pos: [settings.camera_pos.x, settings.camera_pos.y, settings.camera_pos.z, 0.0],
+            camera_pos: [
+                settings.camera_pos.x,
+                settings.camera_pos.y,
+                settings.camera_pos.z,
+                0.0,
+            ],
             base_color: mesh.base_color,
-            emissive: [mesh.emissive[0], mesh.emissive[1], mesh.emissive[2], mesh.alpha_test],
+            emissive: [
+                mesh.emissive[0],
+                mesh.emissive[1],
+                mesh.emissive[2],
+                mesh.alpha_test,
+            ],
             metallic: mesh.metallic,
             roughness: mesh.roughness,
             ambient_intensity: settings.ambient_intensity,
             num_lights: settings.lights.len().min(MAX_LIGHTS) as u32,
-            ambient_color: [settings.ambient_color[0], settings.ambient_color[1], settings.ambient_color[2], 0.0],
+            ambient_color: [
+                settings.ambient_color[0],
+                settings.ambient_color[1],
+                settings.ambient_color[2],
+                0.0,
+            ],
             normal_map_params: [
                 mesh.normal_scale[0],
                 mesh.normal_scale[1],
@@ -1103,11 +1681,17 @@ impl GpuRenderer {
                 0.0,
                 0.0,
             ],
-            light_space_matrix: settings
+            render_params: [
+                1.0 / settings.width as f32,
+                1.0 / settings.height as f32,
+                settings.width as f32,
+                settings.height as f32,
+            ],
+            light_space_matrices: settings
                 .shadow
                 .as_ref()
-                .map(|s| s.light_vp.to_cols_array_2d())
-                .unwrap_or_else(|| Mat4::IDENTITY.to_cols_array_2d()),
+                .map(|s| s.light_vps.map(|matrix| matrix.to_cols_array_2d()))
+                .unwrap_or_else(|| [Mat4::IDENTITY.to_cols_array_2d(); 6]),
             shadow_params: match &settings.shadow {
                 Some(s) => [
                     1.0,
@@ -1118,9 +1702,53 @@ impl GpuRenderer {
                 None => [0.0, 0.0, 0.0, 0.0],
             },
             shadow_params2: match &settings.shadow {
-                Some(s) => [s.light_index as f32, 1.0 / s.map_size as f32, 0.0, 0.0],
+                Some(s) => [
+                    s.light_index as f32,
+                    1.0 / s.map_size as f32,
+                    match s.kind {
+                        ShadowKind::DirectionalOrSpot => 0.0,
+                        ShadowKind::Point => 1.0,
+                        ShadowKind::Cascaded => 2.0,
+                    },
+                    s.layer_count as f32,
+                ],
                 None => [0.0, 0.0, 0.0, 0.0],
             },
+            shadow_params3: settings
+                .shadow
+                .as_ref()
+                .map(|s| s.cascade_splits)
+                .unwrap_or([f32::MAX; 4]),
+            physical_params1: [
+                mesh.clearcoat,
+                mesh.clearcoat_roughness,
+                mesh.transmission,
+                mesh.ior,
+            ],
+            physical_params2: [
+                mesh.sheen_color[0],
+                mesh.sheen_color[1],
+                mesh.sheen_color[2],
+                mesh.sheen_roughness,
+            ],
+            physical_params3: [
+                mesh.anisotropy,
+                mesh.anisotropy_rotation,
+                mesh.thickness,
+                mesh.attenuation_distance,
+            ],
+            physical_params4: [
+                mesh.clearcoat_normal_scale[0],
+                mesh.clearcoat_normal_scale[1],
+                0.0,
+                0.0,
+            ],
+            attenuation_color: [
+                mesh.attenuation_color[0],
+                mesh.attenuation_color[1],
+                mesh.attenuation_color[2],
+                0.0,
+            ],
             lights,
         };
         let uniform_buffer = self
@@ -1154,8 +1782,7 @@ impl GpuRenderer {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING
-                        | wgpu::TextureUsages::COPY_DST,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
                 self.queue.write_texture(
@@ -1173,24 +1800,22 @@ impl GpuRenderer {
                     },
                     tex_size,
                 );
-                let tex_view =
-                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 let sampler_for_tex = self.sampler_for_wrap(tex.wrap_s, tex.wrap_t);
-                let tex_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("headless-three-renderer mesh texture bind group"),
-                        layout: &self.texture_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(&tex_view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
-                            },
-                        ],
-                    });
+                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("headless-three-renderer mesh texture bind group"),
+                    layout: &self.texture_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&tex_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
+                        },
+                    ],
+                });
                 (tex_bind_group, Some(gpu_texture))
             }
             None => (self.default_texture_bind_group.clone(), None),
@@ -1210,8 +1835,7 @@ impl GpuRenderer {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING
-                        | wgpu::TextureUsages::COPY_DST,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
                 self.queue.write_texture(
@@ -1229,23 +1853,21 @@ impl GpuRenderer {
                     },
                     tex_size,
                 );
-                let tex_view =
-                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let tex_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("headless-three-renderer normal map bind group"),
-                        layout: &self.normal_map_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(&tex_view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.sampler),
-                            },
-                        ],
-                    });
+                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("headless-three-renderer normal map bind group"),
+                    layout: &self.normal_map_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&tex_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        },
+                    ],
+                });
                 (tex_bind_group, Some(gpu_texture))
             }
             None => (self.default_normal_map_bind_group.clone(), None),
@@ -1265,8 +1887,7 @@ impl GpuRenderer {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING
-                        | wgpu::TextureUsages::COPY_DST,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
                 self.queue.write_texture(
@@ -1284,23 +1905,21 @@ impl GpuRenderer {
                     },
                     tex_size,
                 );
-                let tex_view =
-                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let tex_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("headless-three-renderer metallic-roughness bind group"),
-                        layout: &self.mr_map_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(&tex_view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.sampler),
-                            },
-                        ],
-                    });
+                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("headless-three-renderer metallic-roughness bind group"),
+                    layout: &self.mr_map_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&tex_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        },
+                    ],
+                });
                 (tex_bind_group, Some(gpu_texture))
             }
             None => (self.default_mr_map_bind_group.clone(), None),
@@ -1320,8 +1939,7 @@ impl GpuRenderer {
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
                     format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING
-                        | wgpu::TextureUsages::COPY_DST,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
                 self.queue.write_texture(
@@ -1339,81 +1957,154 @@ impl GpuRenderer {
                     },
                     tex_size,
                 );
-                let tex_view =
-                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let tex_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("headless-three-renderer emissive map bind group"),
-                        layout: &self.emissive_map_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(&tex_view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.sampler),
-                            },
-                        ],
-                    });
+                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("headless-three-renderer emissive map bind group"),
+                    layout: &self.emissive_map_layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&tex_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        },
+                    ],
+                });
                 (tex_bind_group, Some(gpu_texture))
             }
             None => (self.default_emissive_map_bind_group.clone(), None),
         };
 
-        let (ao_map_bind_group, _ao_map_texture) = match &mesh.ao_map {
-            Some(tex) => {
-                let tex_size = wgpu::Extent3d {
-                    width: tex.width,
-                    height: tex.height,
-                    depth_or_array_layers: 1,
-                };
-                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("headless-three-renderer ao map"),
-                    size: tex_size,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING
-                        | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-                self.queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &gpu_texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
+        let (
+            ao_map_bind_group,
+            _ao_map_texture,
+            _physical_scalar_map_texture,
+            _physical_sheen_map_texture,
+            _physical_anisotropy_map_texture,
+            _clearcoat_normal_map_texture,
+        ) = if mesh.ao_map.is_some()
+            || mesh.physical_maps.is_some()
+            || mesh.clearcoat_normal_map.is_some()
+        {
+            let ao_texture = mesh
+                .ao_map
+                .as_ref()
+                .map(|tex| self.upload_texture("headless-three-renderer ao map", tex));
+            let physical_scalar_texture = mesh.physical_maps.as_ref().map(|maps| {
+                self.upload_texture(
+                    "headless-three-renderer physical scalar map",
+                    &maps.scalar_map,
+                )
+            });
+            let physical_sheen_texture = mesh.physical_maps.as_ref().map(|maps| {
+                self.upload_texture(
+                    "headless-three-renderer physical sheen map",
+                    &maps.sheen_map,
+                )
+            });
+            let physical_anisotropy_texture = mesh.physical_maps.as_ref().map(|maps| {
+                self.upload_texture(
+                    "headless-three-renderer physical anisotropy map",
+                    &maps.anisotropy_map,
+                )
+            });
+            let clearcoat_normal_texture = mesh.clearcoat_normal_map.as_ref().map(|tex| {
+                self.upload_texture("headless-three-renderer clearcoat normal map", tex)
+            });
+
+            let default_white_view = self
+                ._default_texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            let default_normal_view = self
+                ._default_normal_map_texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            let default_anisotropy_view = self
+                ._default_physical_anisotropy_texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            let ao_view = ao_texture
+                .as_ref()
+                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+            let physical_scalar_view = physical_scalar_texture
+                .as_ref()
+                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+            let physical_sheen_view = physical_sheen_texture
+                .as_ref()
+                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+            let physical_anisotropy_view = physical_anisotropy_texture
+                .as_ref()
+                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+            let clearcoat_normal_view = clearcoat_normal_texture
+                .as_ref()
+                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+
+            let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("headless-three-renderer ao and physical maps bind group"),
+                layout: &self.ao_map_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(
+                            ao_view.as_ref().unwrap_or(&default_white_view),
+                        ),
                     },
-                    &tex.rgba,
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(4 * tex.width),
-                        rows_per_image: Some(tex.height),
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(
+                            physical_scalar_view.as_ref().unwrap_or(&default_white_view),
+                        ),
                     },
-                    tex_size,
-                );
-                let tex_view =
-                    gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let tex_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("headless-three-renderer ao map bind group"),
-                        layout: &self.ao_map_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: wgpu::BindingResource::TextureView(&tex_view),
-                            },
-                            wgpu::BindGroupEntry {
-                                binding: 1,
-                                resource: wgpu::BindingResource::Sampler(&self.sampler),
-                            },
-                        ],
-                    });
-                (tex_bind_group, Some(gpu_texture))
-            }
-            None => (self.default_ao_map_bind_group.clone(), None),
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(
+                            physical_sheen_view.as_ref().unwrap_or(&default_white_view),
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: wgpu::BindingResource::TextureView(
+                            physical_anisotropy_view
+                                .as_ref()
+                                .unwrap_or(&default_anisotropy_view),
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: wgpu::BindingResource::TextureView(
+                            clearcoat_normal_view
+                                .as_ref()
+                                .unwrap_or(&default_normal_view),
+                        ),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 5,
+                        resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    },
+                ],
+            });
+            (
+                tex_bind_group,
+                ao_texture,
+                physical_scalar_texture,
+                physical_sheen_texture,
+                physical_anisotropy_texture,
+                clearcoat_normal_texture,
+            )
+        } else {
+            (
+                self.default_ao_map_bind_group.clone(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+
+        let custom_pipeline = match mesh.custom_fragment_shader.as_deref() {
+            Some(fragment_body) => Some(self.create_custom_pipeline(mesh, fragment_body)?),
+            None => None,
         };
 
         Ok(GpuMesh {
@@ -1425,6 +2116,7 @@ impl GpuRenderer {
             mr_map_bind_group,
             emissive_map_bind_group,
             ao_map_bind_group,
+            custom_pipeline,
             index_count: mesh
                 .indices
                 .as_ref()
@@ -1439,6 +2131,10 @@ impl GpuRenderer {
             _mr_map: _mr_map_texture,
             _emissive_map: _emissive_map_texture,
             _ao_map: _ao_map_texture,
+            _physical_scalar_map: _physical_scalar_map_texture,
+            _physical_sheen_map: _physical_sheen_map_texture,
+            _physical_anisotropy_map: _physical_anisotropy_map_texture,
+            _clearcoat_normal_map: _clearcoat_normal_map_texture,
         })
     }
 }
@@ -1483,7 +2179,10 @@ impl GpuRenderer {
     }
 }
 
-fn partition_draw_order(meshes: &[PreparedMesh], camera_pos: glam::Vec3) -> (Vec<usize>, Vec<usize>) {
+fn partition_draw_order(
+    meshes: &[PreparedMesh],
+    camera_pos: glam::Vec3,
+) -> (Vec<usize>, Vec<usize>) {
     let mut opaque = Vec::new();
     let mut transparent = Vec::new();
 
@@ -1499,7 +2198,9 @@ fn partition_draw_order(meshes: &[PreparedMesh], camera_pos: glam::Vec3) -> (Vec
     transparent.sort_by(|&a, &b| {
         let dist_a = mesh_distance_sq(&meshes[a], camera_pos);
         let dist_b = mesh_distance_sq(&meshes[b], camera_pos);
-        dist_b.partial_cmp(&dist_a).unwrap_or(std::cmp::Ordering::Equal)
+        dist_b
+            .partial_cmp(&dist_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     (opaque, transparent)
@@ -1527,6 +2228,45 @@ fn draw_gpu_mesh(pass: &mut wgpu::RenderPass, mesh: &GpuMesh) {
     }
 }
 
+fn post_uniforms(settings: PostProcessingSettings) -> PostUniforms {
+    PostUniforms {
+        params1: [
+            settings.exposure,
+            settings.contrast,
+            settings.saturation,
+            settings.vignette,
+        ],
+        params2: [settings.grayscale, settings.invert, 0.0, 0.0],
+    }
+}
+
+fn copy_texture_to_output(
+    encoder: &mut wgpu::CommandEncoder,
+    texture: &wgpu::Texture,
+    output_buffer: &wgpu::Buffer,
+    padded_bytes_per_row: u32,
+    height: u32,
+    texture_size: wgpu::Extent3d,
+) {
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: output_buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded_bytes_per_row),
+                rows_per_image: Some(height),
+            },
+        },
+        texture_size,
+    );
+}
+
 fn create_default_ibl_bind_group(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -1547,7 +2287,11 @@ fn create_default_ibl_bind_group(
     // 1x1 BRDF LUT with (0, 0, 0, 255)
     let brdf_tex = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("default brdf lut"),
-        size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        size: wgpu::Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -1556,10 +2300,23 @@ fn create_default_ibl_bind_group(
         view_formats: &[],
     });
     queue.write_texture(
-        wgpu::TexelCopyTextureInfo { texture: &brdf_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyTextureInfo {
+            texture: &brdf_tex,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
         &[0u8, 0, 0, 255],
-        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4), rows_per_image: Some(1) },
-        wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(4),
+            rows_per_image: Some(1),
+        },
+        wgpu::Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
     );
     let brdf_view = brdf_tex.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -1567,10 +2324,22 @@ fn create_default_ibl_bind_group(
         label: Some("default ibl bind group"),
         layout,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&irradiance_view) },
-            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&prefilter_view) },
-            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&brdf_view) },
-            wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&irradiance_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&prefilter_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(&brdf_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
         ],
     })
 }
@@ -1584,8 +2353,14 @@ fn create_ibl_bind_group(
 ) -> wgpu::BindGroup {
     // Irradiance cubemap
     let irradiance_tex = create_cubemap(
-        device, queue, ibl.irradiance_size, 1,
-        &ibl.irradiance_faces.iter().map(|f| f.as_slice()).collect::<Vec<_>>(),
+        device,
+        queue,
+        ibl.irradiance_size,
+        1,
+        &ibl.irradiance_faces
+            .iter()
+            .map(|f| f.as_slice())
+            .collect::<Vec<_>>(),
     );
     let irradiance_view = irradiance_tex.create_view(&wgpu::TextureViewDescriptor {
         dimension: Some(wgpu::TextureViewDimension::Cube),
@@ -1594,7 +2369,11 @@ fn create_ibl_bind_group(
 
     // Prefiltered specular cubemap with mip levels
     let prefilter_tex = create_cubemap_with_mips(
-        device, queue, ibl.prefilter_base_size, ibl.prefilter_mip_levels, &ibl.prefilter_faces,
+        device,
+        queue,
+        ibl.prefilter_base_size,
+        ibl.prefilter_mip_levels,
+        &ibl.prefilter_faces,
     );
     let prefilter_view = prefilter_tex.create_view(&wgpu::TextureViewDescriptor {
         dimension: Some(wgpu::TextureViewDimension::Cube),
@@ -1604,7 +2383,11 @@ fn create_ibl_bind_group(
     // BRDF LUT
     let brdf_tex = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("brdf lut"),
-        size: wgpu::Extent3d { width: ibl.brdf_lut_size, height: ibl.brdf_lut_size, depth_or_array_layers: 1 },
+        size: wgpu::Extent3d {
+            width: ibl.brdf_lut_size,
+            height: ibl.brdf_lut_size,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -1613,10 +2396,23 @@ fn create_ibl_bind_group(
         view_formats: &[],
     });
     queue.write_texture(
-        wgpu::TexelCopyTextureInfo { texture: &brdf_tex, mip_level: 0, origin: wgpu::Origin3d::ZERO, aspect: wgpu::TextureAspect::All },
+        wgpu::TexelCopyTextureInfo {
+            texture: &brdf_tex,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
         &ibl.brdf_lut,
-        wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(4 * ibl.brdf_lut_size), rows_per_image: Some(ibl.brdf_lut_size) },
-        wgpu::Extent3d { width: ibl.brdf_lut_size, height: ibl.brdf_lut_size, depth_or_array_layers: 1 },
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(4 * ibl.brdf_lut_size),
+            rows_per_image: Some(ibl.brdf_lut_size),
+        },
+        wgpu::Extent3d {
+            width: ibl.brdf_lut_size,
+            height: ibl.brdf_lut_size,
+            depth_or_array_layers: 1,
+        },
     );
     let brdf_view = brdf_tex.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -1624,10 +2420,22 @@ fn create_ibl_bind_group(
         label: Some("ibl bind group"),
         layout,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&irradiance_view) },
-            wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(&prefilter_view) },
-            wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&brdf_view) },
-            wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::Sampler(sampler) },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&irradiance_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&prefilter_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(&brdf_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
         ],
     })
 }
@@ -1641,7 +2449,11 @@ fn create_cubemap(
 ) -> wgpu::Texture {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("cubemap"),
-        size: wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 6 },
+        size: wgpu::Extent3d {
+            width: size,
+            height: size,
+            depth_or_array_layers: 6,
+        },
         mip_level_count: mip_levels,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -1654,7 +2466,11 @@ fn create_cubemap(
             wgpu::TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
-                origin: wgpu::Origin3d { x: 0, y: 0, z: face as u32 },
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: face as u32,
+                },
                 aspect: wgpu::TextureAspect::All,
             },
             data,
@@ -1663,7 +2479,11 @@ fn create_cubemap(
                 bytes_per_row: Some(4 * size),
                 rows_per_image: Some(size),
             },
-            wgpu::Extent3d { width: size, height: size, depth_or_array_layers: 1 },
+            wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: 1,
+            },
         );
     }
     texture
@@ -1678,7 +2498,11 @@ fn create_cubemap_with_mips(
 ) -> wgpu::Texture {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("prefiltered cubemap"),
-        size: wgpu::Extent3d { width: base_size, height: base_size, depth_or_array_layers: 6 },
+        size: wgpu::Extent3d {
+            width: base_size,
+            height: base_size,
+            depth_or_array_layers: 6,
+        },
         mip_level_count: mip_levels,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -1695,7 +2519,11 @@ fn create_cubemap_with_mips(
                     wgpu::TexelCopyTextureInfo {
                         texture: &texture,
                         mip_level: mip,
-                        origin: wgpu::Origin3d { x: 0, y: 0, z: face },
+                        origin: wgpu::Origin3d {
+                            x: 0,
+                            y: 0,
+                            z: face,
+                        },
                         aspect: wgpu::TextureAspect::All,
                     },
                     &faces[idx],
@@ -1704,7 +2532,11 @@ fn create_cubemap_with_mips(
                         bytes_per_row: Some(4 * mip_size),
                         rows_per_image: Some(mip_size),
                     },
-                    wgpu::Extent3d { width: mip_size, height: mip_size, depth_or_array_layers: 1 },
+                    wgpu::Extent3d {
+                        width: mip_size,
+                        height: mip_size,
+                        depth_or_array_layers: 1,
+                    },
                 );
             }
         }

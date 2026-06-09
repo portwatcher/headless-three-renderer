@@ -139,7 +139,9 @@ mod tests {
 
     #[test]
     fn decodes_raw_rgba_texture() {
-        let rgba = vec![255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255];
+        let rgba = vec![
+            255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255,
+        ];
         let tex = decode_texture(&rgba, Some(2), Some(2), 0).unwrap();
         assert_eq!(tex.width, 2);
         assert_eq!(tex.height, 2);
@@ -186,13 +188,12 @@ mod tests {
         // Ground plane (receives shadow)
         let ground = SceneMesh {
             positions: vec![
-                -5.0, 0.0, -5.0,
-                 5.0, 0.0, -5.0,
-                 5.0, 0.0,  5.0,
-                -5.0, 0.0,  5.0,
+                -5.0, 0.0, -5.0, 5.0, 0.0, -5.0, 5.0, 0.0, 5.0, -5.0, 0.0, 5.0,
             ],
             indices: Some(vec![0, 1, 2, 0, 2, 3]),
-            normals: Some(vec![0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0,  0.0, 1.0, 0.0]),
+            normals: Some(vec![
+                0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+            ]),
             color: Some(vec![0.8, 0.8, 0.8, 1.0]),
             receive_shadow: Some(true),
             ..SceneMesh::default()
@@ -200,16 +201,12 @@ mod tests {
         // Occluder box (casts shadow)
         let occluder = SceneMesh {
             positions: vec![
-                -0.5, 1.0, -0.5,   0.5, 1.0, -0.5,   0.5, 2.0, -0.5,  -0.5, 2.0, -0.5,
-                -0.5, 1.0,  0.5,   0.5, 1.0,  0.5,   0.5, 2.0,  0.5,  -0.5, 2.0,  0.5,
+                -0.5, 1.0, -0.5, 0.5, 1.0, -0.5, 0.5, 2.0, -0.5, -0.5, 2.0, -0.5, -0.5, 1.0, 0.5,
+                0.5, 1.0, 0.5, 0.5, 2.0, 0.5, -0.5, 2.0, 0.5,
             ],
             indices: Some(vec![
-                0,1,2, 0,2,3,
-                4,6,5, 4,7,6,
-                0,3,7, 0,7,4,
-                1,5,6, 1,6,2,
-                3,2,6, 3,6,7,
-                0,4,5, 0,5,1,
+                0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2, 3, 2, 6, 3,
+                6, 7, 0, 4, 5, 0, 5, 1,
             ]),
             color: Some(vec![0.9, 0.2, 0.2, 1.0]),
             cast_shadow: Some(true),
@@ -249,7 +246,154 @@ mod tests {
             ..Camera::default()
         };
 
-        let rgba = renderer.render(&scene, &camera).expect("render should succeed");
+        let rgba = renderer
+            .render(&scene, &camera)
+            .expect("render should succeed");
+        assert_eq!(rgba.len(), 64 * 64 * 4);
+    }
+
+    #[test]
+    fn renders_scene_with_spot_shadow() {
+        let renderer = match GpuRenderer::new() {
+            Ok(r) => r,
+            Err(err) => {
+                eprintln!("skipping: no wgpu adapter available ({err})");
+                return;
+            }
+        };
+
+        let ground = SceneMesh {
+            positions: vec![
+                -4.0, 0.0, -4.0, 4.0, 0.0, -4.0, 4.0, 0.0, 4.0, -4.0, 0.0, 4.0,
+            ],
+            indices: Some(vec![0, 1, 2, 0, 2, 3]),
+            normals: Some(vec![
+                0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+            ]),
+            color: Some(vec![0.75, 0.75, 0.75, 1.0]),
+            receive_shadow: Some(true),
+            ..SceneMesh::default()
+        };
+        let caster = SceneMesh {
+            positions: vec![
+                -0.5, 0.7, -0.5, 0.5, 0.7, -0.5, 0.5, 1.7, -0.5, -0.5, 1.7, -0.5, -0.5, 0.7, 0.5,
+                0.5, 0.7, 0.5, 0.5, 1.7, 0.5, -0.5, 1.7, 0.5,
+            ],
+            indices: Some(vec![
+                0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2, 3, 2, 6, 3,
+                6, 7, 0, 4, 5, 0, 5, 1,
+            ]),
+            color: Some(vec![0.9, 0.25, 0.2, 1.0]),
+            cast_shadow: Some(true),
+            ..SceneMesh::default()
+        };
+        let light = SceneLight {
+            light_type: "spot".into(),
+            color: Some(vec![1.0, 1.0, 1.0]),
+            intensity: Some(8.0),
+            position: Some(vec![0.0, 5.0, 3.0]),
+            direction: Some(vec![0.0, -5.0, -3.0]),
+            distance: Some(10.0),
+            decay: Some(2.0),
+            angle: Some(0.7),
+            penumbra: Some(0.2),
+            cast_shadow: Some(true),
+            shadow_map_size: Some(256),
+            shadow_bias: Some(-0.0005),
+            shadow_normal_bias: Some(0.02),
+            shadow_camera_near: Some(0.1),
+            shadow_camera_far: Some(12.0),
+            ..SceneLight::default()
+        };
+
+        let scene = RenderScene {
+            width: Some(64),
+            height: Some(64),
+            format: Some("rgba".into()),
+            meshes: Some(vec![ground, caster]),
+            lights: Some(vec![light]),
+            ..RenderScene::default()
+        };
+        let camera = Camera {
+            eye: Some(vec![4.0, 3.0, 6.0]),
+            target: Some(vec![0.0, 0.5, 0.0]),
+            ..Camera::default()
+        };
+
+        let rgba = renderer
+            .render(&scene, &camera)
+            .expect("render should succeed");
+        assert_eq!(rgba.len(), 64 * 64 * 4);
+    }
+
+    #[test]
+    fn renders_scene_with_point_shadow() {
+        let renderer = match GpuRenderer::new() {
+            Ok(r) => r,
+            Err(err) => {
+                eprintln!("skipping: no wgpu adapter available ({err})");
+                return;
+            }
+        };
+
+        let ground = SceneMesh {
+            positions: vec![
+                -4.0, 0.0, -4.0, 4.0, 0.0, -4.0, 4.0, 0.0, 4.0, -4.0, 0.0, 4.0,
+            ],
+            indices: Some(vec![0, 1, 2, 0, 2, 3]),
+            normals: Some(vec![
+                0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
+            ]),
+            color: Some(vec![0.75, 0.75, 0.75, 1.0]),
+            receive_shadow: Some(true),
+            ..SceneMesh::default()
+        };
+        let caster = SceneMesh {
+            positions: vec![
+                -0.5, 0.7, -0.5, 0.5, 0.7, -0.5, 0.5, 1.7, -0.5, -0.5, 1.7, -0.5, -0.5, 0.7, 0.5,
+                0.5, 0.7, 0.5, 0.5, 1.7, 0.5, -0.5, 1.7, 0.5,
+            ],
+            indices: Some(vec![
+                0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2, 3, 2, 6, 3,
+                6, 7, 0, 4, 5, 0, 5, 1,
+            ]),
+            color: Some(vec![0.9, 0.25, 0.2, 1.0]),
+            cast_shadow: Some(true),
+            ..SceneMesh::default()
+        };
+        let light = SceneLight {
+            light_type: "point".into(),
+            color: Some(vec![1.0, 1.0, 1.0]),
+            intensity: Some(45.0),
+            position: Some(vec![0.0, 4.0, 2.0]),
+            distance: Some(12.0),
+            decay: Some(2.0),
+            cast_shadow: Some(true),
+            shadow_map_size: Some(256),
+            shadow_bias: Some(-0.0005),
+            shadow_normal_bias: Some(0.02),
+            shadow_camera_near: Some(0.1),
+            shadow_camera_far: Some(12.0),
+            ..SceneLight::default()
+        };
+
+        let scene = RenderScene {
+            width: Some(64),
+            height: Some(64),
+            format: Some("rgba".into()),
+            meshes: Some(vec![ground, caster]),
+            lights: Some(vec![light]),
+            ..RenderScene::default()
+        };
+        let camera = Camera {
+            eye: Some(vec![4.0, 3.0, 6.0]),
+            target: Some(vec![0.0, 0.5, 0.0]),
+            ..Camera::default()
+        };
+
+        let rgba = renderer
+            .render(&scene, &camera)
+            .expect("render should succeed");
         assert_eq!(rgba.len(), 64 * 64 * 4);
     }
 }

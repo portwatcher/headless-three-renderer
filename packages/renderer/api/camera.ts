@@ -5,8 +5,8 @@ const DEFAULT_WIDTH = 512
 const DEFAULT_HEIGHT = 512
 
 export function resolveSize(camera: ThreeCameraLike, options: RenderOptions): { width: number; height: number } {
-  let width = numberOrUndefined(options.width)
-  let height = numberOrUndefined(options.height)
+  let width = numberOrUndefined(options.width) ?? numberOrUndefined(options.target?.width)
+  let height = numberOrUndefined(options.height) ?? numberOrUndefined(options.target?.height)
 
   if (width == null && height == null) {
     width = numberOrUndefined(camera.userData?.width) ?? DEFAULT_WIDTH

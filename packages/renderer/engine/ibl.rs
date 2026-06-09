@@ -40,7 +40,11 @@ pub struct EnvMap {
 impl EnvMap {
     /// Decode from raw image bytes (PNG, JPEG, WebP, or HDR Radiance).
     /// Also accepts raw RGBA8 bytes if width/height hints are given.
-    pub fn from_bytes(data: &[u8], width_hint: Option<u32>, height_hint: Option<u32>) -> Result<Self> {
+    pub fn from_bytes(
+        data: &[u8],
+        width_hint: Option<u32>,
+        height_hint: Option<u32>,
+    ) -> Result<Self> {
         let w = width_hint.unwrap_or(0);
         let h = height_hint.unwrap_or(0);
 
@@ -54,7 +58,11 @@ impl EnvMap {
                     srgb_to_linear(data[i * 4 + 2] as f32 / 255.0),
                 ]);
             }
-            return Ok(Self { pixels, width: w, height: h });
+            return Ok(Self {
+                pixels,
+                width: w,
+                height: h,
+            });
         }
 
         // Raw RGBA16F (half-float)? Three.js HalfFloatType = data is Float16 (2 bytes per component, 8 per pixel)
@@ -67,7 +75,11 @@ impl EnvMap {
                 let b = half_to_f32(u16::from_le_bytes([data[offset + 4], data[offset + 5]]));
                 pixels.push([r, g, b]);
             }
-            return Ok(Self { pixels, width: w, height: h });
+            return Ok(Self {
+                pixels,
+                width: w,
+                height: h,
+            });
         }
 
         // Raw RGBA32F?
@@ -75,17 +87,36 @@ impl EnvMap {
             let mut pixels = Vec::with_capacity((w * h) as usize);
             for i in 0..(w * h) as usize {
                 let offset = i * 16;
-                let r = f32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
-                let g = f32::from_le_bytes([data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]]);
-                let b = f32::from_le_bytes([data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11]]);
+                let r = f32::from_le_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]);
+                let g = f32::from_le_bytes([
+                    data[offset + 4],
+                    data[offset + 5],
+                    data[offset + 6],
+                    data[offset + 7],
+                ]);
+                let b = f32::from_le_bytes([
+                    data[offset + 8],
+                    data[offset + 9],
+                    data[offset + 10],
+                    data[offset + 11],
+                ]);
                 pixels.push([r, g, b]);
             }
-            return Ok(Self { pixels, width: w, height: h });
+            return Ok(Self {
+                pixels,
+                width: w,
+                height: h,
+            });
         }
 
         // Try decoding as an image file
-        let img = image::load_from_memory(data)
-            .context("failed to decode environment map image")?;
+        let img =
+            image::load_from_memory(data).context("failed to decode environment map image")?;
         let rgba = img.to_rgba8();
         let w = rgba.width();
         let h = rgba.height();
@@ -98,7 +129,11 @@ impl EnvMap {
                 srgb_to_linear(raw[i * 4 + 2] as f32 / 255.0),
             ]);
         }
-        Ok(Self { pixels, width: w, height: h })
+        Ok(Self {
+            pixels,
+            width: w,
+            height: h,
+        })
     }
 
     /// Sample the equirectangular map at a world-space direction.
@@ -276,11 +311,7 @@ fn compute_brdf_lut() -> Vec<u8> {
 }
 
 fn integrate_brdf(n_dot_v: f32, roughness: f32, sample_count: u32) -> (f32, f32) {
-    let v = [
-        (1.0 - n_dot_v * n_dot_v).sqrt(),
-        0.0,
-        n_dot_v,
-    ];
+    let v = [(1.0 - n_dot_v * n_dot_v).sqrt(), 0.0, n_dot_v];
     let n = [0.0f32, 0.0, 1.0];
     let (up, right) = ([0.0f32, 1.0, 0.0], [1.0, 0.0, 0.0]);
 
@@ -361,7 +392,11 @@ fn reflect_over(v: [f32; 3], h: [f32; 3]) -> [f32; 3] {
 }
 
 fn make_tangent_frame(n: [f32; 3]) -> ([f32; 3], [f32; 3]) {
-    let up = if n[1].abs() < 0.999 { [0.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] };
+    let up = if n[1].abs() < 0.999 {
+        [0.0, 1.0, 0.0]
+    } else {
+        [1.0, 0.0, 0.0]
+    };
     let right = normalize(cross(up, n));
     let up = cross(n, right);
     (up, right)

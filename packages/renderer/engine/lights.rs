@@ -64,13 +64,20 @@ pub fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
 
         let direction = parse_vec3(
             light.direction.as_deref(),
-            if light_type == 3 { [0.0, 1.0, 0.0] } else { [0.0, -1.0, 0.0] },
+            if light_type == 3 {
+                [0.0, 1.0, 0.0]
+            } else {
+                [0.0, -1.0, 0.0]
+            },
             &format!("scene.lights[{i}].direction"),
         )?;
 
         // Spot light cone parameters
         let params = if light_type == 2 {
-            let angle = light.angle.unwrap_or(std::f64::consts::FRAC_PI_3).clamp(0.0, std::f64::consts::FRAC_PI_2) as f32;
+            let angle = light
+                .angle
+                .unwrap_or(std::f64::consts::FRAC_PI_3)
+                .clamp(0.0, std::f64::consts::FRAC_PI_2) as f32;
             let penumbra = light.penumbra.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
             let cos_outer = angle.cos();
             let cos_inner = (angle * (1.0 - penumbra)).cos();

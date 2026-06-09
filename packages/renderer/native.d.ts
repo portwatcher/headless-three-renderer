@@ -54,6 +54,18 @@ export interface RenderScene {
   environmentMapHeight?: number
   /** Environment map intensity multiplier. Defaults to 1. */
   environmentMapIntensity?: number
+  /** Post-processing exposure adjustment in stops. Defaults to 0. */
+  postExposure?: number
+  /** Post-processing contrast multiplier. Defaults to 1. */
+  postContrast?: number
+  /** Post-processing saturation multiplier. Defaults to 1. */
+  postSaturation?: number
+  /** Post-processing vignette amount 0..1. Defaults to 0. */
+  postVignette?: number
+  /** Post-processing grayscale blend 0..1. Defaults to 0. */
+  postGrayscale?: number
+  /** Post-processing inversion blend 0..1. Defaults to 0. */
+  postInvert?: number
 }
 
 export interface SceneLight {
@@ -77,7 +89,7 @@ export interface SceneLight {
   penumbra?: number
   /** Hemisphere light ground color `[r, g, b]` in 0..1 range. */
   groundColor?: Array<number>
-  /** Whether this light casts shadows (directional lights only). */
+  /** Whether this light casts shadows (directional, spot, and point lights). */
   castShadow?: boolean
   /** Shadow map resolution (square, pixels). Defaults to 512. */
   shadowMapSize?: number
@@ -92,6 +104,10 @@ export interface SceneLight {
   shadowCameraBottom?: number
   shadowCameraNear?: number
   shadowCameraFar?: number
+  /** Cascaded shadow split distances from the active camera. */
+  shadowCascadeSplits?: Array<number>
+  /** Flattened cascade bounds: `[left, right, top, bottom, near, far, ...]`. */
+  shadowCascadeBounds?: Array<number>
 }
 
 export interface SceneMesh {
@@ -129,6 +145,78 @@ export interface SceneMesh {
   metallic?: number
   /** Roughness factor (0..1). Defaults to 1. */
   roughness?: number
+  /** Clearcoat intensity (0..1) for MeshPhysicalMaterial. Defaults to 0. */
+  clearcoat?: number
+  /** Optional clearcoat intensity map. Red channel multiplies `clearcoat`. */
+  clearcoatMap?: Buffer
+  /** Clearcoat map width (required when map is raw RGBA8 bytes). */
+  clearcoatMapWidth?: number
+  /** Clearcoat map height (required when map is raw RGBA8 bytes). */
+  clearcoatMapHeight?: number
+  /** Clearcoat roughness (0..1). Defaults to 0. */
+  clearcoatRoughness?: number
+  /** Optional clearcoat roughness map. Green channel multiplies `clearcoatRoughness`. */
+  clearcoatRoughnessMap?: Buffer
+  /** Clearcoat roughness map width (required when map is raw RGBA8 bytes). */
+  clearcoatRoughnessMapWidth?: number
+  /** Clearcoat roughness map height (required when map is raw RGBA8 bytes). */
+  clearcoatRoughnessMapHeight?: number
+  /** Optional clearcoat normal map. */
+  clearcoatNormalMap?: Buffer
+  /** Clearcoat normal map width (required when map is raw RGBA8 bytes). */
+  clearcoatNormalMapWidth?: number
+  /** Clearcoat normal map height (required when map is raw RGBA8 bytes). */
+  clearcoatNormalMapHeight?: number
+  /** Clearcoat normal map scale `[x, y]`. Defaults to `[1, 1]`. */
+  clearcoatNormalScale?: Array<number>
+  /** Sheen color/intensity `[r, g, b]` in 0..1 range. */
+  sheenColor?: Array<number>
+  /** Optional sheen color map. RGB channels multiply `sheenColor`. */
+  sheenColorMap?: Buffer
+  /** Sheen color map width (required when map is raw RGBA8 bytes). */
+  sheenColorMapWidth?: number
+  /** Sheen color map height (required when map is raw RGBA8 bytes). */
+  sheenColorMapHeight?: number
+  /** Sheen roughness (0..1). Defaults to 1 when sheen is present. */
+  sheenRoughness?: number
+  /** Optional sheen roughness map. Alpha channel multiplies `sheenRoughness`. */
+  sheenRoughnessMap?: Buffer
+  /** Sheen roughness map width (required when map is raw RGBA8 bytes). */
+  sheenRoughnessMapWidth?: number
+  /** Sheen roughness map height (required when map is raw RGBA8 bytes). */
+  sheenRoughnessMapHeight?: number
+  /** Anisotropy strength (0..1). Defaults to 0. */
+  anisotropy?: number
+  /** Anisotropy rotation in tangent space, radians. */
+  anisotropyRotation?: number
+  /** Optional anisotropy map. RG encode direction and B encodes strength. */
+  anisotropyMap?: Buffer
+  /** Anisotropy map width (required when map is raw RGBA8 bytes). */
+  anisotropyMapWidth?: number
+  /** Anisotropy map height (required when map is raw RGBA8 bytes). */
+  anisotropyMapHeight?: number
+  /** Physical transmission factor (0..1). Defaults to 0. */
+  transmission?: number
+  /** Optional transmission map. Red channel multiplies `transmission`. */
+  transmissionMap?: Buffer
+  /** Transmission map width (required when map is raw RGBA8 bytes). */
+  transmissionMapWidth?: number
+  /** Transmission map height (required when map is raw RGBA8 bytes). */
+  transmissionMapHeight?: number
+  /** Index of refraction for physical materials. Defaults to 1.5. */
+  ior?: number
+  /** Transmission volume thickness in model units. Defaults to 0. */
+  thickness?: number
+  /** Optional thickness map. Green channel multiplies `thickness`. */
+  thicknessMap?: Buffer
+  /** Thickness map width (required when map is raw RGBA8 bytes). */
+  thicknessMapWidth?: number
+  /** Thickness map height (required when map is raw RGBA8 bytes). */
+  thicknessMapHeight?: number
+  /** Transmission attenuation distance. Defaults to a very large distance. */
+  attenuationDistance?: number
+  /** Transmission attenuation color `[r, g, b]` in 0..1 range. */
+  attenuationColor?: Array<number>
   /** Emissive color `[r, g, b]` in 0..1 range. */
   emissive?: Array<number>
   /** Emissive intensity multiplier. Defaults to 1. */
@@ -171,6 +259,8 @@ export interface SceneMesh {
   shadingModel?: string
   /** Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`. */
   topology?: string
+  /** WGSL fragment shader body for the custom material path. */
+  customFragmentShader?: string
   /** Whether this mesh casts shadows in the shadow pass. Defaults to false. */
   castShadow?: boolean
   /** Whether this mesh receives shadows in the main pass. Defaults to false. */

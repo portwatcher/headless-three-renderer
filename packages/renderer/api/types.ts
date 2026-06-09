@@ -63,9 +63,31 @@ export interface ThreeMaterialLike {
   opacity?: number
   visible?: boolean
   vertexColors?: boolean
+  userData?: Record<string, any>
   map?: ThreeTextureLike | null
   metalness?: number
   roughness?: number
+  clearcoat?: number
+  clearcoatMap?: ThreeTextureLike | null
+  clearcoatRoughness?: number
+  clearcoatRoughnessMap?: ThreeTextureLike | null
+  clearcoatNormalMap?: ThreeTextureLike | null
+  clearcoatNormalScale?: { x: number; y: number }
+  sheen?: number
+  sheenColor?: ThreeColorLike
+  sheenColorMap?: ThreeTextureLike | null
+  sheenRoughness?: number
+  sheenRoughnessMap?: ThreeTextureLike | null
+  anisotropy?: number
+  anisotropyRotation?: number
+  anisotropyMap?: ThreeTextureLike | null
+  transmission?: number
+  transmissionMap?: ThreeTextureLike | null
+  ior?: number
+  thickness?: number
+  thicknessMap?: ThreeTextureLike | null
+  attenuationDistance?: number
+  attenuationColor?: ThreeColorLike
   emissive?: ThreeColorLike
   emissiveIntensity?: number
   emissiveMap?: ThreeTextureLike | null
@@ -84,6 +106,11 @@ export interface ThreeMaterialLike {
   isMeshPhysicalMaterial?: boolean
   isLineBasicMaterial?: boolean
   isPointsMaterial?: boolean
+  isShaderMaterial?: boolean
+  customFragmentShader?: string
+  customFragmentWgsl?: string
+  headlessFragmentShader?: string
+  headlessFragmentWgsl?: string
   size?: number
 }
 
@@ -100,6 +127,7 @@ export interface ThreeSkeletonLike {
 export interface ThreeObject3DLike {
   visible?: boolean
   children?: ThreeObject3DLike[]
+  userData?: Record<string, any>
   isMesh?: boolean
   isSkinnedMesh?: boolean
   isLine?: boolean
@@ -175,6 +203,43 @@ export interface RenderOptions {
   height?: number
   background?: number[] | ThreeColorLike
   format?: RenderOutputFormat
+  target?: RenderTargetLike
+  postProcessing?: PostProcessingOptions
+}
+
+export interface RenderTargetLike {
+  width?: number
+  height?: number
+  texture?: {
+    image?: {
+      data?: Buffer
+      width?: number
+      height?: number
+    }
+    source?: {
+      data?: {
+        data?: Buffer
+        width?: number
+        height?: number
+      }
+    }
+  }
+  image?: {
+    data?: Buffer
+    width?: number
+    height?: number
+  }
+  data?: Buffer
+}
+
+export interface PostProcessingOptions {
+  enabled?: boolean
+  exposure?: number
+  contrast?: number
+  saturation?: number
+  vignette?: number
+  grayscale?: number | boolean
+  invert?: number | boolean
 }
 
 // ── Native (Rust NAPI) types ────────────────────────────────────────
@@ -203,7 +268,7 @@ export interface NativeSceneLight {
   angle?: number
   penumbra?: number
   groundColor?: number[]
-  /** Whether this light casts shadows (directional only for now). */
+  /** Whether this light casts shadows (directional, spot, and point lights). */
   castShadow?: boolean
   /** Shadow map resolution (square). Defaults to 512. */
   shadowMapSize?: number
@@ -218,6 +283,9 @@ export interface NativeSceneLight {
   shadowCameraBottom?: number
   shadowCameraNear?: number
   shadowCameraFar?: number
+  /** Directional cascaded shadow maps: split distances from camera and flattened [left,right,top,bottom,near,far] bounds. */
+  shadowCascadeSplits?: number[]
+  shadowCascadeBounds?: number[]
 }
 
 export interface NativeSceneMesh {
@@ -235,6 +303,42 @@ export interface NativeSceneMesh {
   textureWrapT?: string
   metallic?: number
   roughness?: number
+  clearcoat?: number
+  clearcoatMap?: Buffer
+  clearcoatMapWidth?: number
+  clearcoatMapHeight?: number
+  clearcoatRoughness?: number
+  clearcoatRoughnessMap?: Buffer
+  clearcoatRoughnessMapWidth?: number
+  clearcoatRoughnessMapHeight?: number
+  clearcoatNormalMap?: Buffer
+  clearcoatNormalMapWidth?: number
+  clearcoatNormalMapHeight?: number
+  clearcoatNormalScale?: number[]
+  sheenColor?: number[]
+  sheenColorMap?: Buffer
+  sheenColorMapWidth?: number
+  sheenColorMapHeight?: number
+  sheenRoughness?: number
+  sheenRoughnessMap?: Buffer
+  sheenRoughnessMapWidth?: number
+  sheenRoughnessMapHeight?: number
+  anisotropy?: number
+  anisotropyRotation?: number
+  anisotropyMap?: Buffer
+  anisotropyMapWidth?: number
+  anisotropyMapHeight?: number
+  transmission?: number
+  transmissionMap?: Buffer
+  transmissionMapWidth?: number
+  transmissionMapHeight?: number
+  ior?: number
+  thickness?: number
+  thicknessMap?: Buffer
+  thicknessMapWidth?: number
+  thicknessMapHeight?: number
+  attenuationDistance?: number
+  attenuationColor?: number[]
   emissive?: number[]
   emissiveIntensity?: number
   normalMap?: Buffer
@@ -256,6 +360,8 @@ export interface NativeSceneMesh {
   side?: string
   shadingModel?: string
   topology?: string
+  /** WGSL fragment body used by the custom material path. */
+  customFragmentShader?: string
   /** Whether this mesh casts shadows in the shadow pass. Defaults to false. */
   castShadow?: boolean
   /** Whether this mesh receives shadows in the main pass. Defaults to false. */
@@ -275,6 +381,12 @@ export interface NativeRenderScene {
   environmentMapWidth?: number
   environmentMapHeight?: number
   environmentMapIntensity?: number
+  postExposure?: number
+  postContrast?: number
+  postSaturation?: number
+  postVignette?: number
+  postGrayscale?: number
+  postInvert?: number
 }
 
 // ── Internal helper types ───────────────────────────────────────────
@@ -286,6 +398,42 @@ export type Vec3 = [number, number, number]
 export interface PbrProperties {
   metallic?: number
   roughness?: number
+  clearcoat?: number
+  clearcoatMap?: Buffer
+  clearcoatMapWidth?: number
+  clearcoatMapHeight?: number
+  clearcoatRoughness?: number
+  clearcoatRoughnessMap?: Buffer
+  clearcoatRoughnessMapWidth?: number
+  clearcoatRoughnessMapHeight?: number
+  clearcoatNormalMap?: Buffer
+  clearcoatNormalMapWidth?: number
+  clearcoatNormalMapHeight?: number
+  clearcoatNormalScale?: number[]
+  sheenColor?: number[]
+  sheenColorMap?: Buffer
+  sheenColorMapWidth?: number
+  sheenColorMapHeight?: number
+  sheenRoughness?: number
+  sheenRoughnessMap?: Buffer
+  sheenRoughnessMapWidth?: number
+  sheenRoughnessMapHeight?: number
+  anisotropy?: number
+  anisotropyRotation?: number
+  anisotropyMap?: Buffer
+  anisotropyMapWidth?: number
+  anisotropyMapHeight?: number
+  transmission?: number
+  transmissionMap?: Buffer
+  transmissionMapWidth?: number
+  transmissionMapHeight?: number
+  ior?: number
+  thickness?: number
+  thicknessMap?: Buffer
+  thicknessMapWidth?: number
+  thicknessMapHeight?: number
+  attenuationDistance?: number
+  attenuationColor?: number[]
   emissive?: number[]
   emissiveIntensity?: number
   normalMap?: Buffer
@@ -306,6 +454,7 @@ export interface PbrProperties {
   transparent?: boolean
   side?: string
   shadingModel?: string
+  customFragmentShader?: string
 }
 
 export interface TextureInfo {

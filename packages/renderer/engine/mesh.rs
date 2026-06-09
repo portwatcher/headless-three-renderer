@@ -43,9 +43,23 @@ pub struct PreparedMesh {
     pub metallic_roughness_texture: Option<PreparedTexture>,
     pub emissive_map: Option<PreparedTexture>,
     pub ao_map: Option<PreparedTexture>,
+    pub physical_maps: Option<PreparedPhysicalMaps>,
+    pub clearcoat_normal_map: Option<PreparedTexture>,
     pub ao_map_intensity: f32,
     pub metallic: f32,
     pub roughness: f32,
+    pub clearcoat: f32,
+    pub clearcoat_roughness: f32,
+    pub clearcoat_normal_scale: [f32; 2],
+    pub sheen_color: [f32; 3],
+    pub sheen_roughness: f32,
+    pub anisotropy: f32,
+    pub anisotropy_rotation: f32,
+    pub transmission: f32,
+    pub ior: f32,
+    pub thickness: f32,
+    pub attenuation_distance: f32,
+    pub attenuation_color: [f32; 3],
     pub emissive: [f32; 3],
     pub base_color: [f32; 4],
     pub alpha_test: f32,
@@ -53,8 +67,18 @@ pub struct PreparedMesh {
     pub side: MeshSide,
     pub shading_model: ShadingModel,
     pub topology: Topology,
+    pub custom_fragment_shader: Option<String>,
     pub cast_shadow: bool,
     pub receive_shadow: bool,
+}
+
+pub struct PreparedPhysicalMaps {
+    /// RGBA: clearcoat, clearcoat roughness, transmission, thickness multipliers.
+    pub scalar_map: PreparedTexture,
+    /// RGBA: sheen color RGB, sheen roughness multiplier in A.
+    pub sheen_map: PreparedTexture,
+    /// RGBA: anisotropy direction RG, strength B.
+    pub anisotropy_map: PreparedTexture,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -360,13 +384,111 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     };
     let ao_map_intensity = clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32;
 
-    // Compute tangents when we have a normal map and UVs (triangle meshes only).
-    if normal_map.is_some() && has_uvs && topology == Topology::Triangles {
-        compute_tangents(&mut vertices, mesh.indices.as_deref());
-    }
+    let clearcoat_map = decode_optional_texture(
+        mesh.clearcoat_map.as_deref(),
+        mesh.clearcoat_map_width,
+        mesh.clearcoat_map_height,
+        mesh_index,
+    )?;
+    let clearcoat_roughness_map = decode_optional_texture(
+        mesh.clearcoat_roughness_map.as_deref(),
+        mesh.clearcoat_roughness_map_width,
+        mesh.clearcoat_roughness_map_height,
+        mesh_index,
+    )?;
+    let clearcoat_normal_map = decode_optional_texture(
+        mesh.clearcoat_normal_map.as_deref(),
+        mesh.clearcoat_normal_map_width,
+        mesh.clearcoat_normal_map_height,
+        mesh_index,
+    )?;
+    let sheen_color_map = decode_optional_texture(
+        mesh.sheen_color_map.as_deref(),
+        mesh.sheen_color_map_width,
+        mesh.sheen_color_map_height,
+        mesh_index,
+    )?;
+    let sheen_roughness_map = decode_optional_texture(
+        mesh.sheen_roughness_map.as_deref(),
+        mesh.sheen_roughness_map_width,
+        mesh.sheen_roughness_map_height,
+        mesh_index,
+    )?;
+    let anisotropy_map = decode_optional_texture(
+        mesh.anisotropy_map.as_deref(),
+        mesh.anisotropy_map_width,
+        mesh.anisotropy_map_height,
+        mesh_index,
+    )?;
+    let transmission_map = decode_optional_texture(
+        mesh.transmission_map.as_deref(),
+        mesh.transmission_map_width,
+        mesh.transmission_map_height,
+        mesh_index,
+    )?;
+    let thickness_map = decode_optional_texture(
+        mesh.thickness_map.as_deref(),
+        mesh.thickness_map_width,
+        mesh.thickness_map_height,
+        mesh_index,
+    )?;
+    let physical_maps = pack_physical_maps(PhysicalMapInputs {
+        clearcoat: clearcoat_map.as_ref(),
+        clearcoat_roughness: clearcoat_roughness_map.as_ref(),
+        sheen_color: sheen_color_map.as_ref(),
+        sheen_roughness: sheen_roughness_map.as_ref(),
+        anisotropy: anisotropy_map.as_ref(),
+        transmission: transmission_map.as_ref(),
+        thickness: thickness_map.as_ref(),
+    });
 
     let metallic = clamp01(mesh.metallic.unwrap_or(0.0)) as f32;
     let roughness = clamp01(mesh.roughness.unwrap_or(1.0)) as f32;
+    let clearcoat = clamp01(mesh.clearcoat.unwrap_or(0.0)) as f32;
+    let clearcoat_roughness = clamp01(mesh.clearcoat_roughness.unwrap_or(0.0)) as f32;
+    let clearcoat_normal_scale = match mesh.clearcoat_normal_scale.as_deref() {
+        Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
+        _ => [1.0, 1.0],
+    };
+    let sheen_color = match mesh.sheen_color.as_deref() {
+        Some(s) if s.len() == 3 => [
+            clamp01(s[0]) as f32,
+            clamp01(s[1]) as f32,
+            clamp01(s[2]) as f32,
+        ],
+        _ => [0.0, 0.0, 0.0],
+    };
+    let sheen_roughness = clamp01(mesh.sheen_roughness.unwrap_or(1.0)).max(0.0001) as f32;
+    let anisotropy = clamp01(mesh.anisotropy.unwrap_or(0.0)) as f32;
+    let anisotropy_rotation = finite_f32(
+        mesh.anisotropy_rotation.unwrap_or(0.0),
+        "mesh anisotropyRotation",
+    )?;
+    let transmission = clamp01(mesh.transmission.unwrap_or(0.0)) as f32;
+    let ior = mesh.ior.unwrap_or(1.5).clamp(1.0, 2.333) as f32;
+    let thickness = mesh.thickness.unwrap_or(0.0).max(0.0) as f32;
+    let attenuation_distance = mesh
+        .attenuation_distance
+        .unwrap_or(1.0e20)
+        .max(0.0)
+        .min(1.0e20) as f32;
+    let attenuation_color = match mesh.attenuation_color.as_deref() {
+        Some(c) if c.len() == 3 => [
+            clamp01(c[0]) as f32,
+            clamp01(c[1]) as f32,
+            clamp01(c[2]) as f32,
+        ],
+        _ => [1.0, 1.0, 1.0],
+    };
+
+    // Compute tangents when normal mapping or anisotropic shading needs a TBN frame.
+    if (normal_map.is_some() || clearcoat_normal_map.is_some() || anisotropy > 0.0)
+        && has_uvs
+        && topology == Topology::Triangles
+    {
+        compute_tangents(&mut vertices, mesh.indices.as_deref());
+    }
+
     let emissive_intensity = mesh.emissive_intensity.unwrap_or(1.0) as f32;
     let emissive = match mesh.emissive.as_deref() {
         Some(e) if e.len() == 3 => [
@@ -378,7 +500,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     };
 
     let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
-    let is_transparent = mesh.transparent.unwrap_or(material_color[3] < 0.999);
+    let is_transparent =
+        mesh.transparent.unwrap_or(material_color[3] < 0.999) || transmission > 0.0001;
     let side = MeshSide::from_str_opt(mesh.side.as_deref());
     // Lines and points are always unlit (no meaningful normals).
     let shading_model = match topology {
@@ -396,9 +519,23 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         metallic_roughness_texture,
         emissive_map,
         ao_map,
+        physical_maps,
+        clearcoat_normal_map,
         ao_map_intensity,
         metallic,
         roughness,
+        clearcoat,
+        clearcoat_roughness,
+        clearcoat_normal_scale,
+        sheen_color,
+        sheen_roughness,
+        anisotropy,
+        anisotropy_rotation,
+        transmission,
+        ior,
+        thickness,
+        attenuation_distance,
+        attenuation_color,
         emissive,
         base_color: color_to_f32(material_color),
         alpha_test,
@@ -406,6 +543,12 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         side,
         shading_model,
         topology,
+        custom_fragment_shader: mesh
+            .custom_fragment_shader
+            .as_deref()
+            .map(str::trim)
+            .filter(|source| !source.is_empty())
+            .map(str::to_owned),
         cast_shadow: mesh.cast_shadow.unwrap_or(false),
         receive_shadow: mesh.receive_shadow.unwrap_or(false),
     })
@@ -431,7 +574,10 @@ pub fn decode_texture(
     }
 
     let img = image::load_from_memory(data).with_context(|| {
-        format!("scene.meshes[{mesh_index}].texture: failed to decode image ({} bytes)", data.len())
+        format!(
+            "scene.meshes[{mesh_index}].texture: failed to decode image ({} bytes)",
+            data.len()
+        )
     })?;
     let rgba = img.to_rgba8();
     Ok(PreparedTexture {
@@ -441,6 +587,136 @@ pub fn decode_texture(
         wrap_s: WrapMode::ClampToEdge,
         wrap_t: WrapMode::ClampToEdge,
     })
+}
+
+fn decode_optional_texture(
+    data: Option<&[u8]>,
+    width_hint: Option<u32>,
+    height_hint: Option<u32>,
+    mesh_index: usize,
+) -> Result<Option<PreparedTexture>> {
+    match data {
+        Some(tex_data) if !tex_data.is_empty() => Ok(Some(decode_texture(
+            tex_data,
+            width_hint,
+            height_hint,
+            mesh_index,
+        )?)),
+        _ => Ok(None),
+    }
+}
+
+struct PhysicalMapInputs<'a> {
+    clearcoat: Option<&'a PreparedTexture>,
+    clearcoat_roughness: Option<&'a PreparedTexture>,
+    sheen_color: Option<&'a PreparedTexture>,
+    sheen_roughness: Option<&'a PreparedTexture>,
+    anisotropy: Option<&'a PreparedTexture>,
+    transmission: Option<&'a PreparedTexture>,
+    thickness: Option<&'a PreparedTexture>,
+}
+
+fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalMaps> {
+    let maps = [
+        inputs.clearcoat,
+        inputs.clearcoat_roughness,
+        inputs.sheen_color,
+        inputs.sheen_roughness,
+        inputs.anisotropy,
+        inputs.transmission,
+        inputs.thickness,
+    ];
+    if maps.iter().all(|map| map.is_none()) {
+        return None;
+    }
+
+    let width = maps
+        .iter()
+        .flatten()
+        .map(|map| map.width)
+        .max()
+        .unwrap_or(1);
+    let height = maps
+        .iter()
+        .flatten()
+        .map(|map| map.height)
+        .max()
+        .unwrap_or(1);
+    let pixel_count = (width * height) as usize;
+    let mut scalar = vec![255u8; pixel_count * 4];
+    let mut sheen = vec![255u8; pixel_count * 4];
+    // Default anisotropy map is direction +X, full strength.
+    let mut anisotropy = vec![0u8; pixel_count * 4];
+    for px in 0..pixel_count {
+        anisotropy[px * 4] = 255;
+        anisotropy[px * 4 + 1] = 128;
+        anisotropy[px * 4 + 2] = 255;
+        anisotropy[px * 4 + 3] = 255;
+    }
+
+    for y in 0..height {
+        for x in 0..width {
+            let out = ((y * width + x) * 4) as usize;
+            if let Some(map) = inputs.clearcoat {
+                scalar[out] = sample_texture_channel(map, x, y, width, height, 0);
+            }
+            if let Some(map) = inputs.clearcoat_roughness {
+                scalar[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
+            }
+            if let Some(map) = inputs.transmission {
+                scalar[out + 2] = sample_texture_channel(map, x, y, width, height, 0);
+            }
+            if let Some(map) = inputs.thickness {
+                scalar[out + 3] = sample_texture_channel(map, x, y, width, height, 1);
+            }
+            if let Some(map) = inputs.sheen_color {
+                sheen[out] = sample_texture_channel(map, x, y, width, height, 0);
+                sheen[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
+                sheen[out + 2] = sample_texture_channel(map, x, y, width, height, 2);
+            }
+            if let Some(map) = inputs.sheen_roughness {
+                sheen[out + 3] = sample_texture_channel(map, x, y, width, height, 3);
+            }
+            if let Some(map) = inputs.anisotropy {
+                anisotropy[out] = sample_texture_channel(map, x, y, width, height, 0);
+                anisotropy[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
+                anisotropy[out + 2] = sample_texture_channel(map, x, y, width, height, 2);
+            }
+        }
+    }
+
+    Some(PreparedPhysicalMaps {
+        scalar_map: packed_texture(scalar, width, height),
+        sheen_map: packed_texture(sheen, width, height),
+        anisotropy_map: packed_texture(anisotropy, width, height),
+    })
+}
+
+fn packed_texture(rgba: Vec<u8>, width: u32, height: u32) -> PreparedTexture {
+    PreparedTexture {
+        rgba,
+        width,
+        height,
+        wrap_s: WrapMode::ClampToEdge,
+        wrap_t: WrapMode::ClampToEdge,
+    }
+}
+
+fn sample_texture_channel(
+    texture: &PreparedTexture,
+    x: u32,
+    y: u32,
+    out_width: u32,
+    out_height: u32,
+    channel: usize,
+) -> u8 {
+    let sx = (((x as f32 + 0.5) / out_width as f32) * texture.width as f32)
+        .floor()
+        .clamp(0.0, (texture.width - 1) as f32) as u32;
+    let sy = (((y as f32 + 0.5) / out_height as f32) * texture.height as f32)
+        .floor()
+        .clamp(0.0, (texture.height - 1) as f32) as u32;
+    texture.rgba[((sy * texture.width + sx) * 4) as usize + channel]
 }
 
 enum ColorMode<'a> {
@@ -560,41 +836,48 @@ fn compute_tangents(vertices: &mut [Vertex], indices: Option<&[u32]>) {
     let mut tan1 = vec![Vec3::ZERO; vertex_count];
     let mut tan2 = vec![Vec3::ZERO; vertex_count];
 
-    let process_triangle = |i0: usize, i1: usize, i2: usize, tan1: &mut [Vec3], tan2: &mut [Vec3]| {
-        let p0 = Vec3::from(vertices[i0].position);
-        let p1 = Vec3::from(vertices[i1].position);
-        let p2 = Vec3::from(vertices[i2].position);
+    let process_triangle =
+        |i0: usize, i1: usize, i2: usize, tan1: &mut [Vec3], tan2: &mut [Vec3]| {
+            let p0 = Vec3::from(vertices[i0].position);
+            let p1 = Vec3::from(vertices[i1].position);
+            let p2 = Vec3::from(vertices[i2].position);
 
-        let uv0 = vertices[i0].uv;
-        let uv1 = vertices[i1].uv;
-        let uv2 = vertices[i2].uv;
+            let uv0 = vertices[i0].uv;
+            let uv1 = vertices[i1].uv;
+            let uv2 = vertices[i2].uv;
 
-        let dp1 = p1 - p0;
-        let dp2 = p2 - p0;
-        let duv1 = [uv1[0] - uv0[0], uv1[1] - uv0[1]];
-        let duv2 = [uv2[0] - uv0[0], uv2[1] - uv0[1]];
+            let dp1 = p1 - p0;
+            let dp2 = p2 - p0;
+            let duv1 = [uv1[0] - uv0[0], uv1[1] - uv0[1]];
+            let duv2 = [uv2[0] - uv0[0], uv2[1] - uv0[1]];
 
-        let det = duv1[0] * duv2[1] - duv1[1] * duv2[0];
-        if det.abs() < 1e-8 {
-            return;
-        }
-        let inv_det = 1.0 / det;
+            let det = duv1[0] * duv2[1] - duv1[1] * duv2[0];
+            if det.abs() < 1e-8 {
+                return;
+            }
+            let inv_det = 1.0 / det;
 
-        let t = (dp1 * duv2[1] - dp2 * duv1[1]) * inv_det;
-        let b = (dp2 * duv1[0] - dp1 * duv2[0]) * inv_det;
+            let t = (dp1 * duv2[1] - dp2 * duv1[1]) * inv_det;
+            let b = (dp2 * duv1[0] - dp1 * duv2[0]) * inv_det;
 
-        tan1[i0] += t;
-        tan1[i1] += t;
-        tan1[i2] += t;
-        tan2[i0] += b;
-        tan2[i1] += b;
-        tan2[i2] += b;
-    };
+            tan1[i0] += t;
+            tan1[i1] += t;
+            tan1[i2] += t;
+            tan2[i0] += b;
+            tan2[i1] += b;
+            tan2[i2] += b;
+        };
 
     match indices {
         Some(idx) => {
             for tri in idx.chunks_exact(3) {
-                process_triangle(tri[0] as usize, tri[1] as usize, tri[2] as usize, &mut tan1, &mut tan2);
+                process_triangle(
+                    tri[0] as usize,
+                    tri[1] as usize,
+                    tri[2] as usize,
+                    &mut tan1,
+                    &mut tan2,
+                );
             }
         }
         None => {
@@ -616,7 +899,11 @@ fn compute_tangents(vertices: &mut [Vertex], indices: Option<&[u32]>) {
         if tangent.length_squared() > 1e-8 {
             let tangent = tangent.normalize();
             // Handedness: sign of dot(cross(n, t), tan2)
-            let w = if n.cross(t).dot(tan2[i]) < 0.0 { -1.0 } else { 1.0 };
+            let w = if n.cross(t).dot(tan2[i]) < 0.0 {
+                -1.0
+            } else {
+                1.0
+            };
             vertices[i].tangent = [tangent.x, tangent.y, tangent.z, w];
         } else {
             // Fallback tangent

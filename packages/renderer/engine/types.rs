@@ -28,6 +28,18 @@ pub struct RenderScene {
     pub environment_map_height: Option<u32>,
     /// Environment map intensity multiplier. Defaults to 1.
     pub environment_map_intensity: Option<f64>,
+    /// Post-processing exposure adjustment in stops. Defaults to 0.
+    pub post_exposure: Option<f64>,
+    /// Post-processing contrast multiplier. Defaults to 1.
+    pub post_contrast: Option<f64>,
+    /// Post-processing saturation multiplier. Defaults to 1.
+    pub post_saturation: Option<f64>,
+    /// Post-processing vignette amount 0..1. Defaults to 0.
+    pub post_vignette: Option<f64>,
+    /// Post-processing grayscale blend 0..1. Defaults to 0.
+    pub post_grayscale: Option<f64>,
+    /// Post-processing inversion blend 0..1. Defaults to 0.
+    pub post_invert: Option<f64>,
 }
 
 #[napi(object)]
@@ -53,7 +65,7 @@ pub struct SceneLight {
     pub penumbra: Option<f64>,
     /// Hemisphere light ground color `[r, g, b]` in 0..1 range.
     pub ground_color: Option<Vec<f64>>,
-    /// Whether this light casts shadows (directional lights only).
+    /// Whether this light casts shadows (directional, spot, and point lights).
     pub cast_shadow: Option<bool>,
     /// Shadow map resolution (square, pixels). Defaults to 512.
     pub shadow_map_size: Option<u32>,
@@ -68,6 +80,10 @@ pub struct SceneLight {
     pub shadow_camera_bottom: Option<f64>,
     pub shadow_camera_near: Option<f64>,
     pub shadow_camera_far: Option<f64>,
+    /// Cascaded shadow split distances from the active camera.
+    pub shadow_cascade_splits: Option<Vec<f64>>,
+    /// Flattened cascade bounds: `[left, right, top, bottom, near, far, ...]`.
+    pub shadow_cascade_bounds: Option<Vec<f64>>,
 }
 
 #[napi(object)]
@@ -107,6 +123,78 @@ pub struct SceneMesh {
     pub metallic: Option<f64>,
     /// Roughness factor (0..1). Defaults to 1.
     pub roughness: Option<f64>,
+    /// Clearcoat intensity (0..1) for MeshPhysicalMaterial. Defaults to 0.
+    pub clearcoat: Option<f64>,
+    /// Optional clearcoat intensity map. Red channel multiplies `clearcoat`.
+    pub clearcoat_map: Option<Buffer>,
+    /// Clearcoat map width (required when map is raw RGBA8 bytes).
+    pub clearcoat_map_width: Option<u32>,
+    /// Clearcoat map height (required when map is raw RGBA8 bytes).
+    pub clearcoat_map_height: Option<u32>,
+    /// Clearcoat roughness (0..1). Defaults to 0.
+    pub clearcoat_roughness: Option<f64>,
+    /// Optional clearcoat roughness map. Green channel multiplies `clearcoatRoughness`.
+    pub clearcoat_roughness_map: Option<Buffer>,
+    /// Clearcoat roughness map width (required when map is raw RGBA8 bytes).
+    pub clearcoat_roughness_map_width: Option<u32>,
+    /// Clearcoat roughness map height (required when map is raw RGBA8 bytes).
+    pub clearcoat_roughness_map_height: Option<u32>,
+    /// Optional clearcoat normal map.
+    pub clearcoat_normal_map: Option<Buffer>,
+    /// Clearcoat normal map width (required when map is raw RGBA8 bytes).
+    pub clearcoat_normal_map_width: Option<u32>,
+    /// Clearcoat normal map height (required when map is raw RGBA8 bytes).
+    pub clearcoat_normal_map_height: Option<u32>,
+    /// Clearcoat normal map scale `[x, y]`. Defaults to `[1, 1]`.
+    pub clearcoat_normal_scale: Option<Vec<f64>>,
+    /// Sheen color/intensity `[r, g, b]` in 0..1 range.
+    pub sheen_color: Option<Vec<f64>>,
+    /// Optional sheen color map. RGB channels multiply `sheenColor`.
+    pub sheen_color_map: Option<Buffer>,
+    /// Sheen color map width (required when map is raw RGBA8 bytes).
+    pub sheen_color_map_width: Option<u32>,
+    /// Sheen color map height (required when map is raw RGBA8 bytes).
+    pub sheen_color_map_height: Option<u32>,
+    /// Sheen roughness (0..1). Defaults to 1 when sheen is present.
+    pub sheen_roughness: Option<f64>,
+    /// Optional sheen roughness map. Alpha channel multiplies `sheenRoughness`.
+    pub sheen_roughness_map: Option<Buffer>,
+    /// Sheen roughness map width (required when map is raw RGBA8 bytes).
+    pub sheen_roughness_map_width: Option<u32>,
+    /// Sheen roughness map height (required when map is raw RGBA8 bytes).
+    pub sheen_roughness_map_height: Option<u32>,
+    /// Anisotropy strength (0..1). Defaults to 0.
+    pub anisotropy: Option<f64>,
+    /// Anisotropy rotation in tangent space, radians.
+    pub anisotropy_rotation: Option<f64>,
+    /// Optional anisotropy map. RG encode direction and B encodes strength.
+    pub anisotropy_map: Option<Buffer>,
+    /// Anisotropy map width (required when map is raw RGBA8 bytes).
+    pub anisotropy_map_width: Option<u32>,
+    /// Anisotropy map height (required when map is raw RGBA8 bytes).
+    pub anisotropy_map_height: Option<u32>,
+    /// Physical transmission factor (0..1). Defaults to 0.
+    pub transmission: Option<f64>,
+    /// Optional transmission map. Red channel multiplies `transmission`.
+    pub transmission_map: Option<Buffer>,
+    /// Transmission map width (required when map is raw RGBA8 bytes).
+    pub transmission_map_width: Option<u32>,
+    /// Transmission map height (required when map is raw RGBA8 bytes).
+    pub transmission_map_height: Option<u32>,
+    /// Index of refraction for physical materials. Defaults to 1.5.
+    pub ior: Option<f64>,
+    /// Transmission volume thickness in model units. Defaults to 0.
+    pub thickness: Option<f64>,
+    /// Optional thickness map. Green channel multiplies `thickness`.
+    pub thickness_map: Option<Buffer>,
+    /// Thickness map width (required when map is raw RGBA8 bytes).
+    pub thickness_map_width: Option<u32>,
+    /// Thickness map height (required when map is raw RGBA8 bytes).
+    pub thickness_map_height: Option<u32>,
+    /// Transmission attenuation distance. Defaults to a very large distance.
+    pub attenuation_distance: Option<f64>,
+    /// Transmission attenuation color `[r, g, b]` in 0..1 range.
+    pub attenuation_color: Option<Vec<f64>>,
     /// Emissive color `[r, g, b]` in 0..1 range.
     pub emissive: Option<Vec<f64>>,
     /// Emissive intensity multiplier. Defaults to 1.
@@ -145,6 +233,8 @@ pub struct SceneMesh {
     pub shading_model: Option<String>,
     /// Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`.
     pub topology: Option<String>,
+    /// WGSL fragment shader body for the custom material path.
+    pub custom_fragment_shader: Option<String>,
     /// Whether this mesh casts shadows in the shadow pass. Defaults to false.
     pub cast_shadow: Option<bool>,
     /// Whether this mesh receives shadows in the main pass. Defaults to false.

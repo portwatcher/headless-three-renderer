@@ -90,6 +90,8 @@ The public API accepts only Three.js-like objects:
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, or a `THREE.Color`. Defaults to `scene.background` when it is a color.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes.
+- `options.target`: a target-like object populated with raw RGBA8 readback data.
+- `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`).
 
 ### Geometry & Scene
 
@@ -106,6 +108,9 @@ The public API accepts only Three.js-like objects:
 - material base color and opacity
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
+- `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, and environment-backed or scene-color transmission / refraction
+- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, transmission, and thickness
+- custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`)
 - normal map with configurable `normalScale`
 - emissive color, intensity, and emissive map
@@ -140,6 +145,8 @@ Environment maps set on `scene.environment` are supported for image-based lighti
 - **BRDF integration LUT** — split-sum approximation lookup table
 
 Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`). `scene.environmentIntensity` is respected.
+
+Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
 
 ### Skinning / Skeletal Animation
 
@@ -205,16 +212,24 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional shadow maps are supported. Set `light.castShadow = true` on a `THREE.DirectionalLight`, configure `light.shadow.camera` (orthographic bounds), and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. The renderer picks the first shadow-casting directional light, renders a depth-only pass, and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and directional cascaded shadow maps are supported. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. The renderer picks the first shadow-casting directional, spot, or point light, renders a depth-only pass, and samples it with 3×3 PCF and a normal-offset bias.
+
+Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has `{ left, right, top, bottom, near, far, split }` bounds.
 
 ### Tone Mapping
 
 Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatible `1/0.6` exposure pre-scale, matching `THREE.ACESFilmicToneMapping`.
 
+### Render Targets & Post-Processing
+
+`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8.
+
+Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert.
+
+### Custom WGSL Fragment Materials
+
+Materials can provide a WGSL fragment body with `material.userData.headlessThreeRenderer.fragmentWgsl`. The body runs inside the renderer's standard vertex, uniform, color, UV, and base-texture setup and returns a `vec4<f32>`.
+
 ### Lines and Points
 
 `THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals.
-
-### Not Yet Implemented
-
-Custom shaders, render targets, point/spot-light shadows, cascaded shadow maps, reflection probes, transmission / refraction, clearcoat / sheen, anisotropy, and post-processing effects.
