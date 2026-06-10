@@ -151,8 +151,10 @@ function toNativeInput(
   const size = resolveSize(camera, options)
   const environment = colorMode ? resolveEnvironmentMap(scene) : { envMap: null }
   const envMap = environment.envMap
+  const environmentRotation = environment.rotation ?? scene.environmentRotation
+  const environmentRotationLabel = environment.rotation ? 'material.envMapRotation' : 'scene.environmentRotation'
   const environmentMapRotation = colorMode
-    ? environmentRotationToNative(scene.environmentRotation, envMap)
+    ? environmentRotationToNative(environmentRotation, envMap, environmentRotationLabel)
     : undefined
   const hasBackgroundOverride = options.background !== undefined
   const optionBackgroundTexture = colorMode && hasBackgroundOverride
@@ -533,9 +535,10 @@ function backgroundRotationToNative(
 function environmentRotationToNative(
   rotation: ThreeSceneRootLike['environmentRotation'],
   envMap: { data?: Buffer } | null,
+  label = 'scene.environmentRotation',
 ): number[] | undefined {
   if (!hasNonZeroRotation(rotation) || !envMap) return undefined
-  const { x, y, z, order } = eulerComponents(rotation, 'scene.environmentRotation')
+  const { x, y, z, order } = eulerComponents(rotation, label)
   return eulerRotationMatrix3Columns(-x, -y, -z, order)
 }
 

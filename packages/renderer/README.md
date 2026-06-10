@@ -146,7 +146,7 @@ The public API accepts only Three.js-like objects:
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
-- single shared material-level reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material env-map classes/options, refraction mappings, PMREM/CubeUV mappings, rotations, and multiple distinct material env maps fail clearly
+- single shared material-level reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material env-map classes/options, refraction mappings, PMREM/CubeUV mappings, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly
 - unsupported `alphaToCoverage` material state fails clearly
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
@@ -174,13 +174,13 @@ Lights are automatically extracted from the scene. The shader uses a Cook-Torran
 
 ### Image-Based Lighting (IBL)
 
-Environment maps set on `scene.environment` are supported for image-based lighting. A single shared material-level reflection `envMap` can also feed the same native IBL path for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial`, with per-material intensity. The renderer CPU-precomputes:
+Environment maps set on `scene.environment` are supported for image-based lighting. A single shared material-level reflection `envMap` can also feed the same native IBL path for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial`, with per-material intensity and one shared material env-map rotation. The renderer CPU-precomputes:
 
 - **Diffuse irradiance cubemap** — cosine-weighted hemisphere convolution
 - **Prefiltered specular cubemap** — GGX importance-sampled at multiple roughness mip levels
 - **BRDF integration LUT** — split-sum approximation lookup table
 
-Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Scene-environment, reflection-probe, and supported material-level LDR inputs honor explicit `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; omitted color space defaults to sRGB for compatibility. Refraction mappings, PMREM/CubeUV environment inputs, material env-map rotations, non-default Phong/Lambert legacy combine/reflectivity, and multiple distinct material env maps fail clearly until those paths land. `scene.environmentIntensity` is respected for scene environments.
+Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Scene-environment, reflection-probe, and supported material-level LDR inputs honor explicit `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; omitted color space defaults to sRGB for compatibility. Refraction mappings, PMREM/CubeUV environment inputs, non-default Phong/Lambert legacy combine/reflectivity, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly until those paths land. `scene.environmentIntensity` is respected for scene environments.
 
 Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular and cube texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
 

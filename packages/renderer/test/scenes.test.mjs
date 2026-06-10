@@ -1188,6 +1188,37 @@ test('MeshPhongMaterial material envMap feeds specular reflection', () => {
   assert.ok(reflected > disabled + 40, `material envMap should add Phong reflection (${reflected} vs ${disabled})`)
 })
 
+test('material envMapRotation rotates shared IBL', () => {
+  function renderWithRotation(yRotation) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = splitEnvironmentTexture()
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 1,
+      roughness: 0,
+      envMap,
+    })
+    material.envMapIntensity = 4
+    material.envMapRotation = new THREE.Euler(0, yRotation, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const unrotated = renderWithRotation(0)
+  const rotated = renderWithRotation(-Math.PI / 2)
+  assert.ok(unrotated.r > unrotated.g + 15, `unrotated material reflection should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
+  assert.ok(rotated.g > rotated.r + 15, `rotated material reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+})
+
 test('material envMap fallback does not light unrelated materials', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -1240,18 +1271,6 @@ test('unsupported material envMap inputs fail clearly', () => {
     )
   }
 
-  const rotated = new THREE.MeshPhongMaterial({ color: 0xffffff, envMap })
-  rotated.envMapRotation.set(0, 0.25, 0)
-  {
-    const scene = new THREE.Scene()
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), rotated))
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /material\.envMapRotation.*not supported/i,
-      'envMapRotation',
-    )
-  }
-
   const firstEnvMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
   })
@@ -1275,6 +1294,27 @@ test('unsupported material envMap inputs fail clearly', () => {
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
       /Multiple distinct material\.envMap textures.*not supported/i,
       'multiple material env maps',
+    )
+  }
+
+  const sharedEnvMap = Object.assign(solidTexture(255, 255, 255), {
+    mapping: THREE.EquirectangularReflectionMapping,
+  })
+  {
+    const scene = new THREE.Scene()
+    const firstMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff, envMap: sharedEnvMap })
+    firstMaterial.envMapRotation = new THREE.Euler(0, 0.25, 0)
+    const secondMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff, envMap: sharedEnvMap })
+    secondMaterial.envMapRotation = new THREE.Euler(0, -0.25, 0)
+    const first = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), firstMaterial)
+    first.position.x = -1.5
+    const second = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), secondMaterial)
+    second.position.x = 1.5
+    scene.add(first, second)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /Multiple material\.envMapRotation values.*not supported/i,
+      'multiple material env rotations',
     )
   }
 })

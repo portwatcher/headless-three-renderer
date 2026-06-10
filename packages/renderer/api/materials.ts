@@ -75,6 +75,7 @@ export interface MaterialExtractionContext {
 export interface EnvironmentMapResolution {
   envMap: EnvironmentMapInfo | null
   materialContext?: MaterialExtractionContext
+  rotation?: ThreeMaterialLike['envMapRotation']
 }
 
 type TextureImageInput = {
@@ -110,6 +111,7 @@ export function resolveEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
 
   return {
     envMap: materialEnvMap.envMap,
+    rotation: materialEnvMap.rotation,
     materialContext: {
       materialEnvironmentSource: 'material',
       materialEnvironmentMaps: materialEnvMap.materials,
@@ -119,8 +121,9 @@ export function resolveEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
 
 function extractMaterialEnvironmentMap(
   scene: ThreeSceneRootLike,
-): { envMap: EnvironmentMapInfo; materials: WeakSet<ThreeMaterialLike> } | null {
+): { envMap: EnvironmentMapInfo; materials: WeakSet<ThreeMaterialLike>; rotation?: ThreeMaterialLike['envMapRotation'] } | null {
   let envTex: ThreeTextureLike | null = null
+  let envRotation: ThreeMaterialLike['envMapRotation'] | undefined
   const materials = new WeakSet<ThreeMaterialLike>()
 
   const visit = (object: ThreeObject3DLike): void => {
@@ -131,6 +134,14 @@ function extractMaterialEnvironmentMap(
       if (!materialEnvMap || material.visible === false) continue
       if (!supportsNativeMaterialEnvironmentMap(material)) continue
       assertSupportedMaterialEnvironmentMap(material)
+      if (hasNonZeroVector3Like(material.envMapRotation)) {
+        if (envRotation && !sameVector3Like(envRotation, material.envMapRotation)) {
+          throw new Error(
+            'Multiple material.envMapRotation values are not supported by @headless-three/renderer yet. Use one shared material envMapRotation, scene.environmentRotation, or render separate passes.',
+          )
+        }
+        envRotation = material.envMapRotation
+      }
       if (envTex && envTex !== materialEnvMap) {
         throw new Error(
           'Multiple distinct material.envMap textures are not supported by @headless-three/renderer yet. Use one shared material envMap, scene.environment, or render separate passes until per-material IBL maps are supported.',
@@ -149,7 +160,7 @@ function extractMaterialEnvironmentMap(
   if (!envTex) return null
 
   const envMap = extractEnvironmentMapFromTexture(envTex, 'material.envMap', 1)
-  return envMap ? { envMap, materials } : null
+  return envMap ? { envMap, materials, rotation: envRotation } : null
 }
 
 function objectMaterials(
@@ -168,11 +179,6 @@ function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): bool
 
 function assertSupportedMaterialEnvironmentMap(material: ThreeMaterialLike): void {
   assertSupportedEnvironmentTexture(material.envMap!, 'material.envMap')
-  if (hasNonZeroVector3Like(material.envMapRotation)) {
-    throw new Error(
-      'material.envMapRotation is not supported by @headless-three/renderer yet. Use scene.environmentRotation with scene.environment, or pre-rotate the material envMap before rendering.',
-    )
-  }
   if (
     (material.isMeshPhongMaterial === true || material.isMeshLambertMaterial === true)
     && material.combine != null
@@ -913,6 +919,24 @@ function vector3LikeToArray(value: unknown): number[] | undefined {
 function hasNonZeroVector3Like(value: unknown): boolean {
   const components = vector3LikeToArray(value)
   return components ? components.some((component) => Math.abs(component) > 1e-12) : false
+}
+
+function sameVector3Like(left: unknown, right: unknown): boolean {
+  const leftComponents = vector3LikeToArray(left)
+  const rightComponents = vector3LikeToArray(right)
+  if (!leftComponents || !rightComponents) return false
+  return leftComponents.every((component, index) => Math.abs(component - rightComponents[index]) <= 1e-12)
+    && eulerLikeOrder(left) === eulerLikeOrder(right)
+}
+
+function eulerLikeOrder(value: unknown): string {
+  if (!value || typeof value !== 'object') return 'XYZ'
+  const arrayLike = value as ArrayLike<unknown>
+  if (typeof arrayLike.length === 'number' && arrayLike.length >= 4 && typeof arrayLike[3] === 'string') {
+    return arrayLike[3]
+  }
+  const order = (value as { order?: unknown }).order
+  return typeof order === 'string' ? order : 'XYZ'
 }
 
 function extractCustomFragmentShader(material: ThreeMaterialLike | undefined): string | undefined {
