@@ -137,7 +137,7 @@ The public API accepts only Three.js-like objects:
 - light maps with `lightMapIntensity`, `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
 - occlusion map (`material.aoMap`) applied to indirect lighting, with `texture.channel` UV selection and wrap/filter sampler settings
 - alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with `texture.channel` UV selection and wrap/filter sampler settings
-- `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level environment/reflection-probe specular reflections
+- `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level, reflection-probe, and supported material-level environment specular reflections
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
@@ -146,7 +146,7 @@ The public API accepts only Three.js-like objects:
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
-- material-level `envMap` reflection/refraction inputs fail clearly; use `scene.environment` or reflection probes for supported IBL, including approximate `MeshPhongMaterial` specular environment reflections
+- single shared material-level reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material env-map classes/options, refraction mappings, PMREM/CubeUV mappings, rotations, and multiple distinct material env maps fail clearly
 - unsupported `alphaToCoverage` material state fails clearly
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
@@ -174,13 +174,13 @@ Lights are automatically extracted from the scene. The shader uses a Cook-Torran
 
 ### Image-Based Lighting (IBL)
 
-Environment maps set on `scene.environment` are supported for image-based lighting. The renderer CPU-precomputes:
+Environment maps set on `scene.environment` are supported for image-based lighting. A single shared material-level reflection `envMap` can also feed the same native IBL path for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial`, with per-material intensity. The renderer CPU-precomputes:
 
 - **Diffuse irradiance cubemap** — cosine-weighted hemisphere convolution
 - **Prefiltered specular cubemap** — GGX importance-sampled at multiple roughness mip levels
 - **BRDF integration LUT** — split-sum approximation lookup table
 
-Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Scene-environment and reflection-probe LDR inputs honor explicit `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; omitted color space defaults to sRGB for compatibility. Refraction mappings and PMREM/CubeUV environment inputs fail clearly until native support lands. `scene.environmentIntensity` is respected.
+Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Scene-environment, reflection-probe, and supported material-level LDR inputs honor explicit `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; omitted color space defaults to sRGB for compatibility. Refraction mappings, PMREM/CubeUV environment inputs, material env-map rotations, non-default Phong/Lambert legacy combine/reflectivity, and multiple distinct material env maps fail clearly until those paths land. `scene.environmentIntensity` is respected for scene environments.
 
 Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular and cube texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
 

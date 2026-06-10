@@ -1162,24 +1162,119 @@ test('MeshPhongMaterial scene environment feeds specular reflection', () => {
   assert.ok(environment > maskedEnvironment + 40, `specularMap should suppress Phong environment reflection (${environment} vs ${maskedEnvironment})`)
 })
 
-test('material envMap reflection inputs fail clearly', () => {
+test('MeshPhongMaterial material envMap feeds specular reflection', () => {
+  function renderPhongMaterialEnvironment(intensity) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = solidTexture(255, 255, 255)
+    envMap.mapping = THREE.EquirectangularReflectionMapping
+    const material = new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 120,
+      envMap,
+    })
+    if (intensity != null) material.envMapIntensity = intensity
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return maxLuminance(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const disabled = renderPhongMaterialEnvironment(0)
+  const reflected = renderPhongMaterialEnvironment(1)
+  assert.ok(reflected > disabled + 40, `material envMap should add Phong reflection (${reflected} vs ${disabled})`)
+})
+
+test('material envMap fallback does not light unrelated materials', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 48, 24),
+    new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 120,
+    }),
+  ))
+
+  const envMap = solidTexture(255, 255, 255)
+  envMap.mapping = THREE.EquirectangularReflectionMapping
+  const envMapped = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 8),
+    new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 120,
+      envMap,
+    }),
+  )
+  envMapped.position.x = 6
+  scene.add(envMapped)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  assert.ok(mean.r + mean.g + mean.b < 5, `material envMap should not affect unrelated Phong material (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('unsupported material envMap inputs fail clearly', () => {
   const envMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
   })
-  const cases = [
-    new THREE.MeshPhongMaterial({ color: 0xffffff, envMap }),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, envMap }),
-  ]
 
-  for (const material of cases) {
+  const unsupportedMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, envMap })
+  {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), material))
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), unsupportedMaterial))
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /material\.envMap.*not supported/i,
-      material.type,
+      /material\.envMap.*only supported/i,
+      'MeshBasicMaterial envMap',
+    )
+  }
+
+  const rotated = new THREE.MeshPhongMaterial({ color: 0xffffff, envMap })
+  rotated.envMapRotation.set(0, 0.25, 0)
+  {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), rotated))
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /material\.envMapRotation.*not supported/i,
+      'envMapRotation',
+    )
+  }
+
+  const firstEnvMap = Object.assign(solidTexture(255, 255, 255), {
+    mapping: THREE.EquirectangularReflectionMapping,
+  })
+  const secondEnvMap = Object.assign(solidTexture(128, 128, 128), {
+    mapping: THREE.EquirectangularReflectionMapping,
+  })
+  {
+    const scene = new THREE.Scene()
+    const first = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshPhongMaterial({ color: 0xffffff, envMap: firstEnvMap }),
+    )
+    first.position.x = -1.5
+    const second = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshPhongMaterial({ color: 0xffffff, envMap: secondEnvMap }),
+    )
+    second.position.x = 1.5
+    scene.add(first, second)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /Multiple distinct material\.envMap textures.*not supported/i,
+      'multiple material env maps',
     )
   }
 })

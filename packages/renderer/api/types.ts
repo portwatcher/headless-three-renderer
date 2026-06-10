@@ -154,6 +154,8 @@ export interface ThreeMaterialLike {
   premultipliedAlpha?: boolean
   map?: ThreeTextureLike | null
   envMap?: ThreeTextureLike | null
+  envMapIntensity?: number
+  envMapRotation?: ThreeEulerLike | ArrayLike<number> | null
   combine?: number
   reflectivity?: number
   refractionRatio?: number
@@ -841,6 +843,8 @@ export interface NativeSceneMesh {
   transparent?: boolean
   side?: string
   shadingModel?: string
+  useEnvironmentMap?: boolean
+  environmentMapIntensity?: number
   topology?: string
   /** WGSL fragment body used by the custom material path. */
   customFragmentShader?: string
@@ -1005,6 +1009,8 @@ export interface PbrProperties {
   attenuationColor?: number[]
   physicalSpecularColor?: number[]
   physicalSpecularIntensity?: number
+  useEnvironmentMap?: boolean
+  environmentMapIntensity?: number
   specularColorMap?: Buffer
   specularColorMapWidth?: number
   specularColorMapHeight?: number

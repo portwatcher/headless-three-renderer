@@ -777,6 +777,10 @@ export interface SceneMesh {
    * or `"lambert"` (diffuse-only / MeshLambertMaterial).
    */
   shadingModel?: string
+  /** Whether this mesh samples the scene/material environment map when one exists. */
+  useEnvironmentMap?: boolean
+  /** Per-mesh environment intensity. Defaults to the scene environment intensity. */
+  environmentMapIntensity?: number
   /** Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`. */
   topology?: string
   /** WGSL fragment shader body for the custom material path. */

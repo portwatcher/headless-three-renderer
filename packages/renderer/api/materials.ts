@@ -1,4 +1,4 @@
-import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneRootLike } from './types'
+import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneRootLike, ThreeObject3DLike } from './types'
 import { clamp01 } from './math'
 import { colorLikeToArray } from './color'
 
@@ -23,6 +23,9 @@ const CubeRefractionMapping = 302
 const EquirectangularReflectionMapping = 303
 const EquirectangularRefractionMapping = 304
 const CubeUVReflectionMapping = 306
+
+// Three.js environment combine constants
+const MultiplyOperation = 0
 
 // Three.js side constants
 const FrontSide = 0
@@ -64,6 +67,16 @@ export interface EnvironmentMapInfo {
   colorSpace?: string
 }
 
+export interface MaterialExtractionContext {
+  materialEnvironmentSource?: 'material'
+  materialEnvironmentMaps?: WeakSet<ThreeMaterialLike>
+}
+
+export interface EnvironmentMapResolution {
+  envMap: EnvironmentMapInfo | null
+  materialContext?: MaterialExtractionContext
+}
+
 type TextureImageInput = {
   data?: ArrayLike<number>
   width?: number
@@ -80,10 +93,112 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
   const envTex = scene.environment ?? probe?.texture
   if (!envTex) return null
   const label = scene.environment ? 'scene.environment' : 'reflectionProbe.texture'
-  assertSupportedEnvironmentTexture(envTex, label)
-
   const intensity = probe?.intensity ?? (scene as any).environmentIntensity ?? 1.0
+  return extractEnvironmentMapFromTexture(envTex, label, intensity)
+}
 
+export function resolveEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMapResolution {
+  const sceneEnvMap = extractEnvironmentMap(scene)
+  if (sceneEnvMap) {
+    return { envMap: sceneEnvMap }
+  }
+
+  const materialEnvMap = extractMaterialEnvironmentMap(scene)
+  if (!materialEnvMap) {
+    return { envMap: null }
+  }
+
+  return {
+    envMap: materialEnvMap.envMap,
+    materialContext: {
+      materialEnvironmentSource: 'material',
+      materialEnvironmentMaps: materialEnvMap.materials,
+    },
+  }
+}
+
+function extractMaterialEnvironmentMap(
+  scene: ThreeSceneRootLike,
+): { envMap: EnvironmentMapInfo; materials: WeakSet<ThreeMaterialLike> } | null {
+  let envTex: ThreeTextureLike | null = null
+  const materials = new WeakSet<ThreeMaterialLike>()
+
+  const visit = (object: ThreeObject3DLike): void => {
+    if (!object || object.visible === false) return
+
+    for (const material of objectMaterials(object.material)) {
+      const materialEnvMap = material?.envMap
+      if (!materialEnvMap || material.visible === false) continue
+      if (!supportsNativeMaterialEnvironmentMap(material)) continue
+      assertSupportedMaterialEnvironmentMap(material)
+      if (envTex && envTex !== materialEnvMap) {
+        throw new Error(
+          'Multiple distinct material.envMap textures are not supported by @headless-three/renderer yet. Use one shared material envMap, scene.environment, or render separate passes until per-material IBL maps are supported.',
+        )
+      }
+      envTex = materialEnvMap
+      materials.add(material)
+    }
+
+    for (const child of object.children ?? []) {
+      visit(child)
+    }
+  }
+
+  visit(scene as unknown as ThreeObject3DLike)
+  if (!envTex) return null
+
+  const envMap = extractEnvironmentMapFromTexture(envTex, 'material.envMap', 1)
+  return envMap ? { envMap, materials } : null
+}
+
+function objectMaterials(
+  material: ThreeMaterialLike | ThreeMaterialLike[] | undefined,
+): ThreeMaterialLike[] {
+  if (!material) return []
+  return Array.isArray(material) ? material.filter(Boolean) : [material]
+}
+
+function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): boolean {
+  return material.isMeshStandardMaterial === true
+    || material.isMeshPhysicalMaterial === true
+    || material.isMeshPhongMaterial === true
+    || material.isMeshLambertMaterial === true
+}
+
+function assertSupportedMaterialEnvironmentMap(material: ThreeMaterialLike): void {
+  assertSupportedEnvironmentTexture(material.envMap!, 'material.envMap')
+  if (hasNonZeroVector3Like(material.envMapRotation)) {
+    throw new Error(
+      'material.envMapRotation is not supported by @headless-three/renderer yet. Use scene.environmentRotation with scene.environment, or pre-rotate the material envMap before rendering.',
+    )
+  }
+  if (
+    (material.isMeshPhongMaterial === true || material.isMeshLambertMaterial === true)
+    && material.combine != null
+    && material.combine !== MultiplyOperation
+  ) {
+    throw new Error(
+      'MeshPhongMaterial and MeshLambertMaterial material.envMap combine modes other than MultiplyOperation are not supported by @headless-three/renderer yet.',
+    )
+  }
+  if (
+    (material.isMeshPhongMaterial === true || material.isMeshLambertMaterial === true)
+    && Number.isFinite(material.reflectivity)
+    && Math.abs(material.reflectivity! - 1) > 1e-6
+  ) {
+    throw new Error(
+      'MeshPhongMaterial and MeshLambertMaterial material.envMap reflectivity values other than 1 are not supported by @headless-three/renderer yet.',
+    )
+  }
+}
+
+function extractEnvironmentMapFromTexture(
+  envTex: ThreeTextureLike,
+  label: string,
+  intensity: number,
+): EnvironmentMapInfo | null {
+  assertSupportedEnvironmentTexture(envTex, label)
   if (isCubeEnvironmentTexture(envTex)) {
     const cube = cubeTextureToEquirectangular(envTex, label)
     return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex) }
@@ -195,14 +310,28 @@ export function materialColor(material: ThreeMaterialLike | undefined): Color4 {
   return color
 }
 
-export function extractPbrProperties(material: ThreeMaterialLike | undefined): PbrProperties {
+export function extractPbrProperties(
+  material: ThreeMaterialLike | undefined,
+  context: MaterialExtractionContext = {},
+): PbrProperties {
   if (!material) return {}
   const customFragmentShader = extractCustomFragmentShader(material)
   assertSupportedShaderMaterial(material, customFragmentShader)
   assertSupportedOnBeforeCompile(material, customFragmentShader)
-  assertSupportedMaterialState(material)
+  assertSupportedMaterialState(material, context)
   assertCompatiblePackedPhysicalMapSamplers(material)
   const props: PbrProperties = {}
+
+  const usesMaterialEnvironmentMap = material.envMap != null
+    && context.materialEnvironmentMaps?.has(material) === true
+  if (usesMaterialEnvironmentMap) {
+    props.useEnvironmentMap = true
+    props.environmentMapIntensity = Number.isFinite(material.envMapIntensity)
+      ? material.envMapIntensity!
+      : 1
+  } else if (context.materialEnvironmentSource === 'material') {
+    props.useEnvironmentMap = false
+  }
 
   if (Number.isFinite(material.metalness)) {
     props.metallic = clamp01(material.metalness!)
@@ -781,6 +910,11 @@ function vector3LikeToArray(value: unknown): number[] | undefined {
   return undefined
 }
 
+function hasNonZeroVector3Like(value: unknown): boolean {
+  const components = vector3LikeToArray(value)
+  return components ? components.some((component) => Math.abs(component) > 1e-12) : false
+}
+
 function extractCustomFragmentShader(material: ThreeMaterialLike | undefined): string | undefined {
   if (!material) return undefined
 
@@ -829,15 +963,18 @@ function assertSupportedOnBeforeCompile(
   )
 }
 
-function assertSupportedMaterialState(material: ThreeMaterialLike): void {
+function assertSupportedMaterialState(
+  material: ThreeMaterialLike,
+  context: MaterialExtractionContext,
+): void {
   if (material.alphaToCoverage === true) {
     throw new Error(
       'material.alphaToCoverage is not supported by @headless-three/renderer yet. Disable alphaToCoverage or use alphaTest/alphaHash for explicit coverage behavior before rendering.',
     )
   }
-  if (material.envMap != null) {
+  if (material.envMap != null && context.materialEnvironmentMaps?.has(material) !== true) {
     throw new Error(
-      'material.envMap reflection/refraction maps are not supported by @headless-three/renderer yet. Use scene.environment or scene-level reflection probes for supported IBL, or bake the material reflection before rendering.',
+      'material.envMap is only supported for MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
     )
   }
   if (

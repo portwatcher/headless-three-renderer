@@ -109,6 +109,8 @@ pub struct PreparedMesh {
     pub stencil_z_pass: StencilOperation,
     pub side: MeshSide,
     pub shading_model: ShadingModel,
+    pub use_environment_map: Option<bool>,
+    pub environment_map_intensity: Option<f32>,
     pub topology: Topology,
     pub custom_fragment_shader: Option<String>,
     pub texture_transform: [f32; 6],
@@ -1266,6 +1268,10 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         }
         Topology::Lines | Topology::Points => ShadingModel::Basic,
     };
+    let environment_map_intensity = match mesh.environment_map_intensity {
+        Some(value) => Some(finite_f32(value, "mesh environmentMapIntensity")?),
+        None => None,
+    };
 
     Ok(PreparedMesh {
         vertices,
@@ -1339,6 +1345,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         stencil_z_pass,
         side,
         shading_model,
+        use_environment_map: mesh.use_environment_map,
+        environment_map_intensity,
         topology,
         custom_fragment_shader: mesh
             .custom_fragment_shader

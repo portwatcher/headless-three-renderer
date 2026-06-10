@@ -731,6 +731,10 @@ pub struct SceneMesh {
     /// Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
     /// or `"lambert"` (diffuse-only / MeshLambertMaterial).
     pub shading_model: Option<String>,
+    /// Whether this mesh samples the scene/material environment map when one exists.
+    pub use_environment_map: Option<bool>,
+    /// Per-mesh environment intensity. Defaults to the scene environment intensity.
+    pub environment_map_intensity: Option<f64>,
     /// Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`.
     pub topology: Option<String>,
     /// WGSL fragment shader body for the custom material path.

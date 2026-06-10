@@ -2226,6 +2226,10 @@ impl GpuRenderer {
         ]);
         let distance_near = mesh.distance_near.unwrap_or(settings.near);
         let distance_far = mesh.distance_far.unwrap_or(settings.far);
+        let mesh_has_ibl = settings.ibl.is_some() && mesh.use_environment_map.unwrap_or(true);
+        let mesh_env_intensity = mesh
+            .environment_map_intensity
+            .unwrap_or(settings.env_intensity);
 
         let uniforms = Uniforms {
             mvp: mvp.to_cols_array_2d(),
@@ -2284,10 +2288,10 @@ impl GpuRenderer {
                 } else {
                     0.0
                 },
-                if settings.ibl.is_some() { 1.0 } else { 0.0 },
+                if mesh_has_ibl { 1.0 } else { 0.0 },
             ],
             ibl_params: [
-                settings.env_intensity,
+                mesh_env_intensity,
                 mesh.shading_model.as_u32() as f32,
                 settings.near,
                 settings.far,

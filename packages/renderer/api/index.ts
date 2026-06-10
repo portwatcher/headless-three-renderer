@@ -22,7 +22,7 @@ import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPositio
 import { colorLikeToArray, resolveBackground } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
-import { extractBackgroundTexture, extractEnvironmentMap } from './materials'
+import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
 
 export {
@@ -149,7 +149,8 @@ function toNativeInput(
   }
 
   const size = resolveSize(camera, options)
-  const envMap = colorMode ? extractEnvironmentMap(scene) : null
+  const environment = colorMode ? resolveEnvironmentMap(scene) : { envMap: null }
+  const envMap = environment.envMap
   const environmentMapRotation = colorMode
     ? environmentRotationToNative(scene.environmentRotation, envMap)
     : undefined
@@ -173,6 +174,7 @@ function toNativeInput(
     clippingPlanes,
     options.localClippingEnabled !== false,
     shadowMaterialMode,
+    environment.materialContext,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)

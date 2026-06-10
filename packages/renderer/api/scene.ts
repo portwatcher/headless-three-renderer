@@ -17,7 +17,7 @@ import {
   readColorAttribute,
   readIndexAttribute,
 } from './attributes'
-import { materialForGroup, materialColor, extractPbrProperties, extractTextureData } from './materials'
+import { materialForGroup, materialColor, extractPbrProperties, extractTextureData, type MaterialExtractionContext } from './materials'
 import { applyCpuSkinning } from './skinning'
 import { applyMorphTargets } from './morphs'
 import { objectLayersMatchCamera } from './layers'
@@ -71,6 +71,7 @@ export function flattenScene(
   globalClippingPlanes: readonly NativeClippingPlane[] = [],
   localClippingEnabled = true,
   shadowMaterialMode?: ShadowMaterialMode,
+  materialContext: MaterialExtractionContext = {},
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
   const clippingContext: ClippingContext = {
@@ -78,7 +79,7 @@ export function flattenScene(
     intersectionPlanes: [],
     clipShadows: false,
   }
-  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode)
+  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
   return meshes
     .sort(compareFlattenedMeshes)
     .map(({ mesh }) => mesh)
@@ -93,6 +94,7 @@ function visitObject(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
+  materialContext: MaterialExtractionContext,
 ): void {
   if (!object || object.visible === false) return
 
@@ -107,19 +109,19 @@ function visitObject(
     updateLodObject(object, camera)
 
     if (object.isMesh === true && object.geometry) {
-      appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode)
+      appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
-      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, nextClippingContext, localClippingEnabled)
+      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, nextClippingContext, localClippingEnabled, materialContext)
     } else if (object.isPoints === true && object.geometry) {
-      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode)
+      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if (object.isSprite === true) {
-      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled)
+      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, materialContext)
     }
   }
 
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {
-    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode)
+    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
   }
 }
 
@@ -131,6 +133,7 @@ function appendMesh(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
+  materialContext: MaterialExtractionContext,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -178,7 +181,7 @@ function appendMesh(
     const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
     const baseColor = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
-    const pbrProps = extractPbrProperties(material)
+    const pbrProps = extractPbrProperties(material, materialContext)
     const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
     const textureInfo = extractTextureData(material)
     const castShadow = object.castShadow === true && !usesCustomShadowMaterial ? true : undefined
@@ -315,6 +318,7 @@ function appendMesh(
         clippingContext,
         localClippingEnabled,
         customShadowMaterial,
+        materialContext,
         positions,
         normals,
         uvs,
@@ -339,6 +343,7 @@ function appendShadowOnlyMeshGroup(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   material: ThreeMaterialLike,
+  materialContext: MaterialExtractionContext,
   positions: number[],
   normals: number[] | null,
   uvs: number[] | null,
@@ -352,7 +357,7 @@ function appendShadowOnlyMeshGroup(
 ): void {
   const baseColor = materialColor(material)
   const useVertexColors = vertexColors && material.vertexColors !== false
-  const pbrProps = extractPbrProperties(material)
+  const pbrProps = extractPbrProperties(material, materialContext)
   const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
   const textureInfo = extractTextureData(material)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
@@ -512,6 +517,7 @@ function appendSprite(
   groupOrder: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
+  materialContext: MaterialExtractionContext,
 ): void {
   assertUnsupportedBillboardShadows(object, 'THREE.Sprite')
 
@@ -589,7 +595,7 @@ function appendSprite(
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
     ...sortInfo,
-    ...extractPbrProperties(material),
+    ...extractPbrProperties(material, materialContext),
   })
 }
 
@@ -602,6 +608,7 @@ function appendPoints(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
+  materialContext: MaterialExtractionContext,
 ): void {
   assertUnsupportedPointShadows(object, shadowMaterialMode)
 
@@ -684,7 +691,7 @@ function appendPoints(
 
     const textureInfo = extractTextureData(material)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
-    const pbrProps = extractPbrProperties(material)
+    const pbrProps = extractPbrProperties(material, materialContext)
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
 
     pushMesh(meshes, {
@@ -799,6 +806,7 @@ function appendLineOrPoints(
   groupOrder: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
+  materialContext: MaterialExtractionContext,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -834,7 +842,7 @@ function appendLineOrPoints(
   let outputColors: number[] | undefined
   const color = materialColor(material)
   const useVertexColors = vertexColors && material?.vertexColors !== false
-  const pbrProps = extractPbrProperties(material)
+  const pbrProps = extractPbrProperties(material, materialContext)
   const textureInfo = extractTextureData(material)
   if (topology === 'lines') {
     const source = indexAttr ?? rangeIndices(vertexCount)
