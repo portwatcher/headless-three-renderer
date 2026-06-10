@@ -120,8 +120,8 @@ Status keys:
 | Conformance invariants | Supported | Scene-level render invariants for materials, PBR, IBL, shadows, post-processing, lines, points, layers, and render order. |
 | Packed artifact verification | Supported | CI packs the package and current-platform native binary, installs them in a clean temp project, and renders a scene. |
 | Node loader setup docs/helpers | Supported | Local `GLTFLoader` setup is documented for file paths, external buffers, encoded image files, and optional image polyfills. The package exports Node helpers for encoded image texture loading and local `file://` fetch bridging. |
-| Golden-image parity corpus | Partial | The repo has scene invariants but not a committed browser-generated golden corpus yet. |
-| Curated external asset corpus | Unsupported | Planned for glTF Sample Assets, VRM/VRMA, and pathological geometry fixtures. |
+| Golden-image parity corpus | Partial | The repo has scene invariants and a generated no-crash/visibility corpus, but not a committed browser-generated golden corpus yet. |
+| Curated external asset corpus | Partial | Generated in-repo fixtures cover transparent layers, skinning/morphs, IBL/shadows, points/lines, LOD/groups, and pathological geometry. Committed glTF Sample Assets plus VRM/VRMA fixtures remain planned. |
 
 ## Packaging
 
