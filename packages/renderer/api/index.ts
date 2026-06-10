@@ -1,6 +1,5 @@
 import type {
   ThreeSceneRootLike,
-  ThreeObject3DLike,
   ThreeCameraLike,
   RenderOptions,
   RenderTargetLike,
@@ -9,6 +8,7 @@ import type {
   NativeRenderScene,
   NativeCamera,
   NativeSceneMesh,
+  NativeSceneLight,
   RenderMode,
   Color4,
   RenderObjectIdEntry,
@@ -20,11 +20,10 @@ const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
 import { colorLikeToArray, resolveBackground } from './color'
-import { flattenScene } from './scene'
+import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, extractEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
-import { objectLayersMatchCamera } from './layers'
 
 export {
   EncodedImageTextureLoader,
@@ -141,7 +140,6 @@ function toNativeInput(
   validateUnsupportedRenderOptions(options)
   const renderMode = normalizedRenderMode(options.renderMode)
   const colorMode = renderMode === 'color'
-  validateUnsupportedSceneState(scene, camera, colorMode)
 
   if (typeof scene.updateMatrixWorld === 'function') {
     scene.updateMatrixWorld(true)
@@ -166,12 +164,15 @@ function toNativeInput(
     ? backgroundRotationToNative(scene.backgroundRotation, backgroundTexture)
     : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
+  const lights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
+  const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
   const flattenedMeshes = flattenScene(
     scene,
     camera,
     size.height,
     clippingPlanes,
     options.localClippingEnabled !== false,
+    shadowMaterialMode,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)
@@ -198,7 +199,7 @@ function toNativeInput(
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
     meshes,
-    lights: colorMode ? extractLights(scene, camera) : [],
+    lights,
     ambientLight: colorMode ? extractAmbientLight(scene, camera) ?? undefined : undefined,
     ambientIntensity: colorMode ? extractAmbientIntensity(scene, camera) ?? undefined : undefined,
     lightProbe: colorMode ? extractLightProbe(scene, camera) ?? undefined : undefined,
@@ -230,6 +231,12 @@ function normalizedRenderMode(mode: RenderOptions['renderMode']): RenderMode {
   throw new TypeError(
     `options.renderMode must be "color", "mask", or "object-id"; received ${String(mode)}`,
   )
+}
+
+function shadowMaterialModeForLights(lights: NativeSceneLight[] | undefined): ShadowMaterialMode | undefined {
+  const shadowLight = lights?.find((light) => light.castShadow === true)
+  if (!shadowLight) return undefined
+  return shadowLight.lightType === 'point' ? 'distance' : 'depth'
 }
 
 function applyRenderMode(meshes: NativeSceneMesh[], mode: RenderMode): NativeSceneMesh[] {
@@ -501,64 +508,6 @@ function finiteOrUndefined(value: unknown): number | undefined {
 function booleanOrNumber(value: unknown): number | undefined {
   if (typeof value === 'boolean') return value ? 1 : 0
   return finiteOrUndefined(value)
-}
-
-function validateUnsupportedSceneState(
-  scene: ThreeSceneRootLike,
-  camera: ThreeCameraLike,
-  colorMode: boolean,
-): void {
-  if (colorMode) {
-    validateUnsupportedCustomShadowMaterials(scene, camera)
-  }
-}
-
-function validateUnsupportedCustomShadowMaterials(scene: ThreeSceneRootLike, camera: ThreeCameraLike): void {
-  const shadowUsage = shadowLightUsage(scene, camera)
-  if (!shadowUsage.depth && !shadowUsage.distance) return
-
-  visitVisibleObjects(scene, camera, (object) => {
-    if (object.castShadow !== true) return
-    const label = object.name || object.uuid || '<unnamed>'
-    if (shadowUsage.depth && object.customDepthMaterial != null) {
-      throw new Error(
-        `THREE.Object3D.customDepthMaterial is not supported by @headless-three/renderer yet for shadow caster "${label}". Disable customDepthMaterial or bake its alpha/displacement behavior into the main material before rendering directional or spot shadows.`,
-      )
-    }
-    if (shadowUsage.distance && object.customDistanceMaterial != null) {
-      throw new Error(
-        `THREE.Object3D.customDistanceMaterial is not supported by @headless-three/renderer yet for shadow caster "${label}". Disable customDistanceMaterial or bake its alpha/displacement behavior into the main material before rendering point-light shadows.`,
-      )
-    }
-  })
-}
-
-function shadowLightUsage(scene: ThreeSceneRootLike, camera: ThreeCameraLike): { depth: boolean; distance: boolean } {
-  const usage = { depth: false, distance: false }
-  visitVisibleObjects(scene, camera, (object) => {
-    if (object.castShadow !== true || object.isLight !== true) return
-    if (object.isPointLight === true) {
-      usage.distance = true
-    } else if (object.isDirectionalLight === true || object.isSpotLight === true) {
-      usage.depth = true
-    }
-  })
-  return usage
-}
-
-function visitVisibleObjects(
-  object: ThreeSceneRootLike | ThreeObject3DLike,
-  camera: ThreeCameraLike,
-  callback: (object: ThreeObject3DLike) => void,
-): void {
-  if (!object || object.visible === false) return
-  if (objectLayersMatchCamera(object, camera)) {
-    callback(object)
-  }
-  const children = Array.isArray(object.children) ? object.children : []
-  for (const child of children) {
-    visitVisibleObjects(child, camera, callback)
-  }
 }
 
 type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY'

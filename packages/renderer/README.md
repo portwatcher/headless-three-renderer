@@ -132,6 +132,7 @@ The public API accepts only Three.js-like objects:
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
+- `Object3D.customDepthMaterial` and `customDistanceMaterial` for shadow caster alpha-tested material inputs
 - emissive color, intensity, and emissive map, with `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings
 - light maps with `lightMapIntensity`, `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
 - occlusion map (`material.aoMap`) applied to indirect lighting, with `texture.channel` UV selection and wrap/filter sampler settings
@@ -146,7 +147,7 @@ The public API accepts only Three.js-like objects:
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
 - material-level `envMap` reflection/refraction inputs fail clearly; use `scene.environment` or reflection probes for supported IBL
-- unsupported `alphaToCoverage` and `clipShadows` material states fail clearly
+- unsupported `alphaToCoverage` material state fails clearly
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 use native anisotropic samplers for supported material/background texture slots when the effective sampler is linear-filtered
@@ -247,7 +248,7 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `THREE.Sprite`/`THREE.Points` shadow flags and `Object3D.customDepthMaterial`/`customDistanceMaterial` shadow overrides fail clearly until those shadow paths land. Additional shadow-casting lights and non-square `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular-map support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `Object3D.customDepthMaterial` is honored for directional/spot shadow caster alpha-tested inputs, and `customDistanceMaterial` is honored for point-light shadow caster alpha-tested inputs. `THREE.Sprite`/`THREE.Points` shadow flags fail clearly until those shadow paths land. Additional shadow-casting lights and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular cube-face support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
 
 Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has `{ left, right, top, bottom, near, far, split }` bounds.
 

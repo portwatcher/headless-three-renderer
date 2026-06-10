@@ -42,6 +42,8 @@ interface MeshInstance {
   color?: Color4
 }
 
+export type ShadowMaterialMode = 'depth' | 'distance'
+
 interface LineSegmentDistance {
   a: number
   b: number
@@ -68,6 +70,7 @@ export function flattenScene(
   viewportHeight = 512,
   globalClippingPlanes: readonly NativeClippingPlane[] = [],
   localClippingEnabled = true,
+  shadowMaterialMode?: ShadowMaterialMode,
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
   const clippingContext: ClippingContext = {
@@ -75,7 +78,7 @@ export function flattenScene(
     intersectionPlanes: [],
     clipShadows: false,
   }
-  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled)
+  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode)
   return meshes
     .sort(compareFlattenedMeshes)
     .map(({ mesh }) => mesh)
@@ -89,6 +92,7 @@ function visitObject(
   viewportHeight: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
 ): void {
   if (!object || object.visible === false) return
 
@@ -103,7 +107,7 @@ function visitObject(
     updateLodObject(object, camera)
 
     if (object.isMesh === true && object.geometry) {
-      appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled)
+      appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode)
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, nextClippingContext, localClippingEnabled)
     } else if (object.isPoints === true && object.geometry) {
@@ -115,7 +119,7 @@ function visitObject(
 
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {
-    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled)
+    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode)
   }
 }
 
@@ -126,6 +130,7 @@ function appendMesh(
   groupOrder: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -169,12 +174,14 @@ function appendMesh(
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
 
+    const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
+    const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
     const baseColor = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material)
     const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
     const textureInfo = extractTextureData(material)
-    const castShadow = object.castShadow === true ? true : undefined
+    const castShadow = object.castShadow === true && !usesCustomShadowMaterial ? true : undefined
     const receiveShadow = object.receiveShadow === true ? true : undefined
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const wireframe = isDepthDistanceWireframeMaterial(material)
@@ -297,6 +304,204 @@ function appendMesh(
         })
       }
     }
+
+    if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
+      appendShadowOnlyMeshGroup(
+        object,
+        camera,
+        meshes,
+        group,
+        groupOrder,
+        clippingContext,
+        localClippingEnabled,
+        customShadowMaterial,
+        positions,
+        normals,
+        uvs,
+        uvChannels,
+        vertexColors,
+        position.count,
+        index,
+        instancedGeometryCount,
+        instancedPositionOffset,
+        instances,
+      )
+    }
+  }
+}
+
+function appendShadowOnlyMeshGroup(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  meshes: FlattenedMesh[],
+  group: GeometryGroup,
+  groupOrder: number,
+  clippingContext: ClippingContext,
+  localClippingEnabled: boolean,
+  material: ThreeMaterialLike,
+  positions: number[],
+  normals: number[] | null,
+  uvs: number[] | null,
+  uvChannels: Array<number[] | null>,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  vertexCount: number,
+  index: number[] | null,
+  instancedGeometryCount: number,
+  instancedPositionOffset: ThreeBufferAttributeLike | null,
+  instances: MeshInstance[],
+): void {
+  const baseColor = materialColor(material)
+  const useVertexColors = vertexColors && material.vertexColors !== false
+  const pbrProps = extractPbrProperties(material)
+  const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
+  const textureInfo = extractTextureData(material)
+  const clipping = clippingState(clippingContext, material, localClippingEnabled)
+  const wireframe = isDepthDistanceWireframeMaterial(material)
+  const hiddenMainPass = shadowOnlyMainPassState()
+
+  if (index) {
+    const indices = index.slice(group.start, group.start + group.count)
+    if (indices.length % 3 !== 0) {
+      throw new Error(`THREE.Mesh "${object.name || object.uuid || '<unnamed>'}" has a non-triangle index range`)
+    }
+    const renderIndices = wireframe ? wireframeIndicesForTriangles(indices) : indices
+    const expandedIndices = expandIndicesForInstances(renderIndices, vertexCount, instancedGeometryCount)
+    const expandedPositions = expandVec3ValuesForInstances(
+      positions,
+      0,
+      vertexCount,
+      instancedGeometryCount,
+      instancedPositionOffset,
+    )
+    const expandedNormals = normals
+      ? expandVec3ValuesForInstances(normals, 0, vertexCount, instancedGeometryCount)
+      : undefined
+    const expandedUvs = uvs
+      ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount)
+      : undefined
+    const expandedSecondaryUvs = secondaryUvs
+      ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount)
+      : undefined
+
+    for (const instance of instances) {
+      const color = instanceColor(baseColor, instance)
+      const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform)
+      pushMesh(meshes, {
+        positions: expandedPositions,
+        indices: expandedIndices,
+        normals: expandedNormals,
+        color,
+        colors: useVertexColors
+          ? expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
+          : undefined,
+        uvs: expandedUvs,
+        uvs2: expandedSecondaryUvs,
+        texture: textureInfo?.data,
+        textureWidth: textureInfo?.width ?? undefined,
+        textureHeight: textureInfo?.height ?? undefined,
+        textureWrapS: textureInfo?.wrapS,
+        textureWrapT: textureInfo?.wrapT,
+        textureMagFilter: textureInfo?.magFilter,
+        textureMinFilter: textureInfo?.minFilter,
+        textureAnisotropy: textureInfo?.anisotropy,
+        textureTransform: textureInfo?.transform,
+        textureColorSpace: textureInfo?.colorSpace,
+        textureUsesUv2: textureInfo?.usesUv2,
+        transform: instance.transform,
+        topology: wireframe ? 'lines' : undefined,
+        castShadow: true,
+        receiveShadow: false,
+        clipShadows: clipShadowsForMaterial(material, clippingContext),
+        ...clipping,
+        ...sortInfo,
+        ...pbrProps,
+        ...hiddenMainPass,
+      })
+    }
+    return
+  }
+
+  if (group.count % 3 !== 0) {
+    throw new Error(`THREE.Mesh "${object.name || object.uuid || '<unnamed>'}" has a non-triangle vertex range`)
+  }
+
+  const expandedGroupPositions = expandVec3ValuesForInstances(
+    positions,
+    group.start,
+    group.count,
+    instancedGeometryCount,
+    instancedPositionOffset,
+  )
+  const expandedGroupNormals = normals
+    ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
+    : undefined
+  const expandedGroupUvs = uvs
+    ? expandVec2ValuesForInstances(uvs, group.start, group.count, instancedGeometryCount)
+    : undefined
+  const expandedGroupSecondaryUvs = secondaryUvs
+    ? expandVec2ValuesForInstances(secondaryUvs, group.start, group.count, instancedGeometryCount)
+    : undefined
+  const expandedGroupIndices = wireframe
+    ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
+    : undefined
+
+  for (const instance of instances) {
+    const color = instanceColor(baseColor, instance)
+    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform)
+    pushMesh(meshes, {
+      positions: expandedGroupPositions,
+      indices: expandedGroupIndices,
+      normals: expandedGroupNormals,
+      color,
+      colors: useVertexColors
+        ? expandColorAttributeForInstances(vertexColors!, color, group.start, group.count, instancedGeometryCount)
+        : undefined,
+      uvs: expandedGroupUvs,
+      uvs2: expandedGroupSecondaryUvs,
+      texture: textureInfo?.data,
+      textureWidth: textureInfo?.width ?? undefined,
+      textureHeight: textureInfo?.height ?? undefined,
+      textureWrapS: textureInfo?.wrapS,
+      textureWrapT: textureInfo?.wrapT,
+      textureMagFilter: textureInfo?.magFilter,
+      textureMinFilter: textureInfo?.minFilter,
+      textureAnisotropy: textureInfo?.anisotropy,
+      textureTransform: textureInfo?.transform,
+      textureColorSpace: textureInfo?.colorSpace,
+      textureUsesUv2: textureInfo?.usesUv2,
+      transform: instance.transform,
+      topology: wireframe ? 'lines' : undefined,
+      castShadow: true,
+      receiveShadow: false,
+      clipShadows: clipShadowsForMaterial(material, clippingContext),
+      ...clipping,
+      ...sortInfo,
+      ...pbrProps,
+      ...hiddenMainPass,
+    })
+  }
+}
+
+function customShadowMaterialForMode(
+  object: ThreeObject3DLike,
+  mode: ShadowMaterialMode | undefined,
+): ThreeMaterialLike | undefined {
+  if (mode === 'depth') return object.customDepthMaterial
+  if (mode === 'distance') return object.customDistanceMaterial
+  return undefined
+}
+
+function shadowOnlyMainPassState(): Pick<
+  NativeSceneMesh,
+  'blending' | 'colorWrite' | 'depthTest' | 'depthWrite' | 'stencilWrite' | 'transparent'
+> {
+  return {
+    blending: 'none',
+    colorWrite: false,
+    depthTest: false,
+    depthWrite: false,
+    stencilWrite: false,
+    transparent: false,
   }
 }
 

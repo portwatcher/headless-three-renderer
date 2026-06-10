@@ -3084,43 +3084,104 @@ test('alpha-tested shadow casters honor alphaMap cutouts', () => {
   assert.ok(cutoutLum > opaqueLum + 30, `alphaMap cutout should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
 })
 
-test('custom shadow caster materials fail clearly', () => {
-  function assertCustomShadowMaterialFails(property, customMaterial, light, pattern) {
+test('customDepthMaterial alphaMap controls directional shadow casters', () => {
+  function renderCustomDepthShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0, 0, 0)
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
     )
-    mesh.name = property
-    mesh.castShadow = true
-    mesh[property] = customMaterial
-    scene.add(mesh)
+    caster.position.y = 1.5
+    caster.castShadow = true
+    const customDepthMaterial = new THREE.MeshDepthMaterial({
+      alphaMap: solidTexture(255, alphaMapGreen, 255),
+      alphaTest: 0.5,
+    })
+    caster.customDepthMaterial = customDepthMaterial
+    scene.add(caster)
 
+    const light = new THREE.DirectionalLight(0xffffff, 2)
     light.castShadow = true
-    light.position.set(2, 3, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
     scene.add(light)
-    if (light.target) scene.add(light.target)
+    scene.add(light.target)
 
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      pattern,
-      property,
-    )
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
   }
 
-  assertCustomShadowMaterialFails(
-    'customDepthMaterial',
-    new THREE.MeshDepthMaterial({ alphaTest: 0.5 }),
-    new THREE.DirectionalLight(0xffffff, 1),
-    /customDepthMaterial.*not supported.*directional or spot shadows/i,
-  )
-  assertCustomShadowMaterialFails(
-    'customDistanceMaterial',
-    new THREE.MeshDistanceMaterial({ alphaTest: 0.5 }),
-    new THREE.PointLight(0xffffff, 1),
-    /customDistanceMaterial.*not supported.*point-light shadows/i,
-  )
+  const opaqueCaster = renderCustomDepthShadow(255)
+  const cutoutCaster = renderCustomDepthShadow(0)
+  const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
+  const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
+  assert.ok(cutoutLum > opaqueLum + 30, `customDepthMaterial alphaMap should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
+})
+
+test('customDistanceMaterial alphaMap controls point-light shadow casters', () => {
+  function renderCustomDistanceShadow(alphaMapGreen) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 2.5, 2.5),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.25
+    caster.castShadow = true
+    const customDistanceMaterial = new THREE.MeshDistanceMaterial({
+      alphaMap: solidTexture(255, alphaMapGreen, 255),
+      alphaTest: 0.5,
+    })
+    caster.customDistanceMaterial = customDistanceMaterial
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const opaqueCaster = renderCustomDistanceShadow(255)
+  const cutoutCaster = renderCustomDistanceShadow(0)
+  const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
+  const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
+  assert.ok(cutoutLum > opaqueLum + 20, `customDistanceMaterial alphaMap should remove the point-shadow caster (${cutoutLum} vs ${opaqueLum})`)
 })
 
 test('base color map applies texture UV transforms', () => {
