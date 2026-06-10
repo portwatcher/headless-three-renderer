@@ -68,6 +68,17 @@ function splitEnvironmentTexture() {
   return texture
 }
 
+function cubeTexture(faceColors) {
+  const faces = faceColors.map(([r, g, b, a = 255]) => ({
+    data: new Uint8Array([r, g, b, a]),
+    width: 1,
+    height: 1,
+  }))
+  const texture = new THREE.CubeTexture(faces)
+  texture.needsUpdate = true
+  return texture
+}
+
 function constantUvPlane(u, v) {
   const geometry = new THREE.PlaneGeometry(2, 2)
   const uv = new Float32Array(geometry.getAttribute('uv').count * 2)
@@ -5229,23 +5240,82 @@ test('equirect background textures honor scene backgroundRotation', () => {
   assert.ok(rotated.g > rotated.r + 80, `rotated -Z view should sample green (${rotated.g} vs ${rotated.r})`)
 })
 
-test('cube background texture mappings fail clearly', () => {
-  const camera = makeCamera()
-  const cases = [
-    ['cube scene background', { sceneBackground: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeReflectionMapping }) }],
-    ['cube texture flag scene background', { sceneBackground: Object.assign(solidTexture(0, 255, 0), { isCubeTexture: true }) }],
-    ['CubeUV option background', { optionBackground: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping }) }],
-  ]
+test('cube DataTexture backgrounds sample from camera direction', () => {
+  const background = cubeTexture([
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+    [0, 255, 0],
+    [255, 0, 0],
+  ])
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
 
-  for (const [name, { sceneBackground, optionBackground }] of cases) {
+  function renderFacing(target, yRotation = 0) {
     const scene = new THREE.Scene()
-    scene.background = sceneBackground ?? new THREE.Color(0, 0, 0)
-    assert.throws(
-      () => renderRgba(scene, camera, { width: 64, height: 64, background: optionBackground }),
-      /background.*cube.*not supported/i,
-      name,
-    )
+    scene.background = background
+    scene.backgroundRotation = new THREE.Euler(0, yRotation, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 0)
+    camera.lookAt(target)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 28, 28, 36, 36)
   }
+
+  const negativeZ = renderFacing(new THREE.Vector3(0, 0, -1))
+  const positiveZ = renderFacing(new THREE.Vector3(0, 0, 1))
+  assert.ok(negativeZ.r > negativeZ.g + 80, `-Z cube face should render red (${negativeZ.r} vs ${negativeZ.g})`)
+  assert.ok(positiveZ.g > positiveZ.r + 80, `+Z cube face should render green (${positiveZ.g} vs ${positiveZ.r})`)
+
+  const rotatedNegativeZ = renderFacing(new THREE.Vector3(0, 0, -1), Math.PI)
+  assert.ok(rotatedNegativeZ.g > rotatedNegativeZ.r + 80, `rotated -Z cube background should render +Z green (${rotatedNegativeZ.g} vs ${rotatedNegativeZ.r})`)
+})
+
+test('render options accept cube DataTexture backgrounds', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  const camera = makeCamera()
+  const background = cubeTexture([
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+    [0, 255, 0],
+    [0, 0, 255],
+  ])
+
+  const mean = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    background,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 28, 28, 36, 36)
+  assert.ok(mean.b > mean.r + 80, `options.background cube texture should override scene background (${mean.b} vs ${mean.r})`)
+})
+
+test('cube background textures require raw six-face images', () => {
+  const scene = new THREE.Scene()
+  scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeReflectionMapping })
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /six raw RGBA face images/i,
+  )
+})
+
+test('CubeUV background texture mappings fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const optionBackground = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping })
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64, background: optionBackground }),
+    /PMREM\/CubeUV texture mapping.*not supported/i,
+  )
 })
 
 test('render options accept texture backgrounds', () => {

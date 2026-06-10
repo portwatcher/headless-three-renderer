@@ -68,7 +68,11 @@ export interface ThreeTextureLike {
     data?: ArrayLike<number>
     width?: number
     height?: number
-  } | Buffer | Uint8Array
+  } | Buffer | Uint8Array | Array<{
+    data?: ArrayLike<number>
+    width?: number
+    height?: number
+  } | Buffer | Uint8Array>
   source?: {
     data?: {
       data?: ArrayLike<number>

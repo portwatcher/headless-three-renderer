@@ -58,6 +58,12 @@ export interface EnvironmentMapInfo {
   intensity: number
 }
 
+type TextureImageInput = {
+  data?: ArrayLike<number>
+  width?: number
+  height?: number
+} | Buffer | Uint8Array
+
 /**
  * Extract environment map data from scene.environment.
  * Supports DataTexture (equirectangular) with Uint8, Float16, Float32 pixel data.
@@ -865,6 +871,10 @@ export function extractBackgroundTexture(
 ): TextureInfo | null {
   const map = textureLike(background)
   if (!map) return null
+  assertSupportedTextureInput(map, label)
+  if (isCubeBackgroundTexture(map)) {
+    return extractCubeBackgroundTexture(map, label)
+  }
   assertSupportedBackgroundTexture(map, label)
 
   const base = extractTextureFromSlot(map)
@@ -887,6 +897,147 @@ function backgroundTextureMapping(map: ThreeTextureLike): 'uv' | 'equirectangula
   return map.mapping === EquirectangularReflectionMapping || map.mapping === EquirectangularRefractionMapping
     ? 'equirectangular'
     : 'uv'
+}
+
+function isCubeBackgroundTexture(map: ThreeTextureLike): boolean {
+  return map.isCubeTexture === true ||
+    map.mapping === CubeReflectionMapping ||
+    map.mapping === CubeRefractionMapping ||
+    map.mapping === CubeUVReflectionMapping
+}
+
+function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
+  if (map.mapping === CubeUVReflectionMapping) {
+    throw new Error(
+      `${label} uses PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a raw six-face CubeTexture, a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
+    )
+  }
+
+  const faces = cubeFaceImages(map)
+  if (!faces) {
+    throw new Error(
+      `${label} uses a cube background texture without six raw RGBA face images. Provide a CubeTexture with six DataTexture-style face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
+    )
+  }
+
+  const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`))
+  const faceWidth = faceTextures[0].width
+  const faceHeight = faceTextures[0].height
+  if (faceWidth !== faceHeight) {
+    throw new Error(`${label} cube background faces must be square raw RGBA images.`)
+  }
+  for (let i = 1; i < faceTextures.length; i += 1) {
+    if (faceTextures[i].width !== faceWidth || faceTextures[i].height !== faceHeight) {
+      throw new Error(`${label} cube background faces must all use the same dimensions.`)
+    }
+  }
+
+  const width = Math.max(64, faceWidth * 4)
+  const height = Math.max(32, faceHeight * 2)
+  const out = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    const v = (y + 0.5) / height
+    const pitch = (v - 0.5) * Math.PI
+    const dirY = Math.sin(pitch)
+    const ring = Math.cos(pitch)
+    for (let x = 0; x < width; x += 1) {
+      const u = (x + 0.5) / width
+      const yaw = (u - 0.5) * Math.PI * 2
+      const dir = [
+        Math.cos(yaw) * ring,
+        dirY,
+        Math.sin(yaw) * ring,
+      ] as const
+      const sample = sampleCubeFace(faceTextures, dir)
+      out.set(sample, (y * width + x) * 4)
+    }
+  }
+
+  return {
+    data: Buffer.from(out.buffer, out.byteOffset, out.byteLength),
+    width,
+    height,
+    wrapS: 'repeat',
+    wrapT: 'clamp',
+    magFilter: filterModeToString(map.magFilter),
+    minFilter: filterModeToString(map.minFilter),
+    anisotropy: textureAnisotropy(map),
+    colorSpace: textureColorSpace(map),
+    mapping: 'equirectangular',
+  }
+}
+
+function cubeFaceImages(map: ThreeTextureLike): TextureImageInput[] | null {
+  const image = (map as any).image ?? (map as any).source?.data
+  if (Array.isArray(image) && image.length >= 6) return image.slice(0, 6) as TextureImageInput[]
+  return null
+}
+
+function imageToRgbaTexture(image: TextureImageInput, label: string): { rgba: Uint8Array; width: number; height: number } {
+  if (Buffer.isBuffer(image) || image instanceof Uint8Array) {
+    throw new Error(
+      `${label} is an encoded or dimensionless cube face image. Cube backgrounds currently require raw DataTexture-style face images with data, width, and height.`,
+    )
+  }
+  if (!image || !image.data || !(image.width! > 0) || !(image.height! > 0)) {
+    throw new Error(`${label} must provide raw face data, width, and height for cube background rendering.`)
+  }
+  const rgba = toRgba8(image.data, image.width!, image.height!)
+  if (!rgba) {
+    throw new Error(`${label} must contain RGB or RGBA numeric pixel data for cube background rendering.`)
+  }
+  return { rgba, width: image.width!, height: image.height! }
+}
+
+function sampleCubeFace(
+  faces: Array<{ rgba: Uint8Array; width: number; height: number }>,
+  dir: readonly [number, number, number],
+): Uint8Array {
+  const [x, y, z] = dir
+  const ax = Math.abs(x)
+  const ay = Math.abs(y)
+  const az = Math.abs(z)
+  let faceIndex = 0
+  let sc = 0
+  let tc = 0
+
+  if (ax >= ay && ax >= az) {
+    if (x >= 0) {
+      faceIndex = 0
+      sc = -z / ax
+    } else {
+      faceIndex = 1
+      sc = z / ax
+    }
+    tc = -y / ax
+  } else if (ay >= ax && ay >= az) {
+    if (y >= 0) {
+      faceIndex = 2
+      sc = x / ay
+      tc = z / ay
+    } else {
+      faceIndex = 3
+      sc = x / ay
+      tc = -z / ay
+    }
+  } else {
+    if (z >= 0) {
+      faceIndex = 4
+      sc = x / az
+    } else {
+      faceIndex = 5
+      sc = -x / az
+    }
+    tc = -y / az
+  }
+
+  const face = faces[faceIndex]
+  const u = Math.max(0, Math.min(1, (sc + 1) * 0.5))
+  const v = Math.max(0, Math.min(1, (tc + 1) * 0.5))
+  const px = Math.min(face.width - 1, Math.floor(u * face.width))
+  const py = Math.min(face.height - 1, Math.floor(v * face.height))
+  const offset = (py * face.width + px) * 4
+  return face.rgba.subarray(offset, offset + 4)
 }
 
 function textureLike(value: unknown): ThreeTextureLike | null {
@@ -1112,7 +1263,7 @@ function areFiniteNumbers(...values: number[]): boolean {
   return true
 }
 
-function toRgba8(data: ArrayBufferView & { length: number }, width: number, height: number): Uint8Array | null {
+function toRgba8(data: ArrayLike<number>, width: number, height: number): Uint8Array | null {
   const pixels = width * height
 
   if (data instanceof Uint8Array || data instanceof Uint8ClampedArray) {
@@ -1156,6 +1307,24 @@ function toRgba8(data: ArrayBufferView & { length: number }, width: number, heig
     const out = new Uint8Array(pixels * 4)
     for (let i = 0; i < pixels * 4; i++) {
       out[i] = Math.max(0, Math.min(255, (data as any)[i]))
+    }
+    return out
+  }
+
+  if (data.length === pixels * 4) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels * 4; i++) {
+      out[i] = Math.max(0, Math.min(255, data[i]))
+    }
+    return out
+  }
+  if (data.length === pixels * 3) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = Math.max(0, Math.min(255, data[i * 3]))
+      out[i * 4 + 1] = Math.max(0, Math.min(255, data[i * 3 + 1]))
+      out[i * 4 + 2] = Math.max(0, Math.min(255, data[i * 3 + 2]))
+      out[i * 4 + 3] = 255
     }
     return out
   }
