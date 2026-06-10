@@ -105,6 +105,7 @@ function toNativeInput(
 ): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera } {
   validateThreeScene(scene)
   validateThreeCamera(camera)
+  validateUnsupportedRenderOptions(options)
 
   if (typeof scene.updateMatrixWorld === 'function') {
     scene.updateMatrixWorld(true)
@@ -219,6 +220,40 @@ function booleanOrNumber(value: unknown): number | undefined {
   return finiteOrUndefined(value)
 }
 
+function validateUnsupportedRenderOptions(options: RenderOptions): void {
+  assertSupportedSampleCount(options.samples, 'options.samples')
+  assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
+  if (options.target) validateUnsupportedRenderTargetOptions(options.target)
+}
+
+function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void {
+  if (target.depthTexture != null) {
+    throw new Error(
+      'Render target depthTexture output is not supported by @headless-three/renderer yet. Render depth with MeshDepthMaterial or omit target.depthTexture until depth readback support lands.',
+    )
+  }
+  if (target.isWebGLMultipleRenderTargets === true || Array.isArray(target.texture)) {
+    throw new Error(
+      'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
+    )
+  }
+  if (Array.isArray(target.textures) && target.textures.length > 1) {
+    throw new Error(
+      'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
+    )
+  }
+  assertSupportedSampleCount(target.samples, 'target.samples')
+  assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
+}
+
+function assertSupportedSampleCount(value: unknown, label: string): void {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 1) {
+    throw new Error(
+      `MSAA sample counts greater than 1 are not supported by @headless-three/renderer yet (${label}=${value}). Use the default single-sample render path until MSAA support lands.`,
+    )
+  }
+}
+
 function writeRenderTarget(
   target: RenderTargetLike,
   data: Buffer,
@@ -234,16 +269,17 @@ function writeRenderTarget(
   image.width = width
   image.height = height
 
-  if (target.texture) {
-    const textureImage = target.texture.image ?? (target.texture.image = {})
+  const texture = target.texture ?? target.textures?.[0]
+  if (texture && !Array.isArray(texture)) {
+    const textureImage = texture.image ?? (texture.image = {})
     textureImage.data = data
     textureImage.width = width
     textureImage.height = height
 
-    if (target.texture.source?.data) {
-      target.texture.source.data.data = data
-      target.texture.source.data.width = width
-      target.texture.source.data.height = height
+    if (texture.source?.data) {
+      texture.source.data.data = data
+      texture.source.data.width = width
+      texture.source.data.height = height
     }
   }
 

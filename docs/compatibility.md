@@ -14,7 +14,7 @@ Status keys:
 |---|---|---|
 | `render(scene, camera, options)` | Supported | Returns PNG by default or raw RGBA when `options.format` is `'rgba'`. |
 | `Renderer` reusable instance | Supported | Reuses the native renderer object across calls. |
-| `renderToTarget()` / `options.target` | Supported | Populates target-like `{ width, height, data, texture.image.data }` fields with RGBA8. |
+| `renderToTarget()` / `options.target` | Supported | Populates target-like `{ width, height, data, texture.image.data }` fields with RGBA8 for a single color output. Unsupported target depth, MRT, and MSAA fields fail clearly. |
 | Post-processing options | Supported | Exposure, contrast, saturation, vignette, grayscale, and invert. |
 | WebGLRenderer-compatible state machine | Unsupported | Non-goal. The contract is scene input and image/target output. |
 
@@ -47,8 +47,8 @@ Status keys:
 | Background textures/cubemaps | Partial | 2D texture backgrounds from `scene.background` or `options.background` are rendered with wrap modes, UV transforms, background intensity, approximate `backgroundBlurriness`, and output color-space conversion. Cube/equirect background mappings fail clearly; rendering cube/equirect backgrounds and exact mapping/color-space/blur parity remain planned. |
 | Output color space | Partial | `options.outputColorSpace` supports `THREE.SRGBColorSpace` (`"srgb"`, default) and `THREE.LinearSRGBColorSpace` (`"srgb-linear"`) for material and 2D texture background output conversion. Exact WebGLRenderer color-management state parity remains planned. |
 | Viewport/scissor | Partial | `options.viewport` and `options.scissor` accept `[x, y, width, height]` or `{ x, y, width, height }` pixel rectangles in top-left output coordinates. Exact WebGLRenderer state-machine parity remains out of scope for the scene-oriented API. |
-| Depth output / MRT | Unsupported | Planned. |
-| MSAA controls | Unsupported | Planned. |
+| Depth output / MRT | Unsupported | Target `depthTexture` and multiple color attachment requests fail clearly. Planned. |
+| MSAA controls | Unsupported | Render-option and target sample counts greater than 1 fail clearly. Planned. |
 
 ## Materials And Textures
 

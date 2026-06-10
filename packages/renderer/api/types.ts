@@ -368,27 +368,41 @@ export interface RenderOptions {
   clippingPlanes?: ThreePlaneLike[] | null
   format?: RenderOutputFormat
   outputColorSpace?: RenderOutputColorSpace
+  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  samples?: number
+  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  sampleCount?: number
   target?: RenderTargetLike
   postProcessing?: PostProcessingOptions
+}
+
+export interface RenderTargetTextureLike {
+  image?: {
+    data?: Buffer
+    width?: number
+    height?: number
+  }
+  source?: {
+    data?: {
+      data?: Buffer
+      width?: number
+      height?: number
+    }
+  }
 }
 
 export interface RenderTargetLike {
   width?: number
   height?: number
-  texture?: {
-    image?: {
-      data?: Buffer
-      width?: number
-      height?: number
-    }
-    source?: {
-      data?: {
-        data?: Buffer
-        width?: number
-        height?: number
-      }
-    }
-  }
+  texture?: RenderTargetTextureLike | RenderTargetTextureLike[]
+  textures?: RenderTargetTextureLike[]
+  /** Depth readback is not implemented yet; non-null values fail clearly. */
+  depthTexture?: unknown
+  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  samples?: number
+  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  sampleCount?: number
+  isWebGLMultipleRenderTargets?: boolean
   image?: {
     data?: Buffer
     width?: number

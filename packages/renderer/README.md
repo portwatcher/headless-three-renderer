@@ -78,7 +78,7 @@ The public API accepts only Three.js-like objects:
 - `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes.
 - `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and 2D texture background output conversion.
-- `options.target`: a target-like object populated with raw RGBA8 readback data.
+- `options.target`: a target-like object populated with raw RGBA8 readback data for a single color output.
 - `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`).
 
 ### Geometry & Scene
@@ -235,7 +235,7 @@ Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatibl
 
 ### Render Targets & Post-Processing
 
-`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8.
+`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8. Target `depthTexture`, multiple color attachments, and sample counts greater than 1 fail clearly until depth readback, MRT, and MSAA support land.
 
 Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert.
 

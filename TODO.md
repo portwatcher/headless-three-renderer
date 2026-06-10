@@ -97,9 +97,9 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Array/cube camera support | Medium | Needed for some environment capture and stereo-ish workflows. |
-| Render target depth output | Medium | Expose depth texture/readback for downstream tools. |
-| Multiple render targets | Medium | Useful for masks, normals, IDs, and deferred-style workflows. |
-| MSAA controls | Medium | Add configurable sample count and resolve behavior. |
+| Render target depth output | Medium | Target `depthTexture` requests fail clearly. Remaining work is exposing depth texture/readback for downstream tools. |
+| Multiple render targets | Medium | Multiple color attachment targets fail clearly. Remaining work is native MRT support for masks, normals, IDs, and deferred-style workflows. |
+| MSAA controls | Medium | Render-option and target sample counts greater than 1 fail clearly. Remaining work is configurable sample count and resolve behavior. |
 | Viewport/scissor support | Medium | Render-option viewport/scissor rectangles are supported in output pixel coordinates; remaining work is exact WebGLRenderer state-machine parity and broader tiled-render ergonomics. |
 | Object ID/mask render modes | Low | Useful for server-side pipelines, segmentation, and picking. |
 

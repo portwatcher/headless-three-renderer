@@ -3394,6 +3394,38 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(target.texture.image.data, target.data)
 })
 
+test('unsupported render target depth, MRT, and MSAA requests fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.1, 0.1, 0.1)
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0x00ffaa })))
+  const camera = makeCamera()
+
+  const targetCases = [
+    [{ depthTexture: {} }, /depthTexture output.*not supported/i, 'depthTexture'],
+    [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'texture array'],
+    [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
+    [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],
+    [{ samples: 4 }, /MSAA sample counts.*not supported/i, 'target samples'],
+    [{ sampleCount: 4 }, /MSAA sample counts.*not supported/i, 'target sampleCount'],
+  ]
+
+  for (const [target, pattern, label] of targetCases) {
+    assert.throws(
+      () => renderToTarget(scene, camera, target, { width: 32, height: 32 }),
+      pattern,
+      label,
+    )
+  }
+
+  for (const options of [{ samples: 4 }, { sampleCount: 4 }]) {
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32, ...options }),
+      /MSAA sample counts.*not supported/i,
+      JSON.stringify(options),
+    )
+  }
+})
+
 test('post-processing options modify the final image', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
