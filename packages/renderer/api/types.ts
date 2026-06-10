@@ -432,6 +432,8 @@ export interface RenderTargetLike {
   height?: number
   texture?: RenderTargetTextureLike | RenderTargetTextureLike[]
   textures?: RenderTargetTextureLike[]
+  objectIdEntries?: RenderObjectIdEntry[]
+  objectIdMap?: Record<string, RenderObjectIdEntry>
   /** Depth readback is not implemented yet; non-null values fail clearly. */
   depthTexture?: unknown
   /** MSAA is not implemented yet; values greater than 1 fail clearly. */
@@ -445,6 +447,15 @@ export interface RenderTargetLike {
     height?: number
   }
   data?: Buffer
+}
+
+export interface RenderObjectIdEntry {
+  /** Adapter object sort id, usually `THREE.Object3D.id`. */
+  id: number
+  /** 24-bit integer encoded in RGB, with 0 reserved for background. */
+  encodedId: number
+  rgb: [number, number, number]
+  hex: string
 }
 
 export interface PostProcessingOptions {

@@ -9,6 +9,7 @@ import type {
   NativeSceneMesh,
   RenderMode,
   Color4,
+  RenderObjectIdEntry,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -51,6 +52,7 @@ export type {
   ThreeCameraLike,
   RenderOptions,
   RenderTargetLike,
+  RenderObjectIdEntry,
   PostProcessingOptions,
 } from './types'
 
@@ -62,9 +64,9 @@ export class Renderer {
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
-    const { buffer, nativeScene } = this.renderNative(scene, camera, options)
+    const { buffer, nativeScene, objectIdEntries } = this.renderNative(scene, camera, options)
     if (options.target) {
-      writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!)
+      writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
     }
     return buffer
   }
@@ -76,25 +78,25 @@ export class Renderer {
     options: RenderOptions = {},
   ): RenderTargetLike {
     const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
-    const { buffer, nativeScene } = this.renderNative(scene, camera, targetOptions)
-    return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!)
+    const { buffer, nativeScene, objectIdEntries } = this.renderNative(scene, camera, targetOptions)
+    return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
   }
 
   private renderNative(
     scene: ThreeSceneRootLike,
     camera: ThreeCameraLike,
     options: RenderOptions,
-  ): { buffer: Buffer; nativeScene: NativeRenderScene } {
-    const { nativeScene, nativeCamera } = toNativeInput(scene, camera, options)
-    return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene }
+  ): { buffer: Buffer; nativeScene: NativeRenderScene; objectIdEntries?: RenderObjectIdEntry[] } {
+    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
+    return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, objectIdEntries }
   }
 }
 
 export function render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
-  const { nativeScene, nativeCamera } = toNativeInput(scene, camera, options)
+  const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   if (options.target) {
-    writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!)
+    writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
   }
   return buffer
 }
@@ -106,16 +108,16 @@ export function renderToTarget(
   options: RenderOptions = {},
 ): RenderTargetLike {
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
-  const { nativeScene, nativeCamera } = toNativeInput(scene, camera, targetOptions)
+  const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, targetOptions)
   const buffer = native.renderNative(nativeScene, nativeCamera)
-  return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!)
+  return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
 }
 
 function toNativeInput(
   scene: ThreeSceneRootLike,
   camera: ThreeCameraLike,
   options: RenderOptions,
-): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera } {
+): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
   validateThreeSceneRoot(scene)
   validateThreeCamera(camera)
   validateUnsupportedSceneState(scene)
@@ -140,7 +142,9 @@ function toNativeInput(
     ? optionBackgroundTexture ?? (hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background'))
     : null
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
-  const meshes = applyRenderMode(flattenScene(scene, camera, size.height, clippingPlanes), renderMode)
+  const flattenedMeshes = flattenScene(scene, camera, size.height, clippingPlanes)
+  const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
+  const meshes = applyRenderMode(flattenedMeshes, renderMode)
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
@@ -182,7 +186,7 @@ function toNativeInput(
     cameraPosition: cameraWorldPosition(camera),
   }
 
-  return { nativeScene, nativeCamera }
+  return { nativeScene, nativeCamera, objectIdEntries }
 }
 
 function normalizedRenderMode(mode: RenderOptions['renderMode']): RenderMode {
@@ -271,17 +275,44 @@ function materialAlpha(mesh: NativeSceneMesh): number {
 }
 
 function objectIdColor(mesh: NativeSceneMesh, index: number): Color4 {
-  const sortIndex = typeof mesh.sortIndex === 'number' && Number.isSafeInteger(mesh.sortIndex) && mesh.sortIndex >= 0
-    ? mesh.sortIndex
-    : index
-  const id = (sortIndex + 1) & 0xffffff
-  const value = id === 0 ? 1 : id
+  const value = encodedObjectId(mesh, index)
   return [
     ((value >> 16) & 0xff) / 255,
     ((value >> 8) & 0xff) / 255,
     (value & 0xff) / 255,
     materialAlpha(mesh),
   ]
+}
+
+function objectIdEntriesForMeshes(meshes: NativeSceneMesh[]): RenderObjectIdEntry[] {
+  const entries = new Map<number, RenderObjectIdEntry>()
+  meshes.forEach((mesh, index) => {
+    const id = objectSortId(mesh, index)
+    const encodedId = encodedObjectId(mesh, index)
+    if (entries.has(encodedId)) return
+    entries.set(encodedId, {
+      id,
+      encodedId,
+      rgb: [
+        (encodedId >> 16) & 0xff,
+        (encodedId >> 8) & 0xff,
+        encodedId & 0xff,
+      ],
+      hex: `#${encodedId.toString(16).padStart(6, '0')}`,
+    })
+  })
+  return [...entries.values()].sort((a, b) => a.encodedId - b.encodedId)
+}
+
+function encodedObjectId(mesh: NativeSceneMesh, index: number): number {
+  const encoded = (objectSortId(mesh, index) + 1) & 0xffffff
+  return encoded === 0 ? 1 : encoded
+}
+
+function objectSortId(mesh: NativeSceneMesh, index: number): number {
+  return typeof mesh.sortIndex === 'number' && Number.isSafeInteger(mesh.sortIndex) && mesh.sortIndex >= 0
+    ? mesh.sortIndex
+    : index
 }
 
 function renderModeFragment(color: Color4): string {
@@ -419,6 +450,7 @@ function writeRenderTarget(
   data: Buffer,
   width: number,
   height: number,
+  objectIdEntries?: RenderObjectIdEntry[],
 ): RenderTargetLike {
   target.width = width
   target.height = height
@@ -441,6 +473,14 @@ function writeRenderTarget(
       texture.source.data.width = width
       texture.source.data.height = height
     }
+  }
+
+  if (objectIdEntries) {
+    target.objectIdEntries = objectIdEntries
+    target.objectIdMap = Object.fromEntries(objectIdEntries.map((entry) => [String(entry.encodedId), entry]))
+  } else {
+    delete target.objectIdEntries
+    delete target.objectIdMap
   }
 
   return target

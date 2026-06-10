@@ -260,6 +260,34 @@ test('renderMode object-id outputs stable per-object RGB IDs', () => {
   assert.ok(background.r < 2 && background.g < 2 && background.b < 2, `object-id background should be black (${background.r}, ${background.g}, ${background.b})`)
 })
 
+test('renderMode object-id target includes reverse lookup metadata', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const left = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+  const right = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+  left.position.x = -0.5
+  right.position.x = 0.5
+  scene.add(left, right)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const target = { texture: {} }
+  renderToTarget(scene, camera, target, { width: 64, height: 64, renderMode: 'object-id' })
+  const leftEncoded = left.id + 1
+  const rightEncoded = right.id + 1
+  assert.equal(target.objectIdEntries.length, 2)
+  assert.deepEqual(target.objectIdMap[String(leftEncoded)].rgb, objectIdBytes(leftEncoded))
+  assert.deepEqual(target.objectIdMap[String(rightEncoded)].rgb, objectIdBytes(rightEncoded))
+  assert.equal(target.objectIdMap[String(leftEncoded)].id, left.id)
+  assert.equal(target.objectIdMap[String(rightEncoded)].hex, `#${rightEncoded.toString(16).padStart(6, '0')}`)
+
+  renderToTarget(scene, camera, target, { width: 64, height: 64 })
+  assert.equal(target.objectIdEntries, undefined)
+  assert.equal(target.objectIdMap, undefined)
+})
+
 test('renderMode mask preserves alphaMap cutouts', () => {
   const scene = new THREE.Scene()
   const discarded = new THREE.Mesh(
