@@ -886,6 +886,7 @@ export interface NativeRenderScene {
   environmentMapWidth?: number
   environmentMapHeight?: number
   environmentMapIntensity?: number
+  environmentMapColorSpace?: string
   environmentMapRotation?: number[]
   fogType?: string
   fogColor?: number[]

@@ -100,6 +100,8 @@ export interface RenderScene {
   environmentMapHeight?: number
   /** Environment map intensity multiplier. Defaults to 1. */
   environmentMapIntensity?: number
+  /** Environment map color space. `"srgb"` is decoded to linear; omitted defaults to sRGB for 8-bit inputs. */
+  environmentMapColorSpace?: string
   /** Environment map direction rotation matrix columns, flattened 3x3. */
   environmentMapRotation?: Array<number>
   /** Scene fog mode: `"linear"` for THREE.Fog or `"exp2"` for THREE.FogExp2. */

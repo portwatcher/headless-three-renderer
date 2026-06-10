@@ -267,6 +267,7 @@ impl RenderSettings {
                     data,
                     scene.environment_map_width,
                     scene.environment_map_height,
+                    parse_environment_color_space(scene.environment_map_color_space.as_deref())?,
                 )?;
                 Some(compute_ibl(&env_map, rotation))
             }
@@ -509,6 +510,20 @@ impl OutputColorSpace {
 
     pub fn is_linear(self) -> bool {
         matches!(self, Self::LinearSrgb)
+    }
+}
+
+fn parse_environment_color_space(value: Option<&str>) -> Result<bool> {
+    let Some(color_space) = value else {
+        return Ok(true);
+    };
+
+    match color_space.to_ascii_lowercase().as_str() {
+        "srgb" => Ok(true),
+        "srgb-linear" | "linear-srgb" | "linearsrgb" | "linear" => Ok(false),
+        other => bail!(
+            "unsupported scene.environmentMapColorSpace `{other}`; expected `srgb` or `srgb-linear`"
+        ),
     }
 }
 

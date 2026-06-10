@@ -191,6 +191,7 @@ function toNativeInput(
     environmentMapWidth: envMap?.width,
     environmentMapHeight: envMap?.height,
     environmentMapIntensity: envMap?.intensity,
+    environmentMapColorSpace: envMap?.colorSpace,
     environmentMapRotation,
     ...(colorMode ? fogToNative(scene.fog) : {}),
     ...(colorMode ? postProcessingToNative(options.postProcessing) : {}),

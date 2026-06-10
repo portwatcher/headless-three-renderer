@@ -61,6 +61,7 @@ export interface EnvironmentMapInfo {
   width: number
   height: number
   intensity: number
+  colorSpace?: string
 }
 
 type TextureImageInput = {
@@ -85,7 +86,7 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
 
   if (isCubeEnvironmentTexture(envTex)) {
     const cube = cubeTextureToEquirectangular(envTex, label)
-    return { data: cube.data, width: cube.width, height: cube.height, intensity }
+    return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex) }
   }
 
   const image = (envTex as any).image ?? (envTex as any).source?.data
@@ -114,7 +115,7 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
       } else {
         buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
       }
-      return { data: buf, width: image.width, height: image.height, intensity }
+      return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
     if (texType === FloatType && rawData instanceof Float32Array) {
@@ -133,22 +134,34 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
       } else {
         buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
       }
-      return { data: buf, width: image.width, height: image.height, intensity }
+      return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
     // UnsignedByteType / default: convert to RGBA8
     const rgba = toRgba8(rawData as any, image.width, image.height)
     if (rgba) {
-      return { data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength), width: image.width, height: image.height, intensity }
+      return {
+        data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength),
+        width: image.width,
+        height: image.height,
+        intensity,
+        colorSpace: textureColorSpace(envTex),
+      }
     }
   }
 
   // Encoded image buffer (e.g. loaded HDR encoded as PNG/EXR)
   if (Buffer.isBuffer(image)) {
-    return { data: image, width: 0, height: 0, intensity }
+    return { data: image, width: 0, height: 0, intensity, colorSpace: textureColorSpace(envTex) }
   }
   if (image instanceof Uint8Array && !((image as any).width > 0)) {
-    return { data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0, intensity }
+    return {
+      data: Buffer.from(image.buffer, image.byteOffset, image.byteLength),
+      width: 0,
+      height: 0,
+      intensity,
+      colorSpace: textureColorSpace(envTex),
+    }
   }
 
   return null
@@ -1291,6 +1304,14 @@ function composeTextureTransformWithFlipY(transform: number[], flipY: boolean): 
 function textureColorSpace(map: ThreeTextureLike | null | undefined): string | undefined {
   if (!map) return undefined
   if (map.colorSpace === 'srgb' || map.encoding === sRGBEncoding) return 'srgb'
+  if (
+    map.colorSpace === 'srgb-linear' ||
+    map.colorSpace === 'linear-srgb' ||
+    map.colorSpace === 'linearsrgb' ||
+    map.colorSpace === 'linear'
+  ) {
+    return 'linear'
+  }
   return undefined
 }
 

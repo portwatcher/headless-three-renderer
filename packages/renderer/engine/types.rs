@@ -64,6 +64,8 @@ pub struct RenderScene {
     pub environment_map_height: Option<u32>,
     /// Environment map intensity multiplier. Defaults to 1.
     pub environment_map_intensity: Option<f64>,
+    /// Environment map color space. `"srgb"` is decoded to linear; omitted defaults to sRGB for 8-bit inputs.
+    pub environment_map_color_space: Option<String>,
     /// Environment map direction rotation matrix columns, flattened 3x3.
     pub environment_map_rotation: Option<Vec<f64>>,
     /// Scene fog mode: `"linear"` for THREE.Fog or `"exp2"` for THREE.FogExp2.

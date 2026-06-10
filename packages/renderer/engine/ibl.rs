@@ -45,6 +45,7 @@ impl EnvMap {
         data: &[u8],
         width_hint: Option<u32>,
         height_hint: Option<u32>,
+        is_srgb: bool,
     ) -> Result<Self> {
         let w = width_hint.unwrap_or(0);
         let h = height_hint.unwrap_or(0);
@@ -54,9 +55,9 @@ impl EnvMap {
             let mut pixels = Vec::with_capacity((w * h) as usize);
             for i in 0..(w * h) as usize {
                 pixels.push([
-                    srgb_to_linear(data[i * 4] as f32 / 255.0),
-                    srgb_to_linear(data[i * 4 + 1] as f32 / 255.0),
-                    srgb_to_linear(data[i * 4 + 2] as f32 / 255.0),
+                    decode_ldr_environment_channel(data[i * 4], is_srgb),
+                    decode_ldr_environment_channel(data[i * 4 + 1], is_srgb),
+                    decode_ldr_environment_channel(data[i * 4 + 2], is_srgb),
                 ]);
             }
             return Ok(Self {
@@ -125,9 +126,9 @@ impl EnvMap {
         let mut pixels = Vec::with_capacity((w * h) as usize);
         for i in 0..(w * h) as usize {
             pixels.push([
-                srgb_to_linear(raw[i * 4] as f32 / 255.0),
-                srgb_to_linear(raw[i * 4 + 1] as f32 / 255.0),
-                srgb_to_linear(raw[i * 4 + 2] as f32 / 255.0),
+                decode_ldr_environment_channel(raw[i * 4], is_srgb),
+                decode_ldr_environment_channel(raw[i * 4 + 1], is_srgb),
+                decode_ldr_environment_channel(raw[i * 4 + 2], is_srgb),
             ]);
         }
         Ok(Self {
@@ -153,6 +154,15 @@ impl EnvMap {
         let x = (u * self.width as f32) as u32 % self.width;
         let y = (v * self.height as f32).min(self.height as f32 - 1.0) as u32;
         self.pixels[(y * self.width + x) as usize]
+    }
+}
+
+fn decode_ldr_environment_channel(value: u8, is_srgb: bool) -> f32 {
+    let normalized = value as f32 / 255.0;
+    if is_srgb {
+        srgb_to_linear(normalized)
+    } else {
+        normalized
     }
 }
 

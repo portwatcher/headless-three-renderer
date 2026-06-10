@@ -4485,6 +4485,43 @@ test('scene environmentRotation rotates cube IBL', () => {
   assert.ok(diff > 1.0, `rotated cube IBL should change the reflection, diff=${diff.toFixed(3)}`)
 })
 
+test('scene environment colorSpace controls RGBA8 IBL decode', () => {
+  function renderColorSpace(colorSpace) {
+    const data = new Uint8Array([
+      128, 128, 128, 255,
+      128, 128, 128, 255,
+      128, 128, 128, 255,
+      128, 128, 128, 255,
+    ])
+    const environment = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+    environment.colorSpace = colorSpace
+    environment.mapping = THREE.EquirectangularReflectionMapping
+    environment.needsUpdate = true
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = environment
+    scene.environmentIntensity = 1
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 20, `linear environment should precompute brighter IBL than decoded sRGB (${linear.r} vs ${srgb.r})`)
+})
+
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
     ['CubeUV scene environment', (scene) => {
