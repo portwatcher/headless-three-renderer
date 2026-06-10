@@ -4001,6 +4001,39 @@ test('LightProbe spherical harmonics contribute diffuse lighting', () => {
   assert.ok(mean.r > mean.b + 40, `LightProbe should tint diffuse lighting red (${mean.r} vs ${mean.b})`)
 })
 
+test('LightProbe honors camera layer filtering', () => {
+  function makeProbe(r, g, b, layer) {
+    const probe = new THREE.LightProbe(undefined, 1.8)
+    for (const coefficient of probe.sh.coefficients) {
+      coefficient.set(0, 0, 0)
+    }
+    probe.sh.coefficients[0].set(r, g, b)
+    probe.layers.set(layer)
+    return probe
+  }
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(makeProbe(1, 0, 0, 0))
+  scene.add(makeProbe(0, 1, 0, 1))
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+  )
+  mesh.layers.set(1)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.layers.set(1)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 25, `camera layer should select the green LightProbe and ignore red (${mean.g} vs ${mean.r})`)
+  assert.ok(mean.g > mean.b + 40, `camera layer should tint diffuse lighting green (${mean.g} vs ${mean.b})`)
+})
+
 test('RectAreaLight approximates finite one-sided area lighting', () => {
   function renderRectArea(width, height, targetZ) {
     const scene = new THREE.Scene()
@@ -7233,6 +7266,36 @@ test('PointsMaterial orthographic size is depth independent', () => {
   assert.ok(
     Math.abs(near.width - far.width) <= 2,
     `orthographic point size should not scale with depth (${near.width} vs ${far.width})`,
+  )
+})
+
+test('PointsMaterial perspective size attenuation shrinks distant point billboards', () => {
+  function renderPoint(z) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, z]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.8,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return nonBackgroundBounds(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, [0, 0, 0])
+  }
+
+  const near = renderPoint(0)
+  const far = renderPoint(-3)
+  assert.ok(
+    near.width >= far.width * 1.7,
+    `perspective point size should shrink with distance (${near.width} vs ${far.width})`,
+  )
+  assert.ok(
+    near.height >= far.height * 1.7,
+    `perspective point height should shrink with distance (${near.height} vs ${far.height})`,
   )
 })
 
