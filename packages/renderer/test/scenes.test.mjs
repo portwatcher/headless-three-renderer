@@ -1423,6 +1423,39 @@ test('SpriteMaterial map applies texture UV transforms', () => {
   assert.ok(mean.g > mean.r + 40, `sprite map offset should shift left sprite UVs from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('SpriteMaterial map honors explicit texture matrices', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 4, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.matrixAutoUpdate = false
+  map.matrix.set(
+    1, 0, 0.5,
+    0, 1, 0,
+    0, 0, 1,
+  )
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map,
+    color: 0xffffff,
+  }))
+  sprite.scale.set(2, 2, 1)
+  scene.add(sprite)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 18, 28, 26, 36)
+  assert.ok(mean.g > mean.r + 40, `explicit sprite map matrix should shift left sprite UVs from red to green (${mean.g} vs ${mean.r})`)
+})
+
 test('SpriteMaterial alphaMap applies texture UV transforms', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,
@@ -1448,6 +1481,38 @@ test('SpriteMaterial alphaMap applies texture UV transforms', () => {
 
   const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 18, 28, 26, 36)
   assert.ok(mean.g > mean.b + 40, `sprite alphaMap offset should shift left sprite UVs into the opaque texel (${mean.g} vs ${mean.b})`)
+})
+
+test('SpriteMaterial alphaMap honors explicit texture matrices', () => {
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.matrixAutoUpdate = false
+  alphaMap.matrix.set(
+    1, 0, 0.5,
+    0, 1, 0,
+    0, 0, 1,
+  )
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    color: 0x00ff00,
+    alphaMap,
+    alphaTest: 0.5,
+  }))
+  sprite.scale.set(2, 2, 1)
+  scene.add(sprite)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 18, 28, 26, 36)
+  assert.ok(mean.g > mean.b + 40, `explicit sprite alphaMap matrix should shift left sprite UVs into the opaque texel (${mean.g} vs ${mean.b})`)
 })
 
 test('SpriteMaterial honors sprite scale and material rotation', () => {
@@ -5500,6 +5565,45 @@ test('LineBasicMaterial map applies texture UV transforms', () => {
   assert.ok(greenPixels > 2, `line map offset should shift line UVs from red to green (${greenPixels})`)
 })
 
+test('LineBasicMaterial map honors explicit texture matrices', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.matrixAutoUpdate = false
+  map.matrix.set(
+    1, 0, 0.5,
+    0, 1, 0,
+    0, 0, 1,
+  )
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Line(
+    geom,
+    new THREE.LineBasicMaterial({ color: 0xffffff, map }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const image = renderRgba(scene, camera, { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(image, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(greenPixels > 2, `explicit line map matrix should shift line UVs from red to green (${greenPixels})`)
+})
+
 test('LineBasicMaterial map decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
@@ -6139,6 +6243,42 @@ test('PointsMaterial map applies texture UV transforms', () => {
   assert.ok(mean.g > mean.r + 40, `point map offset should shift left point-sprite UVs from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('PointsMaterial map honors explicit texture matrices', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 4, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.matrixAutoUpdate = false
+  map.matrix.set(
+    1, 0, 0.5,
+    0, 1, 0,
+    0, 0, 1,
+  )
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 30, 44, 38, 52)
+  assert.ok(mean.g > mean.r + 40, `explicit point map matrix should shift left point-sprite UVs from red to green (${mean.g} vs ${mean.r})`)
+})
+
 test('PointsMaterial alphaMap applies texture UV transforms', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,
@@ -6167,6 +6307,41 @@ test('PointsMaterial alphaMap applies texture UV transforms', () => {
 
   const mean = meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 30, 44, 38, 52)
   assert.ok(mean.g > mean.b + 40, `point alphaMap offset should shift left point-sprite UVs into the opaque texel (${mean.g} vs ${mean.b})`)
+})
+
+test('PointsMaterial alphaMap honors explicit texture matrices', () => {
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.matrixAutoUpdate = false
+  alphaMap.matrix.set(
+    1, 0, 0.5,
+    0, 1, 0,
+    0, 0, 1,
+  )
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0x00ff00,
+    alphaMap,
+    alphaTest: 0.5,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 30, 44, 38, 52)
+  assert.ok(mean.g > mean.b + 40, `explicit point alphaMap matrix should shift left point-sprite UVs into the opaque texel (${mean.g} vs ${mean.b})`)
 })
 
 test('PointsMaterial map decodes sRGB colorSpace before shading', () => {
