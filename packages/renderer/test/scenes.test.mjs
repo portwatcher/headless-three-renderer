@@ -5752,6 +5752,80 @@ test('scene environment colorSpace controls RGBA8 IBL decode', () => {
   assert.ok(linear.r > srgb.r + 20, `linear environment should precompute brighter IBL than decoded sRGB (${linear.r} vs ${srgb.r})`)
 })
 
+test('cube environment and reflection probe colorSpace controls IBL decode', () => {
+  function grayCube(colorSpace) {
+    const environment = cubeTexture([
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+    ])
+    environment.colorSpace = colorSpace
+    return environment
+  }
+
+  function makeMetallicScene(setup) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    setup(scene)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+    ))
+    return scene
+  }
+
+  function renderSceneEnvironment(colorSpace) {
+    const scene = makeMetallicScene((target) => {
+      target.environment = grayCube(colorSpace)
+      target.environmentIntensity = 1
+    })
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  function renderReflectionProbe(colorSpace) {
+    const scene = makeMetallicScene((target) => {
+      target.userData.headlessThreeRenderer = {
+        reflectionProbe: {
+          texture: grayCube(colorSpace),
+          intensity: 1,
+        },
+      }
+    })
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const srgbEnvironment = renderSceneEnvironment(THREE.SRGBColorSpace)
+  const linearEnvironment = renderSceneEnvironment(THREE.LinearSRGBColorSpace)
+  assert.ok(
+    linearEnvironment.r > srgbEnvironment.r + 20,
+    `linear cube environment should precompute brighter IBL than decoded sRGB (${linearEnvironment.r} vs ${srgbEnvironment.r})`,
+  )
+
+  const srgbProbe = renderReflectionProbe(THREE.SRGBColorSpace)
+  const linearProbe = renderReflectionProbe(THREE.LinearSRGBColorSpace)
+  assert.ok(
+    linearProbe.r > srgbProbe.r + 20,
+    `linear cube reflection probe should precompute brighter IBL than decoded sRGB (${linearProbe.r} vs ${srgbProbe.r})`,
+  )
+})
+
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
     ['CubeUV scene environment', (scene) => {
