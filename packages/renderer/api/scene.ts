@@ -560,6 +560,8 @@ function appendLineOrPoints(
   const vertexColors = getAttribute(geometry, 'color')
   const indexAttr = geometry.index ? readIndexAttribute(geometry.index) : null
   const vertexCount = position.count
+  const instancedGeometryCount = instancedBufferGeometryCount(geometry)
+  const instancedPositionOffset = instancedOffsetAttribute(geometry)
 
   const range = geometry.drawRange ?? {}
   const sourceCount = indexAttr ? indexAttr.length : vertexCount
@@ -576,6 +578,11 @@ function appendLineOrPoints(
   if (topology === 'lines') {
     const source = indexAttr ?? rangeIndices(vertexCount)
     if (material?.isLineDashedMaterial === true) {
+      if (instancedGeometryCount > 1) {
+        throw new Error(
+          'LineDashedMaterial with InstancedBufferGeometry is not supported by @headless-three/renderer yet. Expand dashed line instances to regular line geometry before rendering.',
+        )
+      }
       const dashed = dashedLineAttributes(
         positions,
         uvs,
@@ -595,6 +602,11 @@ function appendLineOrPoints(
     } else {
       indices = expandLineIndices(source, drawStart, drawEnd, object)
       if (indices.length < 2) return
+      if (instancedGeometryCount > 1 || instancedPositionOffset) {
+        outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
+        outputUvs = uvs ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount) : undefined
+        indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
+      }
     }
   } else if (indexAttr) {
     indices = indexAttr.slice(drawStart, drawEnd)
@@ -602,7 +614,7 @@ function appendLineOrPoints(
   }
 
   if (useVertexColors && material?.isLineDashedMaterial !== true) {
-    outputColors = readColorAttribute(vertexColors!, color)
+    outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
   }
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(globalClippingPlanes, material)
