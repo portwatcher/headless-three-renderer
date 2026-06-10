@@ -3,10 +3,12 @@ import { colorLikeToArray } from './color'
 import { objectLayersMatchCamera } from './layers'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
+const MAX_NATIVE_LIGHTS = 16
 
 export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike): NativeSceneLight[] | undefined {
   const lights: NativeSceneLight[] = []
   visitLights(scene, camera, lights)
+  assertSupportedLightCount(lights)
   assertSupportedShadowLightCount(lights)
   return lights.length > 0 ? lights : undefined
 }
@@ -244,6 +246,14 @@ function assertSupportedShadowLightCount(lights: NativeSceneLight[]): void {
   if (shadowCasters > 1) {
     throw new Error(
       'Multiple shadow-casting lights are not supported by @headless-three/renderer yet. Keep one visible directional, spot, or point light with castShadow enabled, or render separate passes until multiple shadow maps are supported.',
+    )
+  }
+}
+
+function assertSupportedLightCount(lights: NativeSceneLight[]): void {
+  if (lights.length > MAX_NATIVE_LIGHTS) {
+    throw new Error(
+      `More than ${MAX_NATIVE_LIGHTS} visible non-ambient lights are not supported by @headless-three/renderer yet (${lights.length} found). Keep the closest/brightest ${MAX_NATIVE_LIGHTS} lights, bake lighting, or render separate passes until native light arrays are expanded.`,
     )
   }
 }

@@ -104,7 +104,7 @@ Status keys:
 | Hemisphere light | Supported | Sky/ground gradient ambient term. |
 | `RectAreaLight` | Partial | One-sided finite-area direct-light approximation using the light center, local `-Z` direction, width, and height. Exact Three.js LTC/LUT behavior remains planned. |
 | Light layers | Supported | Lights are filtered against the active camera layers. |
-| Light limit | Partial | Up to 16 lights. |
+| Light limit | Partial | Up to 16 visible non-ambient lights are supported and covered by scale tests. Larger visible non-ambient light sets fail clearly until native light arrays are expanded. |
 | Shadows | Partial | Directional, spot, point, and directional cascaded shadow maps are supported for one shadow-casting light; additional visible shadow-casting lights fail clearly. |
 | Shadow behavior parity | Partial | Supports common camera bounds, square map size, bias, normal bias, cast/receive flags, and alpha-tested casters. Non-square shadow map sizes fail clearly; native multiple-shadow-map rendering, rectangular maps, and blur/radius parity remain planned. |
 | Equirectangular environment IBL | Supported | CPU precomputes diffuse irradiance, prefiltered specular, and BRDF LUT from equirectangular inputs. Cube, refraction, and PMREM/CubeUV environment mappings fail clearly. |
@@ -119,6 +119,7 @@ Status keys:
 |---|---|---|
 | Smoke tests | Supported | Module load, simple renders, output dimensions, reusable renderer. |
 | Conformance invariants | Supported | Scene-level render invariants for materials, PBR, IBL, shadows, post-processing, lines, points, layers, and render order. |
+| Scale budget tests | Supported | CI renders a many-mesh, multi-texture scene at the supported 16-light budget and checks the clear failure path for larger visible non-ambient light sets. |
 | Packed artifact verification | Supported | CI packs the package and current-platform native binary, installs them in a clean temp project, and renders a scene. |
 | Node loader setup docs/helpers | Supported | Local `GLTFLoader` setup is documented for file paths, external buffers, encoded image files, and optional image polyfills. The package exports Node helpers for encoded image texture loading and local `file://` fetch bridging. |
 | Golden-image parity corpus | Partial | The repo has scene invariants and a generated no-crash/visibility corpus, but not a committed browser-generated golden corpus yet. |

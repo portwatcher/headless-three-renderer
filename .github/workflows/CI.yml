@@ -127,6 +127,10 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:corpus
 
+      - name: Scale budget tests
+        working-directory: packages/renderer
+        run: pnpm run test:scale
+
       - name: Conformance tests
         working-directory: packages/renderer
         run: pnpm run test:conformance
