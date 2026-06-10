@@ -111,7 +111,7 @@ function visitObject(
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, nextClippingContext, localClippingEnabled)
     } else if (object.isPoints === true && object.geometry) {
-      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled)
+      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode)
     } else if (object.isSprite === true) {
       appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled)
     }
@@ -601,8 +601,9 @@ function appendPoints(
   viewportHeight: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
 ): void {
-  assertUnsupportedBillboardShadows(object, 'THREE.Points')
+  assertUnsupportedPointShadows(object, shadowMaterialMode)
 
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -706,6 +707,8 @@ function appendPoints(
       transform: IDENTITY_4X4.slice(),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       topology: 'triangles',
+      castShadow: object.castShadow === true ? true : undefined,
+      receiveShadow: false,
       clipShadows: clipShadowsForMaterial(material, clippingContext),
       ...clipping,
       ...sortInfo,
@@ -721,6 +724,18 @@ function assertUnsupportedBillboardShadows(object: ThreeObject3DLike, label: str
   }
   if (object.receiveShadow === true) {
     throw new Error(`${label} receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the billboard to mesh geometry before rendering shadows.`)
+  }
+}
+
+function assertUnsupportedPointShadows(
+  object: ThreeObject3DLike,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
+): void {
+  if (object.receiveShadow === true) {
+    throw new Error('THREE.Points receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the points to mesh geometry before receiving shadows.')
+  }
+  if (object.castShadow === true && shadowMaterialMode === 'distance') {
+    throw new Error('THREE.Points point-light castShadow is not supported by @headless-three/renderer yet. Use directional or spot shadow maps, or expand points to mesh geometry for point-light shadows.')
   }
 }
 
