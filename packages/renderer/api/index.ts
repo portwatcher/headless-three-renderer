@@ -144,7 +144,13 @@ function toNativeInput(
     ? optionBackgroundTexture ?? (hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background'))
     : null
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
-  const flattenedMeshes = flattenScene(scene, camera, size.height, clippingPlanes)
+  const flattenedMeshes = flattenScene(
+    scene,
+    camera,
+    size.height,
+    clippingPlanes,
+    options.localClippingEnabled !== false,
+  )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)
   const nativeScene: NativeRenderScene = {

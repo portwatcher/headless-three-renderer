@@ -87,6 +87,8 @@ The public API accepts only Three.js-like objects:
 - `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported 2D texture backgrounds.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws.
 - `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws.
+- `options.clippingPlanes`: global world-space clipping planes for the render.
+- `options.localClippingEnabled`: `false` disables material-local clipping planes while preserving `options.clippingPlanes`; defaults to `true`.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes.
 - `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and 2D texture background output conversion.
 - `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, or `'object-id'` for flat RGB object IDs.
@@ -139,6 +141,7 @@ The public API accepts only Three.js-like objects:
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
+- render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
 - material-level `envMap` reflection/refraction inputs fail clearly; use `scene.environment` or reflection probes for supported IBL
 - unsupported `alphaToCoverage` and `clipShadows` material states fail clearly
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly

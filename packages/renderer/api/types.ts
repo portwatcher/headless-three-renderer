@@ -414,6 +414,11 @@ export interface RenderOptions {
   viewport?: RenderPixelRectLike | null
   scissor?: RenderPixelRectLike | null
   clippingPlanes?: ThreePlaneLike[] | null
+  /**
+   * Controls whether material-local clippingPlanes are included. Defaults to true
+   * for the scene-oriented API; set false to mimic disabled WebGL local clipping.
+   */
+  localClippingEnabled?: boolean
   format?: RenderOutputFormat
   outputColorSpace?: RenderOutputColorSpace
   /** Alternate flat render passes. Defaults to normal color rendering. */

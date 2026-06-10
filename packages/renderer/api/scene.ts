@@ -60,9 +60,10 @@ export function flattenScene(
   camera?: ThreeCameraLike,
   viewportHeight = 512,
   globalClippingPlanes: readonly NativeClippingPlane[] = [],
+  localClippingEnabled = true,
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
-  visitObject(scene, camera, meshes, 0, viewportHeight, globalClippingPlanes)
+  visitObject(scene, camera, meshes, 0, viewportHeight, globalClippingPlanes, localClippingEnabled)
   return meshes
     .sort(compareFlattenedMeshes)
     .map(({ mesh }) => mesh)
@@ -75,6 +76,7 @@ function visitObject(
   groupOrder: number,
   viewportHeight: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
+  localClippingEnabled: boolean,
 ): void {
   if (!object || object.visible === false) return
 
@@ -86,19 +88,19 @@ function visitObject(
     updateLodObject(object, camera)
 
     if (object.isMesh === true && object.geometry) {
-      appendMesh(object, camera, meshes, nextGroupOrder, globalClippingPlanes)
+      appendMesh(object, camera, meshes, nextGroupOrder, globalClippingPlanes, localClippingEnabled)
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
-      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, globalClippingPlanes)
+      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, globalClippingPlanes, localClippingEnabled)
     } else if (object.isPoints === true && object.geometry) {
-      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, globalClippingPlanes)
+      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, globalClippingPlanes, localClippingEnabled)
     } else if (object.isSprite === true) {
-      appendSprite(object, camera, meshes, nextGroupOrder, globalClippingPlanes)
+      appendSprite(object, camera, meshes, nextGroupOrder, globalClippingPlanes, localClippingEnabled)
     }
   }
 
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {
-    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, globalClippingPlanes)
+    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, globalClippingPlanes, localClippingEnabled)
   }
 }
 
@@ -108,6 +110,7 @@ function appendMesh(
   meshes: FlattenedMesh[],
   groupOrder: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
+  localClippingEnabled: boolean,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -158,7 +161,7 @@ function appendMesh(
     const textureInfo = extractTextureData(material)
     const castShadow = object.castShadow === true ? true : undefined
     const receiveShadow = object.receiveShadow === true ? true : undefined
-    const clipping = clippingState(globalClippingPlanes, material)
+    const clipping = clippingState(globalClippingPlanes, material, localClippingEnabled)
     const wireframe = isDepthDistanceWireframeMaterial(material)
 
     if (index) {
@@ -284,6 +287,7 @@ function appendSprite(
   meshes: FlattenedMesh[],
   groupOrder: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
+  localClippingEnabled: boolean,
 ): void {
   assertUnsupportedBillboardShadows(object, 'THREE.Sprite')
 
@@ -336,7 +340,7 @@ function appendSprite(
 
   const textureInfo = extractTextureData(material)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
-  const clipping = clippingState(globalClippingPlanes, material)
+  const clipping = clippingState(globalClippingPlanes, material, localClippingEnabled)
 
   pushMesh(meshes, {
     positions,
@@ -370,6 +374,7 @@ function appendPoints(
   groupOrder: number,
   viewportHeight: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
+  localClippingEnabled: boolean,
 ): void {
   assertUnsupportedBillboardShadows(object, 'THREE.Points')
 
@@ -459,7 +464,7 @@ function appendPoints(
     const textureInfo = extractTextureData(material)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
     const pbrProps = extractPbrProperties(material)
-    const clipping = clippingState(globalClippingPlanes, material)
+    const clipping = clippingState(globalClippingPlanes, material, localClippingEnabled)
 
     pushMesh(meshes, {
       positions: outputPositions,
@@ -556,6 +561,7 @@ function appendLineOrPoints(
   topology: 'lines' | 'points',
   groupOrder: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
+  localClippingEnabled: boolean,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -640,7 +646,7 @@ function appendLineOrPoints(
     outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
   }
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
-  const clipping = clippingState(globalClippingPlanes, material)
+  const clipping = clippingState(globalClippingPlanes, material, localClippingEnabled)
   const pbrProps = extractPbrProperties(material)
   const textureInfo = extractTextureData(material)
 
@@ -681,12 +687,15 @@ function assertSupportedLineMaterial(material: ThreeMaterialLike | undefined): v
 function clippingState(
   globalClippingPlanes: readonly NativeClippingPlane[],
   material: ThreeMaterialLike | undefined,
+  localClippingEnabled: boolean,
 ): Pick<NativeSceneMesh, 'clippingPlanes' | 'clippingUnionCount'> {
   const globalPlanes = globalClippingPlanes.slice(0, MAX_CLIPPING_PLANES)
-  const localPlanes = extractClippingPlanes(material?.clippingPlanes).slice(
-    0,
-    Math.max(0, MAX_CLIPPING_PLANES - globalPlanes.length),
-  )
+  const localPlanes = localClippingEnabled
+    ? extractClippingPlanes(material?.clippingPlanes).slice(
+      0,
+      Math.max(0, MAX_CLIPPING_PLANES - globalPlanes.length),
+    )
+    : []
   const planes = [...globalPlanes, ...localPlanes]
   if (planes.length === 0) return {}
 

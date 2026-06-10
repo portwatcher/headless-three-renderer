@@ -2082,6 +2082,31 @@ test('render option clippingPlanes apply as global union planes', () => {
   assert.ok(clippedBottom.b > clippedBottom.g + 80, `bottom side should reveal blue background (${clippedBottom.b} vs ${clippedBottom.g})`)
 })
 
+test('localClippingEnabled false ignores material planes but preserves global planes', () => {
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    localClippingEnabled: false,
+    clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)],
+  })
+  const topLeft = meanRegion(rgba, 64, 64, 12, 12, 24, 24)
+  const bottomRight = meanRegion(rgba, 64, 64, 40, 40, 52, 52)
+
+  assert.ok(topLeft.r > topLeft.b + 80, `top-left should ignore the material x-plane (${topLeft.r} vs ${topLeft.b})`)
+  assert.ok(bottomRight.b > bottomRight.r + 80, `bottom-right should still be clipped by the global y-plane (${bottomRight.b} vs ${bottomRight.r})`)
+})
+
 test('clipIntersection requires all local clipping planes to reject a fragment', () => {
   const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
   material.clippingPlanes = [
