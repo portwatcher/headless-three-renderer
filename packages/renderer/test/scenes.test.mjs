@@ -3497,6 +3497,212 @@ test('base color maps decode sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 10, `linear texture should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('color-space decoding composes with explicit texture matrices', () => {
+  function transformedGrayTexture(colorSpace) {
+    const texture = rgbaTexture([
+      0, 0, 0, 255,
+      128, 128, 128, 255,
+    ], 2, 1)
+    texture.colorSpace = colorSpace
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, 0.5)
+    return texture
+  }
+
+  function frontCamera() {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+
+  function assertLinearBrighter(label, renderValue, threshold) {
+    const srgb = renderValue(THREE.SRGBColorSpace)
+    const linear = renderValue(THREE.LinearSRGBColorSpace)
+    assert.ok(
+      linear > srgb + threshold,
+      `${label} should decode the matrix-selected sRGB texel before shading (${linear} vs ${srgb})`,
+    )
+  }
+
+  assertLinearBrighter('base color map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshBasicMaterial({ map: transformedGrayTexture(colorSpace) }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })).r
+  }, 40)
+
+  assertLinearBrighter('background texture', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = transformedGrayTexture(colorSpace)
+    return meanRgba(renderRgba(scene, frontCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })).r
+  }, 40)
+
+  assertLinearBrighter('sprite map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: transformedGrayTexture(colorSpace),
+      color: 0xffffff,
+    }))
+    sprite.scale.set(2, 2, 1)
+    scene.add(sprite)
+    return meanRegion(renderRgba(scene, frontCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 18, 28, 26, 36).r
+  }, 40)
+
+  assertLinearBrighter('point map', (colorSpace) => {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      map: transformedGrayTexture(colorSpace),
+      size: 48,
+      sizeAttenuation: false,
+    })))
+    return meanRegion(renderRgba(scene, frontCamera(), {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 30, 44, 38, 52).r
+  }, 40)
+
+  assertLinearBrighter('line map', (colorSpace) => {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.25, 0.5,
+      0.25, 0.5,
+    ]), 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Line(
+      geom,
+      new THREE.LineBasicMaterial({ color: 0xffffff, map: transformedGrayTexture(colorSpace) }),
+    ))
+    return meanRegion(renderRgba(scene, frontCamera(), {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 0, 46, 96, 50).r
+  }, 10)
+
+  assertLinearBrighter('matcap color map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: solidTexture(255, 255, 255),
+        map: transformedGrayTexture(colorSpace),
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })).r
+  }, 40)
+
+  assertLinearBrighter('emissive map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        emissive: 0xffffff,
+        emissiveMap: transformedGrayTexture(colorSpace),
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })).r
+  }, 40)
+
+  assertLinearBrighter('light map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        lightMap: transformedGrayTexture(colorSpace),
+        lightMapIntensity: 2,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })).r
+  }, 40)
+
+  assertLinearBrighter('specular color map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.05,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+        specularColorMap: transformedGrayTexture(colorSpace),
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 450)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+    return maxLuminance(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }, 5)
+
+  assertLinearBrighter('sheen color map', (colorSpace) => {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 3
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        sheen: 1,
+        sheenColor: new THREE.Color(1, 1, 1),
+        sheenRoughness: 0.35,
+        sheenColorMap: transformedGrayTexture(colorSpace),
+      }),
+    ))
+    return maxLuminance(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }, 3)
+})
+
 test('outputColorSpace controls material and texture background output conversion', () => {
   function renderMaterialOutput(outputColorSpace) {
     const scene = new THREE.Scene()
