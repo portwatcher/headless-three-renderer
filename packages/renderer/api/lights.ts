@@ -176,7 +176,10 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
   const shadow = light.shadow
   assertSupportedShadowBlurOptions(shadow)
-  out.shadowMapSize = shadowMapSizeOrDefault(shadow?.mapSize)
+  const mapSize = shadowMapSizeOrDefault(shadow?.mapSize, light)
+  out.shadowMapSize = Math.max(mapSize.width, mapSize.height)
+  out.shadowMapWidth = mapSize.width
+  out.shadowMapHeight = mapSize.height
   if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
   if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
 
@@ -193,15 +196,17 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   applyShadowCascadeOptions(out, light)
 }
 
-function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike): number {
+function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3DLike): { width: number; height: number } {
   const width = numberOrNull(mapSize?.x ?? mapSize?.width)
   const height = numberOrNull(mapSize?.y ?? mapSize?.height)
-  if (width != null && height != null && Math.floor(width) !== Math.floor(height)) {
+  const resolvedWidth = Math.max(32, Math.floor(width ?? height ?? 512))
+  const resolvedHeight = Math.max(32, Math.floor(height ?? width ?? 512))
+  if (light.isPointLight === true && resolvedWidth !== resolvedHeight) {
     throw new Error(
-      `Non-square light.shadow.mapSize values are not supported by @headless-three/renderer yet (${Math.floor(width)}x${Math.floor(height)}). Use a square shadow map size until rectangular shadow maps are supported.`,
+      `Non-square PointLight shadow map sizes are not supported by @headless-three/renderer yet (${resolvedWidth}x${resolvedHeight}). Use square point-light shadow maps until rectangular cube-face shadows are supported.`,
     )
   }
-  return Math.max(32, Math.floor(width ?? height ?? 512))
+  return { width: resolvedWidth, height: resolvedHeight }
 }
 
 function assertSupportedShadowBlurOptions(shadow: ThreeObject3DLike['shadow']): void {

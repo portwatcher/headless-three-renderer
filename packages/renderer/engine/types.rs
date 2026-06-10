@@ -117,8 +117,12 @@ pub struct SceneLight {
     pub ground_color: Option<Vec<f64>>,
     /// Whether this light casts shadows (directional, spot, and point lights).
     pub cast_shadow: Option<bool>,
-    /// Shadow map resolution (square, pixels). Defaults to 512.
+    /// Legacy square shadow map resolution in pixels. Defaults to 512 when width/height are absent.
     pub shadow_map_size: Option<u32>,
+    /// Shadow map width in pixels. Defaults to `shadowMapSize` or 512.
+    pub shadow_map_width: Option<u32>,
+    /// Shadow map height in pixels. Defaults to `shadowMapSize` or 512.
+    pub shadow_map_height: Option<u32>,
     /// Depth bias in shadow-map NDC.
     pub shadow_bias: Option<f64>,
     /// Normal-offset bias in world space at the receiver.

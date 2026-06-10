@@ -4167,27 +4167,66 @@ test('multiple shadow-casting lights fail clearly', () => {
   )
 })
 
-test('non-square shadow map sizes fail clearly', () => {
+test('rectangular directional shadow map sizes render shadows', () => {
+  function renderRectShadow(castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = castShadow
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(512, 256)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const unshadowed = renderRectShadow(false)
+  const shadowed = renderRectShadow(true)
+  const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+  const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+  assert.ok(shadowedLum < unshadowedLum - 30, `rectangular shadow map should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
+})
+
+test('non-square point-light shadow map sizes fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
-  const receiver = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshStandardMaterial({ color: 0xffffff }),
-  )
-  receiver.receiveShadow = true
-  scene.add(receiver)
-
-  const light = new THREE.DirectionalLight(0xffffff, 1)
-  light.position.set(3, 4, 2)
-  light.target.position.set(0, 0, 0)
+  const light = new THREE.PointLight(0xffffff, 1)
+  light.position.set(2, 4, 2)
   light.castShadow = true
   light.shadow.mapSize.set(512, 256)
   scene.add(light)
-  scene.add(light.target)
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /non-square light\.shadow\.mapSize.*not supported/i,
+    /non-square PointLight shadow map sizes.*not supported/i,
   )
 })
 

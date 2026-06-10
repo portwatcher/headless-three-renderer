@@ -73,9 +73,9 @@ pub struct Uniforms {
     pub light_space_matrices: [[[f32; 4]; 4]; 6],
     /// x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
     pub shadow_params: [f32; 4],
-    /// x = shadow light index (as f32), y = 1/map_size, z = shadow kind, w = reserved
+    /// x = shadow light index, y = 1/map_width, z = 1/map_height, w = shadow kind.
     pub shadow_params2: [f32; 4],
-    /// x/y/z/w = cascade split distances
+    /// x/y/z = cascade split distances, w = shadow layer count.
     pub shadow_params3: [f32; 4],
     /// x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
     pub physical_params1: [f32; 4],
@@ -1691,13 +1691,11 @@ impl GpuRenderer {
             .shadow
             .as_ref()
             .expect("render_shadow_pass requires a configured shadow caster");
-        let size = shadow.map_size;
-
         let shadow_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("headless-three-renderer shadow map"),
             size: wgpu::Extent3d {
-                width: size,
-                height: size,
+                width: shadow.map_width,
+                height: shadow.map_height,
                 depth_or_array_layers: shadow.layer_count,
             },
             mip_level_count: 1,
@@ -2344,21 +2342,24 @@ impl GpuRenderer {
             shadow_params2: match &settings.shadow {
                 Some(s) => [
                     s.light_index as f32,
-                    1.0 / s.map_size as f32,
+                    1.0 / s.map_width as f32,
+                    1.0 / s.map_height as f32,
                     match s.kind {
                         ShadowKind::DirectionalOrSpot => 0.0,
                         ShadowKind::Point => 1.0,
                         ShadowKind::Cascaded => 2.0,
                     },
-                    s.layer_count as f32,
                 ],
                 None => [0.0, 0.0, 0.0, 0.0],
             },
-            shadow_params3: settings
-                .shadow
-                .as_ref()
-                .map(|s| s.cascade_splits)
-                .unwrap_or([f32::MAX; 4]),
+            shadow_params3: settings.shadow.as_ref().map_or([f32::MAX; 4], |s| {
+                [
+                    s.cascade_splits[0],
+                    s.cascade_splits[1],
+                    s.cascade_splits[2],
+                    s.layer_count as f32,
+                ]
+            }),
             physical_params1: [
                 mesh.clearcoat,
                 mesh.clearcoat_roughness,

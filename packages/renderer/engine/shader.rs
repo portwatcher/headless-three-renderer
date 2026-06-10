@@ -84,9 +84,9 @@ struct Uniforms {
   light_space_matrices: array<mat4x4<f32>, 6>,
   // x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
   shadow_params: vec4<f32>,
-  // x = shadow light index (as f32), y = 1/map_size, z = shadow kind (0=2D, 1=point, 2=cascaded), w = layer count
+  // x = shadow light index, y = 1/map_width, z = 1/map_height, w = shadow kind (0=2D, 1=point, 2=cascaded)
   shadow_params2: vec4<f32>,
-  // xyz/w = cascade split distances; missing splits are large sentinel values
+  // x/y/z = cascade split distances, w = shadow layer count.
   shadow_params3: vec4<f32>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
@@ -261,7 +261,7 @@ fn sample_shadow_layer(world_pos: vec3<f32>, layer: u32, world_normal: vec3<f32>
   }
 
   let reference = proj.z - uniforms.shadow_params.y;
-  let texel = uniforms.shadow_params2.y;
+  let texel = uniforms.shadow_params2.yz;
 
   // 3x3 PCF.
   var sum: f32 = 0.0;
@@ -291,8 +291,8 @@ fn sample_shadow(world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
   if uniforms.shadow_params.x < 0.5 || uniforms.shadow_params.w < 0.5 {
     return 1.0;
   }
-  if uniforms.shadow_params2.z > 0.5 {
-    if uniforms.shadow_params2.z > 1.5 {
+  if uniforms.shadow_params2.w > 0.5 {
+    if uniforms.shadow_params2.w > 1.5 {
       let camera_dist = distance(world_pos, uniforms.camera_pos.xyz);
       var layer = 0u;
       if camera_dist > uniforms.shadow_params3.x {
@@ -304,7 +304,7 @@ fn sample_shadow(world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
       if camera_dist > uniforms.shadow_params3.z {
         layer = 3u;
       }
-      layer = min(layer, max(u32(uniforms.shadow_params2.w), 1u) - 1u);
+      layer = min(layer, max(u32(uniforms.shadow_params3.w), 1u) - 1u);
       return sample_shadow_layer(world_pos, layer, world_normal);
     }
     let light_index = u32(uniforms.shadow_params2.x);

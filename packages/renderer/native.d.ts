@@ -143,8 +143,12 @@ export interface SceneLight {
   groundColor?: Array<number>
   /** Whether this light casts shadows (directional, spot, and point lights). */
   castShadow?: boolean
-  /** Shadow map resolution (square, pixels). Defaults to 512. */
+  /** Legacy square shadow map resolution in pixels. Defaults to 512 when width/height are absent. */
   shadowMapSize?: number
+  /** Shadow map width in pixels. Defaults to `shadowMapSize` or 512. */
+  shadowMapWidth?: number
+  /** Shadow map height in pixels. Defaults to `shadowMapSize` or 512. */
+  shadowMapHeight?: number
   /** Depth bias in shadow-map NDC. */
   shadowBias?: number
   /** Normal-offset bias in world space at the receiver. */

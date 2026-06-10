@@ -33,8 +33,10 @@ pub struct ShadowCaster {
     pub layer_count: u32,
     /// Camera-distance split points for cascaded directional shadows.
     pub cascade_splits: [f32; 4],
-    /// Shadow map resolution (square, pixels).
-    pub map_size: u32,
+    /// Shadow map width in pixels.
+    pub map_width: u32,
+    /// Shadow map height in pixels.
+    pub map_height: u32,
     /// Depth bias applied when comparing against the shadow map.
     pub bias: f32,
     /// World-space normal offset applied at the receiver.
@@ -616,6 +618,7 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
         if far <= near {
             bail!("{prefix}.shadow.camera has invalid near/far bounds");
         }
+        let (map_width, map_height) = shadow_map_dimensions(light, &light_type, &prefix)?;
 
         let mut light_vps = [Mat4::IDENTITY; 6];
         let mut cascade_splits = [f32::MAX; 4];
@@ -644,9 +647,10 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
                 .angle
                 .unwrap_or(std::f64::consts::FRAC_PI_3)
                 .clamp(0.001, std::f64::consts::FRAC_PI_2) as f32;
+            let aspect = map_width as f32 / map_height as f32;
             let proj = Mat4::perspective_rh(
                 (angle * 2.0).min(std::f32::consts::PI - 0.001),
-                1.0,
+                aspect,
                 near,
                 far,
             );
@@ -693,7 +697,8 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
                         light_index: i as u32,
                         layer_count,
                         cascade_splits,
-                        map_size: light.shadow_map_size.unwrap_or(512).clamp(32, 4096),
+                        map_width,
+                        map_height,
                         bias: light.shadow_bias.unwrap_or(0.0) as f32,
                         normal_bias: light.shadow_normal_bias.unwrap_or(0.0) as f32,
                     }));
@@ -711,7 +716,6 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
             ShadowKind::DirectionalOrSpot
         };
 
-        let map_size = light.shadow_map_size.unwrap_or(512).clamp(32, 4096);
         let bias = light.shadow_bias.unwrap_or(0.0) as f32;
         let normal_bias = light.shadow_normal_bias.unwrap_or(0.0) as f32;
 
@@ -722,10 +726,26 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
             light_index: i as u32,
             layer_count,
             cascade_splits,
-            map_size,
+            map_width,
+            map_height,
             bias,
             normal_bias,
         }));
     }
     Ok(None)
+}
+
+fn shadow_map_dimensions(
+    light: &crate::types::SceneLight,
+    light_type: &str,
+    prefix: &str,
+) -> Result<(u32, u32)> {
+    let width_hint = light.shadow_map_width.or(light.shadow_map_size);
+    let height_hint = light.shadow_map_height.or(light.shadow_map_size);
+    let width = width_hint.or(height_hint).unwrap_or(512).clamp(32, 4096);
+    let height = height_hint.or(width_hint).unwrap_or(512).clamp(32, 4096);
+    if light_type == "point" && width != height {
+        bail!("{prefix}.shadow.mapSize must be square for point-light cube shadows");
+    }
+    Ok((width, height))
 }

@@ -519,8 +519,12 @@ export interface NativeSceneLight {
   groundColor?: number[]
   /** Whether this light casts shadows (directional, spot, and point lights). */
   castShadow?: boolean
-  /** Shadow map resolution (square). Defaults to 512. */
+  /** Legacy square shadow map resolution. Defaults to 512 when width/height are absent. */
   shadowMapSize?: number
+  /** Shadow map width in pixels. Defaults to `shadowMapSize` or 512. */
+  shadowMapWidth?: number
+  /** Shadow map height in pixels. Defaults to `shadowMapSize` or 512. */
+  shadowMapHeight?: number
   /** Depth bias applied when sampling the shadow map. */
   shadowBias?: number
   /** Normal-offset bias (world space units) applied at receivers. */
