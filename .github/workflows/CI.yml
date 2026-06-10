@@ -119,6 +119,14 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:smoke
 
+      - name: glTF fixture tests
+        working-directory: packages/renderer
+        run: pnpm run test:gltf
+
+      - name: Scene corpus tests
+        working-directory: packages/renderer
+        run: pnpm run test:corpus
+
       - name: Conformance tests
         working-directory: packages/renderer
         run: pnpm run test:conformance

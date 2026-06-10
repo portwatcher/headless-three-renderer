@@ -19,7 +19,7 @@ The tests require the native binary (`headless_three_renderer.*.node`) to be bui
 - **`scenes.test.mjs`** — scene-level invariants: `rgba` format produces `width * height * 4` bytes, meshes cover reasonable portions of the frame, different materials produce different pixel statistics, PBR scenes show lighting gradients, line/point topologies render without error, empty scene renders background color.
 
 The harness intentionally tests **invariants** (dimensions, color statistics, non-emptiness) rather than exact pixel matches, so the same suite passes across Metal / Vulkan / DX12 / llvmpipe without per-platform snapshot drift.
-The generated corpus and minimal glTF fixture are broader no-crash/visibility sweeps; committed browser-generated golden images, glTF Sample Assets, and VRM assets remain future work.
+The generated corpus and minimal glTF fixture are broader no-crash/visibility sweeps and run in CI; committed browser-generated golden images, glTF Sample Assets, and VRM assets remain future work.
 
 ## CI software rendering
 
