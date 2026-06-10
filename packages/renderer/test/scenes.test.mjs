@@ -5913,6 +5913,45 @@ test('PointsMaterial size controls billboard pixel bounds', () => {
   assert.ok(large.height > small.height * 2, `larger point should produce taller bounds (${large.height} vs ${small.height})`)
 })
 
+test('PointsMaterial orthographic size is depth independent', () => {
+  function renderPoint(z) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, z]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 20,
+    })))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 20)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return nonBackgroundBounds(
+      renderRgba(scene, camera, { width: 96, height: 96 }),
+      96,
+      96,
+      [0, 0, 0],
+    )
+  }
+
+  const near = renderPoint(0)
+  const far = renderPoint(-3)
+  assert.ok(
+    near.width >= 16 && near.width <= 26,
+    `orthographic point should render near its pixel size (${near.width})`,
+  )
+  assert.ok(
+    far.width >= 16 && far.width <= 26,
+    `far orthographic point should render near its pixel size (${far.width})`,
+  )
+  assert.ok(
+    Math.abs(near.width - far.width) <= 2,
+    `orthographic point size should not scale with depth (${near.width} vs ${far.width})`,
+  )
+})
+
 test('PointsMaterial opacity blends billboard color over the background', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))

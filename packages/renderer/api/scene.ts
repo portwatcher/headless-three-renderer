@@ -901,6 +901,10 @@ function pointWorldSize(
     return pointSize / projectionY
   }
 
+  if (camera?.isPerspectiveCamera !== true) {
+    return pointSize * 2 / Math.max(1, viewportHeight) / projectionY
+  }
+
   const viewZ = camera ? viewSpaceZ(worldPosition, camera) : -1
   const depth = Number.isFinite(viewZ) ? Math.max(0.0001, Math.abs(viewZ)) : 1
   return pointSize * 2 * depth / Math.max(1, viewportHeight) / projectionY
