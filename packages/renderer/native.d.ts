@@ -651,6 +651,8 @@ export interface SceneMesh {
    * intersection semantics. Defaults to all planes as union planes.
    */
   clippingUnionCount?: number
+  /** Whether clipping planes affect this mesh in the shadow pass. */
+  clipShadows?: boolean
   /** Whether the mesh is transparent (sorted back-to-front, no depth write). */
   transparent?: boolean
   /** Material blending mode: `"none"`, `"normal"`, `"additive"`, `"subtractive"`, `"multiply"`, or `"custom"`. */

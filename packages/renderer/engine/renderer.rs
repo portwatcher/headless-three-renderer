@@ -77,7 +77,7 @@ pub struct Uniforms {
     pub shadow_params2: [f32; 4],
     /// x/y/z = cascade split distances, w = shadow layer count.
     pub shadow_params3: [f32; 4],
-    /// x = PCF radius multiplier.
+    /// x = PCF radius multiplier, y = clip shadow caster fragments by clipping planes.
     pub shadow_params4: [f32; 4],
     /// x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
     pub physical_params1: [f32; 4],
@@ -1071,7 +1071,12 @@ impl GpuRenderer {
                     },
                 }),
                 multisample: wgpu::MultisampleState::default(),
-                fragment: None,
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_shadow"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[],
+                }),
                 multiview_mask: None,
                 cache: None,
             })
@@ -2365,7 +2370,14 @@ impl GpuRenderer {
             shadow_params4: settings
                 .shadow
                 .as_ref()
-                .map(|s| [s.radius, 0.0, 0.0, 0.0])
+                .map(|s| {
+                    [
+                        s.radius,
+                        if mesh.clip_shadows { 1.0 } else { 0.0 },
+                        0.0,
+                        0.0,
+                    ]
+                })
                 .unwrap_or([1.0, 0.0, 0.0, 0.0]),
             physical_params1: [
                 mesh.clearcoat,

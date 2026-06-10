@@ -778,6 +778,8 @@ export interface NativeSceneMesh {
   clippingPlanes?: number[]
   /** Number of leading clipping planes evaluated as union planes; remaining planes use intersection semantics. */
   clippingUnionCount?: number
+  /** Whether material clipping planes affect this mesh in the shadow pass. */
+  clipShadows?: boolean
   blending?: string
   blendEquation?: number
   blendSrc?: number

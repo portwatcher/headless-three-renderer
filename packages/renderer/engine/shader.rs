@@ -88,7 +88,7 @@ struct Uniforms {
   shadow_params2: vec4<f32>,
   // x/y/z = cascade split distances, w = shadow layer count.
   shadow_params3: vec4<f32>,
-  // x = PCF radius multiplier.
+  // x = PCF radius multiplier, y = clip shadow caster fragments by clipping_planes.
   shadow_params4: vec4<f32>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
@@ -214,39 +214,54 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   return output;
 }
 
-fn shadow_position(input: VertexInput, layer: u32) -> vec4<f32> {
+struct ShadowVertexOutput {
+  @builtin(position) position: vec4<f32>,
+  @location(0) world_pos: vec3<f32>,
+};
+
+fn shadow_vertex(input: VertexInput, layer: u32) -> ShadowVertexOutput {
+  var output: ShadowVertexOutput;
   let world_pos = uniforms.model * vec4<f32>(input.position, 1.0);
-  return uniforms.light_space_matrices[layer] * world_pos;
+  output.position = uniforms.light_space_matrices[layer] * world_pos;
+  output.world_pos = world_pos.xyz;
+  return output;
 }
 
 @vertex
-fn vs_shadow0(input: VertexInput) -> @builtin(position) vec4<f32> {
-  return shadow_position(input, 0u);
+fn vs_shadow0(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 0u);
 }
 
 @vertex
-fn vs_shadow1(input: VertexInput) -> @builtin(position) vec4<f32> {
-  return shadow_position(input, 1u);
+fn vs_shadow1(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 1u);
 }
 
 @vertex
-fn vs_shadow2(input: VertexInput) -> @builtin(position) vec4<f32> {
-  return shadow_position(input, 2u);
+fn vs_shadow2(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 2u);
 }
 
 @vertex
-fn vs_shadow3(input: VertexInput) -> @builtin(position) vec4<f32> {
-  return shadow_position(input, 3u);
+fn vs_shadow3(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 3u);
 }
 
 @vertex
-fn vs_shadow4(input: VertexInput) -> @builtin(position) vec4<f32> {
-  return shadow_position(input, 4u);
+fn vs_shadow4(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 4u);
 }
 
 @vertex
-fn vs_shadow5(input: VertexInput) -> @builtin(position) vec4<f32> {
-  return shadow_position(input, 5u);
+fn vs_shadow5(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 5u);
+}
+
+@fragment
+fn fs_shadow(input: ShadowVertexOutput) {
+  if uniforms.shadow_params4.y > 0.5 && is_clipped_by_planes(input.world_pos) {
+    discard;
+  }
 }
 
 fn sample_shadow_layer(world_pos: vec3<f32>, layer: u32, world_normal: vec3<f32>) -> f32 {

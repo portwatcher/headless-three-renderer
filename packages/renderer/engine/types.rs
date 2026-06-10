@@ -615,6 +615,8 @@ pub struct SceneMesh {
     /// Number of leading clipping planes evaluated as union planes. Remaining planes use
     /// intersection semantics. Defaults to all planes as union planes.
     pub clipping_union_count: Option<u32>,
+    /// Whether clipping planes affect this mesh in the shadow pass.
+    pub clip_shadows: Option<bool>,
     /// Whether the mesh is transparent (sorted back-to-front, no depth write).
     pub transparent: Option<bool>,
     /// Material blending mode: `"none"`, `"normal"`, `"additive"`, `"subtractive"`, `"multiply"`, or `"custom"`.

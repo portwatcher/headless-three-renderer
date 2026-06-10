@@ -216,6 +216,7 @@ function appendMesh(
           topology: wireframe ? 'lines' : undefined,
           castShadow,
           receiveShadow,
+          clipShadows: clipShadowsForMaterial(material),
           ...clipping,
           ...sortInfo,
           ...pbrProps,
@@ -272,6 +273,7 @@ function appendMesh(
           topology: wireframe ? 'lines' : undefined,
           castShadow,
           receiveShadow,
+          clipShadows: clipShadowsForMaterial(material),
           ...clipping,
           ...sortInfo,
           ...pbrProps,
@@ -361,6 +363,7 @@ function appendSprite(
     transparent: material?.transparent !== false,
     castShadow: undefined,
     receiveShadow: undefined,
+    clipShadows: clipShadowsForMaterial(material),
     ...clipping,
     ...sortInfo,
     ...extractPbrProperties(material),
@@ -485,6 +488,7 @@ function appendPoints(
       transform: IDENTITY_4X4.slice(),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       topology: 'triangles',
+      clipShadows: clipShadowsForMaterial(material),
       ...clipping,
       ...sortInfo,
       ...pbrProps,
@@ -669,6 +673,7 @@ function appendLineOrPoints(
     transform: matrixElements(object.matrixWorld!, 'object.matrixWorld'),
     transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
     alphaTest: material && Number.isFinite(material.alphaTest) && material.alphaTest! > 0 ? material.alphaTest : undefined,
+    clipShadows: clipShadowsForMaterial(material),
     ...pbrProps,
     shadingModel: 'basic',
     topology,
@@ -703,6 +708,10 @@ function clippingState(
     clippingPlanes: flattenClippingPlanes(planes),
     clippingUnionCount: globalPlanes.length + (material?.clipIntersection === true ? 0 : localPlanes.length),
   }
+}
+
+function clipShadowsForMaterial(material: ThreeMaterialLike | undefined): boolean | undefined {
+  return material?.clipShadows === true ? true : undefined
 }
 
 function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh): void {
