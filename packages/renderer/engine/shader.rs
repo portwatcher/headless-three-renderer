@@ -1279,6 +1279,10 @@ var<uniform> uniforms: Uniforms;
 var t_diffuse: texture_2d<f32>;
 @group(1) @binding(1)
 var s_diffuse: sampler;
+@group(6) @binding(6)
+var t_alpha: texture_2d<f32>;
+@group(6) @binding(9)
+var s_alpha: sampler;
 
 struct VertexInput {
   @location(0) position: vec3<f32>,
@@ -1371,6 +1375,11 @@ fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
   return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
 }
 
+fn transform_alpha_map_uv(uv: vec2<f32>) -> vec2<f32> {
+  let uv1 = vec3<f32>(uv, 1.0);
+  return vec2<f32>(dot(uniforms.alpha_map_transform1.xyz, uv1), dot(uniforms.alpha_map_transform2.xyz, uv1));
+}
+
 @fragment
 fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
   if is_clipped_by_planes(input.world_pos) {
@@ -1384,7 +1393,11 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let transformed_uv = vec2<f32>(dot(uniforms.texture_transform1.xyz, uv1), dot(uniforms.texture_transform2.xyz, uv1));
   let texture_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, transformed_uv));
   let base_color = texture_color * input.color * uniforms.base_color;
-  let alpha = base_color.a;
+  var alpha = base_color.a;
+  if uniforms.ao_params.z > 0.5 {
+    let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
+    alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
+  }
   let alpha_cutoff = uniforms.emissive.w;
   if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
     discard;

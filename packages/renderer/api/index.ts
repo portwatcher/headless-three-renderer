@@ -199,11 +199,6 @@ function applyRenderMode(meshes: NativeSceneMesh[], mode: RenderMode): NativeSce
 }
 
 function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'>, index: number): NativeSceneMesh {
-  if (mesh.alphaMap) {
-    throw new Error(
-      `options.renderMode "${mode}" does not support material.alphaMap cutouts yet. Use base texture alpha with alphaTest/alphaHash, or render the normal color pass until alphaMap support lands for mask and object-id passes.`,
-    )
-  }
   const color = mode === 'mask'
     ? [1, 1, 1, materialAlpha(mesh)] as Color4
     : objectIdColor(mesh, index)
@@ -226,6 +221,15 @@ function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'
     textureTransform: mesh.textureTransform,
     textureColorSpace: mesh.textureColorSpace,
     textureUsesUv2: mesh.textureUsesUv2,
+    alphaMap: mesh.alphaMap,
+    alphaMapWidth: mesh.alphaMapWidth,
+    alphaMapHeight: mesh.alphaMapHeight,
+    alphaMapWrapS: mesh.alphaMapWrapS,
+    alphaMapWrapT: mesh.alphaMapWrapT,
+    alphaMapMagFilter: mesh.alphaMapMagFilter,
+    alphaMapMinFilter: mesh.alphaMapMinFilter,
+    alphaMapTransform: mesh.alphaMapTransform,
+    alphaMapUsesUv2: mesh.alphaMapUsesUv2,
     alphaTest: mesh.alphaTest,
     alphaHash: mesh.alphaHash,
     premultipliedAlpha: mesh.premultipliedAlpha,

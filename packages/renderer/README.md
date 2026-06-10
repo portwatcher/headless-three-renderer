@@ -255,7 +255,7 @@ Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatibl
 
 Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert.
 
-`options.renderMode` can request flat auxiliary passes. `'mask'` clears to black and writes white for visible geometry. `'object-id'` clears to RGB zero and encodes each object's adapter sort ID plus one into RGB bytes, making `format: 'rgba'` the preferred inspection path. These modes bypass scene backgrounds, lighting, environment, fog, and post-processing while preserving depth testing, culling, clipping planes, base texture alpha, `alphaTest`, and `alphaHash`. `material.alphaMap` cutouts fail clearly in these modes until alpha-map bindings are added to the custom pass.
+`options.renderMode` can request flat auxiliary passes. `'mask'` clears to black and writes white for visible geometry. `'object-id'` clears to RGB zero and encodes each object's adapter sort ID plus one into RGB bytes, making `format: 'rgba'` the preferred inspection path. These modes bypass scene backgrounds, lighting, environment, fog, and post-processing while preserving depth testing, culling, clipping planes, base texture alpha, `material.alphaMap`, `alphaTest`, and `alphaHash`.
 
 ### Custom WGSL Fragment Materials
 

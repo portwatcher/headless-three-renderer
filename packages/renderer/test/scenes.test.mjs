@@ -260,24 +260,29 @@ test('renderMode object-id outputs stable per-object RGB IDs', () => {
   assert.ok(background.r < 2 && background.g < 2 && background.b < 2, `object-id background should be black (${background.r}, ${background.g}, ${background.b})`)
 })
 
-test('renderMode alphaMap cutouts fail clearly', () => {
+test('renderMode mask preserves alphaMap cutouts', () => {
   const scene = new THREE.Scene()
-  scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({
-      alphaMap: solidTexture(255, 0, 255),
-      alphaTest: 0.5,
-    }),
-  ))
+  const discarded = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.75, 0.8),
+    new THREE.MeshBasicMaterial({ alphaMap: solidTexture(255, 0, 255), alphaTest: 0.5 }),
+  )
+  const visible = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.75, 0.8),
+    new THREE.MeshBasicMaterial({ alphaMap: solidTexture(0, 255, 0), alphaTest: 0.5 }),
+  )
+  discarded.position.x = -0.5
+  visible.position.x = 0.5
+  scene.add(discarded, visible)
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  assert.throws(
-    () => renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'mask' }),
-    /renderMode "mask".*alphaMap/i,
-  )
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'mask' })
+  const leftMean = meanRegion(rgba, 64, 64, 16, 28, 23, 36)
+  const rightMean = meanRegion(rgba, 64, 64, 41, 28, 48, 36)
+  assert.ok(leftMean.r < 2 && leftMean.g < 2 && leftMean.b < 2, `alphaMap green=0 should discard mask pixels (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+  assert.ok(rightMean.r > 250 && rightMean.g > 250 && rightMean.b > 250, `alphaMap green=255 should keep mask pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
 test('different materials produce visibly different outputs', async () => {
