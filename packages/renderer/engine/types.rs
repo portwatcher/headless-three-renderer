@@ -36,6 +36,8 @@ pub struct RenderScene {
     pub background_texture_color_space: Option<String>,
     /// Background texture mapping: `"uv"` (default) or `"equirectangular"`.
     pub background_texture_mapping: Option<String>,
+    /// Background texture direction rotation matrix columns, flattened 3x3.
+    pub background_texture_rotation: Option<Vec<f64>>,
     /// Approximate 2D background texture blur amount in the 0..1 range.
     pub background_texture_blurriness: Option<f64>,
     /// Output format. Supported values are `"png"` (default) and `"rgba"`.

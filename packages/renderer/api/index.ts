@@ -11,6 +11,7 @@ import type {
   RenderMode,
   Color4,
   RenderObjectIdEntry,
+  ThreeEulerLike,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -143,6 +144,9 @@ function toNativeInput(
   const backgroundTexture = colorMode
     ? optionBackgroundTexture ?? (hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background'))
     : null
+  const backgroundTextureRotation = colorMode
+    ? backgroundRotationToNative(scene.backgroundRotation, backgroundTexture)
+    : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
   const flattenedMeshes = flattenScene(
     scene,
@@ -170,6 +174,7 @@ function toNativeInput(
     backgroundTextureTransform: backgroundTexture?.transform,
     backgroundTextureColorSpace: backgroundTexture?.colorSpace,
     backgroundTextureMapping: backgroundTexture?.mapping,
+    backgroundTextureRotation,
     backgroundTextureBlurriness: colorMode ? finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness) : undefined,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
@@ -391,11 +396,6 @@ function validateUnsupportedSceneState(
   camera: ThreeCameraLike,
   colorMode: boolean,
 ): void {
-  if (hasNonZeroRotation(scene.backgroundRotation)) {
-    throw new Error(
-      'scene.backgroundRotation is not supported by @headless-three/renderer yet. Leave backgroundRotation at its default zero rotation or pre-rotate the background texture before rendering.',
-    )
-  }
   if (hasNonZeroRotation(scene.environmentRotation)) {
     throw new Error(
       'scene.environmentRotation is not supported by @headless-three/renderer yet. Leave environmentRotation at its default zero rotation or pre-rotate the environment texture before rendering.',
@@ -464,6 +464,163 @@ function visitVisibleObjects(
   for (const child of children) {
     visitVisibleObjects(child, camera, callback)
   }
+}
+
+type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY'
+
+function backgroundRotationToNative(
+  rotation: ThreeSceneRootLike['backgroundRotation'],
+  backgroundTexture: { mapping?: string } | null,
+): number[] | undefined {
+  if (!hasNonZeroRotation(rotation)) return undefined
+  if (backgroundTexture?.mapping !== 'equirectangular') {
+    throw new Error(
+      'scene.backgroundRotation is only supported for equirectangular texture backgrounds by @headless-three/renderer. Leave backgroundRotation at its default for color/2D backgrounds or pre-rotate the background texture before rendering.',
+    )
+  }
+  const { x, y, z, order } = eulerComponents(rotation, 'scene.backgroundRotation')
+  // Three.js negates background Euler angles before producing the rotation matrix
+  // to account for the background shader's left-handed frame.
+  return eulerRotationMatrix3Columns(-x, -y, -z, order)
+}
+
+function eulerComponents(value: ThreeEulerLike | ArrayLike<number> | null | undefined, label: string): { x: number; y: number; z: number; order: EulerOrder } {
+  const rotation = value as (ThreeEulerLike & { length?: number }) | null | undefined
+  if (!rotation) return { x: 0, y: 0, z: 0, order: 'XYZ' }
+  if (typeof rotation.length === 'number') {
+    const values = value as ArrayLike<number | string | undefined>
+    return {
+      x: finiteRotationComponent(values[0], `${label}[0]`),
+      y: finiteRotationComponent(values[1], `${label}[1]`),
+      z: finiteRotationComponent(values[2], `${label}[2]`),
+      order: eulerOrder(values[3], `${label}[3]`),
+    }
+  }
+  return {
+    x: finiteRotationComponent(rotation.x, `${label}.x`),
+    y: finiteRotationComponent(rotation.y, `${label}.y`),
+    z: finiteRotationComponent(rotation.z, `${label}.z`),
+    order: eulerOrder(rotation.order, `${label}.order`),
+  }
+}
+
+function finiteRotationComponent(value: unknown, label: string): number {
+  if (value == null) return 0
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number`)
+}
+
+function eulerOrder(value: unknown, label: string): EulerOrder {
+  if (value == null) return 'XYZ'
+  if (
+    value === 'XYZ' ||
+    value === 'YXZ' ||
+    value === 'ZXY' ||
+    value === 'ZYX' ||
+    value === 'YZX' ||
+    value === 'XZY'
+  ) {
+    return value
+  }
+  throw new TypeError(`${label} must be one of XYZ, YXZ, ZXY, ZYX, YZX, or XZY`)
+}
+
+function eulerRotationMatrix3Columns(x: number, y: number, z: number, order: EulerOrder): number[] {
+  const a = Math.cos(x)
+  const b = Math.sin(x)
+  const c = Math.cos(y)
+  const d = Math.sin(y)
+  const e = Math.cos(z)
+  const f = Math.sin(z)
+  const te = new Array<number>(9).fill(0)
+
+  if (order === 'XYZ') {
+    const ae = a * e
+    const af = a * f
+    const be = b * e
+    const bf = b * f
+    te[0] = c * e
+    te[3] = -c * f
+    te[6] = d
+    te[1] = af + be * d
+    te[4] = ae - bf * d
+    te[7] = -b * c
+    te[2] = bf - ae * d
+    te[5] = be + af * d
+    te[8] = a * c
+  } else if (order === 'YXZ') {
+    const ce = c * e
+    const cf = c * f
+    const de = d * e
+    const df = d * f
+    te[0] = ce + df * b
+    te[3] = de * b - cf
+    te[6] = a * d
+    te[1] = a * f
+    te[4] = a * e
+    te[7] = -b
+    te[2] = cf * b - de
+    te[5] = df + ce * b
+    te[8] = a * c
+  } else if (order === 'ZXY') {
+    const ce = c * e
+    const cf = c * f
+    const de = d * e
+    const df = d * f
+    te[0] = ce - df * b
+    te[3] = -a * f
+    te[6] = de + cf * b
+    te[1] = cf + de * b
+    te[4] = a * e
+    te[7] = df - ce * b
+    te[2] = -a * d
+    te[5] = b
+    te[8] = a * c
+  } else if (order === 'ZYX') {
+    const ae = a * e
+    const af = a * f
+    const be = b * e
+    const bf = b * f
+    te[0] = c * e
+    te[3] = be * d - af
+    te[6] = ae * d + bf
+    te[1] = c * f
+    te[4] = bf * d + ae
+    te[7] = af * d - be
+    te[2] = -d
+    te[5] = b * c
+    te[8] = a * c
+  } else if (order === 'YZX') {
+    const ac = a * c
+    const ad = a * d
+    const bc = b * c
+    const bd = b * d
+    te[0] = c * e
+    te[3] = bd - ac * f
+    te[6] = bc * f + ad
+    te[1] = f
+    te[4] = a * e
+    te[7] = -b * e
+    te[2] = -d * e
+    te[5] = ad * f + bc
+    te[8] = ac - bd * f
+  } else {
+    const ac = a * c
+    const ad = a * d
+    const bc = b * c
+    const bd = b * d
+    te[0] = c * e
+    te[3] = -f
+    te[6] = d * e
+    te[1] = ac * f + bd
+    te[4] = a * e
+    te[7] = ad * f - bc
+    te[2] = bc * f - ad
+    te[5] = b * e
+    te[8] = bd * f + ac
+  }
+
+  return te
 }
 
 function hasNonZeroRotation(value: unknown): boolean {

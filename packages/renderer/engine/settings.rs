@@ -89,6 +89,7 @@ pub struct BackgroundTexture {
     pub transform: [f32; 6],
     pub is_srgb: bool,
     pub mapping: BackgroundTextureMapping,
+    pub rotation: [[f32; 4]; 3],
     pub intensity: f32,
     pub blurriness: f32,
 }
@@ -179,6 +180,9 @@ impl RenderSettings {
                     ),
                     mapping: BackgroundTextureMapping::from_scene(
                         scene.background_texture_mapping.as_deref(),
+                    )?,
+                    rotation: parse_background_texture_rotation(
+                        scene.background_texture_rotation.as_deref(),
                     )?,
                     intensity: background_intensity,
                     blurriness: finite_f32(
@@ -510,6 +514,39 @@ fn parse_texture_transform(values: Option<&[f64]>, label: &str) -> Result<[f32; 
         finite_f32(values[3], label)?,
         finite_f32(values[4], label)?,
         finite_f32(values[5], label)?,
+    ])
+}
+
+fn parse_background_texture_rotation(values: Option<&[f64]>) -> Result<[[f32; 4]; 3]> {
+    let Some(values) = values else {
+        return Ok([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ]);
+    };
+    if values.len() != 9 {
+        bail!("scene.backgroundTextureRotation must be an array of 9 numbers");
+    }
+    Ok([
+        [
+            finite_f32(values[0], "scene.backgroundTextureRotation")?,
+            finite_f32(values[1], "scene.backgroundTextureRotation")?,
+            finite_f32(values[2], "scene.backgroundTextureRotation")?,
+            0.0,
+        ],
+        [
+            finite_f32(values[3], "scene.backgroundTextureRotation")?,
+            finite_f32(values[4], "scene.backgroundTextureRotation")?,
+            finite_f32(values[5], "scene.backgroundTextureRotation")?,
+            0.0,
+        ],
+        [
+            finite_f32(values[6], "scene.backgroundTextureRotation")?,
+            finite_f32(values[7], "scene.backgroundTextureRotation")?,
+            finite_f32(values[8], "scene.backgroundTextureRotation")?,
+            0.0,
+        ],
     ])
 }
 

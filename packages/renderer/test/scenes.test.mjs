@@ -4730,26 +4730,30 @@ test('backgroundBlurriness softens 2D texture backgrounds', () => {
   assert.ok(sharp.r > blurred.r + 20, `blurred background should soften the red texel (${sharp.r} vs ${blurred.r})`)
 })
 
-test('scene background and environment rotations fail clearly', () => {
+test('unsupported scene background and environment rotations fail clearly', () => {
   const cases = [
-    ['backgroundRotation', (scene) => {
+    ['color backgroundRotation', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
+    }, /scene\.backgroundRotation.*equirectangular texture backgrounds/i],
+    ['2D backgroundRotation', (scene) => {
       scene.background = solidTexture(0, 255, 0)
       scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
-    }],
+    }, /scene\.backgroundRotation.*equirectangular texture backgrounds/i],
     ['environmentRotation', (scene) => {
       scene.environment = solidTexture(255, 255, 255)
       scene.environmentRotation = new THREE.Euler(0, Math.PI / 4, 0)
-    }],
+    }, /scene\.environmentRotation.*not supported/i],
   ]
 
-  for (const [name, setup] of cases) {
+  for (const [name, setup, pattern] of cases) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     setup(scene)
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      new RegExp(`scene\\.${name}.*not supported`, 'i'),
+      pattern,
       name,
     )
   }
@@ -4843,6 +4847,41 @@ test('equirect background textures sample from camera direction', () => {
   const positiveZ = renderFacing(new THREE.Vector3(0, 0, 1))
   assert.ok(negativeZ.r > negativeZ.g + 80, `-Z view should sample the red equirect half (${negativeZ.r} vs ${negativeZ.g})`)
   assert.ok(positiveZ.g > positiveZ.r + 80, `+Z view should sample the green equirect half (${positiveZ.g} vs ${positiveZ.r})`)
+})
+
+test('equirect background textures honor scene backgroundRotation', () => {
+  const background = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 8, 1)
+  background.mapping = THREE.EquirectangularReflectionMapping
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+
+  function renderWithRotation(yRotation) {
+    const scene = new THREE.Scene()
+    scene.background = background
+    scene.backgroundRotation = new THREE.Euler(0, yRotation, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 0)
+    camera.lookAt(new THREE.Vector3(0, 0, -1))
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 28, 28, 36, 36)
+  }
+
+  const unrotated = renderWithRotation(0)
+  const rotated = renderWithRotation(Math.PI)
+  assert.ok(unrotated.r > unrotated.g + 80, `unrotated -Z view should sample red (${unrotated.r} vs ${unrotated.g})`)
+  assert.ok(rotated.g > rotated.r + 80, `rotated -Z view should sample green (${rotated.g} vs ${rotated.r})`)
 })
 
 test('cube background texture mappings fail clearly', () => {

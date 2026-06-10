@@ -1483,6 +1483,9 @@ struct BackgroundUniforms {
   inverse_view_projection: mat4x4<f32>,
   // xyz = camera world position.
   camera_params: vec4<f32>,
+  rotation1: vec4<f32>,
+  rotation2: vec4<f32>,
+  rotation3: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -1565,12 +1568,20 @@ fn equirect_background_uv(screen_uv: vec2<f32>) -> vec2<f32> {
   let ndc = vec2<f32>(screen_uv.x * 2.0 - 1.0, 1.0 - screen_uv.y * 2.0);
   let world = uniforms.inverse_view_projection * vec4<f32>(ndc, 1.0, 1.0);
   let world_pos = world.xyz / world.w;
-  let dir = normalize(world_pos - uniforms.camera_params.xyz);
+  let dir = rotate_background_direction(normalize(world_pos - uniforms.camera_params.xyz));
   let equirect_uv = vec2<f32>(
     atan2(dir.z, dir.x) * 0.15915494309189535 + 0.5,
     asin(clamp(dir.y, -1.0, 1.0)) * 0.3183098861837907 + 0.5,
   );
   return transform_background_uv(equirect_uv);
+}
+
+fn rotate_background_direction(dir: vec3<f32>) -> vec3<f32> {
+  return normalize(
+    uniforms.rotation1.xyz * dir.x +
+    uniforms.rotation2.xyz * dir.y +
+    uniforms.rotation3.xyz * dir.z
+  );
 }
 
 fn background_sample_uv(uv: vec2<f32>) -> vec2<f32> {

@@ -106,6 +106,9 @@ pub struct BackgroundUniforms {
     pub transform2: [f32; 4],
     pub inverse_view_projection: [[f32; 4]; 4],
     pub camera_params: [f32; 4],
+    pub rotation1: [f32; 4],
+    pub rotation2: [f32; 4],
+    pub rotation3: [f32; 4],
 }
 
 pub struct GpuRenderer {
@@ -1899,6 +1902,9 @@ impl GpuRenderer {
                 settings.camera_pos.z,
                 0.0,
             ],
+            rotation1: background.rotation[0],
+            rotation2: background.rotation[1],
+            rotation3: background.rotation[2],
         };
         let uniform_buffer = self
             .device

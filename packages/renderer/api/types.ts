@@ -109,6 +109,7 @@ export interface ThreeEulerLike {
   x?: number
   y?: number
   z?: number
+  order?: string
   isEuler?: boolean
 }
 
@@ -828,6 +829,7 @@ export interface NativeRenderScene {
   backgroundTextureTransform?: number[]
   backgroundTextureColorSpace?: string
   backgroundTextureMapping?: string
+  backgroundTextureRotation?: number[]
   backgroundTextureBlurriness?: number
   format?: string
   outputColorSpace?: string

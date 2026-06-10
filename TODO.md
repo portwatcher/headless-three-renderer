@@ -29,7 +29,7 @@ Already supported in the current implementation:
 - Clearcoat, sheen, anisotropy, specular intensity/color, transmission/thickness, IOR, attenuation, and related physical material maps.
 - Ambient, directional, point, spot, hemisphere, RectAreaLight approximation, and LightProbe diffuse lighting, up to 16 direct lights.
 - Environment IBL from equirectangular `scene.environment`/reflection probes.
-- Scene background colors plus 2D and equirectangular texture backgrounds, including `backgroundIntensity` and approximate 2D texture `backgroundBlurriness`; non-default background/environment rotations fail clearly.
+- Scene background colors plus 2D and equirectangular texture backgrounds, including `backgroundIntensity`, approximate 2D texture `backgroundBlurriness`, and equirectangular `backgroundRotation`; environment rotations and non-equirectangular background rotations fail clearly.
 - Render-option viewport and scissor rectangles in output pixel coordinates.
 - Flat auxiliary `options.renderMode` passes for white masks and RGB object IDs.
 - Directional, spot, point, and directional cascaded shadow maps for a single shadow-casting light; additional shadow-casting lights fail clearly.
@@ -90,7 +90,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Shadow behavior parity | High | Common `shadow.camera`, square map size, bias, normal bias, cast/receive rules, and alpha-tested casters are supported; non-square shadow map sizes, non-default shadow blur/radius settings, and custom shadow material overrides fail clearly. Remaining work is rectangular map sizes, configurable radius/blur behavior, custom shadow material translation, transparency parity, and deeper golden-tested behavior. |
 | `RectAreaLight` | Medium | One-sided finite-area approximation is supported for direct lighting. Remaining work is exact Three.js LTC/LUT parity and golden tests. |
 | `LightProbe` support | Medium | Three.js `LightProbe` spherical harmonics contribute diffuse indirect lighting; remaining work is exact golden-tested parity with all material/environment combinations. |
-| Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate texture `backgroundBlurriness` are supported for current background texture mappings; non-default background/environment rotations fail clearly. Remaining work is native rotation, exact cube/equirect blur, and exact background/environment mapping controls. |
+| Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, approximate texture `backgroundBlurriness`, and equirectangular `scene.backgroundRotation` are supported for current background texture mappings; non-equirectangular background rotations and `scene.environmentRotation` fail clearly. Remaining work is environment rotation, exact cube/equirect blur, and exact background/environment mapping controls. |
 | PMREM compatibility | Medium | Cube, refraction, and PMREM/CubeUV environment inputs fail clearly. Remaining work is deciding whether to accept Three.js PMREM outputs, prefiltered cubemaps, or keep CPU precompute from source environment maps. |
 
 ## P2 - Cameras, Targets, And Render Pipeline Features
