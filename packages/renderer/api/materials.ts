@@ -172,6 +172,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
   assertSupportedShaderMaterial(material, customFragmentShader)
   assertSupportedOnBeforeCompile(material, customFragmentShader)
   assertSupportedMaterialState(material)
+  assertCompatiblePackedPhysicalMapSamplers(material)
   const props: PbrProperties = {}
 
   if (Number.isFinite(material.metalness)) {
@@ -985,6 +986,50 @@ function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void
       `${label} provides explicit texture mipmaps, which are not uploaded by @headless-three/renderer yet. Provide only the base image level or prefilter/downsample the texture before rendering.`,
     )
   }
+}
+
+function assertCompatiblePackedPhysicalMapSamplers(material: ThreeMaterialLike): void {
+  assertMatchingSamplerSettings('physical extension scalar maps', [
+    ['clearcoatMap', material.clearcoatMap],
+    ['clearcoatRoughnessMap', material.clearcoatRoughnessMap],
+    ['transmissionMap', material.transmissionMap],
+    ['thicknessMap', material.thicknessMap],
+    ['anisotropyMap', material.anisotropyMap],
+  ])
+  assertMatchingSamplerSettings('physical extension sheen maps', [
+    ['sheenColorMap', material.sheenColorMap],
+    ['sheenRoughnessMap', material.sheenRoughnessMap],
+  ])
+  assertMatchingSamplerSettings('physical extension specular maps', [
+    ['specularColorMap', material.specularColorMap],
+    ['specularIntensityMap', material.specularIntensityMap],
+  ])
+}
+
+function assertMatchingSamplerSettings(groupLabel: string, slots: Array<[string, ThreeTextureLike | null | undefined]>): void {
+  let first: { label: string; signature: string } | null = null
+  for (const [label, texture] of slots) {
+    if (!texture) continue
+    const signature = samplerSignature(texture)
+    if (!first) {
+      first = { label, signature }
+      continue
+    }
+    if (signature !== first.signature) {
+      throw new Error(
+        `${groupLabel} are packed into one native texture and must use matching wrap/filter sampler settings. ${label} differs from ${first.label}; use matching wrapS/wrapT/magFilter/minFilter values or render separate passes until independent packed-channel samplers are supported.`,
+      )
+    }
+  }
+}
+
+function samplerSignature(texture: ThreeTextureLike): string {
+  return [
+    wrapModeToString(texture.wrapS) ?? 'clamp',
+    wrapModeToString(texture.wrapT) ?? 'clamp',
+    filterModeToString(texture.magFilter) ?? 'linear',
+    filterModeToString(texture.minFilter) ?? 'linear',
+  ].join('|')
 }
 
 function textureTransform(map: ThreeTextureLike | null | undefined): number[] | undefined {

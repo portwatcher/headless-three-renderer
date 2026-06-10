@@ -2990,6 +2990,36 @@ test('physical extension maps honor nearest texture filters', () => {
   assert.ok(normalDiff > 2, `LinearFilter should blend clearcoat normals differently than NearestFilter, diff=${normalDiff.toFixed(2)}`)
 })
 
+test('conflicting packed physical texture samplers fail clearly', () => {
+  const clearcoatMap = solidTexture(255, 0, 0)
+  clearcoatMap.magFilter = THREE.NearestFilter
+  clearcoatMap.minFilter = THREE.NearestFilter
+  const clearcoatRoughnessMap = solidTexture(0, 255, 0)
+  clearcoatRoughnessMap.magFilter = THREE.LinearFilter
+  clearcoatRoughnessMap.minFilter = THREE.LinearFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshPhysicalMaterial({
+      clearcoat: 1,
+      clearcoatMap,
+      clearcoatRoughness: 0.5,
+      clearcoatRoughnessMap,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /physical extension scalar maps.*packed.*sampler settings.*clearcoatRoughnessMap.*clearcoatMap/i,
+  )
+})
+
 test('specularColorMap samples the selected secondary UV channel', () => {
   function renderWithChannel(channel) {
     const specularColorMap = rgbaTexture([
