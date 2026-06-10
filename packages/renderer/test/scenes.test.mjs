@@ -5252,6 +5252,39 @@ test('lines topology renders successfully', () => {
   assertValidPng(buf, { width: SIZE, height: SIZE })
 })
 
+test('LineBasicMaterial opacity blends over the background', () => {
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Line(
+    geom,
+    new THREE.LineBasicMaterial({
+      color: 0xff0000,
+      opacity: 0.5,
+      transparent: true,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const blendedPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    8,
+    44,
+    88,
+    52,
+    (r, g, b) => r > 50 && b > 80 && g < 40,
+  )
+  assert.ok(blendedPixels > 2, `semi-transparent line should blend red over blue (${blendedPixels})`)
+})
+
 test('LineBasicMaterial map alpha samples line UVs', () => {
   const map = rgbaTexture([
     255, 255, 255, 0,
@@ -5816,6 +5849,30 @@ test('PointsMaterial size controls billboard pixel bounds', () => {
   assert.ok(small.width >= 8 && small.height >= 8, `small point should render as a visible billboard (${small.width}x${small.height})`)
   assert.ok(large.width > small.width * 2, `larger point should produce wider bounds (${large.width} vs ${small.width})`)
   assert.ok(large.height > small.height * 2, `larger point should produce taller bounds (${large.height} vs ${small.height})`)
+})
+
+test('PointsMaterial opacity blends billboard color over the background', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xff0000,
+    opacity: 0.5,
+    transparent: true,
+    size: 34,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > 50, `semi-transparent point should contribute red over blue (${mean.r})`)
+  assert.ok(mean.b > 80, `semi-transparent point should preserve blue background contribution (${mean.b})`)
+  assert.ok(mean.g < 40, `semi-transparent point should not add green (${mean.g})`)
 })
 
 test('PointsMaterial maps, alpha maps, and vertex colors affect billboards', () => {
