@@ -5521,6 +5521,31 @@ test('cube DataTexture backgrounds sample from camera direction', () => {
   assert.ok(rotatedNegativeZ.g > rotatedNegativeZ.r + 80, `rotated -Z cube background should render +Z green (${rotatedNegativeZ.g} vs ${rotatedNegativeZ.r})`)
 })
 
+test('cube background textures decode sRGB colorSpace before output conversion', () => {
+  function renderColorSpace(colorSpace) {
+    const scene = new THREE.Scene()
+    scene.background = cubeTexture([
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+      [128, 128, 128],
+    ])
+    scene.background.colorSpace = colorSpace
+
+    return meanRgba(renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 20, `linear cube background should render brighter than decoded sRGB cube texture (${linear.r} vs ${srgb.r})`)
+})
+
 test('render options accept cube DataTexture backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
