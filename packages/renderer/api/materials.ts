@@ -67,7 +67,7 @@ export function extractEnvironmentMap(scene: ThreeSceneLike): EnvironmentMapInfo
   const probe = extractReflectionProbe(scene)
   const envTex = scene.environment ?? probe?.texture
   if (!envTex) return null
-  assertUncompressedTexture(envTex, 'scene.environment')
+  assertSupportedTextureInput(envTex, 'scene.environment')
 
   const image = (envTex as any).image ?? (envTex as any).source?.data
   if (!image) return null
@@ -900,7 +900,7 @@ function filterModeToString(mode: number | undefined): string | undefined {
 
 function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | null {
   if (!map) return null
-  assertUncompressedTexture(map, 'texture')
+  assertSupportedTextureInput(map, 'texture')
 
   const image = (map as any).image ?? (map as any).source?.data
   if (!image) return null
@@ -934,7 +934,7 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | nu
 }
 
 function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string): void {
-  assertUncompressedTexture(map, label)
+  assertSupportedTextureInput(map, label)
   if (
     map.isCubeTexture === true ||
     map.mapping === CubeReflectionMapping ||
@@ -949,7 +949,7 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
   }
 }
 
-function assertUncompressedTexture(map: ThreeTextureLike, label: string): void {
+function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void {
   if (
     map.isCompressedTexture === true ||
     map.isCompressedArrayTexture === true ||
@@ -957,6 +957,11 @@ function assertUncompressedTexture(map: ThreeTextureLike, label: string): void {
   ) {
     throw new Error(
       `${label} uses a compressed texture. KTX2, Basis, and THREE.CompressedTexture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
+    )
+  }
+  if (Number.isFinite(map.anisotropy) && map.anisotropy! > 1) {
+    throw new Error(
+      `${label} uses texture anisotropy greater than 1, which is not supported by @headless-three/renderer yet. Disable anisotropic filtering or prefilter/downsample the texture before rendering.`,
     )
   }
 }

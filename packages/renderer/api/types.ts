@@ -72,6 +72,7 @@ export interface ThreeTextureLike {
   wrapT?: number
   magFilter?: number
   minFilter?: number
+  anisotropy?: number
   mapping?: number
   channel?: number
   offset?: { x?: number; y?: number }

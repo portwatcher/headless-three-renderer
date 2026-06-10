@@ -2177,6 +2177,24 @@ test('compressed texture inputs fail with a clear pre-decode error', () => {
   )
 })
 
+test('texture anisotropy inputs fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.anisotropy = 4
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /texture anisotropy.*not supported/i,
+  )
+})
+
 test('base color maps decode sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
