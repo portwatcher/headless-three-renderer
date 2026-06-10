@@ -129,6 +129,7 @@ The public API accepts only Three.js-like objects:
 - unsupported `alphaToCoverage` and `clipShadows` material states fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - dashed line material segments preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases
+- line material `linewidth` values other than 1 fail clearly until thick-line support lands
 
 Texture image data can be:
 

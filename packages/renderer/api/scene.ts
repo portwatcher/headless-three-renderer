@@ -524,6 +524,9 @@ function appendLineOrPoints(
 
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
+  if (topology === 'lines') {
+    assertSupportedLineMaterial(material)
+  }
 
   const positions = readVec3Attribute(position)
   const uvAttribute = getAttribute(geometry, 'uv')
@@ -605,6 +608,13 @@ function appendLineOrPoints(
     ...clipping,
     ...sortInfo,
   })
+}
+
+function assertSupportedLineMaterial(material: ThreeMaterialLike | undefined): void {
+  if (!material || !Number.isFinite(material.linewidth) || material.linewidth === 1) return
+  throw new Error(
+    'Line material linewidth values other than 1 are not supported by @headless-three/renderer yet. Use the default 1-pixel line width or expand thick lines to mesh geometry before rendering.',
+  )
 }
 
 function clippingState(

@@ -3689,6 +3689,32 @@ test('LineDashedMaterial renders fewer visible line pixels than a solid line', (
   assert.ok(dashedRatio < solidRatio * 0.85, `dashed line should cover less than solid (${dashedRatio} vs ${solidRatio})`)
 })
 
+test('line materials with non-default linewidth fail clearly', () => {
+  const cases = [
+    new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 }),
+    new THREE.LineDashedMaterial({ color: 0xffffff, linewidth: 2, dashSize: 0.2, gapSize: 0.1 }),
+  ]
+
+  for (const material of cases) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1, 0, 0),
+      new THREE.Vector3(1, 0, 0),
+    ])
+    const line = new THREE.Line(geom, material)
+    line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /linewidth.*not supported/i,
+      material.type,
+    )
+  }
+})
+
 test('LineDashedMaterial map alpha samples reconstructed dash UVs', () => {
   const map = rgbaTexture([
     255, 255, 255, 0,

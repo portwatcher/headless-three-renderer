@@ -226,6 +226,7 @@ export interface ThreeMaterialLike {
   dashSize?: number
   gapSize?: number
   scale?: number
+  linewidth?: number
   rotation?: number
   customFragmentShader?: string
   customFragmentWgsl?: string
