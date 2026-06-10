@@ -3878,6 +3878,12 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(target.height, 32)
   assert.equal(target.data.length, 64 * 32 * 4)
   assert.equal(target.texture.image.data, target.data)
+
+  const singleTextureArrayTarget = { texture: [{}] }
+  renderToTarget(scene, makeCamera(), singleTextureArrayTarget, { width: 32, height: 16 })
+  assert.equal(singleTextureArrayTarget.width, 32)
+  assert.equal(singleTextureArrayTarget.height, 16)
+  assert.equal(singleTextureArrayTarget.texture[0].image.data, singleTextureArrayTarget.data)
 })
 
 test('unsupported render target depth, MRT, and MSAA requests fail clearly', () => {

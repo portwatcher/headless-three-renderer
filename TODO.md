@@ -99,7 +99,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 |---|---:|---|
 | Array/cube camera support | Medium | `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly. Remaining work is native support for environment capture and stereo-ish workflows. |
 | Render target depth output | Medium | Target `depthTexture` requests fail clearly. Remaining work is exposing depth texture/readback for downstream tools. |
-| Multiple render targets | Medium | Multiple color attachment targets fail clearly. Remaining work is native MRT support for masks, normals, IDs, and deferred-style workflows. |
+| Multiple render targets | Medium | Single-output target texture objects, one-element `target.texture` arrays, and `target.textures[0]` write back RGBA8 data; multiple color attachment targets fail clearly. Remaining work is native MRT support for masks, normals, IDs, and deferred-style workflows. |
 | MSAA controls | Medium | Render-option and target sample counts greater than 1 fail clearly. Remaining work is configurable sample count and resolve behavior. |
 | Viewport/scissor support | Medium | Render-option viewport/scissor rectangles are supported in output pixel coordinates; remaining work is exact WebGLRenderer state-machine parity and broader tiled-render ergonomics. |
 | Object ID/mask render modes | Low | Initial `options.renderMode: "mask"` and `"object-id"` passes are supported for flat segmentation output, including base texture and alpha-map cutouts plus target reverse lookup metadata. Remaining work is MRT integration. |

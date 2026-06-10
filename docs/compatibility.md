@@ -14,7 +14,7 @@ Status keys:
 |---|---|---|
 | `render(scene, camera, options)` | Supported | Accepts a `THREE.Scene` or `THREE.Object3D` root and returns PNG by default or raw RGBA when `options.format` is `'rgba'`. |
 | `Renderer` reusable instance | Supported | Reuses the native renderer object across calls. |
-| `renderToTarget()` / `options.target` | Supported | Populates target-like `{ width, height, data, texture.image.data }` fields with RGBA8 for a single color output. Unsupported target depth, MRT, and MSAA fields fail clearly. |
+| `renderToTarget()` / `options.target` | Supported | Populates target-like `{ width, height, data, texture.image.data }` fields with RGBA8 for a single color output, including one-element `target.texture` arrays and `target.textures[0]`. Unsupported target depth, MRT, and MSAA fields fail clearly. |
 | Post-processing options | Supported | Exposure, contrast, saturation, vignette, grayscale, and invert. |
 | WebGLRenderer-compatible state machine | Unsupported | Non-goal. The contract is scene input and image/target output. |
 

@@ -498,7 +498,12 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
       'Render target depthTexture output is not supported by @headless-three/renderer yet. Render depth with MeshDepthMaterial or omit target.depthTexture until depth readback support lands.',
     )
   }
-  if (target.isWebGLMultipleRenderTargets === true || Array.isArray(target.texture)) {
+  if (target.isWebGLMultipleRenderTargets === true) {
+    throw new Error(
+      'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
+    )
+  }
+  if (Array.isArray(target.texture) && target.texture.length > 1) {
     throw new Error(
       'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
     )
@@ -536,8 +541,10 @@ function writeRenderTarget(
   image.width = width
   image.height = height
 
-  const texture = target.texture ?? target.textures?.[0]
-  if (texture && !Array.isArray(texture)) {
+  const texture = Array.isArray(target.texture)
+    ? target.texture[0]
+    : target.texture ?? target.textures?.[0]
+  if (texture) {
     const textureImage = texture.image ?? (texture.image = {})
     textureImage.data = data
     textureImage.width = width
