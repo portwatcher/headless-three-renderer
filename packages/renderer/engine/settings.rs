@@ -181,8 +181,9 @@ impl RenderSettings {
                     mapping: BackgroundTextureMapping::from_scene(
                         scene.background_texture_mapping.as_deref(),
                     )?,
-                    rotation: parse_background_texture_rotation(
+                    rotation: parse_rotation_columns(
                         scene.background_texture_rotation.as_deref(),
+                        "scene.backgroundTextureRotation",
                     )?,
                     intensity: background_intensity,
                     blurriness: finite_f32(
@@ -251,12 +252,16 @@ impl RenderSettings {
 
         let ibl = match &scene.environment_map {
             Some(data) if !data.is_empty() => {
+                let rotation = parse_rotation_columns(
+                    scene.environment_map_rotation.as_deref(),
+                    "scene.environmentMapRotation",
+                )?;
                 let env_map = EnvMap::from_bytes(
                     data,
                     scene.environment_map_width,
                     scene.environment_map_height,
                 )?;
-                Some(compute_ibl(&env_map))
+                Some(compute_ibl(&env_map, rotation))
             }
             _ => None,
         };
@@ -517,7 +522,7 @@ fn parse_texture_transform(values: Option<&[f64]>, label: &str) -> Result<[f32; 
     ])
 }
 
-fn parse_background_texture_rotation(values: Option<&[f64]>) -> Result<[[f32; 4]; 3]> {
+fn parse_rotation_columns(values: Option<&[f64]>, label: &str) -> Result<[[f32; 4]; 3]> {
     let Some(values) = values else {
         return Ok([
             [1.0, 0.0, 0.0, 0.0],
@@ -526,25 +531,25 @@ fn parse_background_texture_rotation(values: Option<&[f64]>) -> Result<[[f32; 4]
         ]);
     };
     if values.len() != 9 {
-        bail!("scene.backgroundTextureRotation must be an array of 9 numbers");
+        bail!("{label} must be an array of 9 numbers");
     }
     Ok([
         [
-            finite_f32(values[0], "scene.backgroundTextureRotation")?,
-            finite_f32(values[1], "scene.backgroundTextureRotation")?,
-            finite_f32(values[2], "scene.backgroundTextureRotation")?,
+            finite_f32(values[0], label)?,
+            finite_f32(values[1], label)?,
+            finite_f32(values[2], label)?,
             0.0,
         ],
         [
-            finite_f32(values[3], "scene.backgroundTextureRotation")?,
-            finite_f32(values[4], "scene.backgroundTextureRotation")?,
-            finite_f32(values[5], "scene.backgroundTextureRotation")?,
+            finite_f32(values[3], label)?,
+            finite_f32(values[4], label)?,
+            finite_f32(values[5], label)?,
             0.0,
         ],
         [
-            finite_f32(values[6], "scene.backgroundTextureRotation")?,
-            finite_f32(values[7], "scene.backgroundTextureRotation")?,
-            finite_f32(values[8], "scene.backgroundTextureRotation")?,
+            finite_f32(values[6], label)?,
+            finite_f32(values[7], label)?,
+            finite_f32(values[8], label)?,
             0.0,
         ],
     ])

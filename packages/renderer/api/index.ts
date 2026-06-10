@@ -137,6 +137,9 @@ function toNativeInput(
 
   const size = resolveSize(camera, options)
   const envMap = colorMode ? extractEnvironmentMap(scene) : null
+  const environmentMapRotation = colorMode
+    ? environmentRotationToNative(scene.environmentRotation, envMap)
+    : undefined
   const hasBackgroundOverride = options.background !== undefined
   const optionBackgroundTexture = colorMode && hasBackgroundOverride
     ? extractBackgroundTexture(options.background, 'options.background')
@@ -187,6 +190,7 @@ function toNativeInput(
     environmentMapWidth: envMap?.width,
     environmentMapHeight: envMap?.height,
     environmentMapIntensity: envMap?.intensity,
+    environmentMapRotation,
     ...(colorMode ? fogToNative(scene.fog) : {}),
     ...(colorMode ? postProcessingToNative(options.postProcessing) : {}),
   }
@@ -396,11 +400,6 @@ function validateUnsupportedSceneState(
   camera: ThreeCameraLike,
   colorMode: boolean,
 ): void {
-  if (hasNonZeroRotation(scene.environmentRotation)) {
-    throw new Error(
-      'scene.environmentRotation is not supported by @headless-three/renderer yet. Leave environmentRotation at its default zero rotation or pre-rotate the environment texture before rendering.',
-    )
-  }
   validateUnsupportedClippingGroups(scene, camera)
   if (colorMode) {
     validateUnsupportedCustomShadowMaterials(scene, camera)
@@ -481,6 +480,15 @@ function backgroundRotationToNative(
   const { x, y, z, order } = eulerComponents(rotation, 'scene.backgroundRotation')
   // Three.js negates background Euler angles before producing the rotation matrix
   // to account for the background shader's left-handed frame.
+  return eulerRotationMatrix3Columns(-x, -y, -z, order)
+}
+
+function environmentRotationToNative(
+  rotation: ThreeSceneRootLike['environmentRotation'],
+  envMap: { data?: Buffer } | null,
+): number[] | undefined {
+  if (!hasNonZeroRotation(rotation) || !envMap) return undefined
+  const { x, y, z, order } = eulerComponents(rotation, 'scene.environmentRotation')
   return eulerRotationMatrix3Columns(-x, -y, -z, order)
 }
 

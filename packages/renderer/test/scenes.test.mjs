@@ -52,6 +52,22 @@ function rgbaTexture(data, width, height) {
   return texture
 }
 
+function splitEnvironmentTexture() {
+  const data = []
+  for (let y = 0; y < 2; y++) {
+    for (let x = 0; x < 8; x++) {
+      if (x < 4) {
+        data.push(255, 0, 0, 255)
+      } else {
+        data.push(0, 255, 0, 255)
+      }
+    }
+  }
+  const texture = rgbaTexture(data, 8, 2)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  return texture
+}
+
 function constantUvPlane(u, v) {
   const geometry = new THREE.PlaneGeometry(2, 2)
   const uv = new Float32Array(geometry.getAttribute('uv').count * 2)
@@ -3993,6 +4009,34 @@ test('scene-level reflection probe feeds physical IBL when scene.environment is 
   assert.ok(diff > 0.5, `expected reflection probe to affect metallic IBL, diff=${diff.toFixed(3)}`)
 })
 
+test('scene environmentRotation rotates equirectangular IBL', () => {
+  function renderWithRotation(yRotation) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = splitEnvironmentTexture()
+    scene.environmentIntensity = 4
+    scene.environmentRotation = new THREE.Euler(0, yRotation, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const unrotated = renderWithRotation(0)
+  const rotated = renderWithRotation(-Math.PI / 2)
+  assert.ok(unrotated.r > unrotated.g + 15, `unrotated reflection should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
+  assert.ok(rotated.g > rotated.r + 15, `rotated reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+})
+
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
     ['cube scene environment', (scene) => {
@@ -4730,7 +4774,7 @@ test('backgroundBlurriness softens 2D texture backgrounds', () => {
   assert.ok(sharp.r > blurred.r + 20, `blurred background should soften the red texel (${sharp.r} vs ${blurred.r})`)
 })
 
-test('unsupported scene background and environment rotations fail clearly', () => {
+test('unsupported scene background rotations fail clearly', () => {
   const cases = [
     ['color backgroundRotation', (scene) => {
       scene.background = new THREE.Color(0, 0, 0)
@@ -4740,10 +4784,6 @@ test('unsupported scene background and environment rotations fail clearly', () =
       scene.background = solidTexture(0, 255, 0)
       scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
     }, /scene\.backgroundRotation.*equirectangular texture backgrounds/i],
-    ['environmentRotation', (scene) => {
-      scene.environment = solidTexture(255, 255, 255)
-      scene.environmentRotation = new THREE.Euler(0, Math.PI / 4, 0)
-    }, /scene\.environmentRotation.*not supported/i],
   ]
 
   for (const [name, setup, pattern] of cases) {

@@ -90,6 +90,8 @@ export interface RenderScene {
   environmentMapHeight?: number
   /** Environment map intensity multiplier. Defaults to 1. */
   environmentMapIntensity?: number
+  /** Environment map direction rotation matrix columns, flattened 3x3. */
+  environmentMapRotation?: Array<number>
   /** Scene fog mode: `"linear"` for THREE.Fog or `"exp2"` for THREE.FogExp2. */
   fogType?: string
   /** Fog color `[r, g, b]` in 0..1 range. */

@@ -15,6 +15,7 @@ const BRDF_LUT_SIZE: u32 = 128;
 const IRRADIANCE_SIZE: u32 = 32;
 const PREFILTER_BASE_SIZE: u32 = 128;
 const PREFILTER_MIP_LEVELS: u32 = 5;
+type RotationColumns = [[f32; 4]; 3];
 
 pub struct IblMaps {
     /// Diffuse irradiance cubemap: 6 faces, IRRADIANCE_SIZE x IRRADIANCE_SIZE, RGBA32F stored as RGBA8.
@@ -155,9 +156,9 @@ impl EnvMap {
     }
 }
 
-pub fn compute_ibl(env_map: &EnvMap) -> IblMaps {
-    let irradiance_faces = compute_irradiance(env_map);
-    let prefilter_faces = compute_prefiltered_env(env_map);
+pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
+    let irradiance_faces = compute_irradiance(env_map, rotation);
+    let prefilter_faces = compute_prefiltered_env(env_map, rotation);
     let brdf_lut = compute_brdf_lut();
 
     IblMaps {
@@ -171,9 +172,21 @@ pub fn compute_ibl(env_map: &EnvMap) -> IblMaps {
     }
 }
 
+fn sample_rotated(env_map: &EnvMap, rotation: RotationColumns, dir: [f32; 3]) -> [f32; 3] {
+    env_map.sample(rotate_direction(rotation, dir))
+}
+
+fn rotate_direction(rotation: RotationColumns, dir: [f32; 3]) -> [f32; 3] {
+    normalize([
+        rotation[0][0] * dir[0] + rotation[1][0] * dir[1] + rotation[2][0] * dir[2],
+        rotation[0][1] * dir[0] + rotation[1][1] * dir[1] + rotation[2][1] * dir[2],
+        rotation[0][2] * dir[0] + rotation[1][2] * dir[1] + rotation[2][2] * dir[2],
+    ])
+}
+
 // ── Irradiance cubemap ──────────────────────────────────────────────
 
-fn compute_irradiance(env_map: &EnvMap) -> Vec<Vec<u8>> {
+fn compute_irradiance(env_map: &EnvMap, rotation: RotationColumns) -> Vec<Vec<u8>> {
     let size = IRRADIANCE_SIZE;
     let mut faces = Vec::with_capacity(6);
     for face in 0..6 {
@@ -181,7 +194,7 @@ fn compute_irradiance(env_map: &EnvMap) -> Vec<Vec<u8>> {
         for y in 0..size {
             for x in 0..size {
                 let dir = cube_dir(face, x, y, size);
-                let color = convolve_diffuse(env_map, dir);
+                let color = convolve_diffuse(env_map, dir, rotation);
                 let idx = ((y * size + x) * 4) as usize;
                 rgba[idx] = linear_to_srgb8(color[0]);
                 rgba[idx + 1] = linear_to_srgb8(color[1]);
@@ -194,7 +207,7 @@ fn compute_irradiance(env_map: &EnvMap) -> Vec<Vec<u8>> {
     faces
 }
 
-fn convolve_diffuse(env_map: &EnvMap, normal: [f32; 3]) -> [f32; 3] {
+fn convolve_diffuse(env_map: &EnvMap, normal: [f32; 3], rotation: RotationColumns) -> [f32; 3] {
     // Hemisphere convolution with cosine weighting.
     // Use a modest sample count for CPU perf.
     let n = normalize(normal);
@@ -215,7 +228,7 @@ fn convolve_diffuse(env_map: &EnvMap, normal: [f32; 3]) -> [f32; 3] {
         ];
         let sample_dir = normalize(sample_dir);
         let n_dot_l = dot(n, sample_dir).max(0.0);
-        let color = env_map.sample(sample_dir);
+        let color = sample_rotated(env_map, rotation, sample_dir);
         result[0] += color[0] * n_dot_l;
         result[1] += color[1] * n_dot_l;
         result[2] += color[2] * n_dot_l;
@@ -232,7 +245,7 @@ fn convolve_diffuse(env_map: &EnvMap, normal: [f32; 3]) -> [f32; 3] {
 
 // ── Prefiltered specular cubemap ────────────────────────────────────
 
-fn compute_prefiltered_env(env_map: &EnvMap) -> Vec<Vec<u8>> {
+fn compute_prefiltered_env(env_map: &EnvMap, rotation: RotationColumns) -> Vec<Vec<u8>> {
     let mut all_faces = Vec::with_capacity((PREFILTER_MIP_LEVELS * 6) as usize);
     for mip in 0..PREFILTER_MIP_LEVELS {
         let roughness = mip as f32 / (PREFILTER_MIP_LEVELS - 1).max(1) as f32;
@@ -242,7 +255,7 @@ fn compute_prefiltered_env(env_map: &EnvMap) -> Vec<Vec<u8>> {
             for y in 0..size {
                 for x in 0..size {
                     let dir = cube_dir(face, x, y, size);
-                    let color = prefilter_env_sample(env_map, dir, roughness);
+                    let color = prefilter_env_sample(env_map, dir, roughness, rotation);
                     let idx = ((y * size + x) * 4) as usize;
                     rgba[idx] = linear_to_srgb8(color[0]);
                     rgba[idx + 1] = linear_to_srgb8(color[1]);
@@ -256,7 +269,12 @@ fn compute_prefiltered_env(env_map: &EnvMap) -> Vec<Vec<u8>> {
     all_faces
 }
 
-fn prefilter_env_sample(env_map: &EnvMap, reflection: [f32; 3], roughness: f32) -> [f32; 3] {
+fn prefilter_env_sample(
+    env_map: &EnvMap,
+    reflection: [f32; 3],
+    roughness: f32,
+    rotation: RotationColumns,
+) -> [f32; 3] {
     let n = normalize(reflection);
     let v = n; // Assume V = N for prefiltering (split-sum assumption)
     let (up, right) = make_tangent_frame(n);
@@ -271,7 +289,7 @@ fn prefilter_env_sample(env_map: &EnvMap, reflection: [f32; 3], roughness: f32) 
         let l = reflect_over(v, h);
         let n_dot_l = dot(n, l).max(0.0);
         if n_dot_l > 0.0 {
-            let color = env_map.sample(l);
+            let color = sample_rotated(env_map, rotation, l);
             result[0] += color[0] * n_dot_l;
             result[1] += color[1] * n_dot_l;
             result[2] += color[2] * n_dot_l;
