@@ -458,8 +458,8 @@ export interface RenderTargetLike {
   textures?: RenderTargetTextureLike[]
   objectIdEntries?: RenderObjectIdEntry[]
   objectIdMap?: Record<string, RenderObjectIdEntry>
-  /** Depth readback is not implemented yet; non-null values fail clearly. */
-  depthTexture?: unknown
+  /** Optional RGBA8 normalized depth readback texture-like target. */
+  depthTexture?: RenderTargetTextureLike
   /** MSAA is not implemented yet; values greater than 1 fail clearly. */
   samples?: number
   /** MSAA is not implemented yet; values greater than 1 fail clearly. */

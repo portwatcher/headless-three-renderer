@@ -4,6 +4,7 @@ import type {
   ThreeCameraLike,
   RenderOptions,
   RenderTargetLike,
+  RenderTargetTextureLike,
   RenderPixelRectLike,
   NativeRenderScene,
   NativeCamera,
@@ -67,9 +68,15 @@ export class Renderer {
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
-    const { buffer, nativeScene, objectIdEntries } = this.renderNative(scene, camera, options)
+    const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, options)
     if (options.target) {
-      writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
+      const depthData = renderTargetDepthBuffer(
+        options.target,
+        nativeScene,
+        nativeCamera,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
     }
     return buffer
   }
@@ -81,17 +88,23 @@ export class Renderer {
     options: RenderOptions = {},
   ): RenderTargetLike {
     const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
-    const { buffer, nativeScene, objectIdEntries } = this.renderNative(scene, camera, targetOptions)
-    return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
+    const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, targetOptions)
+    const depthData = renderTargetDepthBuffer(
+      target,
+      nativeScene,
+      nativeCamera,
+      (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+    )
+    return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
   }
 
   private renderNative(
     scene: ThreeSceneRootLike,
     camera: ThreeCameraLike,
     options: RenderOptions,
-  ): { buffer: Buffer; nativeScene: NativeRenderScene; objectIdEntries?: RenderObjectIdEntry[] } {
+  ): { buffer: Buffer; nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
     const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
-    return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, objectIdEntries }
+    return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, nativeCamera, objectIdEntries }
   }
 }
 
@@ -99,7 +112,8 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, optio
   const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   if (options.target) {
-    writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
+    const depthData = renderTargetDepthBuffer(options.target, nativeScene, nativeCamera, native.renderNative)
+    writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
   }
   return buffer
 }
@@ -113,7 +127,8 @@ export function renderToTarget(
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
   const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, targetOptions)
   const buffer = native.renderNative(nativeScene, nativeCamera)
-  return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries)
+  const depthData = renderTargetDepthBuffer(target, nativeScene, nativeCamera, native.renderNative)
+  return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
 }
 
 function toNativeInput(
@@ -337,6 +352,97 @@ function objectSortId(mesh: NativeSceneMesh, index: number): number {
 
 function renderModeFragment(color: Color4): string {
   return `return vec4<f32>(${formatWgslFloat(color[0])}, ${formatWgslFloat(color[1])}, ${formatWgslFloat(color[2])}, 1.0);`
+}
+
+const DEPTH_READBACK_FRAGMENT = [
+  'let frag_depth = clamp(input.position.z, 0.0, 1.0);',
+  'let depth = 1.0 - frag_depth;',
+  'return vec4<f32>(depth, depth, depth, 1.0);',
+].join('\n')
+
+function renderTargetDepthBuffer(
+  target: RenderTargetLike | undefined,
+  nativeScene: NativeRenderScene,
+  nativeCamera: NativeCamera,
+  renderNativeScene: (scene: NativeRenderScene, camera: NativeCamera) => Buffer,
+): Buffer | undefined {
+  if (target?.depthTexture == null) return undefined
+  return renderNativeScene(depthReadbackScene(nativeScene), nativeCamera)
+}
+
+function depthReadbackScene(scene: NativeRenderScene): NativeRenderScene {
+  return {
+    ...scene,
+    background: [0, 0, 0, 1],
+    backgroundIntensity: 1,
+    backgroundTexture: undefined,
+    backgroundTextureWidth: undefined,
+    backgroundTextureHeight: undefined,
+    backgroundTextureWrapS: undefined,
+    backgroundTextureWrapT: undefined,
+    backgroundTextureMagFilter: undefined,
+    backgroundTextureMinFilter: undefined,
+    backgroundTextureAnisotropy: undefined,
+    backgroundTextureTransform: undefined,
+    backgroundTextureColorSpace: undefined,
+    backgroundTextureMapping: undefined,
+    backgroundTextureRotation: undefined,
+    backgroundTextureBlurriness: undefined,
+    format: 'rgba',
+    outputColorSpace: 'srgb-linear',
+    meshes: scene.meshes?.map(depthReadbackMesh),
+    lights: [],
+    ambientLight: undefined,
+    ambientIntensity: undefined,
+    lightProbe: undefined,
+    environmentMap: undefined,
+    environmentMapWidth: undefined,
+    environmentMapHeight: undefined,
+    environmentMapIntensity: undefined,
+    environmentMapColorSpace: undefined,
+    environmentMapRotation: undefined,
+    fogType: undefined,
+    fogColor: undefined,
+    fogNear: undefined,
+    fogFar: undefined,
+    fogDensity: undefined,
+    postExposure: undefined,
+    postContrast: undefined,
+    postSaturation: undefined,
+    postVignette: undefined,
+    postGrayscale: undefined,
+    postInvert: undefined,
+  }
+}
+
+function depthReadbackMesh(mesh: NativeSceneMesh): NativeSceneMesh {
+  const writesDepth = meshWritesDepth(mesh)
+  return {
+    ...mesh,
+    blending: 'none',
+    depthWrite: writesDepth,
+    colorWrite: writesDepth,
+    transparent: false,
+    shadingModel: 'basic',
+    customFragmentShader: DEPTH_READBACK_FRAGMENT,
+    castShadow: false,
+    receiveShadow: false,
+  }
+}
+
+function meshWritesDepth(mesh: NativeSceneMesh): boolean {
+  if (mesh.depthTest === false) return false
+  if (typeof mesh.depthWrite === 'boolean') return mesh.depthWrite
+  return !meshDefaultsTransparent(mesh)
+}
+
+function meshDefaultsTransparent(mesh: NativeSceneMesh): boolean {
+  if (mesh.alphaHash === true) return false
+  return mesh.transparent === true || materialAlpha(mesh) < 0.999 || finitePositive(mesh.transmission)
+}
+
+function finitePositive(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0.0001
 }
 
 function formatWgslFloat(value: number): string {
@@ -649,11 +755,6 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
 }
 
 function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void {
-  if (target.depthTexture != null) {
-    throw new Error(
-      'Render target depthTexture output is not supported by @headless-three/renderer yet. Render depth with MeshDepthMaterial or omit target.depthTexture until depth readback support lands.',
-    )
-  }
   if (target.isWebGLMultipleRenderTargets === true) {
     throw new Error(
       'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
@@ -687,6 +788,7 @@ function writeRenderTarget(
   width: number,
   height: number,
   objectIdEntries?: RenderObjectIdEntry[],
+  depthData?: Buffer,
 ): RenderTargetLike {
   target.width = width
   target.height = height
@@ -701,16 +803,11 @@ function writeRenderTarget(
     ? target.texture[0]
     : target.texture ?? target.textures?.[0]
   if (texture) {
-    const textureImage = texture.image ?? (texture.image = {})
-    textureImage.data = data
-    textureImage.width = width
-    textureImage.height = height
+    writeRenderTargetTexture(texture, data, width, height)
+  }
 
-    if (texture.source?.data) {
-      texture.source.data.data = data
-      texture.source.data.width = width
-      texture.source.data.height = height
-    }
+  if (target.depthTexture != null && depthData) {
+    writeRenderTargetTexture(target.depthTexture, depthData, width, height)
   }
 
   if (objectIdEntries) {
@@ -722,6 +819,24 @@ function writeRenderTarget(
   }
 
   return target
+}
+
+function writeRenderTargetTexture(
+  texture: RenderTargetTextureLike,
+  data: Buffer,
+  width: number,
+  height: number,
+): void {
+  const textureImage = texture.image ?? (texture.image = {})
+  textureImage.data = data
+  textureImage.width = width
+  textureImage.height = height
+
+  if (texture.source?.data) {
+    texture.source.data.data = data
+    texture.source.data.width = width
+    texture.source.data.height = height
+  }
 }
 
 function validateThreeSceneRoot(scene: unknown): asserts scene is ThreeSceneRootLike {
