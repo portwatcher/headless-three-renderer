@@ -104,8 +104,8 @@ Status keys:
 | `RectAreaLight` | Partial | One-sided finite-area direct-light approximation using the light center, local `-Z` direction, width, and height. Exact Three.js LTC/LUT behavior remains planned. |
 | Light layers | Supported | Lights are filtered against the active camera layers. |
 | Light limit | Partial | Up to 16 lights. |
-| Shadows | Partial | Directional, spot, point, and directional cascaded shadow maps are supported for the first shadow-casting light only. |
-| Shadow behavior parity | Partial | Supports common camera bounds, map size, bias, normal bias, cast/receive flags, and alpha-tested casters. Multiple lights and blur/radius parity remain planned. |
+| Shadows | Partial | Directional, spot, point, and directional cascaded shadow maps are supported for one shadow-casting light; additional visible shadow-casting lights fail clearly. |
+| Shadow behavior parity | Partial | Supports common camera bounds, map size, bias, normal bias, cast/receive flags, and alpha-tested casters. Native multiple-shadow-map rendering and blur/radius parity remain planned. |
 | Equirectangular environment IBL | Supported | CPU precomputes diffuse irradiance, prefiltered specular, and BRDF LUT. |
 | Reflection probe hint | Supported | Uses `scene.userData.headlessThreeRenderer.reflectionProbe` or first probe in `reflectionProbes`. |
 | Environment intensity | Supported | `scene.environmentIntensity`. |

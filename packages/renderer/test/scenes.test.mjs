@@ -3639,6 +3639,29 @@ test('directional cascaded shadow hints render successfully', () => {
   assert.equal(rgba.length, 64 * 64 * 4)
 })
 
+test('multiple shadow-casting lights fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff }),
+  ))
+
+  for (const x of [-3, 3]) {
+    const light = new THREE.DirectionalLight(0xffffff, 1)
+    light.position.set(x, 4, 3)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    scene.add(light)
+    scene.add(light.target)
+  }
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /multiple shadow-casting lights.*not supported/i,
+  )
+})
+
 test('ShadowMaterial is transparent except for received shadows', () => {
   function renderShadowMaterial(castShadow) {
     const scene = new THREE.Scene()

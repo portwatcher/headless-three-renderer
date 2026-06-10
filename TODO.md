@@ -31,7 +31,7 @@ Already supported in the current implementation:
 - Environment IBL from equirectangular `scene.environment`/reflection probes.
 - Scene background colors and 2D texture backgrounds, including `backgroundIntensity` and approximate 2D texture `backgroundBlurriness`.
 - Render-option viewport and scissor rectangles in output pixel coordinates.
-- Directional, spot, point, and directional cascaded shadow maps, limited to the first shadow-casting light.
+- Directional, spot, point, and directional cascaded shadow maps for a single shadow-casting light; additional shadow-casting lights fail clearly.
 - ACES Filmic tone mapping, output color-space controls, simple post-processing, custom WGSL fragment bodies, lines, and point billboards.
 - `THREE.Sprite`/`SpriteMaterial` CPU billboard expansion with color, opacity, texture maps, center, scale, rotation, size attenuation, layers, and render ordering.
 - `LineDashedMaterial` dash/gap patterns for common line, line segment, and line loop cases.
@@ -85,7 +85,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 
 | Task | Impact | Notes |
 |---|---:|---|
-| Multiple shadow-casting lights | Very high | Current renderer uses the first shadow-casting directional/spot/point light only. |
+| Multiple shadow-casting lights | Very high | A single shadow-casting directional/spot/point light is supported; additional visible shadow-casting lights fail clearly. Remaining work is native multi-shadow-map rendering. |
 | Shadow behavior parity | High | Match Three.js `shadow.camera`, map size, bias, normal bias, radius/blur behavior, cast/receive rules, transparency and alpha-tested casters. |
 | `RectAreaLight` | Medium | One-sided finite-area approximation is supported for direct lighting. Remaining work is exact Three.js LTC/LUT parity and golden tests. |
 | `LightProbe` support | Medium | Three.js `LightProbe` spherical harmonics contribute diffuse indirect lighting; remaining work is exact golden-tested parity with all material/environment combinations. |

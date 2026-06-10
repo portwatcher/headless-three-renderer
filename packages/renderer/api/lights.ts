@@ -5,6 +5,7 @@ import { objectLayersMatchCamera } from './layers'
 export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike): NativeSceneLight[] | undefined {
   const lights: NativeSceneLight[] = []
   visitLights(scene, camera, lights)
+  assertSupportedShadowLightCount(lights)
   return lights.length > 0 ? lights : undefined
 }
 
@@ -224,6 +225,18 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function assertSupportedShadowLightCount(lights: NativeSceneLight[]): void {
+  let shadowCasters = 0
+  for (const light of lights) {
+    if (light.castShadow === true) shadowCasters += 1
+  }
+  if (shadowCasters > 1) {
+    throw new Error(
+      'Multiple shadow-casting lights are not supported by @headless-three/renderer yet. Keep one visible directional, spot, or point light with castShadow enabled, or render separate passes until multiple shadow maps are supported.',
+    )
+  }
 }
 
 export function extractAmbientLight(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {
