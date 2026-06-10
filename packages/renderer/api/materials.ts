@@ -26,6 +26,8 @@ const CubeUVReflectionMapping = 306
 
 // Three.js environment combine constants
 const MultiplyOperation = 0
+const MixOperation = 1
+const AddOperation = 2
 
 // Three.js side constants
 const FrontSide = 0
@@ -173,16 +175,22 @@ function objectMaterials(
 function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): boolean {
   return material.isMeshStandardMaterial === true
     || material.isMeshPhysicalMaterial === true
+    || material.isMeshBasicMaterial === true
     || material.isMeshPhongMaterial === true
     || material.isMeshLambertMaterial === true
 }
 
 function assertSupportedMaterialEnvironmentMap(material: ThreeMaterialLike): void {
   assertSupportedEnvironmentTexture(material.envMap!, 'material.envMap')
+  const combine = material.combine ?? MultiplyOperation
+  if (![MultiplyOperation, MixOperation, AddOperation].includes(combine)) {
+    throw new Error(
+      'material.envMap combine must be MultiplyOperation, MixOperation, or AddOperation for @headless-three/renderer.',
+    )
+  }
   if (
     (material.isMeshPhongMaterial === true || material.isMeshLambertMaterial === true)
-    && material.combine != null
-    && material.combine !== MultiplyOperation
+    && combine !== MultiplyOperation
   ) {
     throw new Error(
       'MeshPhongMaterial and MeshLambertMaterial material.envMap combine modes other than MultiplyOperation are not supported by @headless-three/renderer yet.',
@@ -334,6 +342,10 @@ export function extractPbrProperties(
     props.useEnvironmentMap = true
     props.environmentMapIntensity = Number.isFinite(material.envMapIntensity)
       ? material.envMapIntensity!
+      : 1
+    props.environmentMapCombine = material.combine ?? MultiplyOperation
+    props.environmentMapReflectivity = Number.isFinite(material.reflectivity)
+      ? material.reflectivity!
       : 1
   } else if (context.materialEnvironmentSource === 'material') {
     props.useEnvironmentMap = false
@@ -998,7 +1010,7 @@ function assertSupportedMaterialState(
   }
   if (material.envMap != null && context.materialEnvironmentMaps?.has(material) !== true) {
     throw new Error(
-      'material.envMap is only supported for MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
+      'material.envMap is only supported for MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
     )
   }
   if (

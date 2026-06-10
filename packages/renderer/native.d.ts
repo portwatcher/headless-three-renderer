@@ -781,6 +781,10 @@ export interface SceneMesh {
   useEnvironmentMap?: boolean
   /** Per-mesh environment intensity. Defaults to the scene environment intensity. */
   environmentMapIntensity?: number
+  /** Legacy environment blend operation: 0=multiply, 1=mix, 2=add. */
+  environmentMapCombine?: number
+  /** Legacy material environment reflectivity multiplier. */
+  environmentMapReflectivity?: number
   /** Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`. */
   topology?: string
   /** WGSL fragment shader body for the custom material path. */

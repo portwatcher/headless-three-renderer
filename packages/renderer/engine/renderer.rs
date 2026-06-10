@@ -40,8 +40,10 @@ pub struct Uniforms {
     pub light_probe_params: [f32; 4],
     // x/y = normalScale or bumpScale, z = normal mode (0=none, 1=normalMap, 2=bumpMap), w = has_ibl
     pub normal_map_params: [f32; 4],
-    /// x = env_intensity, y/z/w = reserved
+    /// x = env_intensity, y = shading_model, z = camera near, w = camera far
     pub ibl_params: [f32; 4],
+    /// x = legacy env combine, y = reflectivity, z = basic material env map enabled, w = reserved
+    pub env_map_params: [f32; 4],
     /// x = ao_map_intensity, y = has_ao_map, z = has_alpha_map, w = has_light_map
     pub ao_params: [f32; 4],
     /// x = 1/width, y = 1/height, z = width, w = height
@@ -2295,6 +2297,18 @@ impl GpuRenderer {
                 mesh.shading_model.as_u32() as f32,
                 settings.near,
                 settings.far,
+            ],
+            env_map_params: [
+                mesh.environment_map_combine as f32,
+                mesh.environment_map_reflectivity,
+                if mesh.shading_model == ShadingModel::Basic
+                    && mesh.use_environment_map == Some(true)
+                {
+                    1.0
+                } else {
+                    0.0
+                },
+                0.0,
             ],
             ao_params: [
                 mesh.ao_map_intensity,

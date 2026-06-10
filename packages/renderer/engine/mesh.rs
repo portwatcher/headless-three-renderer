@@ -111,6 +111,8 @@ pub struct PreparedMesh {
     pub shading_model: ShadingModel,
     pub use_environment_map: Option<bool>,
     pub environment_map_intensity: Option<f32>,
+    pub environment_map_combine: u32,
+    pub environment_map_reflectivity: f32,
     pub topology: Topology,
     pub custom_fragment_shader: Option<String>,
     pub texture_transform: [f32; 6],
@@ -1272,6 +1274,14 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         Some(value) => Some(finite_f32(value, "mesh environmentMapIntensity")?),
         None => None,
     };
+    let environment_map_combine = mesh.environment_map_combine.unwrap_or(0);
+    if environment_map_combine > 2 {
+        bail!("mesh {mesh_index} environmentMapCombine must be 0, 1, or 2");
+    }
+    let environment_map_reflectivity = match mesh.environment_map_reflectivity {
+        Some(value) => finite_f32(value, "mesh environmentMapReflectivity")?,
+        None => 1.0,
+    };
 
     Ok(PreparedMesh {
         vertices,
@@ -1347,6 +1357,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         shading_model,
         use_environment_map: mesh.use_environment_map,
         environment_map_intensity,
+        environment_map_combine,
+        environment_map_reflectivity,
         topology,
         custom_fragment_shader: mesh
             .custom_fragment_shader

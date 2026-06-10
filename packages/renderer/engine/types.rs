@@ -735,6 +735,10 @@ pub struct SceneMesh {
     pub use_environment_map: Option<bool>,
     /// Per-mesh environment intensity. Defaults to the scene environment intensity.
     pub environment_map_intensity: Option<f64>,
+    /// Legacy environment blend operation: 0=multiply, 1=mix, 2=add.
+    pub environment_map_combine: Option<u32>,
+    /// Legacy material environment reflectivity multiplier.
+    pub environment_map_reflectivity: Option<f64>,
     /// Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`.
     pub topology: Option<String>,
     /// WGSL fragment shader body for the custom material path.

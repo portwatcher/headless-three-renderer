@@ -1188,6 +1188,62 @@ test('MeshPhongMaterial material envMap feeds specular reflection', () => {
   assert.ok(reflected > disabled + 40, `material envMap should add Phong reflection (${reflected} vs ${disabled})`)
 })
 
+test('MeshBasicMaterial material envMap uses legacy combine modes', () => {
+  function renderBasicMaterialEnvironment(combine, reflectivity = 1) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = solidTexture(0, 255, 0)
+    envMap.mapping = THREE.EquirectangularReflectionMapping
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      envMap,
+      combine,
+      reflectivity,
+    })
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const multiply = renderBasicMaterialEnvironment(THREE.MultiplyOperation)
+  const add = renderBasicMaterialEnvironment(THREE.AddOperation)
+  const mixZero = renderBasicMaterialEnvironment(THREE.MixOperation, 0)
+  const mixFull = renderBasicMaterialEnvironment(THREE.MixOperation, 1)
+
+  assert.ok(add.g > multiply.g + 40, `AddOperation should add green env reflection (${add.g} vs ${multiply.g})`)
+  assert.ok(mixZero.r > mixZero.g + 40, `reflectivity 0 should preserve Basic color (${mixZero.r}, ${mixZero.g})`)
+  assert.ok(mixFull.g > mixFull.r + 40, `MixOperation should replace with green env reflection (${mixFull.r}, ${mixFull.g})`)
+})
+
+test('scene environment does not affect MeshBasicMaterial without material envMap', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const environment = solidTexture(0, 255, 0)
+  environment.mapping = THREE.EquirectangularReflectionMapping
+  scene.environment = environment
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const mean = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.g + 40, `scene.environment should not drive Basic material reflection (${mean.r}, ${mean.g})`)
+})
+
 test('material envMapRotation rotates shared IBL', () => {
   function renderWithRotation(yRotation) {
     const scene = new THREE.Scene()
@@ -1258,7 +1314,8 @@ test('unsupported material envMap inputs fail clearly', () => {
     mapping: THREE.EquirectangularReflectionMapping,
   })
 
-  const unsupportedMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, envMap })
+  const unsupportedMaterial = new THREE.MeshMatcapMaterial({ color: 0xffffff })
+  unsupportedMaterial.envMap = envMap
   {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -1267,7 +1324,7 @@ test('unsupported material envMap inputs fail clearly', () => {
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
       /material\.envMap.*only supported/i,
-      'MeshBasicMaterial envMap',
+      'MeshMatcapMaterial envMap',
     )
   }
 

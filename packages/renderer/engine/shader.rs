@@ -38,6 +38,8 @@ struct Uniforms {
   normal_map_params: vec4<f32>,
   // x = env_intensity, y = shading_model (0=standard PBR, 1=basic/unlit, 2=lambert, 3=normal, 4=matcap, 5=phong, 6=depth, 7=toon, 8=distance, 9=shadow), z = camera near, w = camera far
   ibl_params: vec4<f32>,
+  // x = legacy env combine (0=multiply, 1=mix, 2=add), y = reflectivity, z = basic material env map enabled, w = reserved
+  env_map_params: vec4<f32>,
   // x = ao_map_intensity, y = has_ao_map, z = has_alpha_map, w = has_light_map
   ao_params: vec4<f32>,
   // x = 1/width, y = 1/height, z = width, w = height
@@ -888,6 +890,20 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     if has_light_map {
       unlit = light_map_diffuse;
     }
+    if uniforms.normal_map_params.w > 0.5 && uniforms.env_map_params.z > 0.5 {
+      let V_basic = normalize(uniforms.camera_pos.xyz - input.world_pos);
+      let R_basic = reflect(-V_basic, N);
+      let env_color = textureSampleLevel(t_prefilter, s_ibl, R_basic, 0.0).rgb * uniforms.ibl_params.x;
+      let reflectivity = uniforms.env_map_params.y;
+      let combine = u32(uniforms.env_map_params.x + 0.5);
+      if combine == 2u {
+        unlit = unlit + env_color * reflectivity;
+      } else if combine == 1u {
+        unlit = mix(unlit, env_color, reflectivity);
+      } else {
+        unlit = mix(unlit, unlit * env_color, reflectivity);
+      }
+    }
     let emissive_basic = decode_emissive_map_sample(textureSample(t_emissive, s_emissive, transform_emissive_map_uv(uv, uv2))).rgb;
     unlit = unlit + uniforms.emissive.rgb * emissive_basic;
     let mapped_basic = apply_output_color_space(aces_filmic_tone_mapping(unlit));
@@ -1328,6 +1344,7 @@ struct Uniforms {
   light_probe_params: vec4<f32>,
   normal_map_params: vec4<f32>,
   ibl_params: vec4<f32>,
+  env_map_params: vec4<f32>,
   ao_params: vec4<f32>,
   render_params: vec4<f32>,
   output_params: vec4<f32>,
