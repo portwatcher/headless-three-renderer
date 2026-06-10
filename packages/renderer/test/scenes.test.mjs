@@ -1881,6 +1881,99 @@ test('AdditiveBlending adds source color to destination', () => {
   assert.ok(mean.b > 180, `AdditiveBlending should preserve bright blue destination (${mean.b})`)
 })
 
+test('SubtractiveBlending subtracts source color from destination', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const back = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  back.position.z = -0.1
+  scene.add(back)
+  const front = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      opacity: 1,
+      transparent: true,
+      blending: THREE.SubtractiveBlending,
+    }),
+  )
+  front.position.z = 0.1
+  scene.add(front)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(
+    renderRgba(scene, camera, { width: 64, height: 64 }),
+    64,
+    64,
+    24,
+    24,
+    40,
+    40,
+  )
+  assert.ok(
+    mean.g > mean.r + 80,
+    `SubtractiveBlending should subtract red from the destination (${mean.g} vs ${mean.r})`,
+  )
+  assert.ok(
+    mean.b > mean.r + 80,
+    `SubtractiveBlending should preserve non-source destination channels (${mean.b} vs ${mean.r})`,
+  )
+})
+
+test('MultiplyBlending multiplies source and destination colors', () => {
+  function renderBlend(blending) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    back.position.z = -0.1
+    scene.add(back)
+    const front = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        opacity: 1,
+        transparent: true,
+        blending,
+      }),
+    )
+    front.position.z = 0.1
+    scene.add(front)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(
+      renderRgba(scene, camera, { width: 64, height: 64 }),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+  }
+
+  const normal = renderBlend(THREE.NormalBlending)
+  const multiply = renderBlend(THREE.MultiplyBlending)
+  assert.ok(
+    multiply.g < normal.g - 150,
+    `MultiplyBlending should suppress the green source (${multiply.g} vs ${normal.g})`,
+  )
+  assert.ok(
+    multiply.r > multiply.g + 80,
+    `MultiplyBlending should preserve more destination red than source green (${multiply.r} vs ${multiply.g})`,
+  )
+})
+
 test('premultipliedAlpha uses premultiplied additive blend factors', () => {
   function renderAdditive(premultipliedAlpha) {
     const scene = new THREE.Scene()
