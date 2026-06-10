@@ -62,6 +62,8 @@ export interface RenderScene {
   backgroundTextureTransform?: Array<number>
   /** Background texture color space. `"srgb"` is decoded to linear before output conversion. */
   backgroundTextureColorSpace?: string
+  /** Background texture mapping: `"uv"` (default) or `"equirectangular"`. */
+  backgroundTextureMapping?: string
   /** Approximate 2D background texture blur amount in the 0..1 range. */
   backgroundTextureBlurriness?: number
   /** Output format. Supported values are `"png"` (default) and `"rgba"`. */

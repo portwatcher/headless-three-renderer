@@ -4811,13 +4811,46 @@ test('background textures decode sRGB colorSpace before output conversion', () =
   assert.ok(linear.r > srgb.r + 50, `linear background texture should remain brighter than decoded sRGB (${linear.r} vs ${srgb.r})`)
 })
 
-test('cube and equirect background texture mappings fail clearly', () => {
+test('equirect background textures sample from camera direction', () => {
+  const background = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 8, 1)
+  background.mapping = THREE.EquirectangularReflectionMapping
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+
+  function renderFacing(target) {
+    const scene = new THREE.Scene()
+    scene.background = background
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 0)
+    camera.lookAt(target)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 28, 28, 36, 36)
+  }
+
+  const negativeZ = renderFacing(new THREE.Vector3(0, 0, -1))
+  const positiveZ = renderFacing(new THREE.Vector3(0, 0, 1))
+  assert.ok(negativeZ.r > negativeZ.g + 80, `-Z view should sample the red equirect half (${negativeZ.r} vs ${negativeZ.g})`)
+  assert.ok(positiveZ.g > positiveZ.r + 80, `+Z view should sample the green equirect half (${positiveZ.g} vs ${positiveZ.r})`)
+})
+
+test('cube background texture mappings fail clearly', () => {
   const camera = makeCamera()
   const cases = [
-    ['equirect scene background', { sceneBackground: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.EquirectangularReflectionMapping }) }],
     ['cube scene background', { sceneBackground: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeReflectionMapping }) }],
     ['cube texture flag scene background', { sceneBackground: Object.assign(solidTexture(0, 255, 0), { isCubeTexture: true }) }],
-    ['equirect option background', { optionBackground: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.EquirectangularReflectionMapping }) }],
+    ['CubeUV option background', { optionBackground: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping }) }],
   ]
 
   for (const [name, { sceneBackground, optionBackground }] of cases) {
@@ -4825,7 +4858,7 @@ test('cube and equirect background texture mappings fail clearly', () => {
     scene.background = sceneBackground ?? new THREE.Color(0, 0, 0)
     assert.throws(
       () => renderRgba(scene, camera, { width: 64, height: 64, background: optionBackground }),
-      /background.*cube\/equirectangular.*not supported/i,
+      /background.*cube.*not supported/i,
       name,
     )
   }

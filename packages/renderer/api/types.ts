@@ -827,6 +827,7 @@ export interface NativeRenderScene {
   backgroundTextureMinFilter?: string
   backgroundTextureTransform?: number[]
   backgroundTextureColorSpace?: string
+  backgroundTextureMapping?: string
   backgroundTextureBlurriness?: number
   format?: string
   outputColorSpace?: string
@@ -1110,6 +1111,7 @@ export interface TextureInfo {
   minFilter?: string
   transform?: number[]
   colorSpace?: string
+  mapping?: 'uv' | 'equirectangular'
   usesUv2?: boolean
 }
 

@@ -1476,9 +1476,13 @@ struct BackgroundUniforms {
   // transform1.xyz / transform2.xyz = texture transform rows.
   // transform1.w = background intensity.
   transform1: vec4<f32>,
-  // transform2.w integer flags: +1 = texture is sRGB, +2 = LinearSRGBColorSpace output.
+  // transform2.w integer flags: +1 = texture is sRGB, +2 = LinearSRGBColorSpace output,
+  // +4 = equirectangular mapping.
   // transform2.w fractional lane stores 2D background blur amount / 4.
   transform2: vec4<f32>,
+  inverse_view_projection: mat4x4<f32>,
+  // xyz = camera world position.
+  camera_params: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -1528,13 +1532,26 @@ fn background_srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
 }
 
 fn background_texture_is_srgb() -> bool {
+  return background_flag_enabled(1.0);
+}
+
+fn background_output_is_linear() -> bool {
+  return background_flag_enabled(2.0);
+}
+
+fn background_texture_is_equirectangular() -> bool {
+  return background_flag_enabled(4.0);
+}
+
+fn background_flag_enabled(bit: f32) -> bool {
   let flags = floor(uniforms.transform2.w);
-  let srgb_flag = flags - floor(flags * 0.5) * 2.0;
-  return srgb_flag > 0.5;
+  let scaled = floor(flags / bit);
+  let flag = scaled - floor(scaled * 0.5) * 2.0;
+  return flag > 0.5;
 }
 
 fn apply_background_output_color_space(color: vec3<f32>) -> vec3<f32> {
-  if floor(uniforms.transform2.w) > 1.5 {
+  if background_output_is_linear() {
     return color;
   }
   return pow(color, vec3<f32>(1.0 / 2.2));
@@ -1544,8 +1561,27 @@ fn background_blur_amount() -> f32 {
   return fract(uniforms.transform2.w) * 4.0;
 }
 
+fn equirect_background_uv(screen_uv: vec2<f32>) -> vec2<f32> {
+  let ndc = vec2<f32>(screen_uv.x * 2.0 - 1.0, 1.0 - screen_uv.y * 2.0);
+  let world = uniforms.inverse_view_projection * vec4<f32>(ndc, 1.0, 1.0);
+  let world_pos = world.xyz / world.w;
+  let dir = normalize(world_pos - uniforms.camera_params.xyz);
+  let equirect_uv = vec2<f32>(
+    atan2(dir.z, dir.x) * 0.15915494309189535 + 0.5,
+    asin(clamp(dir.y, -1.0, 1.0)) * 0.3183098861837907 + 0.5,
+  );
+  return transform_background_uv(equirect_uv);
+}
+
+fn background_sample_uv(uv: vec2<f32>) -> vec2<f32> {
+  if background_texture_is_equirectangular() {
+    return equirect_background_uv(uv);
+  }
+  return transform_background_uv(uv);
+}
+
 fn sample_background(uv: vec2<f32>) -> vec4<f32> {
-  let transformed_uv = transform_background_uv(uv);
+  let transformed_uv = background_sample_uv(uv);
   let blur = background_blur_amount();
   if blur <= 0.001 {
     return textureSample(t_background, s_background, transformed_uv);

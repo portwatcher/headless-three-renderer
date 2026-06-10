@@ -11,8 +11,8 @@ use crate::mesh::{
     TextureSamplerSettings, Topology, Vertex, WrapMode, prepare_meshes,
 };
 use crate::settings::{
-    BackgroundTexture, OutputColorSpace, OutputFormat, PostProcessingSettings, RenderSettings,
-    ShadowKind,
+    BackgroundTexture, BackgroundTextureMapping, OutputColorSpace, OutputFormat,
+    PostProcessingSettings, RenderSettings, ShadowKind,
 };
 use crate::shader::{BACKGROUND_SHADER, POST_SHADER, SHADER, custom_shader_source};
 use crate::types::{Camera, RenderScene};
@@ -104,6 +104,8 @@ pub struct PostUniforms {
 pub struct BackgroundUniforms {
     pub transform1: [f32; 4],
     pub transform2: [f32; 4],
+    pub inverse_view_projection: [[f32; 4]; 4],
+    pub camera_params: [f32; 4],
 }
 
 pub struct GpuRenderer {
@@ -119,6 +121,7 @@ pub struct GpuRenderer {
     point_pipelines: [wgpu::RenderPipeline; 2],
     pipeline_layout: wgpu::PipelineLayout,
     post_layout: wgpu::BindGroupLayout,
+    background_layout: wgpu::BindGroupLayout,
     post_pipeline: wgpu::RenderPipeline,
     background_pipeline: wgpu::RenderPipeline,
     uniform_layout: wgpu::BindGroupLayout,
@@ -590,6 +593,39 @@ impl GpuRenderer {
                         min_binding_size: wgpu::BufferSize::new(
                             std::mem::size_of::<PostUniforms>() as u64,
                         ),
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let background_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("headless-three-renderer background layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<
+                            BackgroundUniforms,
+                        >() as u64),
                     },
                     count: None,
                 },
@@ -1165,7 +1201,7 @@ impl GpuRenderer {
         let background_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("headless-three-renderer background pipeline layout"),
-                bind_group_layouts: &[Some(&post_layout)],
+                bind_group_layouts: &[Some(&background_layout)],
                 immediate_size: 0,
             });
         let background_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -1208,6 +1244,7 @@ impl GpuRenderer {
             point_pipelines,
             pipeline_layout,
             post_layout,
+            background_layout,
             post_pipeline,
             background_pipeline,
             uniform_layout,
@@ -1332,10 +1369,9 @@ impl GpuRenderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("headless-three-renderer render encoder"),
             });
-        let background_gpu = settings
-            .background_texture
-            .as_ref()
-            .map(|background| self.upload_background(background, settings.output_color_space));
+        let background_gpu = settings.background_texture.as_ref().map(|background| {
+            self.upload_background(background, settings, settings.output_color_space)
+        });
         let background_clear = wgpu::Color {
             r: settings.background[0] * f64::from(settings.background_intensity),
             g: settings.background[1] * f64::from(settings.background_intensity),
@@ -1817,6 +1853,7 @@ impl GpuRenderer {
     fn upload_background(
         &self,
         background: &BackgroundTexture,
+        settings: &RenderSettings,
         output_color_space: OutputColorSpace,
     ) -> GpuBackground {
         let gpu_texture = self.upload_texture(
@@ -1836,6 +1873,11 @@ impl GpuRenderer {
             } else {
                 0.0
             }
+            + if background.mapping == BackgroundTextureMapping::Equirectangular {
+                4.0
+            } else {
+                0.0
+            }
             + background.blurriness * 0.25;
         let uniforms = BackgroundUniforms {
             transform1: [
@@ -1850,6 +1892,13 @@ impl GpuRenderer {
                 background.transform[5],
                 background_flags,
             ],
+            inverse_view_projection: settings.view_projection.inverse().to_cols_array_2d(),
+            camera_params: [
+                settings.camera_pos.x,
+                settings.camera_pos.y,
+                settings.camera_pos.z,
+                0.0,
+            ],
         };
         let uniform_buffer = self
             .device
@@ -1860,7 +1909,7 @@ impl GpuRenderer {
             });
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("headless-three-renderer background bind group"),
-            layout: &self.post_layout,
+            layout: &self.background_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,

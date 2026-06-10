@@ -169,6 +169,7 @@ function toNativeInput(
     backgroundTextureMinFilter: backgroundTexture?.minFilter,
     backgroundTextureTransform: backgroundTexture?.transform,
     backgroundTextureColorSpace: backgroundTexture?.colorSpace,
+    backgroundTextureMapping: backgroundTexture?.mapping,
     backgroundTextureBlurriness: colorMode ? finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness) : undefined,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,

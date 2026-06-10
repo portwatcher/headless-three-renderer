@@ -34,6 +34,8 @@ pub struct RenderScene {
     pub background_texture_transform: Option<Vec<f64>>,
     /// Background texture color space. `"srgb"` is decoded to linear before output conversion.
     pub background_texture_color_space: Option<String>,
+    /// Background texture mapping: `"uv"` (default) or `"equirectangular"`.
+    pub background_texture_mapping: Option<String>,
     /// Approximate 2D background texture blur amount in the 0..1 range.
     pub background_texture_blurriness: Option<f64>,
     /// Output format. Supported values are `"png"` (default) and `"rgba"`.

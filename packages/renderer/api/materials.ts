@@ -864,7 +864,14 @@ export function extractBackgroundTexture(
     minFilter: filterModeToString(map?.minFilter),
     transform: textureTransform(map),
     colorSpace: textureColorSpace(map),
+    mapping: backgroundTextureMapping(map),
   }
+}
+
+function backgroundTextureMapping(map: ThreeTextureLike): 'uv' | 'equirectangular' {
+  return map.mapping === EquirectangularReflectionMapping || map.mapping === EquirectangularRefractionMapping
+    ? 'equirectangular'
+    : 'uv'
 }
 
 function textureLike(value: unknown): ThreeTextureLike | null {
@@ -941,12 +948,10 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
     map.isCubeTexture === true ||
     map.mapping === CubeReflectionMapping ||
     map.mapping === CubeRefractionMapping ||
-    map.mapping === EquirectangularReflectionMapping ||
-    map.mapping === EquirectangularRefractionMapping ||
     map.mapping === CubeUVReflectionMapping
   ) {
     throw new Error(
-      `${label} uses a cube/equirectangular texture mapping, which is not supported as a background yet. Use a 2D UV-mapped texture or pre-render the background to a 2D image before rendering.`,
+      `${label} uses a cube or PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a 2D/equirectangular texture or pre-render the background to a 2D image before rendering.`,
     )
   }
 }

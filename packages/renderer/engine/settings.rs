@@ -88,8 +88,27 @@ pub struct BackgroundTexture {
     pub texture: PreparedTexture,
     pub transform: [f32; 6],
     pub is_srgb: bool,
+    pub mapping: BackgroundTextureMapping,
     pub intensity: f32,
     pub blurriness: f32,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum BackgroundTextureMapping {
+    Uv,
+    Equirectangular,
+}
+
+impl BackgroundTextureMapping {
+    fn from_scene(value: Option<&str>) -> Result<Self> {
+        match value.unwrap_or("uv").to_ascii_lowercase().as_str() {
+            "uv" | "2d" => Ok(Self::Uv),
+            "equirectangular" | "equirect" => Ok(Self::Equirectangular),
+            other => bail!(
+                "unsupported scene.backgroundTextureMapping `{other}`; expected `uv` or `equirectangular`"
+            ),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -158,6 +177,9 @@ impl RenderSettings {
                         scene.background_texture_color_space.as_deref(),
                         Some("srgb")
                     ),
+                    mapping: BackgroundTextureMapping::from_scene(
+                        scene.background_texture_mapping.as_deref(),
+                    )?,
                     intensity: background_intensity,
                     blurriness: finite_f32(
                         scene.background_texture_blurriness.unwrap_or(0.0),

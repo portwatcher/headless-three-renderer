@@ -83,14 +83,14 @@ The public API accepts only Three.js-like objects:
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly until native support lands.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D texture. Defaults to `scene.background`.
-- `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and 2D texture backgrounds.
-- `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported 2D texture backgrounds.
+- `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds.
+- `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws.
 - `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws.
 - `options.clippingPlanes`: global world-space clipping planes for the render.
 - `options.localClippingEnabled`: `false` disables material-local clipping planes while preserving `options.clippingPlanes`; defaults to `true`.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes.
-- `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and 2D texture background output conversion.
+- `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and texture background output conversion.
 - `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, or `'object-id'` for flat RGB object IDs.
 - `options.target`: a target-like object populated with raw RGBA8 readback data for a single color output, including `target.texture`, `target.textures[0]`, or one-element `target.texture` arrays.
 - `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`).
@@ -105,7 +105,7 @@ The public API accepts only Three.js-like objects:
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection
 - vertex colors
-- scene background color and 2D texture backgrounds with `backgroundIntensity` and 2D texture blur; non-default background/environment rotations and cube/equirect backgrounds fail clearly until native support lands
+- scene background color plus 2D and equirectangular texture backgrounds with `backgroundIntensity` and 2D texture blur; non-default background/environment rotations and cube/CubeUV backgrounds fail clearly until native support lands
 - render-option viewport and scissor rectangles in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 
@@ -114,7 +114,7 @@ The public API accepts only Three.js-like objects:
 - material base color and opacity
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
 - base, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
-- material and 2D texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; 2D texture backgrounds decode `THREE.SRGBColorSpace`
+- material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and environment-backed or scene-color transmission / refraction
