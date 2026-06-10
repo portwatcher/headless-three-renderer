@@ -463,7 +463,7 @@ function backgroundRotationToNative(
   if (!hasNonZeroRotation(rotation)) return undefined
   if (backgroundTexture?.mapping !== 'equirectangular') {
     throw new Error(
-      'scene.backgroundRotation is only supported for equirectangular texture backgrounds by @headless-three/renderer. Leave backgroundRotation at its default for color/2D backgrounds or pre-rotate the background texture before rendering.',
+      'scene.backgroundRotation is only supported for equirectangular or cube texture backgrounds by @headless-three/renderer. Leave backgroundRotation at its default for color/2D backgrounds or pre-rotate the background texture before rendering.',
     )
   }
   const { x, y, z, order } = eulerComponents(rotation, 'scene.backgroundRotation')

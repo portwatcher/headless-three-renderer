@@ -5124,16 +5124,66 @@ test('backgroundBlurriness softens 2D texture backgrounds', () => {
   assert.ok(sharp.r > blurred.r + 20, `blurred background should soften the red texel (${sharp.r} vs ${blurred.r})`)
 })
 
+test('backgroundBlurriness softens equirectangular and cube texture backgrounds', () => {
+  function renderBackground(background, blurriness) {
+    const scene = new THREE.Scene()
+    scene.background = background
+    scene.backgroundBlurriness = blurriness
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 0)
+    camera.lookAt(new THREE.Vector3(0, 0, -1))
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 28, 28, 36, 36)
+  }
+
+  const equirect = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 8, 1)
+  equirect.mapping = THREE.EquirectangularReflectionMapping
+  equirect.magFilter = THREE.NearestFilter
+  equirect.minFilter = THREE.NearestFilter
+
+  const cube = cubeTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [255, 0, 0],
+  ])
+  cube.magFilter = THREE.NearestFilter
+  cube.minFilter = THREE.NearestFilter
+
+  for (const [name, background] of [['equirect', equirect], ['cube', cube]]) {
+    const sharp = renderBackground(background, 0)
+    const blurred = renderBackground(background, 1)
+    assert.ok(sharp.r > sharp.g + 80, `${name} sharp background should sample red (${sharp.r} vs ${sharp.g})`)
+    assert.ok(blurred.g > sharp.g + 30, `${name} blurred background should mix in green (${blurred.g} vs ${sharp.g})`)
+    assert.ok(sharp.r > blurred.r + 20, `${name} blurred background should soften red (${sharp.r} vs ${blurred.r})`)
+  }
+})
+
 test('unsupported scene background rotations fail clearly', () => {
   const cases = [
     ['color backgroundRotation', (scene) => {
       scene.background = new THREE.Color(0, 0, 0)
       scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
-    }, /scene\.backgroundRotation.*equirectangular texture backgrounds/i],
+    }, /scene\.backgroundRotation.*equirectangular or cube texture backgrounds/i],
     ['2D backgroundRotation', (scene) => {
       scene.background = solidTexture(0, 255, 0)
       scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
-    }, /scene\.backgroundRotation.*equirectangular texture backgrounds/i],
+    }, /scene\.backgroundRotation.*equirectangular or cube texture backgrounds/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
