@@ -613,13 +613,16 @@ function appendLineOrPoints(
   let outputColors: number[] | undefined
   const color = materialColor(material)
   const useVertexColors = vertexColors && material?.vertexColors !== false
+  const pbrProps = extractPbrProperties(material)
+  const textureInfo = extractTextureData(material)
   if (topology === 'lines') {
     const source = indexAttr ?? rangeIndices(vertexCount)
     if (material?.isLineDashedMaterial === true) {
+      const dashedUvs = textureInfo?.usesUv2 ? secondaryUvs : uvs
       const dashed = instancedGeometryCount > 1 || instancedPositionOffset
         ? dashedLineAttributesForInstances(
           positions,
-          uvs,
+          dashedUvs,
           useVertexColors ? vertexColors! : undefined,
           color,
           source,
@@ -633,7 +636,7 @@ function appendLineOrPoints(
         )
         : dashedLineAttributes(
           positions,
-          uvs,
+          dashedUvs,
           useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
           source,
           drawStart,
@@ -668,8 +671,6 @@ function appendLineOrPoints(
   }
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
-  const pbrProps = extractPbrProperties(material)
-  const textureInfo = extractTextureData(material)
 
   pushMesh(meshes, {
     positions: outputPositions,
