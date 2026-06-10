@@ -12,6 +12,7 @@ Headless Three.js ecosystem for rendering Three.js scenes outside the browser.
 
 - [`@headless-three/renderer` README](./packages/renderer/README.md)
 - [Three.js compatibility matrix](./docs/compatibility.md)
+- [Node loader setup](./docs/node-loader-setup.md)
 - [Renderer roadmap](./TODO.md)
 
 ## Development

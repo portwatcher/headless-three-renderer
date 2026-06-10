@@ -117,7 +117,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 
 | Task | Impact | Notes |
 |---|---:|---|
-| Document Node loader setup | High | GLTFLoader examples need clear recipes for `FileLoader`, image buffers, path resolution, and optional fetch/polyfills. |
+| Document Node loader setup | High | Node `GLTFLoader` setup is documented for local files, `FileLoader`/`fetch`, encoded image buffers, path resolution, and optional image polyfills. Remaining work is keeping examples synced with future helper APIs. |
 | Provide asset loading helpers | Medium | Optional helpers can normalize texture image data into the renderer-supported form. |
 | Add end-to-end glTF/VRM examples | High | Keep simple examples in the repo that run fully in Node. |
 
