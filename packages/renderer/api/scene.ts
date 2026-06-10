@@ -378,6 +378,8 @@ function appendPoints(
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index) : null
   const groups = effectiveGroups(geometry, index, position.count)
+  const instancedGeometryCount = instancedBufferGeometryCount(geometry)
+  const instancedPositionOffset = instancedOffsetAttribute(geometry)
   const transform = matrixElements(object.matrixWorld!, 'points.matrixWorld')
   const axes = cameraBillboardAxes(camera)
 
@@ -398,47 +400,54 @@ function appendPoints(
     const pointSize = Math.max(0, finiteOrDefault(material?.size, 1))
     if (pointSize <= 0) continue
 
-    for (let pointOffset = 0; pointOffset < points.length; pointOffset += 1) {
-      const pointIndex = points[pointOffset]
-      if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= position.count) continue
+    for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
+      const offsetIndex = instancedPositionOffset ? instancedAttributeIndex(instancedPositionOffset, instance) : 0
+      const offset = instancedPositionOffset
+        ? [
+          attributeComponent(instancedPositionOffset, offsetIndex, 0),
+          attributeComponent(instancedPositionOffset, offsetIndex, 1),
+          attributeComponent(instancedPositionOffset, offsetIndex, 2),
+        ]
+        : [0, 0, 0]
 
-      const center = transformPoint(transform, [
-        positions[pointIndex * 3],
-        positions[pointIndex * 3 + 1],
-        positions[pointIndex * 3 + 2],
-      ])
-      const worldSize = pointWorldSize(pointSize, center, material, camera, viewportHeight)
-      if (worldSize <= 0) continue
+      for (let pointOffset = 0; pointOffset < points.length; pointOffset += 1) {
+        const pointIndex = points[pointOffset]
+        if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= position.count) continue
 
-      const vertexBase = outputPositions.length / 3
-      const corners = [
-        [-0.5, -0.5, 0, 0],
-        [0.5, -0.5, 1, 0],
-        [0.5, 0.5, 1, 1],
-        [-0.5, 0.5, 0, 1],
-      ]
-      const pointUv = uvs ? [uvs[pointIndex * 2], uvs[pointIndex * 2 + 1]] : null
-      for (const [x, y, u, v] of corners) {
-        outputPositions.push(
-          center[0] + axes.right[0] * x * worldSize + axes.up[0] * y * worldSize,
-          center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
-          center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
-        )
-        if (pointUv) {
-          outputUvs.push(pointUv[0], pointUv[1])
-        } else {
-          outputUvs.push(u, v)
-        }
-        if (outputColors) {
-          outputColors.push(
-            clamp01(attributeComponent(vertexColors!, pointIndex, 0) * baseColor[0]),
-            clamp01(attributeComponent(vertexColors!, pointIndex, 1) * baseColor[1]),
-            clamp01(attributeComponent(vertexColors!, pointIndex, 2) * baseColor[2]),
-            clamp01((vertexColors!.itemSize && vertexColors!.itemSize >= 4 ? attributeComponent(vertexColors!, pointIndex, 3) : 1) * baseColor[3]),
+        const center = transformPoint(transform, [
+          positions[pointIndex * 3] + offset[0],
+          positions[pointIndex * 3 + 1] + offset[1],
+          positions[pointIndex * 3 + 2] + offset[2],
+        ])
+        const worldSize = pointWorldSize(pointSize, center, material, camera, viewportHeight)
+        if (worldSize <= 0) continue
+
+        const vertexBase = outputPositions.length / 3
+        const corners = [
+          [-0.5, -0.5, 0, 0],
+          [0.5, -0.5, 1, 0],
+          [0.5, 0.5, 1, 1],
+          [-0.5, 0.5, 0, 1],
+        ]
+        const pointUv = uvs ? [uvs[pointIndex * 2], uvs[pointIndex * 2 + 1]] : null
+        const pointColor = outputColors ? pointVertexColor(vertexColors!, baseColor, pointIndex, instance) : null
+        for (const [x, y, u, v] of corners) {
+          outputPositions.push(
+            center[0] + axes.right[0] * x * worldSize + axes.up[0] * y * worldSize,
+            center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
+            center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
           )
+          if (pointUv) {
+            outputUvs.push(pointUv[0], pointUv[1])
+          } else {
+            outputUvs.push(u, v)
+          }
+          if (pointColor) {
+            outputColors!.push(pointColor[0], pointColor[1], pointColor[2], pointColor[3])
+          }
         }
+        outputIndices.push(vertexBase, vertexBase + 1, vertexBase + 2, vertexBase, vertexBase + 2, vertexBase + 3)
       }
-      outputIndices.push(vertexBase, vertexBase + 1, vertexBase + 2, vertexBase, vertexBase + 2, vertexBase + 3)
     }
 
     if (outputPositions.length === 0) continue
@@ -473,6 +482,23 @@ function appendPoints(
       shadingModel: 'basic',
     })
   }
+}
+
+function pointVertexColor(
+  attribute: ThreeBufferAttributeLike,
+  materialColor: Color4,
+  pointIndex: number,
+  instanceIndex: number,
+): Color4 {
+  const sourceIndex = isInstancedAttribute(attribute)
+    ? instancedAttributeIndex(attribute, instanceIndex)
+    : pointIndex
+  return [
+    clamp01(attributeComponent(attribute, sourceIndex, 0) * materialColor[0]),
+    clamp01(attributeComponent(attribute, sourceIndex, 1) * materialColor[1]),
+    clamp01(attributeComponent(attribute, sourceIndex, 2) * materialColor[2]),
+    clamp01((attribute.itemSize && attribute.itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3) : 1) * materialColor[3]),
+  ]
 }
 
 function effectiveGroups(

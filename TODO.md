@@ -18,7 +18,7 @@ Already supported in the current implementation:
 - `THREE.Scene` + `THREE.Camera` input, PNG/RGBA output, reusable renderer, and target-like raw RGBA output.
 - Meshes, skinned meshes, sprites, geometry groups, vertex colors, indices, normals, UVs, and object world transforms.
 - `THREE.InstancedMesh` CPU expansion with `instanceMatrix` and `instanceColor`.
-- `THREE.InstancedBufferGeometry` CPU expansion for mesh geometry with common per-instance offset and color attributes.
+- `THREE.InstancedBufferGeometry` CPU expansion for mesh and point geometry with common per-instance offset and color attributes.
 - CPU skinning and morph target baking before native rendering.
 - `MeshBasicMaterial`, `MeshDepthMaterial`, `MeshDistanceMaterial`, `MeshLambertMaterial`, `MeshMatcapMaterial`, `MeshNormalMaterial`, `MeshPhongMaterial`, `MeshToonMaterial`, `ShadowMaterial`, `MeshStandardMaterial`, and a substantial `MeshPhysicalMaterial` subset.
 - Base color, opacity, premultiplied alpha, base/matcap/emissive/light/physical color map sRGB color-space handling, output color-space controls, base color `flipY`, normal/bump maps, metallic/roughness/specular maps, AO/light maps with selected UV channels, Phong specular maps with selected UV channels, toon gradient maps, alpha/displacement maps, alpha test, alpha hash, transparency sorting, side/culling, and texture wrap modes.
@@ -58,10 +58,10 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 
 | Task | Impact | Notes |
 |---|---:|---|
-| `InstancedBufferGeometry` edge cases | High | Basic mesh CPU expansion supports common per-instance offset/color attributes; remaining work is arbitrary custom vertex attributes, shader integration, and line/point parity. |
+| `InstancedBufferGeometry` edge cases | High | Basic mesh and point CPU expansion supports common per-instance offset/color attributes; remaining work is arbitrary custom vertex attributes, shader integration, and line parity. |
 | `renderOrder` and sorting edge cases | High | Group order, `renderOrder`, material id, projected z, and object/insertion ties are honored; remaining work is exact Three.js bounding-sphere z, materialVariant, transmissive buckets, and custom sort callback parity. |
 | Sprites and billboards | High | `THREE.Sprite`/`SpriteMaterial` CPU billboards support scale, rotation, opacity, texture maps, layers, render ordering, and main-pass clipping; remaining work is exact shadow/WebGL edge-case parity. |
-| Points material parity | Medium | `PointsMaterial` CPU billboards support size, perspective size attenuation, maps, alpha maps, vertex colors, and main-pass clipping; remaining work is hardware cap behavior, circular sprite edge cases, instanced geometry line/point parity, and shadows. |
+| Points material parity | Medium | `PointsMaterial` CPU billboards support size, perspective size attenuation, maps, alpha maps, vertex colors, main-pass clipping, and common instanced geometry offset/color attributes; remaining work is hardware cap behavior, circular sprite edge cases, line instancing parity, and shadows. |
 | Line material parity edge cases | Medium | Current lines support unlit color, vertex colors, and `LineBasicMaterial.map` texture alpha/UVs; `LineDashedMaterial` dash/gap patterns render for common cases with reconstructed map UVs and interpolated vertex colors. Non-default `linewidth` fails clearly. Remaining work is thick-line support and broader line material option parity. |
 | Scene background textures | Medium | 2D texture backgrounds are supported with output color-space conversion and approximate 2D texture blurriness; cube/equirect background mappings fail clearly. Remaining work is rendering cube/equirect backgrounds, cube/equirect blur, newer mapping controls, and exact color-space parity. |
 | Clipping planes | Medium | Render-option global planes and material-local `clippingPlanes`/`clipIntersection` affect the main pass for meshes, sprites, points, and lines, up to eight planes; `clipShadows` fails clearly. Remaining work is exact `WebGLRenderer.localClippingEnabled` state, shadow-pass clipping support, alpha-to-coverage smoothing, and golden-tested parity. |

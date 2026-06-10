@@ -96,6 +96,7 @@ The public API accepts only Three.js-like objects:
 
 - `THREE.Mesh` and `THREE.SkinnedMesh`
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
+- `THREE.InstancedBufferGeometry` for mesh and point geometry with common offset/color attributes
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
 - geometry groups with material arrays
 - mesh world transforms

@@ -4078,6 +4078,41 @@ test('PointsMaterial maps, alpha maps, and vertex colors affect billboards', () 
   assert.ok(discarded.b > discarded.g + 80, `alphaMap green channel should discard point billboards (${discarded.b} vs ${discarded.g})`)
 })
 
+test('Points with InstancedBufferGeometry expand offsets and colors', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 2
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.35, 0, 0,
+    0.35, 0, 0,
+  ]), 3))
+  geometry.setAttribute('color', new THREE.InstancedBufferAttribute(new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
+  ]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    size: 24,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 20, 34, 44, 62, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 34, 76, 62, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(redPixels > 20, `left instanced point should render red pixels (${redPixels})`)
+  assert.ok(greenPixels > 20, `right instanced point should render green pixels (${greenPixels})`)
+})
+
 test('empty scene renders the background color', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
