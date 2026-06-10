@@ -217,6 +217,9 @@ fn vs_main(input: VertexInput) -> VertexOutput {
 struct ShadowVertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) world_pos: vec3<f32>,
+  @location(1) uv: vec2<f32>,
+  @location(2) uv2: vec2<f32>,
+  @location(3) color: vec4<f32>,
 };
 
 fn shadow_vertex(input: VertexInput, layer: u32) -> ShadowVertexOutput {
@@ -224,6 +227,9 @@ fn shadow_vertex(input: VertexInput, layer: u32) -> ShadowVertexOutput {
   let world_pos = uniforms.model * vec4<f32>(input.position, 1.0);
   output.position = uniforms.light_space_matrices[layer] * world_pos;
   output.world_pos = world_pos.xyz;
+  output.uv = input.uv;
+  output.uv2 = input.uv2;
+  output.color = input.color;
   return output;
 }
 
@@ -260,6 +266,22 @@ fn vs_shadow5(input: VertexInput) -> ShadowVertexOutput {
 @fragment
 fn fs_shadow(input: ShadowVertexOutput) {
   if uniforms.shadow_params4.y > 0.5 && is_clipped_by_planes(input.world_pos) {
+    discard;
+  }
+
+  let uv = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
+  let uv2 = vec2<f32>(input.uv2.x, 1.0 - input.uv2.y);
+  var alpha = textureSample(t_diffuse, s_diffuse, transform_map_uv(uv, uv2)).a * input.color.a * uniforms.base_color.a;
+  if uniforms.ao_params.z > 0.5 {
+    let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
+    alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
+  }
+
+  let alpha_cutoff = uniforms.emissive.w;
+  if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
+    discard;
+  }
+  if uniforms.clipping_params.z > 0.5 && alpha < alpha_hash_threshold(input.position) {
     discard;
   }
 }

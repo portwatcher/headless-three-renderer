@@ -2221,6 +2221,57 @@ test('material clipShadows clips shadow caster fragments', () => {
   assert.ok(clippedLum > unclippedLum + 30, `clipShadows should remove the clipped caster shadow (${clippedLum} vs ${unclippedLum})`)
 })
 
+test('alpha-tested shadow casters honor alphaMap cutouts', () => {
+  function renderAlphaShadow(alphaMapGreen) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        alphaMap: solidTexture(255, alphaMapGreen, 255),
+        alphaTest: 0.5,
+      }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const opaqueCaster = renderAlphaShadow(255)
+  const cutoutCaster = renderAlphaShadow(0)
+  const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
+  const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
+  assert.ok(cutoutLum > opaqueLum + 30, `alphaMap cutout should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
+})
+
 test('custom shadow caster materials fail clearly', () => {
   function assertCustomShadowMaterialFails(property, customMaterial, light, pattern) {
     const scene = new THREE.Scene()

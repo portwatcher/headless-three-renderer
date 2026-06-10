@@ -1030,11 +1030,20 @@ impl GpuRenderer {
             ],
         });
 
-        // Dedicated pipeline layout for the depth-only shadow pass (uniforms only).
+        // Dedicated pipeline layout for the shadow pass. The sparse group indices match the main
+        // material pipeline so alpha-tested shadow casters can reuse base/alpha texture bindings.
         let shadow_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("headless-three-renderer shadow pipeline layout"),
-                bind_group_layouts: &[Some(&uniform_layout)],
+                bind_group_layouts: &[
+                    Some(&uniform_layout),
+                    Some(&texture_layout),
+                    Some(&normal_map_layout),
+                    Some(&mr_map_layout),
+                    Some(&emissive_map_layout),
+                    Some(&ibl_layout),
+                    Some(&ao_map_layout),
+                ],
                 immediate_size: 0,
             });
         let make_shadow_pipeline = |entry_point: &'static str, label: &'static str| {
@@ -1753,6 +1762,12 @@ impl GpuRenderer {
                     continue;
                 }
                 pass.set_bind_group(0, &mesh.bind_group, &[]);
+                pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
+                pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
+                pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
+                pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
+                pass.set_bind_group(5, &self.default_ibl_bind_group, &[]);
+                pass.set_bind_group(6, &mesh.ao_map_bind_group, &[]);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 if let Some(index_buffer) = &mesh.index_buffer {
                     pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
