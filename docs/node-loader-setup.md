@@ -55,6 +55,13 @@ const imageBuffer = render(gltf.scene, camera, { width: 1024, height: 1024 })
 await fs.writeFile('render.png', imageBuffer)
 ```
 
+The repository includes the same pattern as a runnable script:
+
+```bash
+pnpm --filter @headless-three/renderer build:ts
+node examples/render-gltf.mjs ./model.gltf render.png
+```
+
 `createEncodedImageTextureLoader()` returns a Three.js loader handler whose
 textures expose encoded PNG/JPEG/WebP bytes through `texture.image` and
 `texture.source.data`. The renderer decodes those bytes natively, so no DOM

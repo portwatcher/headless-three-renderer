@@ -56,6 +56,8 @@ fs.writeFileSync('render.png', imageBuffer)
 
 For local Node.js glTF/GLB loading with external buffers or texture files, see
 the [Node loader setup guide](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/node-loader-setup.md).
+The repository also includes a runnable
+[local glTF example](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs).
 
 The module exports a convenience `render(scene, camera, options)` function and a reusable `Renderer` class:
 

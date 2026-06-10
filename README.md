@@ -15,6 +15,10 @@ Headless Three.js ecosystem for rendering Three.js scenes outside the browser.
 - [Node loader setup](./docs/node-loader-setup.md)
 - [Renderer roadmap](./TODO.md)
 
+## Examples
+
+- [Render a local glTF/GLB asset](./examples/render-gltf.mjs)
+
 ## Development
 
 ```bash
