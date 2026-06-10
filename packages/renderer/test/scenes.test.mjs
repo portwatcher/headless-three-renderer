@@ -2108,6 +2108,30 @@ test('clipIntersection requires all local clipping planes to reject a fragment',
   assert.ok(visibleBottomRight.r > visibleBottomRight.b + 80, `bottom-right should remain visible with intersection clipping (${visibleBottomRight.r} vs ${visibleBottomRight.b})`)
 })
 
+test('scene ClippingGroup planes fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const group = new THREE.Group()
+  group.name = 'clip-group'
+  group.isClippingGroup = true
+  group.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+  group.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  scene.add(group)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /ClippingGroup.*not supported.*clip-group/i,
+  )
+})
+
 test('material clipShadows fails clearly', () => {
   const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
   material.clipShadows = true

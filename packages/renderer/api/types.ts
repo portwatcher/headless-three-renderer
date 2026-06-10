@@ -291,6 +291,7 @@ export interface ThreeObject3DLike {
   isSkinnedMesh?: boolean
   isLOD?: boolean
   isGroup?: boolean
+  isClippingGroup?: boolean
   isLine?: boolean
   isLineSegments?: boolean
   isLineLoop?: boolean
@@ -306,6 +307,10 @@ export interface ThreeObject3DLike {
   isLightProbe?: boolean
   geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike | ThreeMaterialLike[]
+  clippingPlanes?: ThreePlaneLike[] | null
+  enabled?: boolean
+  clipIntersection?: boolean
+  clipShadows?: boolean
   customDepthMaterial?: ThreeMaterialLike
   customDistanceMaterial?: ThreeMaterialLike
   center?: { x?: number; y?: number }

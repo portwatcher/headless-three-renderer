@@ -394,9 +394,21 @@ function validateUnsupportedSceneState(
       'scene.environmentRotation is not supported by @headless-three/renderer yet. Leave environmentRotation at its default zero rotation or pre-rotate the environment texture before rendering.',
     )
   }
+  validateUnsupportedClippingGroups(scene, camera)
   if (colorMode) {
     validateUnsupportedCustomShadowMaterials(scene, camera)
   }
+}
+
+function validateUnsupportedClippingGroups(scene: ThreeSceneRootLike, camera: ThreeCameraLike): void {
+  visitVisibleObjects(scene, camera, (object) => {
+    if (object.isClippingGroup !== true || object.enabled === false) return
+    if (!Array.isArray(object.clippingPlanes) || object.clippingPlanes.length === 0) return
+    const label = object.name || object.uuid || '<unnamed>'
+    throw new Error(
+      `THREE.ClippingGroup is not supported by @headless-three/renderer yet for "${label}". Use options.clippingPlanes or material.clippingPlanes for main-pass clipping, or flatten the group clipping state onto descendant materials before rendering.`,
+    )
+  })
 }
 
 function validateUnsupportedCustomShadowMaterials(scene: ThreeSceneRootLike, camera: ThreeCameraLike): void {
