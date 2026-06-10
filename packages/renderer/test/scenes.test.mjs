@@ -2149,9 +2149,9 @@ test('clipIntersection requires all local clipping planes to reject a fragment',
   assert.ok(visibleBottomRight.r > visibleBottomRight.b + 80, `bottom-right should remain visible with intersection clipping (${visibleBottomRight.r} vs ${visibleBottomRight.b})`)
 })
 
-test('scene ClippingGroup planes fail clearly', () => {
+test('scene ClippingGroup planes clip descendants', () => {
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
+  scene.background = new THREE.Color(0, 0, 1)
 
   const group = new THREE.Group()
   group.name = 'clip-group'
@@ -2167,10 +2167,94 @@ test('scene ClippingGroup planes fail clearly', () => {
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  assert.throws(
-    () => renderRgba(scene, camera, { width: 64, height: 64 }),
-    /ClippingGroup.*not supported.*clip-group/i,
-  )
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const clippedLeft = meanRegion(rgba, 64, 64, 12, 28, 24, 36)
+  const visibleRight = meanRegion(rgba, 64, 64, 40, 28, 52, 36)
+  assert.ok(clippedLeft.b > clippedLeft.r + 80, `left descendant pixels should be clipped by group plane (${clippedLeft.b} vs ${clippedLeft.r})`)
+  assert.ok(visibleRight.r > visibleRight.b + 80, `right descendant pixels should remain visible (${visibleRight.r} vs ${visibleRight.b})`)
+})
+
+test('scene ClippingGroup clipIntersection requires all group planes', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+
+  const group = new THREE.Group()
+  group.isClippingGroup = true
+  group.clipIntersection = true
+  group.clippingPlanes = [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
+    new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+  ]
+  group.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  scene.add(group)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const visibleTopLeft = meanRegion(rgba, 64, 64, 12, 12, 24, 24)
+  const clippedBottomLeft = meanRegion(rgba, 64, 64, 12, 40, 24, 52)
+  const visibleBottomRight = meanRegion(rgba, 64, 64, 40, 40, 52, 52)
+  assert.ok(visibleTopLeft.r > visibleTopLeft.b + 80, `top-left should remain visible with group intersection clipping (${visibleTopLeft.r} vs ${visibleTopLeft.b})`)
+  assert.ok(clippedBottomLeft.b > clippedBottomLeft.r + 80, `bottom-left should be clipped by both group planes (${clippedBottomLeft.b} vs ${clippedBottomLeft.r})`)
+  assert.ok(visibleBottomRight.r > visibleBottomRight.b + 80, `bottom-right should remain visible with group intersection clipping (${visibleBottomRight.r} vs ${visibleBottomRight.b})`)
+})
+
+test('scene ClippingGroup clipShadows clips descendant shadow casters', () => {
+  function renderGroupClipShadows(clipShadows) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const group = new THREE.Group()
+    group.isClippingGroup = true
+    group.clipShadows = clipShadows
+    group.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -10)]
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    group.add(caster)
+    scene.add(group)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const unclippedShadow = renderGroupClipShadows(false)
+  const clippedShadow = renderGroupClipShadows(true)
+  const unclippedLum = unclippedShadow.r + unclippedShadow.g + unclippedShadow.b
+  const clippedLum = clippedShadow.r + clippedShadow.g + clippedShadow.b
+  assert.ok(clippedLum > unclippedLum + 30, `group clipShadows should remove descendant caster shadow (${clippedLum} vs ${unclippedLum})`)
 })
 
 test('material clipShadows clips shadow caster fragments', () => {
