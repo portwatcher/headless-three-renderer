@@ -1395,6 +1395,34 @@ test('SpriteMaterial map decodes sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 15, `linear sprite map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('SpriteMaterial map applies texture UV transforms', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 4, 1)
+  map.offset.set(0.5, 0)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map,
+    color: 0xffffff,
+  }))
+  sprite.scale.set(2, 2, 1)
+  scene.add(sprite)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 18, 28, 26, 36)
+  assert.ok(mean.g > mean.r + 40, `sprite map offset should shift left sprite UVs from red to green (${mean.g} vs ${mean.r})`)
+})
+
 test('SpriteMaterial honors sprite scale and material rotation', () => {
   function renderRotatedSprite(rotation) {
     const scene = new THREE.Scene()
@@ -5019,6 +5047,40 @@ test('LineBasicMaterial map RGB multiplies line color from UVs', () => {
   assert.ok(greenPixels > 2, `secondary line map texel should tint line green (${greenPixels})`)
 })
 
+test('LineBasicMaterial map applies texture UV transforms', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.offset.set(0.5, 0)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Line(
+    geom,
+    new THREE.LineBasicMaterial({ color: 0xffffff, map }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const image = renderRgba(scene, camera, { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(image, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(greenPixels > 2, `line map offset should shift line UVs from red to green (${greenPixels})`)
+})
+
 test('LineBasicMaterial map decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
@@ -5438,6 +5500,37 @@ test('PointsMaterial maps, alpha maps, and vertex colors affect billboards', () 
   ))
   const discarded = meanRgba(renderRgba(alphaScene, camera, { width: 64, height: 64 }))
   assert.ok(discarded.b > discarded.g + 80, `alphaMap green channel should discard point billboards (${discarded.b} vs ${discarded.g})`)
+})
+
+test('PointsMaterial map applies texture UV transforms', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 4, 1)
+  map.offset.set(0.5, 0)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 30, 44, 38, 52)
+  assert.ok(mean.g > mean.r + 40, `point map offset should shift left point-sprite UVs from red to green (${mean.g} vs ${mean.r})`)
 })
 
 test('PointsMaterial map decodes sRGB colorSpace before shading', () => {

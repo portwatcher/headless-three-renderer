@@ -114,6 +114,7 @@ The public API accepts only Three.js-like objects:
 - material base color and opacity
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
+- base, sprite, point, and line color maps honor texture UV transforms
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, toon gradient, matcap color-map, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
@@ -268,4 +269,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. `LineBasicMaterial.map` samples line UVs, including `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed line maps preserve the selected UV channel while reconstructing dash segments. `PointsMaterial` maps use point-sprite UVs and decode sRGB color maps. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed line maps preserve the selected UV channel while reconstructing dash segments. `PointsMaterial` maps use point-sprite UVs, honor texture UV transforms, and decode sRGB color maps. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.
