@@ -116,7 +116,7 @@ The public API accepts only Three.js-like objects:
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and environment-backed or scene-color transmission / refraction
-- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, packed texture-group sampler settings, and sheen/specular color maps include sRGB color-space decode
+- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
 - custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with `texture.channel` UV selection and wrap/filter sampler settings
 - normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with `texture.channel` UV selection and wrap/filter sampler settings
@@ -241,7 +241,7 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. Additional shadow-casting lights and non-square `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular-map support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `THREE.Sprite` and `THREE.Points` shadow flags fail clearly until billboard shadow rendering lands. Additional shadow-casting lights and non-square `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular-map support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
 
 Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has `{ left, right, top, bottom, near, far, split }` bounds.
 
@@ -265,4 +265,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Non-dashed `LineBasicMaterial.map` samples line UVs, including alpha-tested texture alpha.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Non-dashed `LineBasicMaterial.map` samples line UVs, including alpha-tested texture alpha. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.

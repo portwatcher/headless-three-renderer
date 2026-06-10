@@ -285,6 +285,8 @@ function appendSprite(
   groupOrder: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
 ): void {
+  assertUnsupportedBillboardShadows(object, 'THREE.Sprite')
+
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
 
@@ -369,6 +371,8 @@ function appendPoints(
   viewportHeight: number,
   globalClippingPlanes: readonly NativeClippingPlane[],
 ): void {
+  assertUnsupportedBillboardShadows(object, 'THREE.Points')
+
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
   if (!position) return
@@ -481,6 +485,15 @@ function appendPoints(
       ...pbrProps,
       shadingModel: 'basic',
     })
+  }
+}
+
+function assertUnsupportedBillboardShadows(object: ThreeObject3DLike, label: string): void {
+  if (object.castShadow === true) {
+    throw new Error(`${label} castShadow is not supported by @headless-three/renderer yet. Disable castShadow or expand the billboard to mesh geometry before rendering shadows.`)
+  }
+  if (object.receiveShadow === true) {
+    throw new Error(`${label} receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the billboard to mesh geometry before rendering shadows.`)
   }
 }
 

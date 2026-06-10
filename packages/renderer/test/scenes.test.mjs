@@ -1180,6 +1180,26 @@ test('SpriteMaterial honors sprite scale and material rotation', () => {
   assert.ok(vertical.height > vertical.width * 2, `rotated sprite should be tall (${vertical.width}x${vertical.height})`)
 })
 
+test('Sprite shadow flags fail clearly', () => {
+  const cases = [
+    ['castShadow', /THREE\.Sprite castShadow.*not supported/i],
+    ['receiveShadow', /THREE\.Sprite receiveShadow.*not supported/i],
+  ]
+
+  for (const [property, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+    sprite[property] = true
+    scene.add(sprite)
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      property,
+    )
+  }
+})
+
 test('camera layers filter renderable objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -4359,6 +4379,29 @@ test('Points with InstancedBufferGeometry expand offsets and colors', () => {
   const greenPixels = countRegionPixels(rgba, 96, 96, 52, 34, 76, 62, (r, g, b) => g > r + 40 && g > b + 40)
   assert.ok(redPixels > 20, `left instanced point should render red pixels (${redPixels})`)
   assert.ok(greenPixels > 20, `right instanced point should render green pixels (${greenPixels})`)
+})
+
+test('Points shadow flags fail clearly', () => {
+  const cases = [
+    ['castShadow', /THREE\.Points castShadow.*not supported/i],
+    ['receiveShadow', /THREE\.Points receiveShadow.*not supported/i],
+  ]
+
+  for (const [property, pattern] of cases) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+    const scene = new THREE.Scene()
+    const points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xffffff, size: 12 }))
+    points[property] = true
+    scene.add(points)
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      property,
+    )
+  }
 })
 
 test('empty scene renders the background color', () => {
