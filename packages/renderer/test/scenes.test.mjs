@@ -4804,6 +4804,32 @@ test('LineDashedMaterial renders fewer visible line pixels than a solid line', (
   assert.ok(dashedRatio < solidRatio * 0.85, `dashed line should cover less than solid (${dashedRatio} vs ${solidRatio})`)
 })
 
+test('LineDashedMaterial scale changes dash coverage', () => {
+  function renderScale(scale) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      dashSize: 0.5,
+      gapSize: 10,
+      scale,
+    }))
+    line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0.1, 0.1, 0.1)
+    scene.add(line)
+    return nonBackgroundRatio(renderRgba(scene, makeCamera(), { width: 96, height: 96 }), BG)
+  }
+
+  const lowScale = renderScale(0.1)
+  const highScale = renderScale(2)
+  assert.ok(lowScale > 0.001, `low scale should keep the line visible (${lowScale})`)
+  assert.ok(highScale < lowScale * 0.35, `higher scale should advance into the gap sooner (${highScale} vs ${lowScale})`)
+})
+
 test('line materials with non-default linewidth fail clearly', () => {
   const cases = [
     new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 }),

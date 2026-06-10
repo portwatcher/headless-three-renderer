@@ -147,7 +147,7 @@ The public API accepts only Three.js-like objects:
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 fail clearly until native anisotropic filtering lands
-- dashed line material segments preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
+- dashed line material segments honor dash/gap/scale settings and preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
 - line material `linewidth` values other than 1 fail clearly until thick-line support lands
 
 Texture image data can be:
