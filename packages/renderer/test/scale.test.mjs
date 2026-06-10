@@ -74,6 +74,33 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
+test('texture-heavy scene budget renders many unique maps', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const geometry = new THREE.PlaneGeometry(0.18, 0.18)
+  for (let row = 0; row < 8; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      const index = row * 8 + col
+      const material = new THREE.MeshBasicMaterial({ map: makeTexture(index) })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.position.set((col - 3.5) * 0.22, (row - 3.5) * 0.22, 0)
+      scene.add(mesh)
+    }
+  }
+
+  const camera = new THREE.OrthographicCamera(-1.1, 1.1, 1.1, -1.1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = new Renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.25, `texture-heavy scene should render many mapped pixels (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `texture-heavy scene should retain textured color (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('more than 16 visible non-ambient lights fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ color: 0xffffff })))
