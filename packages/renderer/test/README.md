@@ -29,3 +29,5 @@ On Linux CI runners without a GPU, `mesa-vulkan-drivers` provides `lavapipe` (so
 ## Adding visual-regression snapshots (optional)
 
 Pixel-accurate snapshots are not committed by default because they differ across GPU backends. If you want to add them for a single canonical platform (e.g. macOS), store reference PNGs under `test/__snapshots__/` and gate the comparison behind `process.env.UPDATE_SNAPSHOTS === '1'` to regenerate.
+
+Scale-test counts and platform notes are documented in [`docs/scale-budgets.md`](../../../docs/scale-budgets.md).

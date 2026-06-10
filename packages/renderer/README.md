@@ -75,7 +75,7 @@ It also exports Node loader helpers:
 
 ## Supported Three.js Surface
 
-See the versioned [compatibility matrix](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/compatibility.md) for the public support contract, known gaps, and platform package status.
+See the versioned [compatibility matrix](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/compatibility.md) for the public support contract, known gaps, and platform package status. Scale-test budgets and platform notes are documented in [docs/scale-budgets.md](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/scale-budgets.md).
 
 The public API accepts only Three.js-like objects:
 
