@@ -241,7 +241,7 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `THREE.Sprite` and `THREE.Points` shadow flags fail clearly until billboard shadow rendering lands. Additional shadow-casting lights and non-square `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular-map support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `THREE.Sprite`/`THREE.Points` shadow flags and `Object3D.customDepthMaterial`/`customDistanceMaterial` shadow overrides fail clearly until those shadow paths land. Additional shadow-casting lights and non-square `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular-map support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
 
 Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has `{ left, right, top, bottom, near, far, split }` bounds.
 

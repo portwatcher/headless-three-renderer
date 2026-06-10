@@ -2101,6 +2101,45 @@ test('material clipShadows fails clearly', () => {
   )
 })
 
+test('custom shadow caster materials fail clearly', () => {
+  function assertCustomShadowMaterialFails(property, customMaterial, light, pattern) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    mesh.name = property
+    mesh.castShadow = true
+    mesh[property] = customMaterial
+    scene.add(mesh)
+
+    light.castShadow = true
+    light.position.set(2, 3, 2)
+    scene.add(light)
+    if (light.target) scene.add(light.target)
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      property,
+    )
+  }
+
+  assertCustomShadowMaterialFails(
+    'customDepthMaterial',
+    new THREE.MeshDepthMaterial({ alphaTest: 0.5 }),
+    new THREE.DirectionalLight(0xffffff, 1),
+    /customDepthMaterial.*not supported.*directional or spot shadows/i,
+  )
+  assertCustomShadowMaterialFails(
+    'customDistanceMaterial',
+    new THREE.MeshDistanceMaterial({ alphaTest: 0.5 }),
+    new THREE.PointLight(0xffffff, 1),
+    /customDistanceMaterial.*not supported.*point-light shadows/i,
+  )
+})
+
 test('base color map applies texture UV transforms', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,

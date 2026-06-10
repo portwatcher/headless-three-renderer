@@ -1,5 +1,6 @@
 import type {
   ThreeSceneRootLike,
+  ThreeObject3DLike,
   ThreeCameraLike,
   RenderOptions,
   RenderTargetLike,
@@ -21,6 +22,7 @@ import { flattenScene } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, extractEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
+import { objectLayersMatchCamera } from './layers'
 
 export {
   EncodedImageTextureLoader,
@@ -120,10 +122,10 @@ function toNativeInput(
 ): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
   validateThreeSceneRoot(scene)
   validateThreeCamera(camera)
-  validateUnsupportedSceneState(scene)
   validateUnsupportedRenderOptions(options)
   const renderMode = normalizedRenderMode(options.renderMode)
   const colorMode = renderMode === 'color'
+  validateUnsupportedSceneState(scene, camera, colorMode)
 
   if (typeof scene.updateMatrixWorld === 'function') {
     scene.updateMatrixWorld(true)
@@ -377,7 +379,11 @@ function booleanOrNumber(value: unknown): number | undefined {
   return finiteOrUndefined(value)
 }
 
-function validateUnsupportedSceneState(scene: ThreeSceneRootLike): void {
+function validateUnsupportedSceneState(
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  colorMode: boolean,
+): void {
   if (hasNonZeroRotation(scene.backgroundRotation)) {
     throw new Error(
       'scene.backgroundRotation is not supported by @headless-three/renderer yet. Leave backgroundRotation at its default zero rotation or pre-rotate the background texture before rendering.',
@@ -387,6 +393,57 @@ function validateUnsupportedSceneState(scene: ThreeSceneRootLike): void {
     throw new Error(
       'scene.environmentRotation is not supported by @headless-three/renderer yet. Leave environmentRotation at its default zero rotation or pre-rotate the environment texture before rendering.',
     )
+  }
+  if (colorMode) {
+    validateUnsupportedCustomShadowMaterials(scene, camera)
+  }
+}
+
+function validateUnsupportedCustomShadowMaterials(scene: ThreeSceneRootLike, camera: ThreeCameraLike): void {
+  const shadowUsage = shadowLightUsage(scene, camera)
+  if (!shadowUsage.depth && !shadowUsage.distance) return
+
+  visitVisibleObjects(scene, camera, (object) => {
+    if (object.castShadow !== true) return
+    const label = object.name || object.uuid || '<unnamed>'
+    if (shadowUsage.depth && object.customDepthMaterial != null) {
+      throw new Error(
+        `THREE.Object3D.customDepthMaterial is not supported by @headless-three/renderer yet for shadow caster "${label}". Disable customDepthMaterial or bake its alpha/displacement behavior into the main material before rendering directional or spot shadows.`,
+      )
+    }
+    if (shadowUsage.distance && object.customDistanceMaterial != null) {
+      throw new Error(
+        `THREE.Object3D.customDistanceMaterial is not supported by @headless-three/renderer yet for shadow caster "${label}". Disable customDistanceMaterial or bake its alpha/displacement behavior into the main material before rendering point-light shadows.`,
+      )
+    }
+  })
+}
+
+function shadowLightUsage(scene: ThreeSceneRootLike, camera: ThreeCameraLike): { depth: boolean; distance: boolean } {
+  const usage = { depth: false, distance: false }
+  visitVisibleObjects(scene, camera, (object) => {
+    if (object.castShadow !== true || object.isLight !== true) return
+    if (object.isPointLight === true) {
+      usage.distance = true
+    } else if (object.isDirectionalLight === true || object.isSpotLight === true) {
+      usage.depth = true
+    }
+  })
+  return usage
+}
+
+function visitVisibleObjects(
+  object: ThreeSceneRootLike | ThreeObject3DLike,
+  camera: ThreeCameraLike,
+  callback: (object: ThreeObject3DLike) => void,
+): void {
+  if (!object || object.visible === false) return
+  if (objectLayersMatchCamera(object, camera)) {
+    callback(object)
+  }
+  const children = Array.isArray(object.children) ? object.children : []
+  for (const child of children) {
+    visitVisibleObjects(child, camera, callback)
   }
 }
 

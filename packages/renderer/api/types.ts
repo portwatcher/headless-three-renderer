@@ -306,6 +306,8 @@ export interface ThreeObject3DLike {
   isLightProbe?: boolean
   geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike | ThreeMaterialLike[]
+  customDepthMaterial?: ThreeMaterialLike
+  customDistanceMaterial?: ThreeMaterialLike
   center?: { x?: number; y?: number }
   count?: number
   instanceMatrix?: ThreeBufferAttributeLike
