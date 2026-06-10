@@ -1844,14 +1844,27 @@ impl GpuRenderer {
         wrap_t: WrapMode,
         mag_filter: TextureFilter,
         min_filter: TextureFilter,
+        anisotropy: u16,
     ) -> wgpu::Sampler {
         if wrap_s == WrapMode::ClampToEdge
             && wrap_t == WrapMode::ClampToEdge
             && mag_filter == TextureFilter::Linear
             && min_filter == TextureFilter::Linear
+            && anisotropy <= 1
         {
             return self.sampler.clone();
         }
+        let anisotropy_clamp =
+            if mag_filter == TextureFilter::Linear && min_filter == TextureFilter::Linear {
+                anisotropy.clamp(1, 16)
+            } else {
+                1
+            };
+        let mipmap_filter = if anisotropy_clamp > 1 {
+            wgpu::MipmapFilterMode::Linear
+        } else {
+            wgpu::MipmapFilterMode::Nearest
+        };
         self.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("headless-three-renderer per-mesh sampler"),
             address_mode_u: wrap_s.to_address_mode(),
@@ -1859,7 +1872,8 @@ impl GpuRenderer {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: mag_filter.to_filter_mode(),
             min_filter: min_filter.to_filter_mode(),
-            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            mipmap_filter,
+            anisotropy_clamp,
             ..Default::default()
         })
     }
@@ -1870,6 +1884,7 @@ impl GpuRenderer {
             settings.wrap_t,
             settings.mag_filter,
             settings.min_filter,
+            settings.anisotropy,
         )
     }
 
@@ -1889,6 +1904,7 @@ impl GpuRenderer {
             background.texture.wrap_t,
             background.texture.mag_filter,
             background.texture.min_filter,
+            background.texture.anisotropy,
         );
         let background_flags = if background.is_srgb { 1.0 } else { 0.0 }
             + if output_color_space.is_linear() {
@@ -2506,6 +2522,7 @@ impl GpuRenderer {
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.anisotropy,
                 );
                 let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("headless-three-renderer mesh texture bind group"),
@@ -2565,6 +2582,7 @@ impl GpuRenderer {
                         tex.wrap_t,
                         tex.mag_filter,
                         tex.min_filter,
+                        tex.anisotropy,
                     );
                     let tex_bind_group =
                         self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -2624,6 +2642,7 @@ impl GpuRenderer {
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.anisotropy,
                 );
                 let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("headless-three-renderer metallic-roughness bind group"),
@@ -2682,6 +2701,7 @@ impl GpuRenderer {
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.anisotropy,
                 );
                 let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("headless-three-renderer emissive map bind group"),
@@ -2813,27 +2833,49 @@ impl GpuRenderer {
                 .ao_map
                 .as_ref()
                 .map(|tex| {
-                    self.sampler_for_texture(tex.wrap_s, tex.wrap_t, tex.mag_filter, tex.min_filter)
+                    self.sampler_for_texture(
+                        tex.wrap_s,
+                        tex.wrap_t,
+                        tex.mag_filter,
+                        tex.min_filter,
+                        tex.anisotropy,
+                    )
                 })
                 .unwrap_or_else(|| self.sampler.clone());
             let alpha_sampler = mesh
                 .alpha_map
                 .as_ref()
                 .map(|tex| {
-                    self.sampler_for_texture(tex.wrap_s, tex.wrap_t, tex.mag_filter, tex.min_filter)
+                    self.sampler_for_texture(
+                        tex.wrap_s,
+                        tex.wrap_t,
+                        tex.mag_filter,
+                        tex.min_filter,
+                        tex.anisotropy,
+                    )
                 })
                 .unwrap_or_else(|| self.sampler.clone());
             let light_sampler = mesh
                 .light_map
                 .as_ref()
                 .map(|tex| {
-                    self.sampler_for_texture(tex.wrap_s, tex.wrap_t, tex.mag_filter, tex.min_filter)
+                    self.sampler_for_texture(
+                        tex.wrap_s,
+                        tex.wrap_t,
+                        tex.mag_filter,
+                        tex.min_filter,
+                        tex.anisotropy,
+                    )
                 })
                 .unwrap_or_else(|| self.sampler.clone());
             let specular_sampler = match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
-                (None, Some(tex)) => {
-                    self.sampler_for_texture(tex.wrap_s, tex.wrap_t, tex.mag_filter, tex.min_filter)
-                }
+                (None, Some(tex)) => self.sampler_for_texture(
+                    tex.wrap_s,
+                    tex.wrap_t,
+                    tex.mag_filter,
+                    tex.min_filter,
+                    tex.anisotropy,
+                ),
                 _ => self.sampler.clone(),
             };
             let physical_layers_sampler = mesh
@@ -2855,7 +2897,13 @@ impl GpuRenderer {
                 .clearcoat_normal_map
                 .as_ref()
                 .map(|tex| {
-                    self.sampler_for_texture(tex.wrap_s, tex.wrap_t, tex.mag_filter, tex.min_filter)
+                    self.sampler_for_texture(
+                        tex.wrap_s,
+                        tex.wrap_t,
+                        tex.mag_filter,
+                        tex.min_filter,
+                        tex.anisotropy,
+                    )
                 })
                 .unwrap_or_else(|| self.sampler.clone());
 

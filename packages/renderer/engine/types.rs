@@ -30,6 +30,8 @@ pub struct RenderScene {
     pub background_texture_mag_filter: Option<String>,
     /// Background texture minification filter: `"nearest"` or `"linear"`. Defaults to `"linear"`.
     pub background_texture_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub background_texture_anisotropy: Option<f64>,
     /// Background texture UV transform `[a, c, tx, b, d, ty]`.
     pub background_texture_transform: Option<Vec<f64>>,
     /// Background texture color space. `"srgb"` is decoded to linear before output conversion.
@@ -179,6 +181,8 @@ pub struct SceneMesh {
     pub texture_mag_filter: Option<String>,
     /// Texture minification filter: `"nearest"` or `"linear"`. Defaults to `"linear"`.
     pub texture_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub texture_anisotropy: Option<f64>,
     /// Base-color map UV transform `[a, c, tx, b, d, ty]`.
     pub texture_transform: Option<Vec<f64>>,
     /// Base-color texture color space. `"srgb"` is decoded to linear before shading.
@@ -199,6 +203,8 @@ pub struct SceneMesh {
     pub metallic_roughness_texture_mag_filter: Option<String>,
     /// Metallic-roughness texture minification filter.
     pub metallic_roughness_texture_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub metallic_roughness_texture_anisotropy: Option<f64>,
     /// Metallic-roughness map UV transform `[a, c, tx, b, d, ty]`.
     pub metallic_roughness_texture_transform: Option<Vec<f64>>,
     /// Whether metallic-roughness map sampling uses the secondary UV stream.
@@ -217,6 +223,8 @@ pub struct SceneMesh {
     pub specular_map_mag_filter: Option<String>,
     /// Specular map minification filter.
     pub specular_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub specular_map_anisotropy: Option<f64>,
     /// Specular map UV transform `[a, c, tx, b, d, ty]`.
     pub specular_map_transform: Option<Vec<f64>>,
     /// Metallic factor (0..1). Defaults to 0.
@@ -239,6 +247,8 @@ pub struct SceneMesh {
     pub clearcoat_map_mag_filter: Option<String>,
     /// Clearcoat map minification filter.
     pub clearcoat_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub clearcoat_map_anisotropy: Option<f64>,
     /// Clearcoat map UV transform `[a, c, tx, b, d, ty]`.
     pub clearcoat_map_transform: Option<Vec<f64>>,
     /// Whether clearcoat map sampling uses the secondary UV stream.
@@ -259,6 +269,8 @@ pub struct SceneMesh {
     pub clearcoat_roughness_map_mag_filter: Option<String>,
     /// Clearcoat roughness map minification filter.
     pub clearcoat_roughness_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub clearcoat_roughness_map_anisotropy: Option<f64>,
     /// Clearcoat roughness map UV transform `[a, c, tx, b, d, ty]`.
     pub clearcoat_roughness_map_transform: Option<Vec<f64>>,
     /// Whether clearcoat roughness map sampling uses the secondary UV stream.
@@ -277,6 +289,8 @@ pub struct SceneMesh {
     pub clearcoat_normal_map_mag_filter: Option<String>,
     /// Clearcoat normal map minification filter.
     pub clearcoat_normal_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub clearcoat_normal_map_anisotropy: Option<f64>,
     /// Clearcoat normal map UV transform `[a, c, tx, b, d, ty]`.
     pub clearcoat_normal_map_transform: Option<Vec<f64>>,
     /// Whether clearcoat normal map sampling uses the secondary UV stream.
@@ -299,6 +313,8 @@ pub struct SceneMesh {
     pub sheen_color_map_mag_filter: Option<String>,
     /// Sheen color map minification filter.
     pub sheen_color_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub sheen_color_map_anisotropy: Option<f64>,
     /// Sheen color map UV transform `[a, c, tx, b, d, ty]`.
     pub sheen_color_map_transform: Option<Vec<f64>>,
     /// Sheen color texture color space. `"srgb"` is decoded to linear before shading.
@@ -321,6 +337,8 @@ pub struct SceneMesh {
     pub sheen_roughness_map_mag_filter: Option<String>,
     /// Sheen roughness map minification filter.
     pub sheen_roughness_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub sheen_roughness_map_anisotropy: Option<f64>,
     /// Sheen roughness map UV transform `[a, c, tx, b, d, ty]`.
     pub sheen_roughness_map_transform: Option<Vec<f64>>,
     /// Whether sheen roughness map sampling uses the secondary UV stream.
@@ -343,6 +361,8 @@ pub struct SceneMesh {
     pub anisotropy_map_mag_filter: Option<String>,
     /// Anisotropy map minification filter.
     pub anisotropy_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub anisotropy_map_anisotropy: Option<f64>,
     /// Anisotropy map UV transform `[a, c, tx, b, d, ty]`.
     pub anisotropy_map_transform: Option<Vec<f64>>,
     /// Whether anisotropy map sampling uses the secondary UV stream.
@@ -363,6 +383,8 @@ pub struct SceneMesh {
     pub transmission_map_mag_filter: Option<String>,
     /// Transmission map minification filter.
     pub transmission_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub transmission_map_anisotropy: Option<f64>,
     /// Transmission map UV transform `[a, c, tx, b, d, ty]`.
     pub transmission_map_transform: Option<Vec<f64>>,
     /// Whether transmission map sampling uses the secondary UV stream.
@@ -385,6 +407,8 @@ pub struct SceneMesh {
     pub thickness_map_mag_filter: Option<String>,
     /// Thickness map minification filter.
     pub thickness_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub thickness_map_anisotropy: Option<f64>,
     /// Thickness map UV transform `[a, c, tx, b, d, ty]`.
     pub thickness_map_transform: Option<Vec<f64>>,
     /// Whether thickness map sampling uses the secondary UV stream.
@@ -411,6 +435,8 @@ pub struct SceneMesh {
     pub specular_color_map_mag_filter: Option<String>,
     /// Specular color map minification filter.
     pub specular_color_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub specular_color_map_anisotropy: Option<f64>,
     /// Specular color map UV transform `[a, c, tx, b, d, ty]`.
     pub specular_color_map_transform: Option<Vec<f64>>,
     /// Specular color texture color space. `"srgb"` is decoded to linear before shading.
@@ -431,6 +457,8 @@ pub struct SceneMesh {
     pub specular_intensity_map_mag_filter: Option<String>,
     /// Specular intensity map minification filter.
     pub specular_intensity_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub specular_intensity_map_anisotropy: Option<f64>,
     /// Specular intensity map UV transform `[a, c, tx, b, d, ty]`.
     pub specular_intensity_map_transform: Option<Vec<f64>>,
     /// Whether specular intensity map sampling uses the secondary UV stream.
@@ -457,6 +485,8 @@ pub struct SceneMesh {
     pub normal_map_mag_filter: Option<String>,
     /// Normal map minification filter.
     pub normal_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub normal_map_anisotropy: Option<f64>,
     /// Normal map UV transform `[a, c, tx, b, d, ty]`.
     pub normal_map_transform: Option<Vec<f64>>,
     /// Whether normal map sampling uses the secondary UV stream.
@@ -477,6 +507,8 @@ pub struct SceneMesh {
     pub bump_map_mag_filter: Option<String>,
     /// Bump map minification filter.
     pub bump_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub bump_map_anisotropy: Option<f64>,
     /// Bump map UV transform `[a, c, tx, b, d, ty]`.
     pub bump_map_transform: Option<Vec<f64>>,
     /// Whether bump map sampling uses the secondary UV stream.
@@ -538,6 +570,8 @@ pub struct SceneMesh {
     pub emissive_map_mag_filter: Option<String>,
     /// Emissive map minification filter.
     pub emissive_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub emissive_map_anisotropy: Option<f64>,
     /// Emissive map UV transform `[a, c, tx, b, d, ty]`.
     pub emissive_map_transform: Option<Vec<f64>>,
     /// Emissive texture color space. `"srgb"` is decoded to linear before shading.
@@ -559,6 +593,8 @@ pub struct SceneMesh {
     pub ao_map_mag_filter: Option<String>,
     /// AO map minification filter.
     pub ao_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub ao_map_anisotropy: Option<f64>,
     /// AO map UV transform `[a, c, tx, b, d, ty]`.
     pub ao_map_transform: Option<Vec<f64>>,
     /// AO map intensity multiplier (0..1). Defaults to 1.
@@ -578,6 +614,8 @@ pub struct SceneMesh {
     pub light_map_mag_filter: Option<String>,
     /// Light map minification filter.
     pub light_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub light_map_anisotropy: Option<f64>,
     /// Light map UV transform `[a, c, tx, b, d, ty]`.
     pub light_map_transform: Option<Vec<f64>>,
     /// Light-map texture color space. `"srgb"` is decoded to linear before shading.
@@ -599,6 +637,8 @@ pub struct SceneMesh {
     pub alpha_map_mag_filter: Option<String>,
     /// Alpha map minification filter.
     pub alpha_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub alpha_map_anisotropy: Option<f64>,
     /// Alpha map UV transform `[a, c, tx, b, d, ty]`.
     pub alpha_map_transform: Option<Vec<f64>>,
     /// Whether alpha map sampling uses the secondary UV stream.

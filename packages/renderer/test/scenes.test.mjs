@@ -2698,7 +2698,7 @@ test('compressed texture inputs fail with a clear pre-decode error', () => {
   )
 })
 
-test('texture anisotropy inputs fail clearly', () => {
+test('texture anisotropy inputs render with native samplers', () => {
   const map = solidTexture(255, 255, 255)
   map.anisotropy = 4
 
@@ -2710,10 +2710,8 @@ test('texture anisotropy inputs fail clearly', () => {
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  assert.throws(
-    () => renderRgba(scene, camera, { width: 64, height: 64 }),
-    /texture anisotropy.*not supported/i,
-  )
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > 120 && mean.g > 120 && mean.b > 120, `anisotropic mapped plane should render visibly (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('explicit texture mipmaps fail clearly', () => {
@@ -2742,15 +2740,12 @@ test('unsupported texture inputs fail clearly for background and environment slo
     image: { width: 4, height: 4 },
     mipmaps: [{ data: new Uint8Array(16), width: 4, height: 4 }],
   }
-  const anisotropicTexture = solidTexture(255, 255, 255)
-  anisotropicTexture.anisotropy = 4
   const mipmappedTexture = solidTexture(255, 255, 255)
   mipmappedTexture.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
 
   const cases = [
     ['compressed background', (scene) => { scene.background = compressedTexture }, /compressed texture.*pre-decode/i],
     ['compressed environment', (scene) => { scene.environment = compressedTexture }, /compressed texture.*pre-decode/i],
-    ['anisotropic background', (scene) => { scene.background = anisotropicTexture }, /texture anisotropy.*not supported/i],
     ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
   ]
 
@@ -3492,6 +3487,33 @@ test('conflicting packed physical texture samplers fail clearly', () => {
   assert.throws(
     () => renderRgba(scene, camera, { width: 64, height: 64 }),
     /physical extension scalar maps.*packed.*sampler settings.*clearcoatRoughnessMap.*clearcoatMap/i,
+  )
+})
+
+test('conflicting packed physical texture anisotropy settings fail clearly', () => {
+  const clearcoatMap = solidTexture(255, 0, 0)
+  clearcoatMap.anisotropy = 4
+  const clearcoatRoughnessMap = solidTexture(0, 255, 0)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshPhysicalMaterial({
+      clearcoat: 1,
+      clearcoatMap,
+      clearcoatRoughness: 0.5,
+      clearcoatRoughnessMap,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /physical extension scalar maps.*packed.*anisotropy.*clearcoatRoughnessMap.*clearcoatMap/i,
   )
 })
 
@@ -5107,6 +5129,16 @@ test('background textures honor horizontal wrap modes', () => {
   const repeated = renderWrap(THREE.RepeatWrapping)
   assert.ok(clamped.g > clamped.r + 80, `clamped offset should hold the green edge texel (${clamped.g} vs ${clamped.r})`)
   assert.ok(repeated.r > repeated.g + 80, `repeated offset should wrap back to the red texel (${repeated.r} vs ${repeated.g})`)
+})
+
+test('background texture anisotropy renders with native sampler settings', () => {
+  const background = solidTexture(32, 180, 64)
+  background.anisotropy = 4
+
+  const scene = new THREE.Scene()
+  scene.background = background
+  const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 80 && mean.g > mean.b + 80, `anisotropic background texture should render green (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('background textures decode sRGB colorSpace before output conversion', () => {

@@ -193,6 +193,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.clearcoatMapWrapT = wrapModeToString(material.clearcoatMap?.wrapT)
     props.clearcoatMapMagFilter = filterModeToString(material.clearcoatMap?.magFilter)
     props.clearcoatMapMinFilter = filterModeToString(material.clearcoatMap?.minFilter)
+    props.clearcoatMapAnisotropy = textureAnisotropy(material.clearcoatMap)
     props.clearcoatMapTransform = textureTransform(material.clearcoatMap)
     props.clearcoatMapUsesUv2 = textureUvChannel(material.clearcoatMap) > 0
   }
@@ -208,6 +209,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.clearcoatRoughnessMapWrapT = wrapModeToString(material.clearcoatRoughnessMap?.wrapT)
     props.clearcoatRoughnessMapMagFilter = filterModeToString(material.clearcoatRoughnessMap?.magFilter)
     props.clearcoatRoughnessMapMinFilter = filterModeToString(material.clearcoatRoughnessMap?.minFilter)
+    props.clearcoatRoughnessMapAnisotropy = textureAnisotropy(material.clearcoatRoughnessMap)
     props.clearcoatRoughnessMapTransform = textureTransform(material.clearcoatRoughnessMap)
     props.clearcoatRoughnessMapUsesUv2 = textureUvChannel(material.clearcoatRoughnessMap) > 0
   }
@@ -220,6 +222,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.clearcoatNormalMapWrapT = wrapModeToString(material.clearcoatNormalMap?.wrapT)
     props.clearcoatNormalMapMagFilter = filterModeToString(material.clearcoatNormalMap?.magFilter)
     props.clearcoatNormalMapMinFilter = filterModeToString(material.clearcoatNormalMap?.minFilter)
+    props.clearcoatNormalMapAnisotropy = textureAnisotropy(material.clearcoatNormalMap)
     props.clearcoatNormalMapTransform = textureTransform(material.clearcoatNormalMap)
     props.clearcoatNormalMapUsesUv2 = textureUvChannel(material.clearcoatNormalMap) > 0
   }
@@ -248,6 +251,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.sheenColorMapWrapT = wrapModeToString(material.sheenColorMap?.wrapT)
     props.sheenColorMapMagFilter = filterModeToString(material.sheenColorMap?.magFilter)
     props.sheenColorMapMinFilter = filterModeToString(material.sheenColorMap?.minFilter)
+    props.sheenColorMapAnisotropy = textureAnisotropy(material.sheenColorMap)
     props.sheenColorMapTransform = textureTransform(material.sheenColorMap)
     props.sheenColorMapColorSpace = textureColorSpace(material.sheenColorMap)
     props.sheenColorMapUsesUv2 = textureUvChannel(material.sheenColorMap) > 0
@@ -261,6 +265,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.sheenRoughnessMapWrapT = wrapModeToString(material.sheenRoughnessMap?.wrapT)
     props.sheenRoughnessMapMagFilter = filterModeToString(material.sheenRoughnessMap?.magFilter)
     props.sheenRoughnessMapMinFilter = filterModeToString(material.sheenRoughnessMap?.minFilter)
+    props.sheenRoughnessMapAnisotropy = textureAnisotropy(material.sheenRoughnessMap)
     props.sheenRoughnessMapTransform = textureTransform(material.sheenRoughnessMap)
     props.sheenRoughnessMapUsesUv2 = textureUvChannel(material.sheenRoughnessMap) > 0
   }
@@ -280,6 +285,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.anisotropyMapWrapT = wrapModeToString(material.anisotropyMap?.wrapT)
     props.anisotropyMapMagFilter = filterModeToString(material.anisotropyMap?.magFilter)
     props.anisotropyMapMinFilter = filterModeToString(material.anisotropyMap?.minFilter)
+    props.anisotropyMapAnisotropy = textureAnisotropy(material.anisotropyMap)
     props.anisotropyMapTransform = textureTransform(material.anisotropyMap)
     props.anisotropyMapUsesUv2 = textureUvChannel(material.anisotropyMap) > 0
   }
@@ -296,6 +302,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.transmissionMapWrapT = wrapModeToString(material.transmissionMap?.wrapT)
     props.transmissionMapMagFilter = filterModeToString(material.transmissionMap?.magFilter)
     props.transmissionMapMinFilter = filterModeToString(material.transmissionMap?.minFilter)
+    props.transmissionMapAnisotropy = textureAnisotropy(material.transmissionMap)
     props.transmissionMapTransform = textureTransform(material.transmissionMap)
     props.transmissionMapUsesUv2 = textureUvChannel(material.transmissionMap) > 0
   }
@@ -314,6 +321,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.thicknessMapWrapT = wrapModeToString(material.thicknessMap?.wrapT)
     props.thicknessMapMagFilter = filterModeToString(material.thicknessMap?.magFilter)
     props.thicknessMapMinFilter = filterModeToString(material.thicknessMap?.minFilter)
+    props.thicknessMapAnisotropy = textureAnisotropy(material.thicknessMap)
     props.thicknessMapTransform = textureTransform(material.thicknessMap)
     props.thicknessMapUsesUv2 = textureUvChannel(material.thicknessMap) > 0
   }
@@ -344,6 +352,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.specularColorMapWrapT = wrapModeToString(material.specularColorMap?.wrapT)
     props.specularColorMapMagFilter = filterModeToString(material.specularColorMap?.magFilter)
     props.specularColorMapMinFilter = filterModeToString(material.specularColorMap?.minFilter)
+    props.specularColorMapAnisotropy = textureAnisotropy(material.specularColorMap)
     props.specularColorMapTransform = textureTransform(material.specularColorMap)
     props.specularColorMapColorSpace = textureColorSpace(material.specularColorMap)
     props.specularColorMapUsesUv2 = textureUvChannel(material.specularColorMap) > 0
@@ -357,6 +366,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.specularIntensityMapWrapT = wrapModeToString(material.specularIntensityMap?.wrapT)
     props.specularIntensityMapMagFilter = filterModeToString(material.specularIntensityMap?.magFilter)
     props.specularIntensityMapMinFilter = filterModeToString(material.specularIntensityMap?.minFilter)
+    props.specularIntensityMapAnisotropy = textureAnisotropy(material.specularIntensityMap)
     props.specularIntensityMapTransform = textureTransform(material.specularIntensityMap)
     props.specularIntensityMapUsesUv2 = textureUvChannel(material.specularIntensityMap) > 0
   }
@@ -385,6 +395,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.normalMapWrapT = wrapModeToString(material.normalMap?.wrapT)
     props.normalMapMagFilter = filterModeToString(material.normalMap?.magFilter)
     props.normalMapMinFilter = filterModeToString(material.normalMap?.minFilter)
+    props.normalMapAnisotropy = textureAnisotropy(material.normalMap)
     props.normalMapTransform = textureTransform(material.normalMap)
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
   }
@@ -400,6 +411,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.bumpMapWrapT = wrapModeToString(material.bumpMap?.wrapT)
     props.bumpMapMagFilter = filterModeToString(material.bumpMap?.magFilter)
     props.bumpMapMinFilter = filterModeToString(material.bumpMap?.minFilter)
+    props.bumpMapAnisotropy = textureAnisotropy(material.bumpMap)
     props.bumpMapTransform = textureTransform(material.bumpMap)
     props.bumpMapUsesUv2 = textureUvChannel(material.bumpMap) > 0
     props.bumpScale = Number.isFinite(material.bumpScale) ? material.bumpScale! : 1
@@ -470,6 +482,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.metallicRoughnessTextureWrapT = wrapModeToString(mrMap?.wrapT)
     props.metallicRoughnessTextureMagFilter = filterModeToString(mrMap?.magFilter)
     props.metallicRoughnessTextureMinFilter = filterModeToString(mrMap?.minFilter)
+    props.metallicRoughnessTextureAnisotropy = textureAnisotropy(mrMap)
     props.metallicRoughnessTextureTransform = textureTransform(mrMap)
     props.metallicRoughnessTextureUsesUv2 = textureUvChannel(mrMap) > 0
   }
@@ -483,6 +496,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.specularMapWrapT = wrapModeToString(material.specularMap?.wrapT)
     props.specularMapMagFilter = filterModeToString(material.specularMap?.magFilter)
     props.specularMapMinFilter = filterModeToString(material.specularMap?.minFilter)
+    props.specularMapAnisotropy = textureAnisotropy(material.specularMap)
     props.specularMapTransform = textureTransform(material.specularMap)
   }
 
@@ -495,6 +509,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.emissiveMapWrapT = wrapModeToString(material.emissiveMap?.wrapT)
     props.emissiveMapMagFilter = filterModeToString(material.emissiveMap?.magFilter)
     props.emissiveMapMinFilter = filterModeToString(material.emissiveMap?.minFilter)
+    props.emissiveMapAnisotropy = textureAnisotropy(material.emissiveMap)
     props.emissiveMapTransform = textureTransform(material.emissiveMap)
     props.emissiveMapColorSpace = textureColorSpace(material.emissiveMap)
     props.emissiveMapUsesUv2 = textureUvChannel(material.emissiveMap) > 0
@@ -509,6 +524,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.aoMapWrapT = wrapModeToString(material.aoMap?.wrapT)
     props.aoMapMagFilter = filterModeToString(material.aoMap?.magFilter)
     props.aoMapMinFilter = filterModeToString(material.aoMap?.minFilter)
+    props.aoMapAnisotropy = textureAnisotropy(material.aoMap)
     props.aoMapTransform = textureTransform(material.aoMap)
     props.aoMapIntensity = Number.isFinite(material.aoMapIntensity) ? material.aoMapIntensity! : 1
   }
@@ -522,6 +538,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.lightMapWrapT = wrapModeToString(material.lightMap?.wrapT)
     props.lightMapMagFilter = filterModeToString(material.lightMap?.magFilter)
     props.lightMapMinFilter = filterModeToString(material.lightMap?.minFilter)
+    props.lightMapAnisotropy = textureAnisotropy(material.lightMap)
     props.lightMapTransform = textureTransform(material.lightMap)
     props.lightMapColorSpace = textureColorSpace(material.lightMap)
     props.lightMapIntensity = Number.isFinite(material.lightMapIntensity) ? material.lightMapIntensity! : 1
@@ -536,6 +553,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.alphaMapWrapT = wrapModeToString(material.alphaMap?.wrapT)
     props.alphaMapMagFilter = filterModeToString(material.alphaMap?.magFilter)
     props.alphaMapMinFilter = filterModeToString(material.alphaMap?.minFilter)
+    props.alphaMapAnisotropy = textureAnisotropy(material.alphaMap)
     props.alphaMapTransform = textureTransform(material.alphaMap)
     props.alphaMapUsesUv2 = textureUvChannel(material.alphaMap) > 0
   }
@@ -834,6 +852,7 @@ export function extractTextureData(material: ThreeMaterialLike | undefined): Tex
     wrapT: material?.isMeshMatcapMaterial ? undefined : wrapModeToString(map?.wrapT),
     magFilter: filterModeToString(map?.magFilter),
     minFilter: filterModeToString(map?.minFilter),
+    anisotropy: textureAnisotropy(map),
     transform: material?.isMeshMatcapMaterial ? undefined : textureTransform(map),
     colorSpace: textureColorSpace(map),
     usesUv2: material?.isMeshMatcapMaterial ? false : textureUvChannel(map) > 0,
@@ -857,6 +876,7 @@ export function extractBackgroundTexture(
     wrapT: wrapModeToString(map?.wrapT),
     magFilter: filterModeToString(map?.magFilter),
     minFilter: filterModeToString(map?.minFilter),
+    anisotropy: textureAnisotropy(map),
     transform: textureTransform(map),
     colorSpace: textureColorSpace(map),
     mapping: backgroundTextureMapping(map),
@@ -976,11 +996,6 @@ function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void
       `${label} uses a compressed texture. KTX2, Basis, and THREE.CompressedTexture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
     )
   }
-  if (Number.isFinite(map.anisotropy) && map.anisotropy! > 1) {
-    throw new Error(
-      `${label} uses texture anisotropy greater than 1, which is not supported by @headless-three/renderer yet. Disable anisotropic filtering or prefilter/downsample the texture before rendering.`,
-    )
-  }
   if (Array.isArray(map.mipmaps) && map.mipmaps.length > 0) {
     throw new Error(
       `${label} provides explicit texture mipmaps, which are not uploaded by @headless-three/renderer yet. Provide only the base image level or prefilter/downsample the texture before rendering.`,
@@ -1017,7 +1032,7 @@ function assertMatchingSamplerSettings(groupLabel: string, slots: Array<[string,
     }
     if (signature !== first.signature) {
       throw new Error(
-        `${groupLabel} are packed into one native texture and must use matching wrap/filter sampler settings. ${label} differs from ${first.label}; use matching wrapS/wrapT/magFilter/minFilter values or render separate passes until independent packed-channel samplers are supported.`,
+        `${groupLabel} are packed into one native texture and must use matching wrap/filter/anisotropy sampler settings. ${label} differs from ${first.label}; use matching wrapS/wrapT/magFilter/minFilter/anisotropy values or render separate passes until independent packed-channel samplers are supported.`,
       )
     }
   }
@@ -1029,7 +1044,14 @@ function samplerSignature(texture: ThreeTextureLike): string {
     wrapModeToString(texture.wrapT) ?? 'clamp',
     filterModeToString(texture.magFilter) ?? 'linear',
     filterModeToString(texture.minFilter) ?? 'linear',
+    String(textureAnisotropy(texture) ?? 1),
   ].join('|')
+}
+
+function textureAnisotropy(map: ThreeTextureLike | null | undefined): number | undefined {
+  const value = map?.anisotropy
+  if (!Number.isFinite(value) || value! <= 1) return undefined
+  return Math.max(1, Math.min(16, Math.floor(value!)))
 }
 
 function textureTransform(map: ThreeTextureLike | null | undefined): number[] | undefined {

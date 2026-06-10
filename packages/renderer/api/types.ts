@@ -559,6 +559,7 @@ export interface NativeSceneMesh {
   textureWrapT?: string
   textureMagFilter?: string
   textureMinFilter?: string
+  textureAnisotropy?: number
   textureTransform?: number[]
   textureColorSpace?: string
   textureUsesUv2?: boolean
@@ -574,6 +575,7 @@ export interface NativeSceneMesh {
   clearcoatMapWrapT?: string
   clearcoatMapMagFilter?: string
   clearcoatMapMinFilter?: string
+  clearcoatMapAnisotropy?: number
   clearcoatMapTransform?: number[]
   clearcoatMapUsesUv2?: boolean
   clearcoatRoughness?: number
@@ -584,6 +586,7 @@ export interface NativeSceneMesh {
   clearcoatRoughnessMapWrapT?: string
   clearcoatRoughnessMapMagFilter?: string
   clearcoatRoughnessMapMinFilter?: string
+  clearcoatRoughnessMapAnisotropy?: number
   clearcoatRoughnessMapTransform?: number[]
   clearcoatRoughnessMapUsesUv2?: boolean
   clearcoatNormalMap?: Buffer
@@ -593,6 +596,7 @@ export interface NativeSceneMesh {
   clearcoatNormalMapWrapT?: string
   clearcoatNormalMapMagFilter?: string
   clearcoatNormalMapMinFilter?: string
+  clearcoatNormalMapAnisotropy?: number
   clearcoatNormalMapTransform?: number[]
   clearcoatNormalMapUsesUv2?: boolean
   clearcoatNormalScale?: number[]
@@ -604,6 +608,7 @@ export interface NativeSceneMesh {
   sheenColorMapWrapT?: string
   sheenColorMapMagFilter?: string
   sheenColorMapMinFilter?: string
+  sheenColorMapAnisotropy?: number
   sheenColorMapTransform?: number[]
   sheenColorMapColorSpace?: string
   sheenColorMapUsesUv2?: boolean
@@ -615,6 +620,7 @@ export interface NativeSceneMesh {
   sheenRoughnessMapWrapT?: string
   sheenRoughnessMapMagFilter?: string
   sheenRoughnessMapMinFilter?: string
+  sheenRoughnessMapAnisotropy?: number
   sheenRoughnessMapTransform?: number[]
   sheenRoughnessMapUsesUv2?: boolean
   anisotropy?: number
@@ -626,6 +632,7 @@ export interface NativeSceneMesh {
   anisotropyMapWrapT?: string
   anisotropyMapMagFilter?: string
   anisotropyMapMinFilter?: string
+  anisotropyMapAnisotropy?: number
   anisotropyMapTransform?: number[]
   anisotropyMapUsesUv2?: boolean
   transmission?: number
@@ -636,6 +643,7 @@ export interface NativeSceneMesh {
   transmissionMapWrapT?: string
   transmissionMapMagFilter?: string
   transmissionMapMinFilter?: string
+  transmissionMapAnisotropy?: number
   transmissionMapTransform?: number[]
   transmissionMapUsesUv2?: boolean
   ior?: number
@@ -647,6 +655,7 @@ export interface NativeSceneMesh {
   thicknessMapWrapT?: string
   thicknessMapMagFilter?: string
   thicknessMapMinFilter?: string
+  thicknessMapAnisotropy?: number
   thicknessMapTransform?: number[]
   thicknessMapUsesUv2?: boolean
   attenuationDistance?: number
@@ -660,6 +669,7 @@ export interface NativeSceneMesh {
   specularColorMapWrapT?: string
   specularColorMapMagFilter?: string
   specularColorMapMinFilter?: string
+  specularColorMapAnisotropy?: number
   specularColorMapTransform?: number[]
   specularColorMapColorSpace?: string
   specularColorMapUsesUv2?: boolean
@@ -670,6 +680,7 @@ export interface NativeSceneMesh {
   specularIntensityMapWrapT?: string
   specularIntensityMapMagFilter?: string
   specularIntensityMapMinFilter?: string
+  specularIntensityMapAnisotropy?: number
   specularIntensityMapTransform?: number[]
   specularIntensityMapUsesUv2?: boolean
   emissive?: number[]
@@ -681,6 +692,7 @@ export interface NativeSceneMesh {
   normalMapWrapT?: string
   normalMapMagFilter?: string
   normalMapMinFilter?: string
+  normalMapAnisotropy?: number
   normalMapTransform?: number[]
   normalMapUsesUv2?: boolean
   normalScale?: number[]
@@ -691,6 +703,7 @@ export interface NativeSceneMesh {
   bumpMapWrapT?: string
   bumpMapMagFilter?: string
   bumpMapMinFilter?: string
+  bumpMapAnisotropy?: number
   bumpMapTransform?: number[]
   bumpMapUsesUv2?: boolean
   bumpScale?: number
@@ -721,6 +734,7 @@ export interface NativeSceneMesh {
   metallicRoughnessTextureWrapT?: string
   metallicRoughnessTextureMagFilter?: string
   metallicRoughnessTextureMinFilter?: string
+  metallicRoughnessTextureAnisotropy?: number
   metallicRoughnessTextureTransform?: number[]
   metallicRoughnessTextureUsesUv2?: boolean
   emissiveMap?: Buffer
@@ -730,6 +744,7 @@ export interface NativeSceneMesh {
   emissiveMapWrapT?: string
   emissiveMapMagFilter?: string
   emissiveMapMinFilter?: string
+  emissiveMapAnisotropy?: number
   emissiveMapTransform?: number[]
   emissiveMapColorSpace?: string
   emissiveMapUsesUv2?: boolean
@@ -740,6 +755,7 @@ export interface NativeSceneMesh {
   aoMapWrapT?: string
   aoMapMagFilter?: string
   aoMapMinFilter?: string
+  aoMapAnisotropy?: number
   aoMapTransform?: number[]
   aoMapIntensity?: number
   lightMap?: Buffer
@@ -749,6 +765,7 @@ export interface NativeSceneMesh {
   lightMapWrapT?: string
   lightMapMagFilter?: string
   lightMapMinFilter?: string
+  lightMapAnisotropy?: number
   lightMapTransform?: number[]
   lightMapColorSpace?: string
   lightMapIntensity?: number
@@ -759,6 +776,7 @@ export interface NativeSceneMesh {
   specularMapWrapT?: string
   specularMapMagFilter?: string
   specularMapMinFilter?: string
+  specularMapAnisotropy?: number
   specularMapTransform?: number[]
   alphaMap?: Buffer
   alphaMapWidth?: number
@@ -767,6 +785,7 @@ export interface NativeSceneMesh {
   alphaMapWrapT?: string
   alphaMapMagFilter?: string
   alphaMapMinFilter?: string
+  alphaMapAnisotropy?: number
   alphaMapTransform?: number[]
   alphaMapUsesUv2?: boolean
   alphaTest?: number
@@ -834,6 +853,7 @@ export interface NativeRenderScene {
   backgroundTextureWrapT?: string
   backgroundTextureMagFilter?: string
   backgroundTextureMinFilter?: string
+  backgroundTextureAnisotropy?: number
   backgroundTextureTransform?: number[]
   backgroundTextureColorSpace?: string
   backgroundTextureMapping?: string
@@ -881,6 +901,7 @@ export interface PbrProperties {
   clearcoatMapWrapT?: string
   clearcoatMapMagFilter?: string
   clearcoatMapMinFilter?: string
+  clearcoatMapAnisotropy?: number
   clearcoatMapTransform?: number[]
   clearcoatMapUsesUv2?: boolean
   clearcoatRoughness?: number
@@ -891,6 +912,7 @@ export interface PbrProperties {
   clearcoatRoughnessMapWrapT?: string
   clearcoatRoughnessMapMagFilter?: string
   clearcoatRoughnessMapMinFilter?: string
+  clearcoatRoughnessMapAnisotropy?: number
   clearcoatRoughnessMapTransform?: number[]
   clearcoatRoughnessMapUsesUv2?: boolean
   clearcoatNormalMap?: Buffer
@@ -900,6 +922,7 @@ export interface PbrProperties {
   clearcoatNormalMapWrapT?: string
   clearcoatNormalMapMagFilter?: string
   clearcoatNormalMapMinFilter?: string
+  clearcoatNormalMapAnisotropy?: number
   clearcoatNormalMapTransform?: number[]
   clearcoatNormalMapUsesUv2?: boolean
   clearcoatNormalScale?: number[]
@@ -911,6 +934,7 @@ export interface PbrProperties {
   sheenColorMapWrapT?: string
   sheenColorMapMagFilter?: string
   sheenColorMapMinFilter?: string
+  sheenColorMapAnisotropy?: number
   sheenColorMapTransform?: number[]
   sheenColorMapColorSpace?: string
   sheenColorMapUsesUv2?: boolean
@@ -922,6 +946,7 @@ export interface PbrProperties {
   sheenRoughnessMapWrapT?: string
   sheenRoughnessMapMagFilter?: string
   sheenRoughnessMapMinFilter?: string
+  sheenRoughnessMapAnisotropy?: number
   sheenRoughnessMapTransform?: number[]
   sheenRoughnessMapUsesUv2?: boolean
   anisotropy?: number
@@ -933,6 +958,7 @@ export interface PbrProperties {
   anisotropyMapWrapT?: string
   anisotropyMapMagFilter?: string
   anisotropyMapMinFilter?: string
+  anisotropyMapAnisotropy?: number
   anisotropyMapTransform?: number[]
   anisotropyMapUsesUv2?: boolean
   transmission?: number
@@ -943,6 +969,7 @@ export interface PbrProperties {
   transmissionMapWrapT?: string
   transmissionMapMagFilter?: string
   transmissionMapMinFilter?: string
+  transmissionMapAnisotropy?: number
   transmissionMapTransform?: number[]
   transmissionMapUsesUv2?: boolean
   ior?: number
@@ -954,6 +981,7 @@ export interface PbrProperties {
   thicknessMapWrapT?: string
   thicknessMapMagFilter?: string
   thicknessMapMinFilter?: string
+  thicknessMapAnisotropy?: number
   thicknessMapTransform?: number[]
   thicknessMapUsesUv2?: boolean
   attenuationDistance?: number
@@ -967,6 +995,7 @@ export interface PbrProperties {
   specularColorMapWrapT?: string
   specularColorMapMagFilter?: string
   specularColorMapMinFilter?: string
+  specularColorMapAnisotropy?: number
   specularColorMapTransform?: number[]
   specularColorMapColorSpace?: string
   specularColorMapUsesUv2?: boolean
@@ -977,6 +1006,7 @@ export interface PbrProperties {
   specularIntensityMapWrapT?: string
   specularIntensityMapMagFilter?: string
   specularIntensityMapMinFilter?: string
+  specularIntensityMapAnisotropy?: number
   specularIntensityMapTransform?: number[]
   specularIntensityMapUsesUv2?: boolean
   emissive?: number[]
@@ -990,6 +1020,7 @@ export interface PbrProperties {
   normalMapWrapT?: string
   normalMapMagFilter?: string
   normalMapMinFilter?: string
+  normalMapAnisotropy?: number
   normalMapTransform?: number[]
   normalMapUsesUv2?: boolean
   normalScale?: number[]
@@ -1000,6 +1031,7 @@ export interface PbrProperties {
   bumpMapWrapT?: string
   bumpMapMagFilter?: string
   bumpMapMinFilter?: string
+  bumpMapAnisotropy?: number
   bumpMapTransform?: number[]
   bumpMapUsesUv2?: boolean
   bumpScale?: number
@@ -1030,6 +1062,7 @@ export interface PbrProperties {
   metallicRoughnessTextureWrapT?: string
   metallicRoughnessTextureMagFilter?: string
   metallicRoughnessTextureMinFilter?: string
+  metallicRoughnessTextureAnisotropy?: number
   metallicRoughnessTextureTransform?: number[]
   metallicRoughnessTextureUsesUv2?: boolean
   emissiveMap?: Buffer
@@ -1039,6 +1072,7 @@ export interface PbrProperties {
   emissiveMapWrapT?: string
   emissiveMapMagFilter?: string
   emissiveMapMinFilter?: string
+  emissiveMapAnisotropy?: number
   emissiveMapTransform?: number[]
   emissiveMapColorSpace?: string
   emissiveMapUsesUv2?: boolean
@@ -1049,6 +1083,7 @@ export interface PbrProperties {
   aoMapWrapT?: string
   aoMapMagFilter?: string
   aoMapMinFilter?: string
+  aoMapAnisotropy?: number
   aoMapTransform?: number[]
   aoMapIntensity?: number
   lightMap?: Buffer
@@ -1058,6 +1093,7 @@ export interface PbrProperties {
   lightMapWrapT?: string
   lightMapMagFilter?: string
   lightMapMinFilter?: string
+  lightMapAnisotropy?: number
   lightMapTransform?: number[]
   lightMapColorSpace?: string
   lightMapIntensity?: number
@@ -1068,6 +1104,7 @@ export interface PbrProperties {
   specularMapWrapT?: string
   specularMapMagFilter?: string
   specularMapMinFilter?: string
+  specularMapAnisotropy?: number
   specularMapTransform?: number[]
   alphaMap?: Buffer
   alphaMapWidth?: number
@@ -1076,6 +1113,7 @@ export interface PbrProperties {
   alphaMapWrapT?: string
   alphaMapMagFilter?: string
   alphaMapMinFilter?: string
+  alphaMapAnisotropy?: number
   alphaMapTransform?: number[]
   alphaMapUsesUv2?: boolean
   alphaTest?: number
@@ -1120,6 +1158,7 @@ export interface TextureInfo {
   wrapT?: string
   magFilter?: string
   minFilter?: string
+  anisotropy?: number
   transform?: number[]
   colorSpace?: string
   mapping?: 'uv' | 'equirectangular'

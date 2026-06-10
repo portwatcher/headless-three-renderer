@@ -58,6 +58,8 @@ export interface RenderScene {
   backgroundTextureMagFilter?: string
   /** Background texture minification filter: `"nearest"` or `"linear"`. Defaults to `"linear"`. */
   backgroundTextureMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  backgroundTextureAnisotropy?: number
   /** Background texture UV transform `[a, c, tx, b, d, ty]`. */
   backgroundTextureTransform?: Array<number>
   /** Background texture color space. `"srgb"` is decoded to linear before output conversion. */
@@ -203,6 +205,8 @@ export interface SceneMesh {
   textureMagFilter?: string
   /** Texture minification filter: `"nearest"` or `"linear"`. Defaults to `"linear"`. */
   textureMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  textureAnisotropy?: number
   /** Base-color map UV transform `[a, c, tx, b, d, ty]`. */
   textureTransform?: Array<number>
   /** Base-color texture color space. `"srgb"` is decoded to linear before shading. */
@@ -223,6 +227,8 @@ export interface SceneMesh {
   metallicRoughnessTextureMagFilter?: string
   /** Metallic-roughness texture minification filter. */
   metallicRoughnessTextureMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  metallicRoughnessTextureAnisotropy?: number
   /** Metallic-roughness map UV transform `[a, c, tx, b, d, ty]`. */
   metallicRoughnessTextureTransform?: Array<number>
   /** Whether metallic-roughness map sampling uses the secondary UV stream. */
@@ -241,6 +247,8 @@ export interface SceneMesh {
   specularMapMagFilter?: string
   /** Specular map minification filter. */
   specularMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  specularMapAnisotropy?: number
   /** Specular map UV transform `[a, c, tx, b, d, ty]`. */
   specularMapTransform?: Array<number>
   /** Metallic factor (0..1). Defaults to 0. */
@@ -263,6 +271,8 @@ export interface SceneMesh {
   clearcoatMapMagFilter?: string
   /** Clearcoat map minification filter. */
   clearcoatMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  clearcoatMapAnisotropy?: number
   /** Clearcoat map UV transform `[a, c, tx, b, d, ty]`. */
   clearcoatMapTransform?: Array<number>
   /** Whether clearcoat map sampling uses the secondary UV stream. */
@@ -283,6 +293,8 @@ export interface SceneMesh {
   clearcoatRoughnessMapMagFilter?: string
   /** Clearcoat roughness map minification filter. */
   clearcoatRoughnessMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  clearcoatRoughnessMapAnisotropy?: number
   /** Clearcoat roughness map UV transform `[a, c, tx, b, d, ty]`. */
   clearcoatRoughnessMapTransform?: Array<number>
   /** Whether clearcoat roughness map sampling uses the secondary UV stream. */
@@ -301,6 +313,8 @@ export interface SceneMesh {
   clearcoatNormalMapMagFilter?: string
   /** Clearcoat normal map minification filter. */
   clearcoatNormalMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  clearcoatNormalMapAnisotropy?: number
   /** Clearcoat normal map UV transform `[a, c, tx, b, d, ty]`. */
   clearcoatNormalMapTransform?: Array<number>
   /** Whether clearcoat normal map sampling uses the secondary UV stream. */
@@ -323,6 +337,8 @@ export interface SceneMesh {
   sheenColorMapMagFilter?: string
   /** Sheen color map minification filter. */
   sheenColorMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  sheenColorMapAnisotropy?: number
   /** Sheen color map UV transform `[a, c, tx, b, d, ty]`. */
   sheenColorMapTransform?: Array<number>
   /** Sheen color texture color space. `"srgb"` is decoded to linear before shading. */
@@ -345,6 +361,8 @@ export interface SceneMesh {
   sheenRoughnessMapMagFilter?: string
   /** Sheen roughness map minification filter. */
   sheenRoughnessMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  sheenRoughnessMapAnisotropy?: number
   /** Sheen roughness map UV transform `[a, c, tx, b, d, ty]`. */
   sheenRoughnessMapTransform?: Array<number>
   /** Whether sheen roughness map sampling uses the secondary UV stream. */
@@ -367,6 +385,8 @@ export interface SceneMesh {
   anisotropyMapMagFilter?: string
   /** Anisotropy map minification filter. */
   anisotropyMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  anisotropyMapAnisotropy?: number
   /** Anisotropy map UV transform `[a, c, tx, b, d, ty]`. */
   anisotropyMapTransform?: Array<number>
   /** Whether anisotropy map sampling uses the secondary UV stream. */
@@ -387,6 +407,8 @@ export interface SceneMesh {
   transmissionMapMagFilter?: string
   /** Transmission map minification filter. */
   transmissionMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  transmissionMapAnisotropy?: number
   /** Transmission map UV transform `[a, c, tx, b, d, ty]`. */
   transmissionMapTransform?: Array<number>
   /** Whether transmission map sampling uses the secondary UV stream. */
@@ -409,6 +431,8 @@ export interface SceneMesh {
   thicknessMapMagFilter?: string
   /** Thickness map minification filter. */
   thicknessMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  thicknessMapAnisotropy?: number
   /** Thickness map UV transform `[a, c, tx, b, d, ty]`. */
   thicknessMapTransform?: Array<number>
   /** Whether thickness map sampling uses the secondary UV stream. */
@@ -435,6 +459,8 @@ export interface SceneMesh {
   specularColorMapMagFilter?: string
   /** Specular color map minification filter. */
   specularColorMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  specularColorMapAnisotropy?: number
   /** Specular color map UV transform `[a, c, tx, b, d, ty]`. */
   specularColorMapTransform?: Array<number>
   /** Specular color texture color space. `"srgb"` is decoded to linear before shading. */
@@ -455,6 +481,8 @@ export interface SceneMesh {
   specularIntensityMapMagFilter?: string
   /** Specular intensity map minification filter. */
   specularIntensityMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  specularIntensityMapAnisotropy?: number
   /** Specular intensity map UV transform `[a, c, tx, b, d, ty]`. */
   specularIntensityMapTransform?: Array<number>
   /** Whether specular intensity map sampling uses the secondary UV stream. */
@@ -481,6 +509,8 @@ export interface SceneMesh {
   normalMapMagFilter?: string
   /** Normal map minification filter. */
   normalMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  normalMapAnisotropy?: number
   /** Normal map UV transform `[a, c, tx, b, d, ty]`. */
   normalMapTransform?: Array<number>
   /** Whether normal map sampling uses the secondary UV stream. */
@@ -501,6 +531,8 @@ export interface SceneMesh {
   bumpMapMagFilter?: string
   /** Bump map minification filter. */
   bumpMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  bumpMapAnisotropy?: number
   /** Bump map UV transform `[a, c, tx, b, d, ty]`. */
   bumpMapTransform?: Array<number>
   /** Whether bump map sampling uses the secondary UV stream. */
@@ -564,6 +596,8 @@ export interface SceneMesh {
   emissiveMapMagFilter?: string
   /** Emissive map minification filter. */
   emissiveMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  emissiveMapAnisotropy?: number
   /** Emissive map UV transform `[a, c, tx, b, d, ty]`. */
   emissiveMapTransform?: Array<number>
   /** Emissive texture color space. `"srgb"` is decoded to linear before shading. */
@@ -587,6 +621,8 @@ export interface SceneMesh {
   aoMapMagFilter?: string
   /** AO map minification filter. */
   aoMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  aoMapAnisotropy?: number
   /** AO map UV transform `[a, c, tx, b, d, ty]`. */
   aoMapTransform?: Array<number>
   /** AO map intensity multiplier (0..1). Defaults to 1. */
@@ -608,6 +644,8 @@ export interface SceneMesh {
   lightMapMagFilter?: string
   /** Light map minification filter. */
   lightMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  lightMapAnisotropy?: number
   /** Light map UV transform `[a, c, tx, b, d, ty]`. */
   lightMapTransform?: Array<number>
   /** Light-map texture color space. `"srgb"` is decoded to linear before shading. */
@@ -631,6 +669,8 @@ export interface SceneMesh {
   alphaMapMagFilter?: string
   /** Alpha map minification filter. */
   alphaMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  alphaMapAnisotropy?: number
   /** Alpha map UV transform `[a, c, tx, b, d, ty]`. */
   alphaMapTransform?: Array<number>
   /** Whether alpha map sampling uses the secondary UV stream. */

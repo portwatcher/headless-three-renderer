@@ -3,7 +3,9 @@ use glam::{Mat4, Vec3};
 
 use crate::ibl::{EnvMap, IblMaps, compute_ibl};
 use crate::lights::{GpuLight, MAX_LIGHTS, prepare_lights};
-use crate::mesh::{PreparedTexture, TextureFilter, WrapMode, decode_texture_with_label};
+use crate::mesh::{
+    PreparedTexture, TextureFilter, WrapMode, decode_texture_with_label, texture_anisotropy,
+};
 use crate::types::{Camera, RenderScene};
 use crate::util::{
     finite_f32, finite_positive, parse_color, parse_mat4, parse_vec3, validate_dimension,
@@ -172,6 +174,7 @@ impl RenderSettings {
                     TextureFilter::from_str_opt(scene.background_texture_mag_filter.as_deref());
                 texture.min_filter =
                     TextureFilter::from_str_opt(scene.background_texture_min_filter.as_deref());
+                texture.anisotropy = texture_anisotropy(scene.background_texture_anisotropy);
                 Some(BackgroundTexture {
                     texture,
                     transform: parse_texture_transform(

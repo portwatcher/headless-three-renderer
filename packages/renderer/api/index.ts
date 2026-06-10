@@ -174,6 +174,7 @@ function toNativeInput(
     backgroundTextureWrapT: backgroundTexture?.wrapT,
     backgroundTextureMagFilter: backgroundTexture?.magFilter,
     backgroundTextureMinFilter: backgroundTexture?.minFilter,
+    backgroundTextureAnisotropy: backgroundTexture?.anisotropy,
     backgroundTextureTransform: backgroundTexture?.transform,
     backgroundTextureColorSpace: backgroundTexture?.colorSpace,
     backgroundTextureMapping: backgroundTexture?.mapping,

@@ -181,6 +181,7 @@ pub struct TextureSamplerSettings {
     pub wrap_t: WrapMode,
     pub mag_filter: TextureFilter,
     pub min_filter: TextureFilter,
+    pub anisotropy: u16,
 }
 
 impl Default for TextureSamplerSettings {
@@ -190,6 +191,7 @@ impl Default for TextureSamplerSettings {
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
             min_filter: TextureFilter::Linear,
+            anisotropy: 1,
         }
     }
 }
@@ -201,6 +203,7 @@ impl TextureSamplerSettings {
             wrap_t: tex.wrap_t,
             mag_filter: tex.mag_filter,
             min_filter: tex.min_filter,
+            anisotropy: tex.anisotropy,
         })
     }
 
@@ -437,6 +440,7 @@ pub struct PreparedTexture {
     pub wrap_t: WrapMode,
     pub mag_filter: TextureFilter,
     pub min_filter: TextureFilter,
+    pub anisotropy: u16,
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -493,6 +497,13 @@ pub fn prepare_meshes(scene: &crate::types::RenderScene) -> Result<Vec<PreparedM
         meshes.iter().enumerate().map(prepare_mesh).collect()
     } else {
         Ok(Vec::new())
+    }
+}
+
+pub fn texture_anisotropy(value: Option<f64>) -> u16 {
+    match value {
+        Some(value) if value.is_finite() && value > 1.0 => value.floor().clamp(1.0, 16.0) as u16,
+        _ => 1,
     }
 }
 
@@ -664,10 +675,14 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.texture_height,
                 mesh_index,
             )?;
-            tex.wrap_s = WrapMode::from_str_opt(mesh.texture_wrap_s.as_deref());
-            tex.wrap_t = WrapMode::from_str_opt(mesh.texture_wrap_t.as_deref());
-            tex.mag_filter = TextureFilter::from_str_opt(mesh.texture_mag_filter.as_deref());
-            tex.min_filter = TextureFilter::from_str_opt(mesh.texture_min_filter.as_deref());
+            apply_texture_sampling(
+                &mut tex,
+                mesh.texture_wrap_s.as_deref(),
+                mesh.texture_wrap_t.as_deref(),
+                mesh.texture_mag_filter.as_deref(),
+                mesh.texture_min_filter.as_deref(),
+                mesh.texture_anisotropy,
+            );
             Some(tex)
         }
         _ => None,
@@ -735,6 +750,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.normal_map_wrap_t.as_deref(),
                 mesh.normal_map_mag_filter.as_deref(),
                 mesh.normal_map_min_filter.as_deref(),
+                mesh.normal_map_anisotropy,
             );
             Some(tex)
         }
@@ -759,6 +775,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.bump_map_wrap_t.as_deref(),
                 mesh.bump_map_mag_filter.as_deref(),
                 mesh.bump_map_min_filter.as_deref(),
+                mesh.bump_map_anisotropy,
             );
             Some(tex)
         }
@@ -817,6 +834,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.metallic_roughness_texture_wrap_t.as_deref(),
                 mesh.metallic_roughness_texture_mag_filter.as_deref(),
                 mesh.metallic_roughness_texture_min_filter.as_deref(),
+                mesh.metallic_roughness_texture_anisotropy,
             );
             Some(tex)
         }
@@ -837,6 +855,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.specular_map_wrap_t.as_deref(),
                 mesh.specular_map_mag_filter.as_deref(),
                 mesh.specular_map_min_filter.as_deref(),
+                mesh.specular_map_anisotropy,
             );
             Some(tex)
         }
@@ -857,6 +876,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.emissive_map_wrap_t.as_deref(),
                 mesh.emissive_map_mag_filter.as_deref(),
                 mesh.emissive_map_min_filter.as_deref(),
+                mesh.emissive_map_anisotropy,
             );
             Some(tex)
         }
@@ -873,6 +893,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.ao_map_wrap_t.as_deref(),
                 mesh.ao_map_mag_filter.as_deref(),
                 mesh.ao_map_min_filter.as_deref(),
+                mesh.ao_map_anisotropy,
             );
             Some(tex)
         }
@@ -894,6 +915,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.light_map_wrap_t.as_deref(),
                 mesh.light_map_mag_filter.as_deref(),
                 mesh.light_map_min_filter.as_deref(),
+                mesh.light_map_anisotropy,
             );
             Some(tex)
         }
@@ -919,6 +941,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 mesh.alpha_map_wrap_t.as_deref(),
                 mesh.alpha_map_mag_filter.as_deref(),
                 mesh.alpha_map_min_filter.as_deref(),
+                mesh.alpha_map_anisotropy,
             );
             Some(tex)
         }
@@ -934,6 +957,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.clearcoat_map_wrap_t.as_deref(),
         mesh.clearcoat_map_mag_filter.as_deref(),
         mesh.clearcoat_map_min_filter.as_deref(),
+        mesh.clearcoat_map_anisotropy,
     )?;
     let clearcoat_roughness_map = decode_optional_texture_with_sampling(
         mesh.clearcoat_roughness_map.as_deref(),
@@ -944,6 +968,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.clearcoat_roughness_map_wrap_t.as_deref(),
         mesh.clearcoat_roughness_map_mag_filter.as_deref(),
         mesh.clearcoat_roughness_map_min_filter.as_deref(),
+        mesh.clearcoat_roughness_map_anisotropy,
     )?;
     let clearcoat_normal_map = decode_optional_texture_with_sampling(
         mesh.clearcoat_normal_map.as_deref(),
@@ -954,6 +979,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.clearcoat_normal_map_wrap_t.as_deref(),
         mesh.clearcoat_normal_map_mag_filter.as_deref(),
         mesh.clearcoat_normal_map_min_filter.as_deref(),
+        mesh.clearcoat_normal_map_anisotropy,
     )?;
     let sheen_color_map = decode_optional_texture_with_sampling(
         mesh.sheen_color_map.as_deref(),
@@ -964,6 +990,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.sheen_color_map_wrap_t.as_deref(),
         mesh.sheen_color_map_mag_filter.as_deref(),
         mesh.sheen_color_map_min_filter.as_deref(),
+        mesh.sheen_color_map_anisotropy,
     )?;
     let sheen_roughness_map = decode_optional_texture_with_sampling(
         mesh.sheen_roughness_map.as_deref(),
@@ -974,6 +1001,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.sheen_roughness_map_wrap_t.as_deref(),
         mesh.sheen_roughness_map_mag_filter.as_deref(),
         mesh.sheen_roughness_map_min_filter.as_deref(),
+        mesh.sheen_roughness_map_anisotropy,
     )?;
     let anisotropy_map = decode_optional_texture_with_sampling(
         mesh.anisotropy_map.as_deref(),
@@ -984,6 +1012,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.anisotropy_map_wrap_t.as_deref(),
         mesh.anisotropy_map_mag_filter.as_deref(),
         mesh.anisotropy_map_min_filter.as_deref(),
+        mesh.anisotropy_map_anisotropy,
     )?;
     let transmission_map = decode_optional_texture_with_sampling(
         mesh.transmission_map.as_deref(),
@@ -994,6 +1023,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.transmission_map_wrap_t.as_deref(),
         mesh.transmission_map_mag_filter.as_deref(),
         mesh.transmission_map_min_filter.as_deref(),
+        mesh.transmission_map_anisotropy,
     )?;
     let thickness_map = decode_optional_texture_with_sampling(
         mesh.thickness_map.as_deref(),
@@ -1004,6 +1034,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.thickness_map_wrap_t.as_deref(),
         mesh.thickness_map_mag_filter.as_deref(),
         mesh.thickness_map_min_filter.as_deref(),
+        mesh.thickness_map_anisotropy,
     )?;
     let specular_color_map = decode_optional_texture_with_sampling(
         mesh.specular_color_map.as_deref(),
@@ -1014,6 +1045,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.specular_color_map_wrap_t.as_deref(),
         mesh.specular_color_map_mag_filter.as_deref(),
         mesh.specular_color_map_min_filter.as_deref(),
+        mesh.specular_color_map_anisotropy,
     )?;
     let specular_intensity_map = decode_optional_texture_with_sampling(
         mesh.specular_intensity_map.as_deref(),
@@ -1024,6 +1056,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.specular_intensity_map_wrap_t.as_deref(),
         mesh.specular_intensity_map_mag_filter.as_deref(),
         mesh.specular_intensity_map_min_filter.as_deref(),
+        mesh.specular_intensity_map_anisotropy,
     )?;
     let physical_maps = pack_physical_maps(PhysicalMapInputs {
         clearcoat: clearcoat_map.as_ref(),
@@ -1564,6 +1597,7 @@ pub fn decode_texture_with_label(
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
             min_filter: TextureFilter::Linear,
+            anisotropy: 1,
         });
     }
 
@@ -1578,6 +1612,7 @@ pub fn decode_texture_with_label(
         wrap_t: WrapMode::ClampToEdge,
         mag_filter: TextureFilter::Linear,
         min_filter: TextureFilter::Linear,
+        anisotropy: 1,
     })
 }
 
@@ -1607,10 +1642,11 @@ fn decode_optional_texture_with_sampling(
     wrap_t: Option<&str>,
     mag_filter: Option<&str>,
     min_filter: Option<&str>,
+    anisotropy: Option<f64>,
 ) -> Result<Option<PreparedTexture>> {
     let mut texture = decode_optional_texture(data, width_hint, height_hint, mesh_index)?;
     if let Some(tex) = texture.as_mut() {
-        apply_texture_sampling(tex, wrap_s, wrap_t, mag_filter, min_filter);
+        apply_texture_sampling(tex, wrap_s, wrap_t, mag_filter, min_filter, anisotropy);
     }
     Ok(texture)
 }
@@ -1621,11 +1657,13 @@ fn apply_texture_sampling(
     wrap_t: Option<&str>,
     mag_filter: Option<&str>,
     min_filter: Option<&str>,
+    anisotropy: Option<f64>,
 ) {
     texture.wrap_s = WrapMode::from_str_opt(wrap_s);
     texture.wrap_t = WrapMode::from_str_opt(wrap_t);
     texture.mag_filter = TextureFilter::from_str_opt(mag_filter);
     texture.min_filter = TextureFilter::from_str_opt(min_filter);
+    texture.anisotropy = texture_anisotropy(anisotropy);
 }
 
 struct PhysicalMapInputs<'a> {
@@ -1802,6 +1840,7 @@ fn packed_texture(rgba: Vec<u8>, width: u32, height: u32) -> PreparedTexture {
         wrap_t: WrapMode::ClampToEdge,
         mag_filter: TextureFilter::Linear,
         min_filter: TextureFilter::Linear,
+        anisotropy: 1,
     }
 }
 
