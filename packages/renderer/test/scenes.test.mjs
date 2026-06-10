@@ -3184,6 +3184,106 @@ test('customDistanceMaterial alphaMap controls point-light shadow casters', () =
   assert.ok(cutoutLum > opaqueLum + 20, `customDistanceMaterial alphaMap should remove the point-shadow caster (${cutoutLum} vs ${opaqueLum})`)
 })
 
+test('customDepthMaterial displacement shifts directional shadow casters', () => {
+  function renderCustomDepthDisplacement(displacementScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 2.5, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.set(0, 1.7, 0)
+    caster.rotation.x = -Math.PI / 2
+    caster.castShadow = true
+    caster.customDepthMaterial = new THREE.MeshDepthMaterial({
+      displacementMap: solidTexture(255, 0, 0),
+      displacementScale,
+      displacementBias: 0,
+    })
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  const flat = renderCustomDepthDisplacement(0)
+  const displaced = renderCustomDepthDisplacement(2)
+  const diff = meanAbsDiff(flat, displaced)
+  assert.ok(diff > 5, `customDepthMaterial displacement should move the directional caster shadow, diff=${diff.toFixed(3)}`)
+})
+
+test('customDistanceMaterial displacement shifts point-light shadow casters', () => {
+  function renderCustomDistanceDisplacement(displacementScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 2.5, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.set(0, 1.7, 0)
+    caster.rotation.x = -Math.PI / 2
+    caster.castShadow = true
+    caster.customDistanceMaterial = new THREE.MeshDistanceMaterial({
+      displacementMap: solidTexture(255, 0, 0),
+      displacementScale,
+      displacementBias: 0,
+    })
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  const flat = renderCustomDistanceDisplacement(0)
+  const displaced = renderCustomDistanceDisplacement(2)
+  const diff = meanAbsDiff(flat, displaced)
+  assert.ok(diff > 5, `customDistanceMaterial displacement should move the point-light caster shadow, diff=${diff.toFixed(3)}`)
+})
+
 test('base color map applies texture UV transforms', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
