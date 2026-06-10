@@ -50,6 +50,17 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     assert.deepEqual(Buffer.from(dataUriTexture.image), imageBytes)
     assert.equal(dataUriTexture.source.data, dataUriTexture.image)
 
+    const blobUrl = URL.createObjectURL(new Blob([imageBytes], { type: 'image/png' }))
+    try {
+      const blobTexture = await new Promise((resolve, reject) => {
+        loader.load(blobUrl, resolve, undefined, reject)
+      })
+      assert.deepEqual(Buffer.from(blobTexture.image), imageBytes)
+      assert.equal(blobTexture.source.data, blobTexture.image)
+    } finally {
+      URL.revokeObjectURL(blobUrl)
+    }
+
     installLocalFileFetch()
     const response = await fetch(pathToFileURL(imagePath).href)
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), imageBytes)

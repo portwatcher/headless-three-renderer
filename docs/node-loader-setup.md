@@ -31,7 +31,10 @@ async function loadGltfFromFile(filePath) {
   const bytes = await fs.readFile(absolute)
 
   const manager = new THREE.LoadingManager()
-  manager.addHandler(/\.(png|jpe?g|webp)$/i, createEncodedImageTextureLoader(root))
+  const encodedImages = createEncodedImageTextureLoader(root)
+  manager.addHandler(/^blob:/i, encodedImages)
+  manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
+  manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
 
   const loader = new GLTFLoader(manager)
   const baseUrl = pathToFileURL(`${root}${path.sep}`).href
@@ -66,7 +69,7 @@ node examples/render-gltf.mjs ./model.gltf render.png
 textures expose encoded PNG/JPEG/WebP bytes through `texture.image` and
 `texture.source.data`. The renderer decodes those bytes natively, so no DOM
 `Image`, canvas, or WebGL context is needed for external image files or
-PNG/JPEG/WebP data URI image references.
+PNG/JPEG/WebP data URI or Blob URL image references.
 
 ## FileLoader And Fetch
 
@@ -92,11 +95,17 @@ manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
 ```
 
 For images embedded in GLB files or glTF bufferViews, `GLTFLoader` converts the
-bufferView into a `Blob` URL and then uses its internal image loader. In plain
-Node, that path still needs an image implementation such as a `createImageBitmap`
-polyfill, or a preprocessing step that rewrites embedded images as external
-PNG/JPEG/WebP files or data URIs so the encoded-buffer loader above can handle
-them.
+bufferView into a `Blob` URL and then uses its internal image loader. On modern
+Node versions with `Blob`, `URL.createObjectURL`, and `fetch(blobUrl)` support,
+register the same encoded-buffer loader for Blob URLs:
+
+```js
+manager.addHandler(/^blob:/i, encodedImages)
+```
+
+If your Node version or loader stack does not provide Blob URL fetch support,
+install the needed polyfills or preprocess embedded images as external
+PNG/JPEG/WebP files or data URIs so the encoded-buffer loader can handle them.
 
 After loading, texture slots should expose one of the renderer-supported image
 forms:

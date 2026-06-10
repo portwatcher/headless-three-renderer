@@ -118,8 +118,8 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 
 | Task | Impact | Notes |
 |---|---:|---|
-| Document Node loader setup | High | Node `GLTFLoader` setup is documented for local files, `FileLoader`/`fetch`, encoded image buffers, PNG/JPEG/WebP data URI images, path resolution, and optional image polyfills. Remaining work is keeping examples synced with future helper APIs. |
-| Provide asset loading helpers | Medium | `createEncodedImageTextureLoader`, `EncodedImageTextureLoader`, `installLocalFileFetch`, and `resolveLocalAssetPath` help Node loaders expose renderer-supported encoded texture buffers from local files and PNG/JPEG/WebP data URIs. Remaining work is broader helper coverage for GLB bufferView images, KTX2/Basis pre-decode, and higher-level glTF/VRM loading. |
+| Document Node loader setup | High | Node `GLTFLoader` setup is documented for local files, `FileLoader`/`fetch`, encoded image buffers, PNG/JPEG/WebP data URI and Blob URL images, GLB bufferView image handling, path resolution, and optional image polyfills. Remaining work is keeping examples synced with future helper APIs. |
+| Provide asset loading helpers | Medium | `createEncodedImageTextureLoader`, `EncodedImageTextureLoader`, `installLocalFileFetch`, and `resolveLocalAssetPath` help Node loaders expose renderer-supported encoded texture buffers from local files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs used by GLB bufferView images. Remaining work is broader helper coverage for KTX2/Basis pre-decode and higher-level glTF/VRM loading. |
 | Add end-to-end glTF/VRM examples | High | `examples/render-gltf.mjs` renders a local glTF/GLB asset fully in Node using the exported loader helpers, and tests now render a committed minimal glTF fixture through `GLTFLoader`. Remaining work is committed glTF Sample Assets plus VRM/VRMA-specific examples and fixtures. |
 
 ## Acceptance Criteria For "Fully Supports Three.js Scenes"

@@ -45,7 +45,11 @@ export class EncodedImageTextureLoader {
     const texture = new Texture()
     const source = /^data:/i.test(url) ? url : (this.loaderPath ? `${this.loaderPath}${url}` : url)
     const encodedDataUri = encodedImageDataUriBuffer(source)
-    const data = encodedDataUri ? Promise.resolve(encodedDataUri) : readFile(resolveLocalAssetPath(source, this.rootDir))
+    const data = encodedDataUri
+      ? Promise.resolve(encodedDataUri)
+      : /^blob:/i.test(source)
+        ? readBlobUrlBuffer(source)
+        : readFile(resolveLocalAssetPath(source, this.rootDir))
 
     data.then((buffer) => {
       texture.image = buffer
@@ -78,6 +82,21 @@ function encodedImageDataUriBuffer(url: string): Buffer | null {
     return Buffer.from(payload, 'base64')
   }
   return Buffer.from(decodeURIComponent(payload), 'utf8')
+}
+
+async function readBlobUrlBuffer(url: string): Promise<Buffer> {
+  if (typeof fetch !== 'function') {
+    throw new Error('Blob URL textures require global fetch support. Install a fetch polyfill or rewrite embedded images as files/data URIs before loading.')
+  }
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Blob URL texture fetch failed with status ${response.status}.`)
+  }
+  const contentType = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase()
+  if (contentType && !/^image\/(?:png|jpe?g|webp)$/.test(contentType)) {
+    throw new Error(`Blob URL texture has unsupported content type "${contentType}". Use PNG, JPEG, or WebP embedded images.`)
+  }
+  return Buffer.from(await response.arrayBuffer())
 }
 
 export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd()): string {

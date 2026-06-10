@@ -58,7 +58,10 @@ async function loadGltfFixture(filePath) {
   const root = path.dirname(filePath)
   const bytes = await readFile(filePath)
   const manager = new THREE.LoadingManager()
-  manager.addHandler(/\.(png|jpe?g|webp)$/i, createEncodedImageTextureLoader(root))
+  const encodedImages = createEncodedImageTextureLoader(root)
+  manager.addHandler(/^blob:/i, encodedImages)
+  manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
+  manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
 
   const loader = new GLTFLoader(manager)
   const baseUrl = pathToFileURL(`${root}${path.sep}`).href
