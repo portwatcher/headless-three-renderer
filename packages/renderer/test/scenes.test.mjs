@@ -1259,6 +1259,132 @@ test('MeshToonMaterial gradientMap decodes sRGB colorSpace before shading', () =
   assert.ok(linear.r > srgb.r + 20, `linear toon gradient ramp should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('MeshToonMaterial map samples the selected secondary UV channel', () => {
+  function renderWithChannel(channel) {
+    const map = rgbaTexture([
+      0, 255, 0, 255,
+      255, 0, 0, 255,
+    ], 2, 1)
+    map.channel = channel
+
+    const geometry = constantUvPlane(0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshToonMaterial({ color: 0xffffff, map }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 3)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const primary = renderWithChannel(0)
+  const secondary = renderWithChannel(1)
+  assert.ok(primary.g > primary.r + 40, `toon map channel=0 should sample the primary UV green texel (${primary.g} vs ${primary.r})`)
+  assert.ok(secondary.r > secondary.g + 40, `toon map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
+})
+
+test('MeshToonMaterial emissiveMap samples the selected secondary UV channel', () => {
+  function renderWithChannel(channel) {
+    const emissiveMap = rgbaTexture([
+      0, 255, 0, 255,
+      255, 0, 0, 255,
+    ], 2, 1)
+    emissiveMap.channel = channel
+
+    const geometry = constantUvPlane(0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshToonMaterial({
+        color: 0x000000,
+        emissive: 0xffffff,
+        emissiveMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const primary = renderWithChannel(0)
+  const secondary = renderWithChannel(1)
+  assert.ok(primary.g > primary.r + 40, `toon emissiveMap channel=0 should sample the primary UV green texel (${primary.g} vs ${primary.r})`)
+  assert.ok(secondary.r > secondary.g + 40, `toon emissiveMap channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
+})
+
+test('MeshToonMaterial lightMap contributes through secondary UVs', () => {
+  const lightMap = rgbaTexture([
+    0, 0, 0, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  lightMap.channel = 1
+
+  const geometry = constantUvPlane(0.25, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshToonMaterial({
+      color: 0xffffff,
+      lightMap,
+      lightMapIntensity: 4,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > 100 && mean.g > 100 && mean.b > 100, `toon lightMap should add the bright uv1 texel (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('MeshToonMaterial alphaMap cutouts participate in alpha testing', () => {
+  function renderAlpha(alphaMapGreen) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({
+        color: 0xff0000,
+        alphaMap: solidTexture(255, alphaMapGreen, 255),
+        alphaTest: 0.5,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 3)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const discarded = renderAlpha(0)
+  const visible = renderAlpha(255)
+  assert.ok(discarded.b > discarded.r + 40, `toon alphaMap green=0 should discard to the blue background (${discarded.b} vs ${discarded.r})`)
+  assert.ok(visible.r > visible.b + 40, `toon alphaMap green=255 should keep the red toon surface (${visible.r} vs ${visible.b})`)
+})
+
 test('MeshDepthMaterial renders nearer fragments brighter than farther fragments', () => {
   function renderDepthAt(z) {
     const scene = new THREE.Scene()
