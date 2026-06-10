@@ -448,6 +448,36 @@ test('MeshNormalMaterial bumpMap perturbs output normals', () => {
   assert.ok(diff > 2, `bumpMap should perturb MeshNormalMaterial output normals (diff=${diff.toFixed(2)})`)
 })
 
+test('MeshNormalMaterial bumpMap honors explicit texture matrices', () => {
+  function renderBumpMaterial(matrixOffsetX) {
+    const bumpMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    bumpMap.magFilter = THREE.LinearFilter
+    bumpMap.minFilter = THREE.LinearFilter
+    if (matrixOffsetX !== 0) setTextureMatrixOffset(bumpMap, matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({ bumpMap, bumpScale: 4 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const unshifted = renderBumpMaterial(0)
+  const shifted = renderBumpMaterial(0.5)
+  const diff = meanAbsDiff(unshifted, shifted)
+  assert.ok(diff > 2, `explicit bumpMap matrix should change the bump perturbation (diff=${diff.toFixed(2)})`)
+})
+
 test('MeshNormalMaterial normalMap samples the selected secondary UV channel', () => {
   function renderNormalMaterial(channel) {
     const normalMap = rgbaTexture([
