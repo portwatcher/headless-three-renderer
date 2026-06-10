@@ -2895,6 +2895,43 @@ test('scene ClippingGroup clipIntersection requires all group planes', () => {
   assert.ok(visibleBottomRight.r > visibleBottomRight.b + 80, `bottom-right should remain visible with group intersection clipping (${visibleBottomRight.r} vs ${visibleBottomRight.b})`)
 })
 
+test('nested ClippingGroup planes compose inherited union and child intersection rules', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+
+  const parent = new THREE.Group()
+  parent.isClippingGroup = true
+  parent.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+
+  const child = new THREE.Group()
+  child.isClippingGroup = true
+  child.clipIntersection = true
+  child.clippingPlanes = [
+    new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0),
+  ]
+
+  child.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  parent.add(child)
+  scene.add(parent)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const clippedTopLeft = meanRegion(rgba, 64, 64, 12, 12, 24, 24)
+  const visibleTopRight = meanRegion(rgba, 64, 64, 40, 12, 52, 24)
+  const clippedBottomRight = meanRegion(rgba, 64, 64, 40, 40, 52, 52)
+
+  assert.ok(clippedTopLeft.b > clippedTopLeft.r + 80, `top-left should inherit the parent union clip (${clippedTopLeft.b} vs ${clippedTopLeft.r})`)
+  assert.ok(visibleTopRight.r > visibleTopRight.b + 80, `top-right should survive the child intersection group (${visibleTopRight.r} vs ${visibleTopRight.b})`)
+  assert.ok(clippedBottomRight.b > clippedBottomRight.r + 80, `bottom-right should be clipped by both child intersection planes (${clippedBottomRight.b} vs ${clippedBottomRight.r})`)
+})
+
 test('scene ClippingGroup clipShadows clips descendant shadow casters', () => {
   function renderGroupClipShadows(clipShadows) {
     const scene = new THREE.Scene()
