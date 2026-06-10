@@ -1366,6 +1366,35 @@ test('SpriteMaterial renders texture maps and opacity as a camera-facing billboa
   assert.ok(opaque.g > translucent.g + 20, `sprite opacity should reduce output intensity (${opaque.g} vs ${translucent.g})`)
 })
 
+test('SpriteMaterial map decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const map = solidTexture(128, 128, 128)
+    map.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map,
+      color: 0xffffff,
+    }))
+    sprite.scale.set(2, 2, 1)
+    scene.add(sprite)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 15, `linear sprite map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
+})
+
 test('SpriteMaterial honors sprite scale and material rotation', () => {
   function renderRotatedSprite(rotation) {
     const scene = new THREE.Scene()
@@ -4990,6 +5019,42 @@ test('LineBasicMaterial map RGB multiplies line color from UVs', () => {
   assert.ok(greenPixels > 2, `secondary line map texel should tint line green (${greenPixels})`)
 })
 
+test('LineBasicMaterial map decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const map = solidTexture(128, 128, 128)
+    map.colorSpace = colorSpace
+
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.5, 0.5,
+      0.5, 0.5,
+    ]), 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Line(
+      geom,
+      new THREE.LineBasicMaterial({ color: 0xffffff, map }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 0, 46, 96, 50)
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 5, `linear line map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
+})
+
 test('LineBasicMaterial map samples the selected secondary UV channel', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
@@ -5373,6 +5438,38 @@ test('PointsMaterial maps, alpha maps, and vertex colors affect billboards', () 
   ))
   const discarded = meanRgba(renderRgba(alphaScene, camera, { width: 64, height: 64 }))
   assert.ok(discarded.b > discarded.g + 80, `alphaMap green channel should discard point billboards (${discarded.b} vs ${discarded.g})`)
+})
+
+test('PointsMaterial map decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const map = solidTexture(128, 128, 128)
+    map.colorSpace = colorSpace
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      map,
+      size: 48,
+      sizeAttenuation: false,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 40, 40, 56, 56)
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 15, `linear point map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
 test('PointsMaterial maps use point-sprite UVs instead of geometry UV attributes', () => {
