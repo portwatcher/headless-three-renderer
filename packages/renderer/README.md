@@ -101,7 +101,7 @@ The public API accepts only Three.js-like objects:
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection
 - vertex colors
-- scene background color and 2D texture backgrounds with `backgroundIntensity` and 2D texture blur; cube/equirect backgrounds fail clearly until native support lands
+- scene background color and 2D texture backgrounds with `backgroundIntensity` and 2D texture blur; non-default background/environment rotations and cube/equirect backgrounds fail clearly until native support lands
 - render-option viewport and scissor rectangles in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 

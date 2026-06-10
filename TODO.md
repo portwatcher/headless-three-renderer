@@ -29,7 +29,7 @@ Already supported in the current implementation:
 - Clearcoat, sheen, anisotropy, specular intensity/color, transmission/thickness, IOR, attenuation, and related physical material maps.
 - Ambient, directional, point, spot, hemisphere, RectAreaLight approximation, and LightProbe diffuse lighting, up to 16 direct lights.
 - Environment IBL from equirectangular `scene.environment`/reflection probes.
-- Scene background colors and 2D texture backgrounds, including `backgroundIntensity` and approximate 2D texture `backgroundBlurriness`.
+- Scene background colors and 2D texture backgrounds, including `backgroundIntensity` and approximate 2D texture `backgroundBlurriness`; non-default background/environment rotations fail clearly.
 - Render-option viewport and scissor rectangles in output pixel coordinates.
 - Directional, spot, point, and directional cascaded shadow maps for a single shadow-casting light; additional shadow-casting lights fail clearly.
 - ACES Filmic tone mapping, output color-space controls, simple post-processing, custom WGSL fragment bodies, lines, and point billboards.
@@ -89,7 +89,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Shadow behavior parity | High | Match Three.js `shadow.camera`, map size, bias, normal bias, radius/blur behavior, cast/receive rules, transparency and alpha-tested casters. |
 | `RectAreaLight` | Medium | One-sided finite-area approximation is supported for direct lighting. Remaining work is exact Three.js LTC/LUT parity and golden tests. |
 | `LightProbe` support | Medium | Three.js `LightProbe` spherical harmonics contribute diffuse indirect lighting; remaining work is exact golden-tested parity with all material/environment combinations. |
-| Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate 2D texture `backgroundBlurriness` are supported; remaining work is newer rotation, cube/equirect blur, and exact background/environment mapping controls. |
+| Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate 2D texture `backgroundBlurriness` are supported; non-default background/environment rotations fail clearly. Remaining work is native rotation, cube/equirect blur, and exact background/environment mapping controls. |
 | PMREM compatibility | Medium | Decide whether to accept Three.js PMREM outputs, prefiltered cubemaps, or keep CPU precompute from source environment maps. |
 
 ## P2 - Cameras, Targets, And Render Pipeline Features

@@ -4092,6 +4092,31 @@ test('backgroundBlurriness softens 2D texture backgrounds', () => {
   assert.ok(sharp.r > blurred.r + 20, `blurred background should soften the red texel (${sharp.r} vs ${blurred.r})`)
 })
 
+test('scene background and environment rotations fail clearly', () => {
+  const cases = [
+    ['backgroundRotation', (scene) => {
+      scene.background = solidTexture(0, 255, 0)
+      scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
+    }],
+    ['environmentRotation', (scene) => {
+      scene.environment = solidTexture(255, 255, 255)
+      scene.environmentRotation = new THREE.Euler(0, Math.PI / 4, 0)
+    }],
+  ]
+
+  for (const [name, setup] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    setup(scene)
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      new RegExp(`scene\\.${name}.*not supported`, 'i'),
+      name,
+    )
+  }
+})
+
 test('background textures apply UV transforms', () => {
   const background = rgbaTexture([
     255, 0, 0, 255,

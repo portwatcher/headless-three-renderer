@@ -92,6 +92,13 @@ export interface ThreeVector3Like {
   z?: number
 }
 
+export interface ThreeEulerLike {
+  x?: number
+  y?: number
+  z?: number
+  isEuler?: boolean
+}
+
 export type ThreePlaneLike = {
   normal?: ThreeVector3Like | ArrayLike<number>
   constant?: number
@@ -337,6 +344,7 @@ export interface ThreeSceneLike extends ThreeObject3DLike {
   background?: ThreeColorLike | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
+  backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null
   fog?: {
     isFog?: boolean
     isFogExp2?: boolean
@@ -347,6 +355,7 @@ export interface ThreeSceneLike extends ThreeObject3DLike {
   } | null
   environment?: ThreeTextureLike | null
   environmentIntensity?: number
+  environmentRotation?: ThreeEulerLike | ArrayLike<number> | null
   updateMatrixWorld?(force?: boolean): void
 }
 

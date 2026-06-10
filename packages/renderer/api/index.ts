@@ -34,6 +34,7 @@ export type {
   ThreeBufferGeometryLike,
   ThreeTextureLike,
   ThreeVector3Like,
+  ThreeEulerLike,
   ThreePlaneLike,
   RenderPixelRectLike,
   ThreeLayersLike,
@@ -112,6 +113,7 @@ function toNativeInput(
 ): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera } {
   validateThreeScene(scene)
   validateThreeCamera(camera)
+  validateUnsupportedSceneState(scene)
   validateUnsupportedRenderOptions(options)
 
   if (typeof scene.updateMatrixWorld === 'function') {
@@ -225,6 +227,40 @@ function finiteOrUndefined(value: unknown): number | undefined {
 function booleanOrNumber(value: unknown): number | undefined {
   if (typeof value === 'boolean') return value ? 1 : 0
   return finiteOrUndefined(value)
+}
+
+function validateUnsupportedSceneState(scene: ThreeSceneLike): void {
+  if (hasNonZeroRotation(scene.backgroundRotation)) {
+    throw new Error(
+      'scene.backgroundRotation is not supported by @headless-three/renderer yet. Leave backgroundRotation at its default zero rotation or pre-rotate the background texture before rendering.',
+    )
+  }
+  if (hasNonZeroRotation(scene.environmentRotation)) {
+    throw new Error(
+      'scene.environmentRotation is not supported by @headless-three/renderer yet. Leave environmentRotation at its default zero rotation or pre-rotate the environment texture before rendering.',
+    )
+  }
+}
+
+function hasNonZeroRotation(value: unknown): boolean {
+  if (!value) return false
+  const rotation = value as { x?: unknown; y?: unknown; z?: unknown; length?: unknown }
+  if (
+    nonZeroFinite(rotation.x) ||
+    nonZeroFinite(rotation.y) ||
+    nonZeroFinite(rotation.z)
+  ) {
+    return true
+  }
+  if (typeof rotation.length === 'number') {
+    const values = value as ArrayLike<unknown>
+    return nonZeroFinite(values[0]) || nonZeroFinite(values[1]) || nonZeroFinite(values[2])
+  }
+  return false
+}
+
+function nonZeroFinite(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) > 1e-12
 }
 
 function validateUnsupportedRenderOptions(options: RenderOptions): void {

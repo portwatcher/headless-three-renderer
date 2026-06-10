@@ -110,7 +110,7 @@ Status keys:
 | Reflection probe hint | Supported | Uses `scene.userData.headlessThreeRenderer.reflectionProbe` or first probe in `reflectionProbes`. |
 | Environment intensity | Supported | `scene.environmentIntensity`. |
 | `LightProbe` | Partial | Spherical-harmonics coefficients from visible, camera-layer-matching `THREE.LightProbe` objects contribute diffuse indirect lighting. Exact golden-tested parity across every material/environment combination remains planned. |
-| Environment/background rotation and intensity controls | Partial | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate 2D texture `backgroundBlurriness` are supported. Environment/background rotation, cube/equirect background blur, and newer mapping controls remain planned. |
+| Environment/background rotation and intensity controls | Partial | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate 2D texture `backgroundBlurriness` are supported. Non-default `scene.backgroundRotation` and `scene.environmentRotation` fail clearly; native rotation, cube/equirect background blur, and newer mapping controls remain planned. |
 
 ## Test Coverage
 
