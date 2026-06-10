@@ -137,6 +137,7 @@ The public API accepts only Three.js-like objects:
 - alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with `texture.channel` UV selection and wrap/filter sampler settings
 - `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, and wrap/filter sampler settings
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
+- `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
 - `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths
 - alpha test (`material.alphaTest`) with fragment discard
