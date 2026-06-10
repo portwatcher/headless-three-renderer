@@ -106,7 +106,7 @@ Status keys:
 | Light layers | Supported | Lights are filtered against the active camera layers. |
 | Light limit | Partial | Up to 16 visible non-ambient lights are supported and covered by scale tests. Larger visible non-ambient light sets fail clearly until native light arrays are expanded. |
 | Shadows | Partial | Directional, spot, point, and directional cascaded shadow maps are supported for one shadow-casting light; additional visible shadow-casting lights fail clearly. |
-| Shadow behavior parity | Partial | Supports common camera bounds, square map size, bias, normal bias, cast/receive flags, and alpha-tested casters. Non-square shadow map sizes fail clearly; native multiple-shadow-map rendering, rectangular maps, and blur/radius parity remain planned. |
+| Shadow behavior parity | Partial | Supports common camera bounds, square map size, bias, normal bias, cast/receive flags, and alpha-tested casters. Non-square shadow map sizes and non-default shadow blur/radius settings fail clearly; native multiple-shadow-map rendering, rectangular maps, and blur/radius support remain planned. |
 | Equirectangular environment IBL | Supported | CPU precomputes diffuse irradiance, prefiltered specular, and BRDF LUT from equirectangular inputs. Cube, refraction, and PMREM/CubeUV environment mappings fail clearly. |
 | Reflection probe hint | Supported | Uses `scene.userData.headlessThreeRenderer.reflectionProbe` or first probe in `reflectionProbes`. |
 | Environment intensity | Supported | `scene.environmentIntensity`. |

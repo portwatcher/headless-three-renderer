@@ -175,6 +175,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
   const shadow = light.shadow
+  assertSupportedShadowBlurOptions(shadow)
   out.shadowMapSize = shadowMapSizeOrDefault(shadow?.mapSize)
   if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
   if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
@@ -201,6 +202,19 @@ function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike): number {
     )
   }
   return Math.max(32, Math.floor(width ?? height ?? 512))
+}
+
+function assertSupportedShadowBlurOptions(shadow: ThreeObject3DLike['shadow']): void {
+  if (Number.isFinite(shadow?.radius) && Math.abs(shadow!.radius! - 1) > 1e-12) {
+    throw new Error(
+      `Non-default light.shadow.radius values are not supported by @headless-three/renderer yet (${shadow!.radius}). Use the default radius of 1 until configurable shadow blur/radius support lands.`,
+    )
+  }
+  if (Number.isFinite(shadow?.blurSamples) && shadow!.blurSamples !== 8) {
+    throw new Error(
+      `Non-default light.shadow.blurSamples values are not supported by @headless-three/renderer yet (${shadow!.blurSamples}). Use the default blurSamples value of 8 until configurable shadow blur/radius support lands.`,
+    )
+  }
 }
 
 function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {

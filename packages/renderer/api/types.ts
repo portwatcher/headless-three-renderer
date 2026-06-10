@@ -335,6 +335,7 @@ export interface ThreeObject3DLike {
     bias?: number
     normalBias?: number
     radius?: number
+    blurSamples?: number
     camera?: {
       left?: number
       right?: number
