@@ -175,7 +175,6 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
   const shadow = light.shadow
-  assertSupportedShadowBlurOptions(shadow)
   const mapSize = shadowMapSizeOrDefault(shadow?.mapSize, light)
   out.shadowMapSize = Math.max(mapSize.width, mapSize.height)
   out.shadowMapWidth = mapSize.width
@@ -208,14 +207,6 @@ function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3D
     )
   }
   return { width: resolvedWidth, height: resolvedHeight }
-}
-
-function assertSupportedShadowBlurOptions(shadow: ThreeObject3DLike['shadow']): void {
-  if (Number.isFinite(shadow?.blurSamples) && shadow!.blurSamples !== 8) {
-    throw new Error(
-      `Non-default light.shadow.blurSamples values are not supported by @headless-three/renderer yet (${shadow!.blurSamples}). Use the default blurSamples value of 8 until configurable shadow blurSamples support lands.`,
-    )
-  }
 }
 
 function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
