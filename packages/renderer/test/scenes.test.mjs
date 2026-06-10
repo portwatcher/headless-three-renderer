@@ -631,6 +631,34 @@ test('MeshMatcapMaterial map samples the selected secondary UV channel', () => {
   assert.ok(secondary.r > secondary.g + 40, `matcap map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
 })
 
+test('MeshMatcapMaterial map decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const map = solidTexture(128, 128, 128)
+    map.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: solidTexture(255, 255, 255),
+        map,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 15, `linear matcap map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
+})
+
 test('normalMap applies texture UV transforms', () => {
   function renderWithOffset(offsetX) {
     const normalMap = rgbaTexture([
