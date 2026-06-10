@@ -5725,6 +5725,64 @@ test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
   assert.ok(Math.abs(leftDepth.r - leftDepth.b) <= 1, 'depth red and blue channels should match')
 })
 
+test('renderToTarget depthTexture honors scissor clipping', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = {}
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, {
+    width: 64,
+    height: 64,
+    scissor: { x: 16, y: 16, width: 32, height: 32 },
+  })
+
+  const inside = meanRegion(depthTexture.image.data, 64, 64, 24, 24, 40, 40)
+  const outsideLeft = meanRegion(depthTexture.image.data, 64, 64, 4, 24, 12, 40)
+  const outsideTop = meanRegion(depthTexture.image.data, 64, 64, 24, 4, 40, 12)
+  assert.ok(inside.r > 80, `scissored depth region should contain visible mesh depth (${inside.r})`)
+  assert.ok(outsideLeft.r < 2, `left of scissor should keep background depth (${outsideLeft.r})`)
+  assert.ok(outsideTop.r < 2, `above scissor should keep background depth (${outsideTop.r})`)
+})
+
+test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(3.2, 2.4),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      alphaMap,
+      alphaTest: 0.5,
+    }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = {}
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+
+  const discarded = meanRegion(depthTexture.image.data, 64, 64, 14, 26, 24, 38)
+  const visible = meanRegion(depthTexture.image.data, 64, 64, 40, 26, 50, 38)
+  assert.ok(discarded.r < 2, `alphaMap cutout should keep background depth (${discarded.r})`)
+  assert.ok(visible.r > 80, `opaque alphaMap region should write visible mesh depth (${visible.r})`)
+})
+
 test('unsupported render target MRT and MSAA requests fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)

@@ -98,7 +98,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Array/cube camera support | Medium | `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly. Remaining work is native support for environment capture and stereo-ish workflows. |
-| Render target depth output | Medium | Single-output targets with `depthTexture` populate RGBA8 normalized depth readback using the active target viewport/scissor and depth-tested visible geometry. Remaining work is native float depth texture readback and exact WebGL render-target depth semantics. |
+| Render target depth output | Medium | Single-output targets with `depthTexture` populate RGBA8 normalized depth readback using depth-tested visible geometry; direct conformance covers near/far ordering, texture writeback, scissor clipping, and alpha-map/alpha-test cutouts. Remaining work is native float depth texture readback and exact WebGL render-target depth semantics. |
 | Multiple render targets | Medium | Single-output target texture objects, one-element `target.texture` arrays, and `target.textures[0]` write back RGBA8 data; multiple color attachment targets fail clearly. Remaining work is native MRT support for masks, normals, IDs, and deferred-style workflows. |
 | MSAA controls | Medium | Render-option and target sample counts greater than 1 fail clearly. Remaining work is configurable sample count and resolve behavior. |
 | Viewport/scissor support | Medium | Render-option viewport/scissor rectangles are supported in output pixel coordinates; remaining work is exact WebGLRenderer state-machine parity and broader tiled-render ergonomics. |
