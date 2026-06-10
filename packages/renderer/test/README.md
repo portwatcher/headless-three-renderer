@@ -14,7 +14,7 @@ The tests require the native binary (`headless_three_renderer.*.node`) to be bui
 ## What is covered
 
 - **`smoke.test.mjs`** — module loads, `Renderer` can be constructed, basic scenes render to correctly-sized PNG buffers, renderer instances are reusable.
-- **`gltf.test.mjs`** — a committed local glTF fixture loads through `GLTFLoader` and renders through the documented Node loader setup.
+- **`gltf.test.mjs`** — committed local glTF fixtures load geometry/materials and encoded data-URI textures through `GLTFLoader` and render through the documented Node loader setup.
 - **`corpus.test.mjs`** — generated representative scenes render without crashes and produce visible non-background pixels for transparent layers, skinned/morphed geometry, physical IBL + shadows, instanced points/lines, LOD/groups, and pathological geometry.
 - **`scale.test.mjs`** — many-mesh, texture-heavy, and supported 16-light budget scenes render, and larger visible non-ambient light sets fail clearly.
 - **`scenes.test.mjs`** — scene-level invariants: `rgba` format produces `width * height * 4` bytes, meshes cover reasonable portions of the frame, different materials produce different pixel statistics, PBR scenes show lighting gradients, line/point topologies render without error, empty scene renders background color.

@@ -113,6 +113,9 @@ export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd
 export function installLocalFileFetch(): void {
   const marker = Symbol.for('headless-three-renderer.local-file-fetch')
   const globalScope = globalThis as any
+  if (typeof globalScope.self === 'undefined') {
+    globalScope.self = globalScope
+  }
   if (globalScope[marker]) return
 
   if (typeof globalScope.ProgressEvent === 'undefined') {
