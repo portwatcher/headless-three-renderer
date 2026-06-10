@@ -52,6 +52,15 @@ function rgbaTexture(data, width, height) {
   return texture
 }
 
+function setTextureMatrixOffset(texture, x, y = 0) {
+  texture.matrixAutoUpdate = false
+  texture.matrix.set(
+    1, 0, x,
+    0, 1, y,
+    0, 0, 1,
+  )
+}
+
 function splitEnvironmentTexture() {
   const data = []
   for (let y = 0; y < 2; y++) {
@@ -637,6 +646,34 @@ test('MeshMatcapMaterial map multiplies matcap color and applies UV transforms',
   assert.ok(green.g > green.r + 40, `matcap color map offset should sample the green texel (${green.g} vs ${green.r})`)
 })
 
+test('MeshMatcapMaterial map honors explicit texture matrices', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(map, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    constantUvPlane(0.25, 0.5),
+    new THREE.MeshMatcapMaterial({
+      color: 0xffffff,
+      matcap: solidTexture(255, 255, 255),
+      map,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 40, `explicit matcap map matrix should sample the green texel (${mean.g} vs ${mean.r})`)
+})
+
 test('MeshMatcapMaterial map samples the selected secondary UV channel', () => {
   function renderMatcapMap(channel) {
     const map = rgbaTexture([
@@ -769,6 +806,45 @@ test('normalMap applies texture UV transforms', () => {
   const shifted = renderWithOffset(0.5)
   const diff = meanAbsDiff(unshifted, shifted)
   assert.ok(diff > 2, `normalMap offset should change the sampled tangent-space normals (diff=${diff.toFixed(2)})`)
+})
+
+test('normalMap honors explicit texture matrices', () => {
+  function renderWithMatrix(matrixOffsetX) {
+    const normalMap = rgbaTexture([
+      128, 128, 255, 255,
+      255, 128, 128, 255,
+    ], 2, 1)
+    normalMap.magFilter = THREE.LinearFilter
+    normalMap.minFilter = THREE.LinearFilter
+    if (matrixOffsetX !== 0) setTextureMatrixOffset(normalMap, matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0,
+        normalMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 4)
+    light.position.set(3, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const unshifted = renderWithMatrix(0)
+  const shifted = renderWithMatrix(0.5)
+  const diff = meanAbsDiff(unshifted, shifted)
+  assert.ok(diff > 2, `explicit normalMap matrix should change sampled tangent-space normals (diff=${diff.toFixed(2)})`)
 })
 
 test('normalMap honors nearest texture filters', () => {
@@ -945,6 +1021,43 @@ test('MeshPhongMaterial specularMap applies texture UV transforms', () => {
 
   const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   assert.ok(mean.r > 35, `specularMap offset should sample uv1's enabled texel (${mean.r})`)
+})
+
+test('MeshPhongMaterial specularMap honors explicit texture matrices', () => {
+  const specularMap = rgbaTexture([
+    0, 0, 0, 255,
+    255, 0, 0, 255,
+  ], 2, 1)
+  specularMap.channel = 1
+  specularMap.magFilter = THREE.NearestFilter
+  specularMap.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(specularMap, 0.5)
+
+  const geometry = constantUvPlane(0.75, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 4,
+      specularMap,
+    }),
+  ))
+
+  const light = new THREE.DirectionalLight(0xffffff, 8)
+  light.position.set(0, 0, 3)
+  scene.add(light)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > 35, `explicit specularMap matrix should sample uv1's enabled texel (${mean.r})`)
 })
 
 test('MeshPhongMaterial specularMap honors nearest texture filters', () => {
@@ -1240,6 +1353,38 @@ test('displacementMap applies texture UV transforms before depth output', () => 
   assert.ok(displaced.r > flat.r + 15, `displaced depth plane should move nearer and render brighter (${displaced.r} vs ${flat.r})`)
 })
 
+test('displacementMap honors explicit texture matrices before depth output', () => {
+  function renderDisplaced(matrixOffsetX) {
+    const displacementMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    displacementMap.magFilter = THREE.NearestFilter
+    displacementMap.minFilter = THREE.NearestFilter
+    if (matrixOffsetX !== 0) setTextureMatrixOffset(displacementMap, matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshDepthMaterial({
+        displacementMap,
+        displacementScale: 2.5,
+        displacementBias: 0,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const flat = renderDisplaced(0)
+  const displaced = renderDisplaced(0.5)
+  assert.ok(displaced.r > flat.r + 15, `explicit displacementMap matrix should move the plane nearer (${displaced.r} vs ${flat.r})`)
+})
+
 test('displacementMap samples the selected secondary UV channel before depth output', () => {
   function renderDisplaced(channel) {
     const displacementMap = rgbaTexture([
@@ -1432,12 +1577,7 @@ test('SpriteMaterial map honors explicit texture matrices', () => {
   ], 4, 1)
   map.magFilter = THREE.NearestFilter
   map.minFilter = THREE.NearestFilter
-  map.matrixAutoUpdate = false
-  map.matrix.set(
-    1, 0, 0.5,
-    0, 1, 0,
-    0, 0, 1,
-  )
+  setTextureMatrixOffset(map, 0.5)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -1490,12 +1630,7 @@ test('SpriteMaterial alphaMap honors explicit texture matrices', () => {
   ], 2, 1)
   alphaMap.magFilter = THREE.NearestFilter
   alphaMap.minFilter = THREE.NearestFilter
-  alphaMap.matrixAutoUpdate = false
-  alphaMap.matrix.set(
-    1, 0, 0.5,
-    0, 1, 0,
-    0, 0, 1,
-  )
+  setTextureMatrixOffset(alphaMap, 0.5)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
@@ -2273,6 +2408,34 @@ test('aoMap applies texture UV transforms on the selected channel', () => {
   assert.ok(mean.r < 20, `aoMap offset should darken the plane through uv1 (${mean.r})`)
 })
 
+test('aoMap honors explicit texture matrices on the selected channel', () => {
+  const aoMap = rgbaTexture([
+    255, 255, 255, 255,
+    0, 0, 0, 255,
+  ], 2, 1)
+  aoMap.channel = 1
+  aoMap.magFilter = THREE.NearestFilter
+  aoMap.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(aoMap, 0.5)
+
+  const geometry = constantUvPlane(0.75, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({ color: 0xffffff, aoMap, aoMapIntensity: 1 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r < 20, `explicit aoMap matrix should darken the plane through uv1 (${mean.r})`)
+})
+
 test('aoMap honors nearest texture filters', () => {
   function renderWithFilter(filter) {
     const aoMap = rgbaTexture([
@@ -2348,6 +2511,35 @@ test('alphaMap applies texture UV transforms before alpha testing', () => {
 
   const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   assert.ok(mean.r > mean.b + 40, `alphaMap offset should sample the visible texel before alpha testing (${mean.r} vs ${mean.b})`)
+})
+
+test('alphaMap honors explicit texture matrices before alpha testing', () => {
+  const alphaMap = rgbaTexture([
+    255, 0, 0, 255,
+    255, 255, 0, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(alphaMap, 0.5)
+
+  const geometry = constantUvPlane(0.25, 0.5)
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      alphaMap,
+      alphaTest: 0.5,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > mean.b + 40, `explicit alphaMap matrix should sample the visible texel before alpha testing (${mean.r} vs ${mean.b})`)
 })
 
 test('alphaMap samples the selected secondary UV channel', () => {
@@ -2881,6 +3073,34 @@ test('emissiveMap applies texture UV transforms', () => {
   assert.ok(mean.r > mean.g + 40, `emissiveMap offset should sample the red texel (${mean.r} vs ${mean.g})`)
 })
 
+test('emissiveMap honors explicit texture matrices', () => {
+  const emissiveMap = rgbaTexture([
+    0, 0, 0, 255,
+    255, 0, 0, 255,
+  ], 2, 1)
+  emissiveMap.magFilter = THREE.NearestFilter
+  emissiveMap.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(emissiveMap, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    constantUvPlane(0.25, 0.5),
+    new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0xff0000,
+      emissiveMap,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > mean.g + 40, `explicit emissiveMap matrix should sample the red texel (${mean.r} vs ${mean.g})`)
+})
+
 test('emissiveMap samples the selected secondary UV channel', () => {
   function renderWithChannel(channel) {
     const emissiveMap = rgbaTexture([
@@ -2986,6 +3206,44 @@ test('metallicRoughness maps apply texture UV transforms', () => {
   assert.ok(Math.abs(smooth - rough) > 20, `roughnessMap offset should change the sampled texel (${smooth} vs ${rough})`)
 })
 
+test('metallicRoughness maps honor explicit texture matrices', () => {
+  function renderWithMatrix(matrixOffsetX) {
+    const roughnessMap = rgbaTexture([
+      0, 255, 0, 255,
+      0, 0, 0, 255,
+    ], 2, 1)
+    roughnessMap.magFilter = THREE.NearestFilter
+    roughnessMap.minFilter = THREE.NearestFilter
+    if (matrixOffsetX !== 0) setTextureMatrixOffset(roughnessMap, matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        roughnessMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 12)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const rough = maxLuminance(renderWithMatrix(0))
+  const smooth = maxLuminance(renderWithMatrix(0.5))
+  assert.ok(Math.abs(smooth - rough) > 20, `explicit roughnessMap matrix should change the sampled texel (${smooth} vs ${rough})`)
+})
+
 test('metallicRoughness maps sample the selected secondary UV channel', () => {
   function renderWithChannel(channel) {
     const roughnessMap = rgbaTexture([
@@ -3060,12 +3318,7 @@ test('base color maps honor explicit texture matrices', () => {
   ], 2, 1)
   map.magFilter = THREE.NearestFilter
   map.minFilter = THREE.NearestFilter
-  map.matrixAutoUpdate = false
-  map.matrix.set(
-    1, 0, 0.5,
-    0, 1, 0,
-    0, 0, 1,
-  )
+  setTextureMatrixOffset(map, 0.5)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -3361,6 +3614,35 @@ test('lightMap applies texture UV transforms on the selected channel', () => {
 
   const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   assert.ok(mean.g > mean.r + 40, `lightMap offset should sample uv1 green texel, got ${mean.g} vs ${mean.r}`)
+})
+
+test('lightMap honors explicit texture matrices on the selected channel', () => {
+  const lightMap = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  lightMap.channel = 1
+  lightMap.magFilter = THREE.NearestFilter
+  lightMap.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(lightMap, 0.5)
+
+  const geometry = constantUvPlane(0.75, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    lightMap,
+    lightMapIntensity: 3,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 40, `explicit lightMap matrix should sample uv1 green texel, got ${mean.g} vs ${mean.r}`)
 })
 
 test('lightMap honors nearest texture filters', () => {
@@ -5572,12 +5854,7 @@ test('LineBasicMaterial map honors explicit texture matrices', () => {
   ], 2, 1)
   map.magFilter = THREE.NearestFilter
   map.minFilter = THREE.NearestFilter
-  map.matrixAutoUpdate = false
-  map.matrix.set(
-    1, 0, 0.5,
-    0, 1, 0,
-    0, 0, 1,
-  )
+  setTextureMatrixOffset(map, 0.5)
 
   const geom = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-1.5, 0, 0),
@@ -6252,12 +6529,7 @@ test('PointsMaterial map honors explicit texture matrices', () => {
   ], 4, 1)
   map.magFilter = THREE.NearestFilter
   map.minFilter = THREE.NearestFilter
-  map.matrixAutoUpdate = false
-  map.matrix.set(
-    1, 0, 0.5,
-    0, 1, 0,
-    0, 0, 1,
-  )
+  setTextureMatrixOffset(map, 0.5)
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
@@ -6316,12 +6588,7 @@ test('PointsMaterial alphaMap honors explicit texture matrices', () => {
   ], 2, 1)
   alphaMap.magFilter = THREE.NearestFilter
   alphaMap.minFilter = THREE.NearestFilter
-  alphaMap.matrixAutoUpdate = false
-  alphaMap.matrix.set(
-    1, 0, 0.5,
-    0, 1, 0,
-    0, 0, 1,
-  )
+  setTextureMatrixOffset(alphaMap, 0.5)
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
