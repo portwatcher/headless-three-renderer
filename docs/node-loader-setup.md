@@ -65,7 +65,8 @@ node examples/render-gltf.mjs ./model.gltf render.png
 `createEncodedImageTextureLoader()` returns a Three.js loader handler whose
 textures expose encoded PNG/JPEG/WebP bytes through `texture.image` and
 `texture.source.data`. The renderer decodes those bytes natively, so no DOM
-`Image`, canvas, or WebGL context is needed for external image files.
+`Image`, canvas, or WebGL context is needed for external image files or
+PNG/JPEG/WebP data URI image references.
 
 ## FileLoader And Fetch
 
@@ -81,11 +82,21 @@ external `.bin` buffers. `GLTFLoader` resolves those URLs before calling
 
 ## Embedded Images
 
+For images embedded directly as PNG/JPEG/WebP data URIs in `.gltf` JSON, register
+the encoded-buffer loader for data URI image schemes:
+
+```js
+const encodedImages = createEncodedImageTextureLoader(root)
+manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
+manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
+```
+
 For images embedded in GLB files or glTF bufferViews, `GLTFLoader` converts the
 bufferView into a `Blob` URL and then uses its internal image loader. In plain
-Node, that path needs an image implementation such as a `createImageBitmap`
+Node, that path still needs an image implementation such as a `createImageBitmap`
 polyfill, or a preprocessing step that rewrites embedded images as external
-PNG/JPEG/WebP files so the encoded-buffer loader above can handle them.
+PNG/JPEG/WebP files or data URIs so the encoded-buffer loader above can handle
+them.
 
 After loading, texture slots should expose one of the renderer-supported image
 forms:

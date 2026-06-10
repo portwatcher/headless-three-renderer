@@ -43,9 +43,11 @@ export class EncodedImageTextureLoader {
     onError?: TextureErrorCallback,
   ): TextureLike {
     const texture = new Texture()
-    const resolved = resolveLocalAssetPath(this.loaderPath ? `${this.loaderPath}${url}` : url, this.rootDir)
+    const source = /^data:/i.test(url) ? url : (this.loaderPath ? `${this.loaderPath}${url}` : url)
+    const encodedDataUri = encodedImageDataUriBuffer(source)
+    const data = encodedDataUri ? Promise.resolve(encodedDataUri) : readFile(resolveLocalAssetPath(source, this.rootDir))
 
-    readFile(resolved).then((buffer) => {
+    data.then((buffer) => {
       texture.image = buffer
       texture.source.data = buffer
       texture.needsUpdate = true
@@ -58,6 +60,24 @@ export class EncodedImageTextureLoader {
 
 export function createEncodedImageTextureLoader(rootDir?: string): EncodedImageTextureLoader {
   return new EncodedImageTextureLoader(rootDir)
+}
+
+function encodedImageDataUriBuffer(url: string): Buffer | null {
+  if (!/^data:/i.test(url)) return null
+  const comma = url.indexOf(',')
+  if (comma < 0) {
+    throw new Error('Data URI texture is missing a comma separator.')
+  }
+
+  const metadata = url.slice(5, comma).toLowerCase()
+  if (!/^image\/(?:png|jpe?g|webp)(?:;|$)/.test(metadata)) {
+    throw new Error('Data URI texture is not a supported encoded image. Use PNG, JPEG, or WebP data URIs.')
+  }
+  const payload = url.slice(comma + 1)
+  if (/(?:^|;)base64(?:;|$)/.test(metadata)) {
+    return Buffer.from(payload, 'base64')
+  }
+  return Buffer.from(decodeURIComponent(payload), 'utf8')
 }
 
 export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd()): string {
