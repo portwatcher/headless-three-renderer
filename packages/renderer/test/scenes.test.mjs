@@ -2271,6 +2271,25 @@ test('texture anisotropy inputs fail clearly', () => {
   )
 })
 
+test('explicit texture mipmaps fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
+  map.minFilter = THREE.LinearMipmapLinearFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /explicit texture mipmaps.*not uploaded/i,
+  )
+})
+
 test('base color maps decode sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)

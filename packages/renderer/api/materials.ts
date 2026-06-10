@@ -980,6 +980,11 @@ function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void
       `${label} uses texture anisotropy greater than 1, which is not supported by @headless-three/renderer yet. Disable anisotropic filtering or prefilter/downsample the texture before rendering.`,
     )
   }
+  if (Array.isArray(map.mipmaps) && map.mipmaps.length > 0) {
+    throw new Error(
+      `${label} provides explicit texture mipmaps, which are not uploaded by @headless-three/renderer yet. Provide only the base image level or prefilter/downsample the texture before rendering.`,
+    )
+  }
 }
 
 function textureTransform(map: ThreeTextureLike | null | undefined): number[] | undefined {
