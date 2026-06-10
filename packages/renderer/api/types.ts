@@ -734,6 +734,7 @@ export interface NativeSceneMesh {
   gradientMapMagFilter?: string
   gradientMapMinFilter?: string
   gradientMapAnisotropy?: number
+  gradientMapColorSpace?: string
   displacementMap?: Buffer
   displacementMapWidth?: number
   displacementMapHeight?: number
@@ -1073,6 +1074,7 @@ export interface PbrProperties {
   gradientMapMagFilter?: string
   gradientMapMinFilter?: string
   gradientMapAnisotropy?: number
+  gradientMapColorSpace?: string
   displacementMap?: Buffer
   displacementMapWidth?: number
   displacementMapHeight?: number

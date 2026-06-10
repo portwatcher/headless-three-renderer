@@ -1067,6 +1067,37 @@ test('MeshToonMaterial gradientMap honors nearest and linear filters', () => {
   assert.ok(linear.r > nearest.r + 30, `LinearFilter should blend in the bright toon ramp texel (${linear.r} vs ${nearest.r})`)
 })
 
+test('MeshToonMaterial gradientMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const gradientMap = solidTexture(128, 128, 128)
+    gradientMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 20, `linear toon gradient ramp should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
+})
+
 test('MeshDepthMaterial renders nearer fragments brighter than farther fragments', () => {
   function renderDepthAt(z) {
     const scene = new THREE.Scene()

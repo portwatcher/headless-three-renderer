@@ -96,7 +96,7 @@ struct Uniforms {
   physical_params2: vec4<f32>,
   // x = anisotropy, y = anisotropy rotation, z/w = thickness/attenuation distance or distance near/far
   physical_params3: vec4<f32>,
-  // x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map or matcap map sRGB flag
+  // x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map, matcap map sRGB flag, or toon gradient map sRGB flag depending on shading model.
   physical_params4: vec4<f32>,
   // xyz = attenuation color or distance reference position
   attenuation_color: vec4<f32>,
@@ -663,6 +663,13 @@ fn decode_light_map_sample(sample: vec4<f32>) -> vec4<f32> {
   return sample;
 }
 
+fn decode_toon_gradient_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.physical_params4.w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
 fn light_probe_irradiance(normal: vec3<f32>) -> vec3<f32> {
   let x = normal.x;
   let y = normal.y;
@@ -1125,7 +1132,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
         let toon_coord = dot(N, L) * 0.5 + 0.5;
         var toon_irradiance: f32;
         if uniforms.light_probe_params.y > 0.5 {
-          toon_irradiance = textureSample(t_physical_sheen, s_physical_sheen_map, vec2<f32>(toon_coord, 0.0)).r;
+          toon_irradiance = decode_toon_gradient_map_sample(textureSample(t_physical_sheen, s_physical_sheen_map, vec2<f32>(toon_coord, 0.0))).r;
         } else {
           let toon_width = fwidth(toon_coord) * 0.5;
           toon_irradiance = mix(0.7, 1.0, smoothstep(0.7 - toon_width, 0.7 + toon_width, toon_coord));

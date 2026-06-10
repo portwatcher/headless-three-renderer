@@ -587,6 +587,8 @@ export interface SceneMesh {
   gradientMapMinFilter?: string
   /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
   gradientMapAnisotropy?: number
+  /** Gradient map color space: `"srgb"` or `"linear"`. */
+  gradientMapColorSpace?: string
   /**
    * Optional displacement map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
    * Red channel displaces vertices along their object-space normals.

@@ -475,6 +475,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.gradientMapMagFilter = filterModeToString(material.gradientMap?.magFilter)
     props.gradientMapMinFilter = filterModeToString(material.gradientMap?.minFilter)
     props.gradientMapAnisotropy = textureAnisotropy(material.gradientMap)
+    props.gradientMapColorSpace = textureColorSpace(material.gradientMap)
   }
 
   const displacementMapInfo = extractTextureFromSlot(material.displacementMap)

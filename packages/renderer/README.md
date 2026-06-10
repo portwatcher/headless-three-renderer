@@ -126,7 +126,7 @@ The public API accepts only Three.js-like objects:
 - `material.flatShading` per-face normals for triangle meshes without normal maps
 - `MeshMatcapMaterial.map` color maps with `texture.channel` UV selection and transforms
 - displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, `texture.channel` UV selection, and texture transforms
-- `MeshToonMaterial.gradientMap` red-channel diffuse ramps with wrap/filter sampler settings
+- `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode and wrap/filter sampler settings
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output

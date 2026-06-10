@@ -85,7 +85,7 @@ pub struct Uniforms {
     pub physical_params2: [f32; 4],
     /// x = anisotropy, y = anisotropy rotation, z/w = thickness/attenuation distance or distance near/far.
     pub physical_params3: [f32; 4],
-    /// x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map
+    /// x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map, matcap map sRGB flag, or toon gradient map sRGB flag depending on shading model.
     pub physical_params4: [f32; 4],
     /// xyz = attenuation color or distance reference position, w = reserved
     pub attenuation_color: [f32; 4],
@@ -2438,6 +2438,8 @@ impl GpuRenderer {
                 mesh.light_map_intensity,
                 if mesh.shading_model == ShadingModel::Matcap {
                     if mesh.matcap_map_is_srgb { 1.0 } else { 0.0 }
+                } else if mesh.shading_model == ShadingModel::Toon {
+                    if mesh.gradient_map_is_srgb { 1.0 } else { 0.0 }
                 } else if mesh.specular_map.is_some() {
                     1.0
                 } else {

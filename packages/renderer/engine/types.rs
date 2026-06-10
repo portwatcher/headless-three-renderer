@@ -563,6 +563,8 @@ pub struct SceneMesh {
     pub gradient_map_min_filter: Option<String>,
     /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
     pub gradient_map_anisotropy: Option<f64>,
+    /// Gradient map color space: `"srgb"` or `"linear"`.
+    pub gradient_map_color_space: Option<String>,
     /// Optional displacement map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
     /// Red channel displaces vertices along their object-space normals.
     pub displacement_map: Option<Buffer>,

@@ -151,6 +151,7 @@ pub struct PreparedMesh {
     pub thickness_map_uses_uv2: bool,
     pub texture_is_srgb: bool,
     pub matcap_map_is_srgb: bool,
+    pub gradient_map_is_srgb: bool,
     pub emissive_map_is_srgb: bool,
     pub light_map_is_srgb: bool,
     pub cast_shadow: bool,
@@ -734,6 +735,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         parse_texture_transform(mesh.thickness_map_transform.as_deref(), mesh_index)?;
     let texture_is_srgb = matches!(mesh.texture_color_space.as_deref(), Some("srgb"));
     let matcap_map_is_srgb = matches!(mesh.matcap_map_color_space.as_deref(), Some("srgb"));
+    let gradient_map_is_srgb = matches!(mesh.gradient_map_color_space.as_deref(), Some("srgb"));
     let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
     let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
 
@@ -1386,6 +1388,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         thickness_map_uses_uv2: mesh.thickness_map_uses_uv2.unwrap_or(false),
         texture_is_srgb,
         matcap_map_is_srgb,
+        gradient_map_is_srgb,
         emissive_map_is_srgb,
         light_map_is_srgb,
         cast_shadow: mesh.cast_shadow.unwrap_or(false),
