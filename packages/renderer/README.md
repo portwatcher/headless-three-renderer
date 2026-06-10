@@ -114,12 +114,12 @@ The public API accepts only Three.js-like objects:
 - material base color and opacity
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
-- base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, and alpha maps honor texture UV transforms, including explicit texture matrices for those covered slots
+- base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, toon gradient, matcap color-map, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and roughness-aware environment-backed or scene-color transmission / refraction
-- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
+- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, texture transforms including explicit matrices, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
 - custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with `texture.channel` UV selection and wrap/filter sampler settings
 - normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with `texture.channel` UV selection and wrap/filter sampler settings

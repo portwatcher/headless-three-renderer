@@ -4117,6 +4117,359 @@ test('physical extension maps apply texture UV transforms', () => {
   assert.ok(mean.b > mean.r + 40, `transmissionMap offset should sample the transmitting texel (${mean.b} vs ${mean.r})`)
 })
 
+test('physical extension maps honor explicit texture matrices', () => {
+  function makeMap(data, matrixOffsetX = 0) {
+    const texture = rgbaTexture(data, 2, 1)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    if (matrixOffsetX !== 0) setTextureMatrixOffset(texture, matrixOffsetX)
+    return texture
+  }
+
+  function frontCamera() {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+
+  function luminance(mean) {
+    return 0.2126 * mean.r + 0.7152 * mean.g + 0.0722 * mean.b
+  }
+
+  function renderSpecularColor(matrixOffsetX) {
+    const specularColorMap = makeMap([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+        specularColorMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  const specularColorPrimary = renderSpecularColor(0)
+  const specularColorShifted = renderSpecularColor(0.5)
+  assert.ok(
+    specularColorShifted.r > specularColorPrimary.r + 4,
+    `explicit specularColorMap matrix should sample the red texel (${specularColorShifted.r} vs ${specularColorPrimary.r})`,
+  )
+  assert.ok(
+    specularColorShifted.r > specularColorShifted.g + 4,
+    `explicit specularColorMap matrix should tint the specular response red (${specularColorShifted.r} vs ${specularColorShifted.g})`,
+  )
+
+  function renderSpecularIntensity(matrixOffsetX) {
+    const specularIntensityMap = makeMap([
+      0, 0, 0, 0,
+      0, 0, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+        specularIntensityMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64 })
+  }
+
+  assert.ok(
+    maxLuminance(renderSpecularIntensity(0.5)) > maxLuminance(renderSpecularIntensity(0)) + 40,
+    'explicit specularIntensityMap matrix should enable the shifted specular texel',
+  )
+
+  function renderTransmission(matrixOffsetX) {
+    const transmissionMap = makeMap([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xff0000,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        transmissionMap,
+        ior: 1.5,
+        thickness: 0,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  const transmissionPrimary = renderTransmission(0)
+  const transmissionShifted = renderTransmission(0.5)
+  assert.ok(
+    transmissionPrimary.r > transmissionPrimary.b + 30,
+    `primary transmissionMap texel should keep the physical surface opaque red (${transmissionPrimary.r} vs ${transmissionPrimary.b})`,
+  )
+  assert.ok(
+    transmissionShifted.b > transmissionShifted.r + 40,
+    `explicit transmissionMap matrix should sample the transmitting texel (${transmissionShifted.b} vs ${transmissionShifted.r})`,
+  )
+
+  function renderClearcoat(matrixOffsetX) {
+    const clearcoatMap = makeMap([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        clearcoatMap,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  assert.ok(
+    luminance(renderClearcoat(0.5)) > luminance(renderClearcoat(0)) + 80,
+    'explicit clearcoatMap matrix should enable stronger clearcoat IBL',
+  )
+
+  function renderClearcoatRoughness(matrixOffsetX) {
+    const clearcoatRoughnessMap = makeMap([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 1,
+        clearcoatRoughnessMap,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  assert.ok(
+    luminance(renderClearcoatRoughness(0)) > luminance(renderClearcoatRoughness(0.5)) + 20,
+    'explicit clearcoatRoughnessMap matrix should sample the rougher shifted texel',
+  )
+
+  function renderClearcoatNormal(matrixOffsetX) {
+    const clearcoatNormalMap = makeMap([
+      128, 128, 255, 255,
+      255, 128, 128, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        clearcoatNormalMap,
+        clearcoatNormalScale: new THREE.Vector2(1, 1),
+      }),
+    ))
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64 })
+  }
+
+  assert.ok(
+    meanAbsDiff(renderClearcoatNormal(0), renderClearcoatNormal(0.5)) > 5,
+    'explicit clearcoatNormalMap matrix should sample the tilted normal texel',
+  )
+
+  function renderSheenColor(matrixOffsetX) {
+    const sheenColorMap = makeMap([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        sheen: 1,
+        sheenColor: new THREE.Color(1, 1, 1),
+        sheenRoughness: 0.35,
+        sheenColorMap,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  const sheenColorPrimary = renderSheenColor(0)
+  const sheenColorShifted = renderSheenColor(0.5)
+  assert.ok(
+    sheenColorShifted.r > sheenColorPrimary.r + 3,
+    `explicit sheenColorMap matrix should add red sheen (${sheenColorShifted.r} vs ${sheenColorPrimary.r})`,
+  )
+  assert.ok(
+    sheenColorShifted.r > sheenColorShifted.g + 3,
+    `explicit sheenColorMap matrix should keep the sampled red sheen tint (${sheenColorShifted.r} vs ${sheenColorShifted.g})`,
+  )
+
+  function renderSheenRoughness(matrixOffsetX) {
+    const sheenRoughnessMap = makeMap([
+      0, 0, 0, 0,
+      0, 0, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        sheen: 1,
+        sheenColor: new THREE.Color(1, 0, 0),
+        sheenRoughness: 1,
+        sheenRoughnessMap,
+      }),
+    ))
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64 })
+  }
+
+  assert.ok(
+    meanAbsDiff(renderSheenRoughness(0), renderSheenRoughness(0.5)) > 5,
+    'explicit sheenRoughnessMap matrix should sample the rough shifted texel',
+  )
+
+  function renderAnisotropy(matrixOffsetX) {
+    const anisotropyMap = makeMap([
+      128, 128, 0, 255,
+      255, 128, 255, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x111111,
+        roughness: 0.2,
+        metalness: 0,
+        anisotropy: 1,
+        anisotropyRotation: Math.PI / 4,
+        anisotropyMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 250)
+    light.position.set(0.8, 0.8, 2)
+    scene.add(light)
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64 })
+  }
+
+  assert.ok(
+    meanAbsDiff(renderAnisotropy(0), renderAnisotropy(0.5)) > 1,
+    'explicit anisotropyMap matrix should sample the anisotropic shifted texel',
+  )
+
+  function renderThickness(matrixOffsetX) {
+    const thicknessMap = makeMap([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        ior: 1.5,
+        thickness: 8,
+        thicknessMap,
+        attenuationColor: new THREE.Color(0.02, 0.02, 1),
+        attenuationDistance: 1,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  const thicknessPrimary = renderThickness(0)
+  const thicknessShifted = renderThickness(0.5)
+  assert.ok(
+    thicknessPrimary.r > thicknessPrimary.b - 15,
+    `primary thicknessMap texel should leave the transmitted plane mostly white (${thicknessPrimary.r} vs ${thicknessPrimary.b})`,
+  )
+  assert.ok(
+    thicknessShifted.b > thicknessShifted.r + 40,
+    `explicit thicknessMap matrix should sample the attenuating texel (${thicknessShifted.b} vs ${thicknessShifted.r})`,
+  )
+})
+
 test('physical extension maps honor nearest texture filters', () => {
   function filteredTexture(data, filter) {
     const texture = rgbaTexture(data, 2, 1)
