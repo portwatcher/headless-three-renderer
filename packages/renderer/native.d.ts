@@ -547,6 +547,16 @@ export interface SceneMesh {
   matcapMapWidth?: number
   /** Matcap color map height (required when `matcap_map` is raw RGBA8 bytes). */
   matcapMapHeight?: number
+  /** Matcap color map horizontal wrap mode. */
+  matcapMapWrapS?: string
+  /** Matcap color map vertical wrap mode. */
+  matcapMapWrapT?: string
+  /** Matcap color map magnification filter. */
+  matcapMapMagFilter?: string
+  /** Matcap color map minification filter. */
+  matcapMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  matcapMapAnisotropy?: number
   /** Matcap color map UV transform `[a, c, tx, b, d, ty]`. */
   matcapMapTransform?: Array<number>
   /** Matcap color map color space: `"srgb"` or `"linear"`. */
@@ -567,6 +577,16 @@ export interface SceneMesh {
   gradientMapWidth?: number
   /** Gradient map height (required when `gradient_map` is raw RGBA8 bytes). */
   gradientMapHeight?: number
+  /** Gradient map horizontal wrap mode. */
+  gradientMapWrapS?: string
+  /** Gradient map vertical wrap mode. */
+  gradientMapWrapT?: string
+  /** Gradient map magnification filter. */
+  gradientMapMagFilter?: string
+  /** Gradient map minification filter. */
+  gradientMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  gradientMapAnisotropy?: number
   /**
    * Optional displacement map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
    * Red channel displaces vertices along their object-space normals.

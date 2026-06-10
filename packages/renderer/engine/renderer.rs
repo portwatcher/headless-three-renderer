@@ -2883,11 +2883,21 @@ impl GpuRenderer {
                 .as_ref()
                 .map(|maps| self.sampler_for_settings(maps.physical_layers_sampler))
                 .unwrap_or_else(|| self.sampler.clone());
-            let physical_sheen_sampler = mesh
-                .physical_maps
-                .as_ref()
-                .map(|maps| self.sampler_for_settings(maps.sheen_sampler))
-                .unwrap_or_else(|| self.sampler.clone());
+            let physical_sheen_sampler = match (
+                mesh.matcap_map.as_ref(),
+                mesh.gradient_map.as_ref(),
+                mesh.physical_maps.as_ref(),
+            ) {
+                (Some(tex), _, _) | (None, Some(tex), _) => self.sampler_for_texture(
+                    tex.wrap_s,
+                    tex.wrap_t,
+                    tex.mag_filter,
+                    tex.min_filter,
+                    tex.anisotropy,
+                ),
+                (None, None, Some(maps)) => self.sampler_for_settings(maps.sheen_sampler),
+                (None, None, None) => self.sampler.clone(),
+            };
             let physical_specular_sampler = mesh
                 .physical_maps
                 .as_ref()

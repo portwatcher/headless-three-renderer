@@ -714,6 +714,11 @@ export interface NativeSceneMesh {
   matcapMap?: Buffer
   matcapMapWidth?: number
   matcapMapHeight?: number
+  matcapMapWrapS?: string
+  matcapMapWrapT?: string
+  matcapMapMagFilter?: string
+  matcapMapMinFilter?: string
+  matcapMapAnisotropy?: number
   matcapMapTransform?: number[]
   matcapMapColorSpace?: string
   matcapMapUsesUv2?: boolean
@@ -724,6 +729,11 @@ export interface NativeSceneMesh {
   gradientMap?: Buffer
   gradientMapWidth?: number
   gradientMapHeight?: number
+  gradientMapWrapS?: string
+  gradientMapWrapT?: string
+  gradientMapMagFilter?: string
+  gradientMapMinFilter?: string
+  gradientMapAnisotropy?: number
   displacementMap?: Buffer
   displacementMapWidth?: number
   displacementMapHeight?: number
@@ -1043,6 +1053,11 @@ export interface PbrProperties {
   matcapMap?: Buffer
   matcapMapWidth?: number
   matcapMapHeight?: number
+  matcapMapWrapS?: string
+  matcapMapWrapT?: string
+  matcapMapMagFilter?: string
+  matcapMapMinFilter?: string
+  matcapMapAnisotropy?: number
   matcapMapTransform?: number[]
   matcapMapColorSpace?: string
   matcapMapUsesUv2?: boolean
@@ -1053,6 +1068,11 @@ export interface PbrProperties {
   gradientMap?: Buffer
   gradientMapWidth?: number
   gradientMapHeight?: number
+  gradientMapWrapS?: string
+  gradientMapWrapT?: string
+  gradientMapMagFilter?: string
+  gradientMapMinFilter?: string
+  gradientMapAnisotropy?: number
   displacementMap?: Buffer
   displacementMapWidth?: number
   displacementMapHeight?: number

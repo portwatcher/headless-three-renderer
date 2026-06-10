@@ -803,21 +803,43 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     )?;
 
     let gradient_map = match &mesh.gradient_map {
-        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
-            tex_data,
-            mesh.gradient_map_width,
-            mesh.gradient_map_height,
-            mesh_index,
-        )?),
+        Some(tex_data) if !tex_data.is_empty() => {
+            let mut tex = decode_texture(
+                tex_data,
+                mesh.gradient_map_width,
+                mesh.gradient_map_height,
+                mesh_index,
+            )?;
+            apply_texture_sampling(
+                &mut tex,
+                mesh.gradient_map_wrap_s.as_deref(),
+                mesh.gradient_map_wrap_t.as_deref(),
+                mesh.gradient_map_mag_filter.as_deref(),
+                mesh.gradient_map_min_filter.as_deref(),
+                mesh.gradient_map_anisotropy,
+            );
+            Some(tex)
+        }
         _ => None,
     };
     let matcap_map = match &mesh.matcap_map {
-        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
-            tex_data,
-            mesh.matcap_map_width,
-            mesh.matcap_map_height,
-            mesh_index,
-        )?),
+        Some(tex_data) if !tex_data.is_empty() => {
+            let mut tex = decode_texture(
+                tex_data,
+                mesh.matcap_map_width,
+                mesh.matcap_map_height,
+                mesh_index,
+            )?;
+            apply_texture_sampling(
+                &mut tex,
+                mesh.matcap_map_wrap_s.as_deref(),
+                mesh.matcap_map_wrap_t.as_deref(),
+                mesh.matcap_map_mag_filter.as_deref(),
+                mesh.matcap_map_min_filter.as_deref(),
+                mesh.matcap_map_anisotropy,
+            );
+            Some(tex)
+        }
         _ => None,
     };
 

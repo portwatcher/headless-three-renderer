@@ -523,6 +523,16 @@ pub struct SceneMesh {
     pub matcap_map_width: Option<u32>,
     /// Matcap color map height (required when `matcap_map` is raw RGBA8 bytes).
     pub matcap_map_height: Option<u32>,
+    /// Matcap color map horizontal wrap mode.
+    pub matcap_map_wrap_s: Option<String>,
+    /// Matcap color map vertical wrap mode.
+    pub matcap_map_wrap_t: Option<String>,
+    /// Matcap color map magnification filter.
+    pub matcap_map_mag_filter: Option<String>,
+    /// Matcap color map minification filter.
+    pub matcap_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub matcap_map_anisotropy: Option<f64>,
     /// Matcap color map UV transform `[a, c, tx, b, d, ty]`.
     pub matcap_map_transform: Option<Vec<f64>>,
     /// Matcap color map color space: `"srgb"` or `"linear"`.
@@ -543,6 +553,16 @@ pub struct SceneMesh {
     pub gradient_map_width: Option<u32>,
     /// Gradient map height (required when `gradient_map` is raw RGBA8 bytes).
     pub gradient_map_height: Option<u32>,
+    /// Gradient map horizontal wrap mode.
+    pub gradient_map_wrap_s: Option<String>,
+    /// Gradient map vertical wrap mode.
+    pub gradient_map_wrap_t: Option<String>,
+    /// Gradient map magnification filter.
+    pub gradient_map_mag_filter: Option<String>,
+    /// Gradient map minification filter.
+    pub gradient_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub gradient_map_anisotropy: Option<f64>,
     /// Optional displacement map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
     /// Red channel displaces vertices along their object-space normals.
     pub displacement_map: Option<Buffer>,

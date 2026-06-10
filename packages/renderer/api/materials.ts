@@ -428,6 +428,11 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
       props.matcapMap = matcapMapInfo.data
       props.matcapMapWidth = matcapMapInfo.width
       props.matcapMapHeight = matcapMapInfo.height
+      props.matcapMapWrapS = wrapModeToString(material.map?.wrapS)
+      props.matcapMapWrapT = wrapModeToString(material.map?.wrapT)
+      props.matcapMapMagFilter = filterModeToString(material.map?.magFilter)
+      props.matcapMapMinFilter = filterModeToString(material.map?.minFilter)
+      props.matcapMapAnisotropy = textureAnisotropy(material.map)
       props.matcapMapTransform = textureTransform(material.map)
       props.matcapMapColorSpace = textureColorSpace(material.map)
       props.matcapMapUsesUv2 = textureUvChannel(material.map) > 0
@@ -465,6 +470,11 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.gradientMap = gradientMapInfo.data
     props.gradientMapWidth = gradientMapInfo.width
     props.gradientMapHeight = gradientMapInfo.height
+    props.gradientMapWrapS = wrapModeToString(material.gradientMap?.wrapS)
+    props.gradientMapWrapT = wrapModeToString(material.gradientMap?.wrapT)
+    props.gradientMapMagFilter = filterModeToString(material.gradientMap?.magFilter)
+    props.gradientMapMinFilter = filterModeToString(material.gradientMap?.minFilter)
+    props.gradientMapAnisotropy = textureAnisotropy(material.gradientMap)
   }
 
   const displacementMapInfo = extractTextureFromSlot(material.displacementMap)

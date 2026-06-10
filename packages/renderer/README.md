@@ -115,7 +115,7 @@ The public API accepts only Three.js-like objects:
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
 - base, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
-- base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
+- base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, toon gradient, matcap color-map, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and environment-backed or scene-color transmission / refraction
 - physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
@@ -126,7 +126,7 @@ The public API accepts only Three.js-like objects:
 - `material.flatShading` per-face normals for triangle meshes without normal maps
 - `MeshMatcapMaterial.map` color maps with `texture.channel` UV selection and transforms
 - displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, `texture.channel` UV selection, and texture transforms
-- `MeshToonMaterial.gradientMap` red-channel diffuse ramps
+- `MeshToonMaterial.gradientMap` red-channel diffuse ramps with wrap/filter sampler settings
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output

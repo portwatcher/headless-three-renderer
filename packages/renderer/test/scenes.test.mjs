@@ -658,6 +658,38 @@ test('MeshMatcapMaterial map samples the selected secondary UV channel', () => {
   assert.ok(secondary.r > secondary.g + 40, `matcap map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
 })
 
+test('MeshMatcapMaterial map honors nearest and linear filters', () => {
+  function renderWithFilter(filter) {
+    const map = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    map.magFilter = filter
+    map.minFilter = filter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: solidTexture(255, 255, 255),
+        map,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const nearest = renderWithFilter(THREE.NearestFilter)
+  const linear = renderWithFilter(THREE.LinearFilter)
+  assert.ok(linear.r > nearest.r + 30, `LinearFilter should blend in the bright matcap map texel (${linear.r} vs ${nearest.r})`)
+})
+
 test('MeshMatcapMaterial map decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
@@ -1002,6 +1034,37 @@ test('MeshToonMaterial gradientMap controls toon diffuse ramp', () => {
   const blackRamp = renderGradientMap(solidTexture(0, 0, 0))
   const whiteRamp = renderGradientMap(solidTexture(255, 255, 255))
   assert.ok(whiteRamp.r > blackRamp.r + 30, `white toon gradient ramp should brighten diffuse output (${whiteRamp.r} vs ${blackRamp.r})`)
+})
+
+test('MeshToonMaterial gradientMap honors nearest and linear filters', () => {
+  function renderWithFilter(filter) {
+    const gradientMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    gradientMap.magFilter = filter
+    gradientMap.minFilter = filter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(Math.sqrt(0.99), 0, -0.1)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const nearest = renderWithFilter(THREE.NearestFilter)
+  const linear = renderWithFilter(THREE.LinearFilter)
+  assert.ok(linear.r > nearest.r + 30, `LinearFilter should blend in the bright toon ramp texel (${linear.r} vs ${nearest.r})`)
 })
 
 test('MeshDepthMaterial renders nearer fragments brighter than farther fragments', () => {

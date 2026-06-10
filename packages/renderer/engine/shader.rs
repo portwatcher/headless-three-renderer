@@ -872,7 +872,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     let matcap_uv = vec2<f32>(dot(matcap_x, view_normal), dot(matcap_y, view_normal)) * 0.495 + vec2<f32>(0.5);
     var matcap_surface_color = input.color.rgb * uniforms.base_color.rgb;
     if uniforms.light_probe_params.w > 0.5 {
-      let matcap_map = decode_matcap_map_sample(textureSample(t_physical_sheen, s_physical, transform_matcap_color_map_uv(uv, uv2)));
+      let matcap_map = decode_matcap_map_sample(textureSample(t_physical_sheen, s_physical_sheen_map, transform_matcap_color_map_uv(uv, uv2)));
       matcap_surface_color *= matcap_map.rgb;
     }
     var matcap_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, matcap_uv)).rgb * matcap_surface_color;
@@ -1125,7 +1125,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
         let toon_coord = dot(N, L) * 0.5 + 0.5;
         var toon_irradiance: f32;
         if uniforms.light_probe_params.y > 0.5 {
-          toon_irradiance = textureSample(t_physical_sheen, s_physical, vec2<f32>(toon_coord, 0.0)).r;
+          toon_irradiance = textureSample(t_physical_sheen, s_physical_sheen_map, vec2<f32>(toon_coord, 0.0)).r;
         } else {
           let toon_width = fwidth(toon_coord) * 0.5;
           toon_irradiance = mix(0.7, 1.0, smoothstep(0.7 - toon_width, 0.7 + toon_width, toon_coord));
