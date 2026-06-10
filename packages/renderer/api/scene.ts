@@ -403,7 +403,6 @@ function appendPoints(
   if (!position) return
 
   const positions = readVec3Attribute(position)
-  const uvs = getAttribute(geometry, 'uv') ? readVec2Attribute(getAttribute(geometry, 'uv')!) : null
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index) : null
   const groups = effectiveGroups(geometry, index, position.count)
@@ -458,7 +457,6 @@ function appendPoints(
           [0.5, 0.5, 1, 1],
           [-0.5, 0.5, 0, 1],
         ]
-        const pointUv = uvs ? [uvs[pointIndex * 2], uvs[pointIndex * 2 + 1]] : null
         const pointColor = outputColors ? pointVertexColor(vertexColors!, baseColor, pointIndex, instance) : null
         for (const [x, y, u, v] of corners) {
           outputPositions.push(
@@ -466,11 +464,7 @@ function appendPoints(
             center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
             center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
           )
-          if (pointUv) {
-            outputUvs.push(pointUv[0], pointUv[1])
-          } else {
-            outputUvs.push(u, v)
-          }
+          outputUvs.push(u, v)
           if (pointColor) {
             outputColors!.push(pointColor[0], pointColor[1], pointColor[2], pointColor[3])
           }

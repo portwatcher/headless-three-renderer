@@ -268,4 +268,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Non-dashed `LineBasicMaterial.map` samples line UVs, including alpha-tested texture alpha. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Non-dashed `LineBasicMaterial.map` samples line UVs, including alpha-tested texture alpha. `PointsMaterial` maps use point-sprite UVs. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.

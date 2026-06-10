@@ -5058,6 +5058,38 @@ test('PointsMaterial maps, alpha maps, and vertex colors affect billboards', () 
   assert.ok(discarded.b > discarded.g + 80, `alphaMap green channel should discard point billboards (${discarded.b} vs ${discarded.g})`)
 })
 
+test('PointsMaterial maps use point-sprite UVs instead of geometry UV attributes', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const left = meanRegion(rgba, 96, 96, 28, 40, 42, 56)
+  const right = meanRegion(rgba, 96, 96, 54, 40, 68, 56)
+  assert.ok(left.r > left.g + 60, `left point-sprite half should sample red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 60, `right point-sprite half should sample green (${right.g} vs ${right.r})`)
+})
+
 test('Points with InstancedBufferGeometry expand offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 2
