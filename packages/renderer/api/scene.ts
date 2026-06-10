@@ -52,6 +52,7 @@ interface LineSegmentDistance {
 interface DashedLineExpansion {
   positions: number[]
   uvs?: number[]
+  uvs2?: number[]
   colors?: number[]
 }
 
@@ -618,11 +619,11 @@ function appendLineOrPoints(
   if (topology === 'lines') {
     const source = indexAttr ?? rangeIndices(vertexCount)
     if (material?.isLineDashedMaterial === true) {
-      const dashedUvs = textureInfo?.usesUv2 ? secondaryUvs : uvs
       const dashed = instancedGeometryCount > 1 || instancedPositionOffset
         ? dashedLineAttributesForInstances(
           positions,
-          dashedUvs,
+          uvs,
+          secondaryUvs,
           useVertexColors ? vertexColors! : undefined,
           color,
           source,
@@ -636,7 +637,8 @@ function appendLineOrPoints(
         )
         : dashedLineAttributes(
           positions,
-          dashedUvs,
+          uvs,
+          secondaryUvs,
           useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
           source,
           drawStart,
@@ -648,7 +650,7 @@ function appendLineOrPoints(
       if (dashed.positions.length < 6) return
       outputPositions = dashed.positions
       outputUvs = dashed.uvs
-      outputSecondaryUvs = undefined
+      outputSecondaryUvs = dashed.uvs2
       outputColors = dashed.colors
       indices = null
     } else {
@@ -1223,6 +1225,7 @@ function distanceBetweenMatrices(a: ThreeCameraLike['matrixWorld'], b: ThreeObje
 function dashedLineAttributes(
   positions: number[],
   uvs: number[] | null,
+  uvs2: number[] | null,
   colors: number[] | undefined,
   source: number[],
   start: number,
@@ -1237,17 +1240,17 @@ function dashedLineAttributes(
   if (dashSize <= 0) return { positions: [] }
 
   const segments = lineSegmentsWithDistances(positions, source, start, end, object, lineDistance)
-  const out = createDashedLineExpansion(uvs, colors)
+  const out = createDashedLineExpansion(uvs, uvs2, colors)
   if (scale <= 0 || gapSize <= 0) {
     for (const segment of segments) {
-      appendInterpolatedLine(out, positions, uvs, colors, segment.a, segment.b, 0, 1)
+      appendInterpolatedLine(out, positions, uvs, uvs2, colors, segment.a, segment.b, 0, 1)
     }
     return out
   }
 
   const totalSize = dashSize + gapSize
   for (const segment of segments) {
-    appendDashedSegment(out, positions, uvs, colors, segment, scale, dashSize, totalSize)
+    appendDashedSegment(out, positions, uvs, uvs2, colors, segment, scale, dashSize, totalSize)
   }
   return out
 }
@@ -1255,6 +1258,7 @@ function dashedLineAttributes(
 function dashedLineAttributesForInstances(
   positions: number[],
   uvs: number[] | null,
+  uvs2: number[] | null,
   vertexColors: ThreeBufferAttributeLike | undefined,
   materialColor: Color4,
   source: number[],
@@ -1269,6 +1273,7 @@ function dashedLineAttributesForInstances(
   const out: DashedLineExpansion = {
     positions: [],
     uvs: uvs ? [] : undefined,
+    uvs2: uvs2 ? [] : undefined,
     colors: vertexColors ? [] : undefined,
   }
   const baseColors = vertexColors && !isInstancedAttribute(vertexColors)
@@ -1285,6 +1290,7 @@ function dashedLineAttributesForInstances(
     const dashed = dashedLineAttributes(
       instancePositions,
       uvs,
+      uvs2,
       instanceColors,
       source,
       start,
@@ -1344,6 +1350,7 @@ function repeatedInstancedColorValues(
 function appendDashedLineExpansion(out: DashedLineExpansion, value: DashedLineExpansion): void {
   appendNumberArray(out.positions, value.positions)
   if (out.uvs && value.uvs) appendNumberArray(out.uvs, value.uvs)
+  if (out.uvs2 && value.uvs2) appendNumberArray(out.uvs2, value.uvs2)
   if (out.colors && value.colors) appendNumberArray(out.colors, value.colors)
 }
 
@@ -1351,10 +1358,15 @@ function appendNumberArray(out: number[], values: number[]): void {
   for (const value of values) out.push(value)
 }
 
-function createDashedLineExpansion(uvs: number[] | null, colors: number[] | undefined): DashedLineExpansion {
+function createDashedLineExpansion(
+  uvs: number[] | null,
+  uvs2: number[] | null,
+  colors: number[] | undefined,
+): DashedLineExpansion {
   return {
     positions: [],
     uvs: uvs ? [] : undefined,
+    uvs2: uvs2 ? [] : undefined,
     colors: colors ? [] : undefined,
   }
 }
@@ -1412,6 +1424,7 @@ function appendDashedSegment(
   out: DashedLineExpansion,
   positions: number[],
   uvs: number[] | null,
+  uvs2: number[] | null,
   colors: number[] | undefined,
   segment: LineSegmentDistance,
   scale: number,
@@ -1436,7 +1449,7 @@ function appendDashedSegment(
     if (visible && next > cursor + 1e-6) {
       const t0 = (cursor - s0) / span
       const t1 = (next - s0) / span
-      appendInterpolatedLine(out, positions, uvs, colors, segment.a, segment.b, t0, t1)
+      appendInterpolatedLine(out, positions, uvs, uvs2, colors, segment.a, segment.b, t0, t1)
     }
     cursor = next
   }
@@ -1446,6 +1459,7 @@ function appendInterpolatedLine(
   out: DashedLineExpansion,
   positions: number[],
   uvs: number[] | null,
+  uvs2: number[] | null,
   colors: number[] | undefined,
   a: number,
   b: number,
@@ -1457,6 +1471,10 @@ function appendInterpolatedLine(
   if (out.uvs && uvs) {
     appendInterpolatedAttribute(out.uvs, uvs, 2, a, b, t0)
     appendInterpolatedAttribute(out.uvs, uvs, 2, a, b, t1)
+  }
+  if (out.uvs2 && uvs2) {
+    appendInterpolatedAttribute(out.uvs2, uvs2, 2, a, b, t0)
+    appendInterpolatedAttribute(out.uvs2, uvs2, 2, a, b, t1)
   }
   if (out.colors && colors) {
     appendInterpolatedAttribute(out.colors, colors, 4, a, b, t0)
