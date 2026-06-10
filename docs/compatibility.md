@@ -66,7 +66,7 @@ Status keys:
 | `MeshDepthMaterial` | Partial | Basic, RGBA, RGB, and RG depth packing are supported, including wireframe output, base/alpha map alpha testing, and CPU-baked displacement through the common material path. `Object3D.customDepthMaterial` shadow overrides fail clearly. |
 | `MeshDistanceMaterial` | Partial | Red-channel distance output is supported, including wireframe output, optional `referencePosition`, `nearDistance`, and `farDistance` overrides plus base/alpha map alpha testing and CPU-baked displacement through the common material path. `Object3D.customDistanceMaterial` shadow overrides fail clearly; point-shadow automation and packed distance variants remain planned. |
 | `MeshToonMaterial` | Partial | Lit toon shading supports Three.js' no-gradient-map fallback bands, red-channel `gradientMap` ramps, and the common map, normal, bump, emissive, AO, light-map, alpha, displacement, side, fog, and shadow paths. Exact edge-case parity remains planned. |
-| `ShadowMaterial` | Partial | Transparent shadow receiver output is supported for the renderer's current shadow map path, including scene fog and `material.fog` opt-out. Exact color-space behavior and multiple shadow-casting lights remain planned. |
+| `ShadowMaterial` | Partial | Transparent shadow receiver output is supported for the renderer's current shadow map path, including `material.color`, scene fog, `material.fog` opt-out, and output color-space conversion. Exact WebGLRenderer edge-case parity and multiple shadow-casting lights remain planned. |
 | Base color and opacity | Supported | Includes transparent sorting path. |
 | Vertex colors | Supported | Multiplied with material color. |
 | `material.side` | Supported | Front, back, and double-sided culling. |
