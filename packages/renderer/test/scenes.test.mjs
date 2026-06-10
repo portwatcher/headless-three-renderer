@@ -4804,6 +4804,43 @@ test('LineBasicMaterial map alpha samples line UVs', () => {
   assert.ok(discarded < visible * 0.3, `transparent map alpha texel should discard most line pixels (${discarded} vs ${visible})`)
 })
 
+test('LineBasicMaterial map RGB multiplies line color from UVs', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+
+  function renderLine(u) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      u, 0.5,
+      u, 0.5,
+    ]), 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Line(
+      geom,
+      new THREE.LineBasicMaterial({ color: 0xffffff, map }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  const red = renderLine(0.25)
+  const green = renderLine(0.75)
+  const redPixels = countRegionPixels(red, 96, 96, 0, 0, 96, 96, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(green, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(redPixels > 2, `primary line map texel should tint line red (${redPixels})`)
+  assert.ok(greenPixels > 2, `secondary line map texel should tint line green (${greenPixels})`)
+})
+
 test('LineDashedMaterial renders fewer visible line pixels than a solid line', () => {
   function makeScene(material) {
     const geom = new THREE.BufferGeometry().setFromPoints([
