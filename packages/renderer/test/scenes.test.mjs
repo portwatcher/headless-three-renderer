@@ -5593,6 +5593,41 @@ test('LineDashedMaterial uses custom lineDistance attributes', () => {
   assert.ok(rightPixels > 2, `custom lineDistance should reset and keep the right dashed segment visible (${rightPixels})`)
 })
 
+test('LineDashedMaterial renders LineLoop closing dashes', () => {
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1, -0.8, 0),
+    new THREE.Vector3(1, -0.8, 0),
+    new THREE.Vector3(1, 0.8, 0),
+  ])
+  const line = new THREE.LineLoop(geom, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 0.25,
+    gapSize: 0.15,
+    scale: 1,
+  }))
+  line.computeLineDistances()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(line)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const closingPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    20,
+    28,
+    36,
+    68,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+  assert.ok(closingPixels > 2, `dashed LineLoop should render dashes on the closing segment (${closingPixels})`)
+})
+
 test('line materials with non-default linewidth fail clearly', () => {
   const cases = [
     new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 }),
