@@ -3384,13 +3384,13 @@ test('LOD selects object level from active camera distance', () => {
 })
 
 test('Fog and FogExp2 affect material output', () => {
-  function renderFogged(fog) {
+  function renderFogged(fog, materialFog = true) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.fog = fog
     scene.add(new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
-      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0xff0000, fog: materialFog }),
     ))
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
@@ -3405,6 +3405,12 @@ test('Fog and FogExp2 affect material output', () => {
 
   const exp2 = renderFogged(new THREE.FogExp2(0x0000ff, 1.0))
   assert.ok(exp2.b > exp2.r + 40, `FogExp2 should mix the red plane toward blue (${exp2.b} vs ${exp2.r})`)
+
+  const optOut = renderFogged(new THREE.Fog(0x00ff00, 0, 1), false)
+  assert.ok(
+    optOut.r > optOut.g + 40,
+    `material.fog=false should keep the red material color (${optOut.r} vs ${optOut.g})`,
+  )
 })
 
 test('Fog affects sprites, points, and lines with material fog opt-out', () => {
