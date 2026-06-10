@@ -4356,6 +4356,70 @@ test('scene-level reflection probe feeds physical IBL when scene.environment is 
   assert.ok(diff > 0.5, `expected reflection probe to affect metallic IBL, diff=${diff.toFixed(3)}`)
 })
 
+test('cube scene environments feed physical IBL', () => {
+  function makeScene(environment) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = environment
+    scene.environmentIntensity = 4
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+    ))
+    return scene
+  }
+
+  const camera = makeCamera()
+  const noEnvironment = renderRgba(makeScene(null), camera)
+  const rawCube = renderRgba(makeScene(cubeTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])), camera)
+  const encodedCube = renderRgba(makeScene(encodedCubeTexture()), camera)
+
+  const rawDiff = meanAbsDiff(noEnvironment, rawCube)
+  const encodedDiff = meanAbsDiff(noEnvironment, encodedCube)
+  assert.ok(rawDiff > 0.5, `raw cube environment should affect metallic IBL, diff=${rawDiff.toFixed(3)}`)
+  assert.ok(encodedDiff > 0.5, `encoded cube environment should affect metallic IBL, diff=${encodedDiff.toFixed(3)}`)
+})
+
+test('cube reflection probes feed physical IBL', () => {
+  function makeScene(texture) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0.04, 0.04, 0.045)
+    addLights(scene)
+    scene.userData.headlessThreeRenderer = {
+      reflectionProbe: {
+        texture,
+        intensity: 1.0,
+      },
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1.0, roughness: 0.2 }),
+    ))
+    return scene
+  }
+
+  const camera = makeCamera()
+  const withoutProbe = new THREE.Scene()
+  withoutProbe.background = new THREE.Color(0.04, 0.04, 0.045)
+  addLights(withoutProbe)
+  withoutProbe.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 32, 32),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1.0, roughness: 0.2 }),
+  ))
+
+  const noProbe = renderRgba(withoutProbe, camera)
+  const withCubeProbe = renderRgba(makeScene(encodedCubeTexture()), camera)
+  const diff = meanAbsDiff(noProbe, withCubeProbe)
+  assert.ok(diff > 0.5, `encoded cube reflection probe should affect metallic IBL, diff=${diff.toFixed(3)}`)
+})
+
 test('scene environmentRotation rotates equirectangular IBL', () => {
   function renderWithRotation(yRotation) {
     const scene = new THREE.Scene()
@@ -4386,19 +4450,16 @@ test('scene environmentRotation rotates equirectangular IBL', () => {
 
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
-    ['cube scene environment', (scene) => {
-      scene.environment = Object.assign(makeEnvironmentTexture(), { isCubeTexture: true })
-    }],
     ['CubeUV scene environment', (scene) => {
       scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping })
     }],
     ['refraction scene environment', (scene) => {
       scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.EquirectangularRefractionMapping })
     }],
-    ['cube reflection probe', (scene) => {
+    ['CubeUV reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: {
-          texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeReflectionMapping }),
+          texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping }),
         },
       }
     }],
@@ -4411,7 +4472,7 @@ test('unsupported environment and reflection probe mappings fail clearly', () =>
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /PMREM\/CubeUV environment mapping.*not supported/i,
+      /refraction or PMREM\/CubeUV environment mapping.*not supported/i,
       name,
     )
   }

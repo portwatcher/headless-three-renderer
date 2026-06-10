@@ -28,7 +28,7 @@ Already supported in the current implementation:
 - Material-local `clippingPlanes`, `THREE.ClippingGroup`, plus render-option global `clippingPlanes`, up to eight world-space planes, including local/group `clipIntersection`, group `clipShadows`, and `options.localClippingEnabled` opt-out.
 - Clearcoat, sheen, anisotropy, specular intensity/color, transmission/thickness, IOR, attenuation, and related physical material maps.
 - Ambient, directional, point, spot, hemisphere, RectAreaLight approximation, and LightProbe diffuse lighting, up to 16 direct lights.
-- Environment IBL from equirectangular `scene.environment`/reflection probes.
+- Environment IBL from equirectangular or cube `scene.environment`/reflection probes.
 - Scene background colors plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds, including `backgroundIntensity`, approximate texture `backgroundBlurriness`, equirectangular/cube `backgroundRotation`, and equirectangular `environmentRotation`; unsupported background rotations fail clearly.
 - Render-option viewport and scissor rectangles in output pixel coordinates.
 - Flat auxiliary `options.renderMode` passes for white masks and RGB object IDs.
@@ -91,7 +91,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | `RectAreaLight` | Medium | One-sided finite-area approximation is supported for direct lighting. Remaining work is exact Three.js LTC/LUT parity and golden tests. |
 | `LightProbe` support | Medium | Three.js `LightProbe` spherical harmonics contribute diffuse indirect lighting; remaining work is exact golden-tested parity with all material/environment combinations. |
 | Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, approximate texture `backgroundBlurriness`, equirectangular/cube `scene.backgroundRotation`, and equirectangular `scene.environmentRotation` are supported for current background/environment texture mappings; unsupported background rotations fail clearly. Remaining work is exact blur parity and exact background/environment mapping controls. |
-| PMREM compatibility | Medium | Cube, refraction, and PMREM/CubeUV environment inputs fail clearly. Remaining work is deciding whether to accept Three.js PMREM outputs, prefiltered cubemaps, or keep CPU precompute from source environment maps. |
+| PMREM compatibility | Medium | Cube reflection environment inputs are converted through the renderer's CPU IBL precompute path; refraction and PMREM/CubeUV environment inputs fail clearly. Remaining work is deciding whether to accept Three.js PMREM outputs, prefiltered cubemaps, or keep CPU precompute from source environment maps. |
 
 ## P2 - Cameras, Targets, And Render Pipeline Features
 

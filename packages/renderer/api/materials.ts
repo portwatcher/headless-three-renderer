@@ -81,10 +81,15 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
   const label = scene.environment ? 'scene.environment' : 'reflectionProbe.texture'
   assertSupportedEnvironmentTexture(envTex, label)
 
+  const intensity = probe?.intensity ?? (scene as any).environmentIntensity ?? 1.0
+
+  if (isCubeEnvironmentTexture(envTex)) {
+    const cube = cubeTextureToEquirectangular(envTex, label)
+    return { data: cube.data, width: cube.width, height: cube.height, intensity }
+  }
+
   const image = (envTex as any).image ?? (envTex as any).source?.data
   if (!image) return null
-
-  const intensity = probe?.intensity ?? (scene as any).environmentIntensity ?? 1.0
 
   // DataTexture: { data, width, height }
   if (image.data && image.width > 0 && image.height > 0) {
@@ -923,6 +928,10 @@ function isCubeBackgroundTexture(map: ThreeTextureLike): boolean {
     map.mapping === CubeUVReflectionMapping
 }
 
+function isCubeEnvironmentTexture(map: ThreeTextureLike): boolean {
+  return map.isCubeTexture === true || map.mapping === CubeReflectionMapping
+}
+
 function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
   if (map.mapping === CubeUVReflectionMapping) {
     throw new Error(
@@ -930,10 +939,24 @@ function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): Tex
     )
   }
 
+  const cube = cubeTextureToEquirectangular(map, label)
+  return {
+    ...cube,
+    wrapS: 'repeat',
+    wrapT: 'clamp',
+    magFilter: filterModeToString(map.magFilter),
+    minFilter: filterModeToString(map.minFilter),
+    anisotropy: textureAnisotropy(map),
+    colorSpace: textureColorSpace(map),
+    mapping: 'equirectangular',
+  }
+}
+
+function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { data: Buffer; width: number; height: number } {
   const faces = cubeFaceImages(map)
   if (!faces) {
     throw new Error(
-      `${label} uses a cube background texture without six raw or encoded face images. Provide a CubeTexture with six DataTexture-style or encoded PNG/JPEG/WebP face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
+      `${label} uses a cube texture without six raw or encoded face images. Provide a CubeTexture with six DataTexture-style or encoded PNG/JPEG/WebP face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
     )
   }
 
@@ -974,13 +997,6 @@ function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): Tex
     data: Buffer.from(out.buffer, out.byteOffset, out.byteLength),
     width,
     height,
-    wrapS: 'repeat',
-    wrapT: 'clamp',
-    magFilter: filterModeToString(map.magFilter),
-    minFilter: filterModeToString(map.minFilter),
-    anisotropy: textureAnisotropy(map),
-    colorSpace: textureColorSpace(map),
-    mapping: 'equirectangular',
   }
 }
 
@@ -1153,14 +1169,12 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
 function assertSupportedEnvironmentTexture(map: ThreeTextureLike, label: string): void {
   assertSupportedTextureInput(map, label)
   if (
-    map.isCubeTexture === true ||
-    map.mapping === CubeReflectionMapping ||
     map.mapping === CubeRefractionMapping ||
     map.mapping === EquirectangularRefractionMapping ||
     map.mapping === CubeUVReflectionMapping
   ) {
     throw new Error(
-      `${label} uses a cube, refraction, or PMREM/CubeUV environment mapping, which is not supported by @headless-three/renderer yet. Provide an equirectangular texture and let the renderer precompute IBL, or pre-convert the source before rendering.`,
+      `${label} uses refraction or PMREM/CubeUV environment mapping, which is not supported by @headless-three/renderer yet. Provide an equirectangular or six-face cube reflection texture and let the renderer precompute IBL, or pre-convert the source before rendering.`,
     )
   }
 }

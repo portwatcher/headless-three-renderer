@@ -176,9 +176,9 @@ Environment maps set on `scene.environment` are supported for image-based lighti
 - **Prefiltered specular cubemap** — GGX importance-sampled at multiple roughness mip levels
 - **BRDF integration LUT** — split-sum approximation lookup table
 
-Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`). Cube textures, refraction mappings, and PMREM/CubeUV environment inputs fail clearly until native support lands. `scene.environmentIntensity` is respected.
+Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Refraction mappings and PMREM/CubeUV environment inputs fail clearly until native support lands. `scene.environmentIntensity` is respected.
 
-Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
+Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular and cube texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
 
 ### Skinning / Skeletal Animation
 
