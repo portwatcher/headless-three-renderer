@@ -117,7 +117,15 @@ jobs:
 
       - name: Smoke tests
         working-directory: packages/renderer
-        run: pnpm test
+        run: pnpm run test:smoke
+
+      - name: Conformance tests
+        working-directory: packages/renderer
+        run: pnpm run test:conformance
+
+      - name: Release artifact verification
+        working-directory: packages/renderer
+        run: pnpm run verify:pack
 
   publish:
     name: Publish to npm

@@ -9,7 +9,7 @@ pub const MAX_LIGHTS: usize = 16;
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
 pub struct GpuLight {
-    /// 0 = directional, 1 = point, 2 = spot, 3 = hemisphere
+    /// 0 = directional, 1 = point, 2 = spot, 3 = hemisphere, 4 = rect area
     pub light_type: u32,
     pub _pad0: [u32; 3],
     pub color_intensity: [f32; 4],
@@ -17,7 +17,7 @@ pub struct GpuLight {
     pub position: [f32; 4],
     /// xyz = direction, w = decay
     pub direction: [f32; 4],
-    /// spot: [cos_outer_angle, cos_inner_angle, 0, 0]
+    /// spot: [cos_outer_angle, cos_inner_angle, 0, 0]; rect area: [width, height, 0, 0]
     pub params: [f32; 4],
 }
 
@@ -33,6 +33,7 @@ pub fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
             "point" => 1,
             "spot" => 2,
             "hemisphere" => 3,
+            "rectarea" => 4,
             other => bail!("scene.lights[{i}].lightType `{other}` is not supported"),
         };
         let color = parse_color(
@@ -66,6 +67,8 @@ pub fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
             light.direction.as_deref(),
             if light_type == 3 {
                 [0.0, 1.0, 0.0]
+            } else if light_type == 4 {
+                [0.0, 0.0, -1.0]
             } else {
                 [0.0, -1.0, 0.0]
             },
@@ -82,6 +85,13 @@ pub fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
             let cos_outer = angle.cos();
             let cos_inner = (angle * (1.0 - penumbra)).cos();
             [cos_outer, cos_inner, 0.0, 0.0]
+        } else if light_type == 4 {
+            [
+                light.width.unwrap_or(10.0).max(0.0) as f32,
+                light.height.unwrap_or(10.0).max(0.0) as f32,
+                0.0,
+                0.0,
+            ]
         } else {
             [0.0; 4]
         };

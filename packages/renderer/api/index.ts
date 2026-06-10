@@ -3,6 +3,7 @@ import type {
   ThreeCameraLike,
   RenderOptions,
   RenderTargetLike,
+  RenderPixelRectLike,
   NativeRenderScene,
   NativeCamera,
 } from './types'
@@ -10,19 +11,25 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const native = require('../native.js')
 
-import { resolveSize, cameraViewProjection, cameraWorldPosition } from './camera'
-import { resolveBackground } from './color'
+import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
+import { colorLikeToArray, resolveBackground } from './color'
 import { flattenScene } from './scene'
-import { extractLights, extractAmbientLight, extractAmbientIntensity } from './lights'
-import { extractEnvironmentMap } from './materials'
+import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
+import { extractBackgroundTexture, extractEnvironmentMap } from './materials'
+import { extractClippingPlanes } from './clipping'
 
 export type {
   RenderOutputFormat,
+  RenderOutputColorSpace,
   ThreeColorLike,
   ThreeMatrix4Like,
   ThreeBufferAttributeLike,
   ThreeBufferGeometryLike,
   ThreeTextureLike,
+  ThreeVector3Like,
+  ThreePlaneLike,
+  RenderPixelRectLike,
+  ThreeLayersLike,
   ThreeMaterialLike,
   ThreeBoneLike,
   ThreeSkeletonLike,
@@ -108,29 +115,77 @@ function toNativeInput(
 
   const size = resolveSize(camera, options)
   const envMap = extractEnvironmentMap(scene)
+  const hasBackgroundOverride = options.background !== undefined
+  const optionBackgroundTexture = hasBackgroundOverride
+    ? extractBackgroundTexture(options.background, 'options.background')
+    : null
+  const backgroundTexture = optionBackgroundTexture ?? (
+    hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background')
+  )
+  const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
     background: resolveBackground(scene, options),
+    backgroundIntensity: options.backgroundIntensity ?? scene.backgroundIntensity,
+    viewport: pixelRectToArray(options.viewport),
+    scissor: pixelRectToArray(options.scissor),
+    backgroundTexture: backgroundTexture?.data,
+    backgroundTextureWidth: backgroundTexture?.width,
+    backgroundTextureHeight: backgroundTexture?.height,
+    backgroundTextureWrapS: backgroundTexture?.wrapS,
+    backgroundTextureWrapT: backgroundTexture?.wrapT,
+    backgroundTextureMagFilter: backgroundTexture?.magFilter,
+    backgroundTextureMinFilter: backgroundTexture?.minFilter,
+    backgroundTextureTransform: backgroundTexture?.transform,
+    backgroundTextureColorSpace: backgroundTexture?.colorSpace,
+    backgroundTextureBlurriness: finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness),
     format: options.format ?? (options.target ? 'rgba' : 'png'),
-    meshes: flattenScene(scene),
-    lights: extractLights(scene),
-    ambientLight: extractAmbientLight(scene) ?? undefined,
-    ambientIntensity: extractAmbientIntensity(scene) ?? undefined,
+    outputColorSpace: options.outputColorSpace,
+    meshes: flattenScene(scene, camera, size.height, clippingPlanes),
+    lights: extractLights(scene, camera),
+    ambientLight: extractAmbientLight(scene, camera) ?? undefined,
+    ambientIntensity: extractAmbientIntensity(scene, camera) ?? undefined,
+    lightProbe: extractLightProbe(scene, camera) ?? undefined,
     environmentMap: envMap?.data,
     environmentMapWidth: envMap?.width,
     environmentMapHeight: envMap?.height,
     environmentMapIntensity: envMap?.intensity,
+    ...fogToNative(scene.fog),
     ...postProcessingToNative(options.postProcessing),
   }
   const nativeCamera: NativeCamera = {
     width: size.width,
     height: size.height,
+    near: finiteOrUndefined(camera.near),
+    far: finiteOrUndefined(camera.far),
     viewProjection: cameraViewProjection(camera),
+    viewMatrix: cameraViewMatrix(camera),
     cameraPosition: cameraWorldPosition(camera),
   }
 
   return { nativeScene, nativeCamera }
+}
+
+function fogToNative(fog: ThreeSceneLike['fog']): Partial<NativeRenderScene> {
+  if (!fog) return {}
+  const color = colorLikeToArray(fog.color)
+  if (fog.isFogExp2) {
+    return {
+      fogType: 'exp2',
+      fogColor: color ?? undefined,
+      fogDensity: finiteOrUndefined(fog.density),
+    }
+  }
+  if (fog.isFog) {
+    return {
+      fogType: 'linear',
+      fogColor: color ?? undefined,
+      fogNear: finiteOrUndefined(fog.near),
+      fogFar: finiteOrUndefined(fog.far),
+    }
+  }
+  return {}
 }
 
 function postProcessingToNative(post: RenderOptions['postProcessing']): Partial<NativeRenderScene> {
@@ -143,6 +198,16 @@ function postProcessingToNative(post: RenderOptions['postProcessing']): Partial<
     postGrayscale: booleanOrNumber(post.grayscale),
     postInvert: booleanOrNumber(post.invert),
   }
+}
+
+function pixelRectToArray(rect: RenderPixelRectLike | null | undefined): number[] | undefined {
+  if (!rect) return undefined
+  if (typeof (rect as ArrayLike<number>).length === 'number') {
+    const values = rect as ArrayLike<number>
+    return [values[0], values[1], values[2], values[3]]
+  }
+  const values = rect as { x?: number; y?: number; width?: number; height?: number }
+  return [values.x!, values.y!, values.width!, values.height!]
 }
 
 function finiteOrUndefined(value: unknown): number | undefined {

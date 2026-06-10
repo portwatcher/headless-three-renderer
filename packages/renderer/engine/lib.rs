@@ -16,7 +16,7 @@ use renderer::GpuRenderer;
 use types::{Camera, RenderScene};
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
-const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24Plus;
+const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24PlusStencil8;
 const MAX_DIMENSION: u32 = 8192;
 const DEFAULT_WIDTH: u32 = 512;
 const DEFAULT_HEIGHT: u32 = 512;

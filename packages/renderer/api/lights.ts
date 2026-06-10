@@ -1,24 +1,25 @@
-import type { ThreeObject3DLike, NativeSceneLight } from './types'
+import type { ThreeCameraLike, ThreeObject3DLike, NativeSceneLight } from './types'
 import { colorLikeToArray } from './color'
+import { objectLayersMatchCamera } from './layers'
 
-export function extractLights(scene: ThreeObject3DLike): NativeSceneLight[] | undefined {
+export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike): NativeSceneLight[] | undefined {
   const lights: NativeSceneLight[] = []
-  visitLights(scene, lights)
+  visitLights(scene, camera, lights)
   return lights.length > 0 ? lights : undefined
 }
 
-function visitLights(object: ThreeObject3DLike, lights: NativeSceneLight[]): void {
+function visitLights(object: ThreeObject3DLike, camera: ThreeCameraLike | undefined, lights: NativeSceneLight[]): void {
   if (!object) return
   if (object.visible === false) return
 
-  if (object.isLight === true) {
+  if (object.isLight === true && objectLayersMatchCamera(object, camera)) {
     const light = extractLight(object)
     if (light) lights.push(light)
   }
 
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {
-    visitLights(child, lights)
+    visitLights(child, camera, lights)
   }
 }
 
@@ -117,6 +118,32 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
     return out
   }
 
+  if (light.isRectAreaLight === true) {
+    const pos = light.matrixWorld
+      ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]]
+      : [0, 0, 0]
+    let direction = [0, 0, -1]
+    if (light.matrixWorld) {
+      const e = light.matrixWorld.elements
+      direction = [-e[8], -e[9], -e[10]]
+    }
+    const len = Math.sqrt(direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2)
+    if (len > 0) {
+      direction[0] /= len
+      direction[1] /= len
+      direction[2] /= len
+    }
+    return {
+      lightType: 'rectArea',
+      color: [color[0], color[1], color[2]],
+      intensity,
+      position: pos,
+      direction,
+      width: Number.isFinite(light.width) ? light.width! : 10,
+      height: Number.isFinite(light.height) ? light.height! : 10,
+    }
+  }
+
   if (light.isHemisphereLight === true) {
     const groundColor = colorLikeToArray(light.groundColor) ?? [0.04, 0.02, 0.0, 1]
     let direction = [0, 1, 0]
@@ -199,9 +226,9 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-export function extractAmbientLight(scene: ThreeObject3DLike): number[] | null {
+export function extractAmbientLight(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {
   let color: number[] | null = null
-  visitForAmbient(scene, (light) => {
+  visitForAmbient(scene, camera, (light) => {
     const c = colorLikeToArray(light.color) ?? [1, 1, 1, 1]
     if (!color) {
       color = [c[0], c[1], c[2]]
@@ -214,20 +241,76 @@ export function extractAmbientLight(scene: ThreeObject3DLike): number[] | null {
   return color
 }
 
-export function extractAmbientIntensity(scene: ThreeObject3DLike): number | undefined {
+export function extractAmbientIntensity(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number | undefined {
   let intensity = 0
-  visitForAmbient(scene, (light) => {
+  visitForAmbient(scene, camera, (light) => {
     intensity += Number.isFinite(light.intensity) ? light.intensity! : 1
   })
   return intensity > 0 ? intensity : undefined
 }
 
-function visitForAmbient(object: ThreeObject3DLike, callback: (light: ThreeObject3DLike) => void): void {
+export function extractLightProbe(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {
+  const coefficients = new Array<number>(27).fill(0)
+  let found = false
+
+  visitForLightProbe(scene, camera, (light) => {
+    const source = light.sh?.coefficients
+    if (!Array.isArray(source) || source.length < 9) return
+
+    const intensity = Number.isFinite(light.intensity) ? light.intensity! : 1
+    for (let i = 0; i < 9; i += 1) {
+      const coefficient = coefficientToRgb(source[i])
+      if (!coefficient) continue
+      coefficients[i * 3] += coefficient[0] * intensity
+      coefficients[i * 3 + 1] += coefficient[1] * intensity
+      coefficients[i * 3 + 2] += coefficient[2] * intensity
+    }
+    found = true
+  })
+
+  return found ? coefficients : null
+}
+
+function visitForLightProbe(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  callback: (light: ThreeObject3DLike) => void,
+): void {
   if (!object) return
   if (object.visible === false) return
-  if (object.isAmbientLight === true) callback(object)
+  if (object.isLightProbe === true && objectLayersMatchCamera(object, camera)) callback(object)
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {
-    visitForAmbient(child, callback)
+    visitForLightProbe(child, camera, callback)
+  }
+}
+
+function coefficientToRgb(value: unknown): [number, number, number] | null {
+  if (!value) return null
+  if (Array.isArray(value) || ArrayBuffer.isView(value)) {
+    const array = value as ArrayLike<number>
+    return finiteRgb(array[0], array[1], array[2])
+  }
+  const v = value as { r?: number; g?: number; b?: number; x?: number; y?: number; z?: number }
+  return finiteRgb(v.r ?? v.x, v.g ?? v.y, v.b ?? v.z)
+}
+
+function finiteRgb(r: unknown, g: unknown, b: unknown): [number, number, number] | null {
+  if (typeof r !== 'number' || typeof g !== 'number' || typeof b !== 'number') return null
+  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null
+  return [r, g, b]
+}
+
+function visitForAmbient(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  callback: (light: ThreeObject3DLike) => void,
+): void {
+  if (!object) return
+  if (object.visible === false) return
+  if (object.isAmbientLight === true && objectLayersMatchCamera(object, camera)) callback(object)
+  const children = Array.isArray(object.children) ? object.children : []
+  for (const child of children) {
+    visitForAmbient(child, camera, callback)
   }
 }

@@ -1,6 +1,7 @@
 pub const SHADER: &str = r#"
 const PI: f32 = 3.14159265359;
 const MAX_LIGHTS: u32 = 16u;
+const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
   light_type: u32,
@@ -12,12 +13,13 @@ struct GpuLight {
   position: vec4<f32>,
   // xyz = direction, w = decay
   direction: vec4<f32>,
-  // spot: x = cos(outer_angle), y = cos(inner_angle)
+  // spot: x = cos(outer_angle), y = cos(inner_angle); rect area: x = width, y = height
   params: vec4<f32>,
 };
 
 struct Uniforms {
   mvp: mat4x4<f32>,
+  view: mat4x4<f32>,
   model: mat4x4<f32>,
   normal_matrix: mat4x4<f32>,
   camera_pos: vec4<f32>,
@@ -28,14 +30,57 @@ struct Uniforms {
   ambient_intensity: f32,
   num_lights: u32,
   ambient_color: vec4<f32>,
-  // x = normal_scale.x, y = normal_scale.y, z = has_normal_map (1.0 or 0.0), w = has_ibl (1.0 or 0.0)
+  // xyz = LightProbe SH coefficient, w = reserved.
+  light_probe: array<vec4<f32>, 9>,
+  // x = has LightProbe, y = has toon gradient map, z = depth packing, w = has matcap color map.
+  light_probe_params: vec4<f32>,
+  // x/y = normalScale or bumpScale, z = normal mode (0=none, 1=normalMap, 2=bumpMap), w = has_ibl
   normal_map_params: vec4<f32>,
-  // x = env_intensity, y = shading_model (0=standard PBR, 1=basic/unlit, 2=lambert)
+  // x = env_intensity, y = shading_model (0=standard PBR, 1=basic/unlit, 2=lambert, 3=normal, 4=matcap, 5=phong, 6=depth, 7=toon, 8=distance, 9=shadow), z = camera near, w = camera far
   ibl_params: vec4<f32>,
-  // x = ao_map_intensity, y = has_ao_map (1.0 or 0.0)
+  // x = ao_map_intensity, y = has_ao_map, z = has_alpha_map, w = has_light_map
   ao_params: vec4<f32>,
   // x = 1/width, y = 1/height, z = width, w = height
   render_params: vec4<f32>,
+  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output.
+  output_params: vec4<f32>,
+  // texture_transform1.xyz / texture_transform2.xyz = base-color texture transform rows.
+  // texture_transform1.w = base texture uses secondary UV stream.
+  // texture_transform2.w = base texture is sRGB and must be decoded to linear before shading.
+  texture_transform1: vec4<f32>,
+  texture_transform2: vec4<f32>,
+  // alpha_map_transform1.xyz / alpha_map_transform2.xyz = alpha-map texture transform rows.
+  // alpha_map_transform2.w = alpha map uses secondary UV stream.
+  alpha_map_transform1: vec4<f32>,
+  alpha_map_transform2: vec4<f32>,
+  // Row pairs for normal, metallic-roughness, emissive, AO, light, and specular map transforms.
+  // map_transform_rows[1].w = active normal/bump map uses secondary UV stream.
+  // map_transform_rows[3].w = metallic-roughness map uses secondary UV stream.
+  // map_transform_rows[4].w = emissive map is sRGB.
+  // map_transform_rows[5].w = emissive map uses secondary UV stream.
+  // map_transform_rows[8].w = light map is sRGB.
+  map_transform_rows: array<vec4<f32>, 12>,
+  // Row pairs for clearcoat, clearcoat roughness, clearcoat normal, sheen color,
+  // sheen roughness, anisotropy, transmission, and thickness map transforms.
+  // physical_map_transform_rows[1].w = clearcoat map uses secondary UV stream.
+  // physical_map_transform_rows[3].w = clearcoat roughness map uses secondary UV stream.
+  // physical_map_transform_rows[5].w = clearcoat normal map uses secondary UV stream.
+  // physical_map_transform_rows[7].w = sheen color map uses secondary UV stream, or matcap color map when shading_model is matcap.
+  // physical_map_transform_rows[9].w = sheen roughness map uses secondary UV stream.
+  // physical_map_transform_rows[11].w = anisotropy map uses secondary UV stream.
+  // physical_map_transform_rows[13].w = transmission map uses secondary UV stream.
+  // physical_map_transform_rows[15].w = thickness map uses secondary UV stream.
+  // physical_map_transform_rows[17].w = specular color map uses secondary UV stream.
+  // physical_map_transform_rows[19].w = specular intensity map uses secondary UV stream.
+  physical_map_transform_rows: array<vec4<f32>, 20>,
+  // World-space clipping planes [normal.xyz, constant].
+  clipping_planes: array<vec4<f32>, 8>,
+  // x = union plane count, y = total plane count, z = alpha hash enabled, w = premultiplied alpha.
+  clipping_params: vec4<f32>,
+  // xyz = fog color
+  fog_color: vec4<f32>,
+  // x = mode (0=off, 1=linear, 2=exp2), y = near, z = far, w = density
+  fog_params: vec4<f32>,
   light_space_matrices: array<mat4x4<f32>, 6>,
   // x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
   shadow_params: vec4<f32>,
@@ -47,12 +92,14 @@ struct Uniforms {
   physical_params1: vec4<f32>,
   // xyz = sheen color, w = sheen roughness
   physical_params2: vec4<f32>,
-  // x = anisotropy, y = anisotropy rotation, z = thickness, w = attenuation distance
+  // x = anisotropy, y = anisotropy rotation, z/w = thickness/attenuation distance or distance near/far
   physical_params3: vec4<f32>,
-  // x/y = clearcoat normal scale
+  // x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map or matcap map sRGB flag
   physical_params4: vec4<f32>,
-  // xyz = attenuation color
+  // xyz = attenuation color or distance reference position
   attenuation_color: vec4<f32>,
+  // xyz = MeshPhysicalMaterial specular color factor, w = specular intensity.
+  physical_specular: vec4<f32>,
   lights: array<GpuLight, 16>,
 };
 
@@ -91,15 +138,35 @@ var s_ibl: sampler;
 @group(6) @binding(0)
 var t_ao: texture_2d<f32>;
 @group(6) @binding(1)
-var t_physical_scalar: texture_2d<f32>;
+var t_physical_layers: texture_2d_array<f32>;
 @group(6) @binding(2)
 var t_physical_sheen: texture_2d<f32>;
 @group(6) @binding(3)
-var t_physical_anisotropy: texture_2d<f32>;
+var t_physical_specular: texture_2d<f32>;
 @group(6) @binding(4)
 var t_clearcoat_normal: texture_2d<f32>;
 @group(6) @binding(5)
+var s_physical: sampler;
+@group(6) @binding(6)
+var t_alpha: texture_2d<f32>;
+@group(6) @binding(7)
+var t_light_map: texture_2d<f32>;
+@group(6) @binding(8)
 var s_ao: sampler;
+@group(6) @binding(9)
+var s_alpha: sampler;
+@group(6) @binding(10)
+var s_light_map: sampler;
+@group(6) @binding(11)
+var s_specular_map: sampler;
+@group(6) @binding(12)
+var s_physical_layers_map: sampler;
+@group(6) @binding(13)
+var s_physical_sheen_map: sampler;
+@group(6) @binding(14)
+var s_physical_specular_map: sampler;
+@group(6) @binding(15)
+var s_clearcoat_normal_map: sampler;
 
 @group(7) @binding(0)
 var t_shadow: texture_depth_2d_array;
@@ -116,6 +183,7 @@ struct VertexInput {
   @location(2) tangent: vec4<f32>,
   @location(3) color: vec4<f32>,
   @location(4) uv: vec2<f32>,
+  @location(5) uv2: vec2<f32>,
 };
 
 struct VertexOutput {
@@ -126,6 +194,7 @@ struct VertexOutput {
   @location(3) tangent_w: f32,
   @location(4) color: vec4<f32>,
   @location(5) uv: vec2<f32>,
+  @location(6) uv2: vec2<f32>,
 };
 
 @vertex
@@ -139,6 +208,7 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   output.tangent_w = input.tangent.w;
   output.color = input.color;
   output.uv = input.uv;
+  output.uv2 = input.uv2;
   return output;
 }
 
@@ -298,9 +368,17 @@ fn fresnel_schlick(cos_theta: f32, f0: vec3<f32>) -> vec3<f32> {
   return f0 + (vec3<f32>(1.0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
+fn fresnel_schlick_f90(cos_theta: f32, f0: vec3<f32>, f90: f32) -> vec3<f32> {
+  return f0 + (vec3<f32>(f90) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
 // Schlick Fresnel with roughness for IBL
 fn fresnel_schlick_roughness(cos_theta: f32, f0: vec3<f32>, roughness: f32) -> vec3<f32> {
   return f0 + (max(vec3<f32>(1.0 - roughness), f0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
+fn fresnel_schlick_roughness_f90(cos_theta: f32, f0: vec3<f32>, f90: f32, roughness: f32) -> vec3<f32> {
+  return f0 + (max(vec3<f32>(f90 * (1.0 - roughness)), f0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
 // Estevez/Kulla Charlie distribution and Neubelt visibility for cloth sheen.
@@ -380,60 +458,319 @@ fn get_spot_attenuation(cone_cos: f32, penumbra_cos: f32, angle_cos: f32) -> f32
   return smoothstep(cone_cos, penumbra_cos, angle_cos);
 }
 
+fn apply_fog(color: vec3<f32>, fog_distance: f32) -> vec3<f32> {
+  if uniforms.fog_params.x == 1.0 {
+    let fog_factor = smoothstep(uniforms.fog_params.y, uniforms.fog_params.z, fog_distance);
+    return mix(color, uniforms.fog_color.rgb, fog_factor);
+  }
+  if uniforms.fog_params.x == 2.0 {
+    let fog_density_distance = uniforms.fog_params.w * fog_distance;
+    let fog_factor = clamp(1.0 - exp2(-fog_density_distance * fog_density_distance * 1.442695), 0.0, 1.0);
+    return mix(color, uniforms.fog_color.rgb, fog_factor);
+  }
+  return color;
+}
+
+fn transform_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let map_uv = select(uv, uv2, uniforms.texture_transform1.w > 0.5);
+  let uv1 = vec3<f32>(map_uv, 1.0);
+  return vec2<f32>(dot(uniforms.texture_transform1.xyz, uv1), dot(uniforms.texture_transform2.xyz, uv1));
+}
+
+fn transform_alpha_map_uv(uv: vec2<f32>) -> vec2<f32> {
+  let uv1 = vec3<f32>(uv, 1.0);
+  return vec2<f32>(dot(uniforms.alpha_map_transform1.xyz, uv1), dot(uniforms.alpha_map_transform2.xyz, uv1));
+}
+
+fn transform_slot_uv(uv: vec2<f32>, row_index: u32) -> vec2<f32> {
+  let uv1 = vec3<f32>(uv, 1.0);
+  return vec2<f32>(
+    dot(uniforms.map_transform_rows[row_index].xyz, uv1),
+    dot(uniforms.map_transform_rows[row_index + 1u].xyz, uv1),
+  );
+}
+
+fn transform_normal_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let normal_uv = select(uv, uv2, uniforms.map_transform_rows[1u].w > 0.5);
+  return transform_slot_uv(normal_uv, 0u);
+}
+
+fn transform_metallic_roughness_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let mr_uv = select(uv, uv2, uniforms.map_transform_rows[3u].w > 0.5);
+  return transform_slot_uv(mr_uv, 2u);
+}
+
+fn transform_emissive_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let emissive_uv = select(uv, uv2, uniforms.map_transform_rows[5u].w > 0.5);
+  return transform_slot_uv(emissive_uv, 4u);
+}
+
+fn transform_ao_map_uv(uv: vec2<f32>) -> vec2<f32> {
+  return transform_slot_uv(uv, 6u);
+}
+
+fn transform_light_map_uv(uv: vec2<f32>) -> vec2<f32> {
+  return transform_slot_uv(uv, 8u);
+}
+
+fn transform_specular_map_uv(uv: vec2<f32>) -> vec2<f32> {
+  return transform_slot_uv(uv, 10u);
+}
+
+fn transform_physical_slot_uv(uv: vec2<f32>, row_index: u32) -> vec2<f32> {
+  let uv1 = vec3<f32>(uv, 1.0);
+  return vec2<f32>(
+    dot(uniforms.physical_map_transform_rows[row_index].xyz, uv1),
+    dot(uniforms.physical_map_transform_rows[row_index + 1u].xyz, uv1),
+  );
+}
+
+fn transform_clearcoat_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let clearcoat_uv = select(uv, uv2, uniforms.physical_map_transform_rows[1u].w > 0.5);
+  return transform_physical_slot_uv(clearcoat_uv, 0u);
+}
+
+fn transform_clearcoat_roughness_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let roughness_uv = select(uv, uv2, uniforms.physical_map_transform_rows[3u].w > 0.5);
+  return transform_physical_slot_uv(roughness_uv, 2u);
+}
+
+fn transform_clearcoat_normal_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let normal_uv = select(uv, uv2, uniforms.physical_map_transform_rows[5u].w > 0.5);
+  return transform_physical_slot_uv(normal_uv, 4u);
+}
+
+fn transform_sheen_color_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let sheen_uv = select(uv, uv2, uniforms.physical_map_transform_rows[7u].w > 0.5);
+  return transform_physical_slot_uv(sheen_uv, 6u);
+}
+
+fn transform_matcap_color_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let map_uv = select(uv, uv2, uniforms.physical_map_transform_rows[7u].w > 0.5);
+  return transform_physical_slot_uv(map_uv, 6u);
+}
+
+fn transform_sheen_roughness_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let roughness_uv = select(uv, uv2, uniforms.physical_map_transform_rows[9u].w > 0.5);
+  return transform_physical_slot_uv(roughness_uv, 8u);
+}
+
+fn transform_anisotropy_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let anisotropy_uv = select(uv, uv2, uniforms.physical_map_transform_rows[11u].w > 0.5);
+  return transform_physical_slot_uv(anisotropy_uv, 10u);
+}
+
+fn transform_transmission_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let transmission_uv = select(uv, uv2, uniforms.physical_map_transform_rows[13u].w > 0.5);
+  return transform_physical_slot_uv(transmission_uv, 12u);
+}
+
+fn transform_thickness_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let thickness_uv = select(uv, uv2, uniforms.physical_map_transform_rows[15u].w > 0.5);
+  return transform_physical_slot_uv(thickness_uv, 14u);
+}
+
+fn transform_specular_color_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let specular_uv = select(uv, uv2, uniforms.physical_map_transform_rows[17u].w > 0.5);
+  return transform_physical_slot_uv(specular_uv, 16u);
+}
+
+fn transform_specular_intensity_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let specular_uv = select(uv, uv2, uniforms.physical_map_transform_rows[19u].w > 0.5);
+  return transform_physical_slot_uv(specular_uv, 18u);
+}
+
+fn srgb_to_linear_channel(value: f32) -> f32 {
+  if value <= 0.04045 {
+    return value / 12.92;
+  }
+  return pow((value + 0.055) / 1.055, 2.4);
+}
+
+fn srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
+  return vec3<f32>(
+    srgb_to_linear_channel(color.r),
+    srgb_to_linear_channel(color.g),
+    srgb_to_linear_channel(color.b),
+  );
+}
+
+fn decode_color_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.texture_transform2.w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
+fn decode_matcap_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.physical_params4.w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
+fn decode_emissive_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.map_transform_rows[4u].w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
+fn decode_light_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.map_transform_rows[8u].w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
+fn light_probe_irradiance(normal: vec3<f32>) -> vec3<f32> {
+  let x = normal.x;
+  let y = normal.y;
+  let z = normal.z;
+  var result = uniforms.light_probe[0].rgb * 0.886227;
+  result = result + uniforms.light_probe[1].rgb * (2.0 * 0.511664 * y);
+  result = result + uniforms.light_probe[2].rgb * (2.0 * 0.511664 * z);
+  result = result + uniforms.light_probe[3].rgb * (2.0 * 0.511664 * x);
+  result = result + uniforms.light_probe[4].rgb * (2.0 * 0.429043 * x * y);
+  result = result + uniforms.light_probe[5].rgb * (2.0 * 0.429043 * y * z);
+  result = result + uniforms.light_probe[6].rgb * (0.743125 * z * z - 0.247708);
+  result = result + uniforms.light_probe[7].rgb * (2.0 * 0.429043 * x * z);
+  result = result + uniforms.light_probe[8].rgb * (0.429043 * (x * x - y * y));
+  return max(result, vec3<f32>(0.0));
+}
+
+fn is_clipped_by_planes(world_pos: vec3<f32>) -> bool {
+  let total_count = min(u32(uniforms.clipping_params.y), MAX_CLIPPING_PLANES);
+  let union_count = min(u32(uniforms.clipping_params.x), total_count);
+
+  for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+    if i < union_count {
+      let plane = uniforms.clipping_planes[i];
+      if dot(plane.xyz, world_pos) + plane.w < 0.0 {
+        return true;
+      }
+    }
+  }
+
+  if union_count < total_count {
+    var clipped = true;
+    for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+      if i >= union_count && i < total_count {
+        let plane = uniforms.clipping_planes[i];
+        clipped = clipped && (dot(plane.xyz, world_pos) + plane.w < 0.0);
+      }
+    }
+    if clipped {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
+  let pixel = floor(position.xy);
+  return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
+}
+
+fn bump_height(bump_uv: vec2<f32>) -> f32 {
+  return uniforms.normal_map_params.x * textureSample(t_normal, s_normal, bump_uv).r;
+}
+
+fn perturb_normal_from_bump(surf_pos: vec3<f32>, surf_norm: vec3<f32>, bump_uv: vec2<f32>) -> vec3<f32> {
+  let d_st_dx = dpdx(bump_uv);
+  let d_st_dy = dpdy(bump_uv);
+  let h_ll = bump_height(bump_uv);
+  let d_h_dx = bump_height(bump_uv + d_st_dx) - h_ll;
+  let d_h_dy = bump_height(bump_uv + d_st_dy) - h_ll;
+
+  let sigma_x = normalize(dpdx(surf_pos));
+  let sigma_y = normalize(dpdy(surf_pos));
+  let r1 = cross(sigma_y, surf_norm);
+  let r2 = cross(surf_norm, sigma_x);
+  let det = dot(sigma_x, r1);
+  let grad = sign(det) * (d_h_dx * r1 + d_h_dy * r2);
+  return normalize(abs(det) * surf_norm - grad);
+}
+
+fn output_color(rgb: vec3<f32>, alpha: f32) -> vec4<f32> {
+  if uniforms.clipping_params.w > 0.5 {
+    return vec4<f32>(rgb * alpha, alpha);
+  }
+  return vec4<f32>(rgb, alpha);
+}
+
+fn pack_depth_to_rgba(v: f32) -> vec4<f32> {
+  if v <= 0.0 {
+    return vec4<f32>(0.0);
+  }
+  if v >= 1.0 {
+    return vec4<f32>(1.0);
+  }
+  var vuf = floor(v * 16777216.0);
+  let af = fract(v * 16777216.0);
+  let bf = fract(vuf / 256.0);
+  vuf = floor(vuf / 256.0);
+  let gf = fract(vuf / 256.0);
+  vuf = floor(vuf / 256.0);
+  return vec4<f32>(vuf / 255.0, gf * (256.0 / 255.0), bf * (256.0 / 255.0), af);
+}
+
+fn pack_depth_to_rgb(v: f32) -> vec3<f32> {
+  if v <= 0.0 {
+    return vec3<f32>(0.0);
+  }
+  if v >= 1.0 {
+    return vec3<f32>(1.0);
+  }
+  var vuf = floor(v * 65536.0);
+  let bf = fract(v * 65536.0);
+  let gf = fract(vuf / 256.0);
+  vuf = floor(vuf / 256.0);
+  return vec3<f32>(vuf / 255.0, gf * (256.0 / 255.0), bf);
+}
+
+fn pack_depth_to_rg(v: f32) -> vec2<f32> {
+  if v <= 0.0 {
+    return vec2<f32>(0.0);
+  }
+  if v >= 1.0 {
+    return vec2<f32>(1.0);
+  }
+  let vuf = floor(v * 256.0);
+  let gf = fract(v * 256.0);
+  return vec2<f32>(vuf / 255.0, gf);
+}
+
 @fragment
 fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
+  if is_clipped_by_planes(input.world_pos) {
+    discard;
+  }
+
   let uv = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
+  let uv2 = vec2<f32>(input.uv2.x, 1.0 - input.uv2.y);
   let screen_uv = clamp(input.position.xy * uniforms.render_params.xy, vec2<f32>(0.0), vec2<f32>(1.0));
-  let tex_color = textureSample(t_diffuse, s_diffuse, uv);
+  let tex_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, transform_map_uv(uv, uv2)));
   let albedo = tex_color.rgb * input.color.rgb * uniforms.base_color.rgb;
-  let alpha = tex_color.a * input.color.a * uniforms.base_color.a;
+  var alpha = tex_color.a * input.color.a * uniforms.base_color.a;
+  if uniforms.ao_params.z > 0.5 {
+    let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
+    alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
+  }
 
   // Alpha test: discard fragments below the cutoff threshold
   let alpha_cutoff = uniforms.emissive.w;
   if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
     discard;
   }
+  if uniforms.clipping_params.z > 0.5 && alpha < alpha_hash_threshold(input.position) {
+    discard;
+  }
 
   let shading_model = u32(uniforms.ibl_params.y);
 
-  // Ambient occlusion: sample red channel, blend toward 1.0 by intensity.
-  // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
-  var ao: f32 = 1.0;
-  if uniforms.ao_params.y > 0.5 {
-    let ao_sample = textureSample(t_ao, s_ao, uv).r;
-    ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
-  }
-
-  // MeshBasicMaterial: unlit. Output = albedo * ao, then emissive + tone map + gamma.
-  if shading_model == 1u {
-    var unlit = albedo * ao;
-    let emissive_basic = textureSample(t_emissive, s_emissive, uv).rgb;
-    unlit = unlit + uniforms.emissive.rgb * emissive_basic;
-    let mapped_basic = aces_filmic_tone_mapping(unlit);
-    let gamma_basic = pow(mapped_basic, vec3<f32>(1.0 / 2.2));
-    return vec4<f32>(gamma_basic, alpha);
-  }
-
-  let use_specular = shading_model == 0u;
-
-  let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, uv);
-  let metallic = uniforms.metallic * mr_sample.b;
-  let roughness = max(uniforms.roughness * mr_sample.g, 0.04);
-  let physical_scalar_sample = textureSample(t_physical_scalar, s_ao, uv);
-  let physical_sheen_sample = textureSample(t_physical_sheen, s_ao, uv);
-  let physical_anisotropy_sample = textureSample(t_physical_anisotropy, s_ao, uv);
-  let clearcoat = clamp(uniforms.physical_params1.x * physical_scalar_sample.r, 0.0, 1.0);
-  let clearcoat_roughness = max(uniforms.physical_params1.y * physical_scalar_sample.g, 0.0525);
-  let transmission = clamp(uniforms.physical_params1.z * physical_scalar_sample.b, 0.0, 1.0);
-  let ior = clamp(uniforms.physical_params1.w, 1.0, 2.333);
-  let sheen_color = clamp(uniforms.physical_params2.rgb * physical_sheen_sample.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
-  let sheen_roughness = clamp(uniforms.physical_params2.w * physical_sheen_sample.a, 0.0001, 1.0);
-  let anisotropy = clamp(uniforms.physical_params3.x, 0.0, 1.0);
-  let anisotropy_rotation = uniforms.physical_params3.y;
-  let thickness = max(uniforms.physical_params3.z * physical_scalar_sample.a, 0.0);
-  let attenuation_distance = max(uniforms.physical_params3.w, 0.0);
-
-  // Normal mapping via TBN matrix
+  // Normal mapping via TBN matrix.
   var N = normalize(input.world_normal);
   // Flip normal when shading back-facing fragments (BackSide / DoubleSide).
   // For FrontSide meshes, back faces are culled so front_facing is always true.
@@ -441,17 +778,131 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     N = -N;
   }
   var tbn = tangent_basis(N, input.world_tangent, input.tangent_w);
-  if uniforms.normal_map_params.z > 0.5 {
-    let normal_sample = textureSample(t_normal, s_normal, uv).rgb;
+  let normal_mode = u32(uniforms.normal_map_params.z + 0.5);
+  if normal_mode == 1u {
+    let normal_sample = textureSample(t_normal, s_normal, transform_normal_map_uv(uv, uv2)).rgb;
     var tangent_normal = normal_sample * 2.0 - vec3<f32>(1.0);
     tangent_normal.x *= uniforms.normal_map_params.x;
     tangent_normal.y *= uniforms.normal_map_params.y;
     N = normalize(tbn * tangent_normal);
     tbn = tangent_basis(N, tbn[0], input.tangent_w);
+  } else if normal_mode == 2u {
+    N = perturb_normal_from_bump(input.world_pos, N, transform_normal_map_uv(uv, uv2));
+    tbn = tangent_basis(N, tbn[0], input.tangent_w);
+  }
+
+  // Ambient occlusion: sample red channel, blend toward 1.0 by intensity.
+  // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
+  var ao: f32 = 1.0;
+  if uniforms.ao_params.y > 0.5 {
+    let ao_sample = textureSample(t_ao, s_ao, transform_ao_map_uv(uv2)).r;
+    ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
+  }
+  let has_light_map = uniforms.ao_params.w > 0.5;
+  var light_map_irradiance = vec3<f32>(0.0);
+  if has_light_map {
+    light_map_irradiance = decode_light_map_sample(textureSample(t_light_map, s_light_map, transform_light_map_uv(uv2))).rgb * max(uniforms.physical_params4.z, 0.0);
+  }
+  let light_map_diffuse = albedo * light_map_irradiance * (1.0 / PI) * ao;
+
+  // MeshBasicMaterial: unlit. Output = albedo * ao, then emissive + tone map + gamma.
+  if shading_model == 1u {
+    var unlit = albedo * ao;
+    if has_light_map {
+      unlit = light_map_diffuse;
+    }
+    let emissive_basic = decode_emissive_map_sample(textureSample(t_emissive, s_emissive, transform_emissive_map_uv(uv, uv2))).rgb;
+    unlit = unlit + uniforms.emissive.rgb * emissive_basic;
+    let mapped_basic = apply_output_color_space(aces_filmic_tone_mapping(unlit));
+    let fogged_basic = apply_fog(mapped_basic, distance(input.world_pos, uniforms.camera_pos.xyz));
+    return output_color(fogged_basic, alpha);
+  }
+
+  if shading_model == 3u {
+    let view_normal = normalize((uniforms.view * vec4<f32>(N, 0.0)).xyz);
+    return output_color(view_normal * 0.5 + vec3<f32>(0.5), alpha);
+  }
+
+  if shading_model == 4u {
+    let view_normal = normalize((uniforms.view * vec4<f32>(N, 0.0)).xyz);
+    let view_position = (uniforms.view * vec4<f32>(input.world_pos, 1.0)).xyz;
+    let view_dir = normalize(-view_position);
+    let matcap_x = normalize(vec3<f32>(view_dir.z, 0.0, -view_dir.x));
+    let matcap_y = cross(view_dir, matcap_x);
+    let matcap_uv = vec2<f32>(dot(matcap_x, view_normal), dot(matcap_y, view_normal)) * 0.495 + vec2<f32>(0.5);
+    var matcap_surface_color = input.color.rgb * uniforms.base_color.rgb;
+    if uniforms.light_probe_params.w > 0.5 {
+      let matcap_map = decode_matcap_map_sample(textureSample(t_physical_sheen, s_physical, transform_matcap_color_map_uv(uv, uv2)));
+      matcap_surface_color *= matcap_map.rgb;
+    }
+    var matcap_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, matcap_uv)).rgb * matcap_surface_color;
+    let mapped_matcap = apply_output_color_space(aces_filmic_tone_mapping(matcap_color));
+    let fogged_matcap = apply_fog(mapped_matcap, distance(input.world_pos, uniforms.camera_pos.xyz));
+    return output_color(fogged_matcap, alpha);
+  }
+
+  if shading_model == 6u {
+    let frag_depth = clamp(input.position.z, 0.0, 1.0);
+    let depth_packing = u32(uniforms.light_probe_params.z + 0.5);
+    if depth_packing == 1u {
+      return pack_depth_to_rgba(frag_depth);
+    }
+    if depth_packing == 2u {
+      return vec4<f32>(pack_depth_to_rgb(frag_depth), 1.0);
+    }
+    if depth_packing == 3u {
+      return vec4<f32>(pack_depth_to_rg(frag_depth), 0.0, 1.0);
+    }
+    let depth = 1.0 - frag_depth;
+    return output_color(vec3<f32>(depth), alpha);
+  }
+
+  if shading_model == 8u {
+    let distance_depth = clamp(
+      (distance(input.world_pos, uniforms.attenuation_color.xyz) - uniforms.physical_params3.z) / max(uniforms.physical_params3.w - uniforms.physical_params3.z, 0.0001),
+      0.0,
+      1.0,
+    );
+    return output_color(vec3<f32>(distance_depth, 0.0, 0.0), alpha);
+  }
+
+  let use_specular = shading_model == 0u;
+  let use_phong = shading_model == 5u;
+  let use_toon = shading_model == 7u;
+  let use_shadow_material = shading_model == 9u;
+
+  let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, transform_metallic_roughness_map_uv(uv, uv2));
+  let metallic = uniforms.metallic * mr_sample.b;
+  let roughness = max(uniforms.roughness * mr_sample.g, 0.04);
+  let clearcoat_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_clearcoat_map_uv(uv, uv2), 0).r;
+  let clearcoat_roughness_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_clearcoat_roughness_map_uv(uv, uv2), 0).g;
+  let transmission_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_transmission_map_uv(uv, uv2), 0).b;
+  let thickness_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_thickness_map_uv(uv, uv2), 0).a;
+  let sheen_color_sample = textureSample(t_physical_sheen, s_physical_sheen_map, transform_sheen_color_map_uv(uv, uv2)).rgb;
+  let sheen_roughness_sample = textureSample(t_physical_sheen, s_physical_sheen_map, transform_sheen_roughness_map_uv(uv, uv2)).a;
+  let physical_anisotropy_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_anisotropy_map_uv(uv, uv2), 1);
+  let physical_specular_color_sample = textureSample(t_physical_specular, s_physical_specular_map, transform_specular_color_map_uv(uv, uv2)).rgb;
+  let physical_specular_intensity_sample = textureSample(t_physical_specular, s_physical_specular_map, transform_specular_intensity_map_uv(uv, uv2)).a;
+  let clearcoat = clamp(uniforms.physical_params1.x * clearcoat_sample, 0.0, 1.0);
+  let clearcoat_roughness = max(uniforms.physical_params1.y * clearcoat_roughness_sample, 0.0525);
+  let transmission = clamp(uniforms.physical_params1.z * transmission_sample, 0.0, 1.0);
+  let ior = clamp(uniforms.physical_params1.w, 1.0, 2.333);
+  let sheen_color = clamp(uniforms.physical_params2.rgb * sheen_color_sample, vec3<f32>(0.0), vec3<f32>(1.0));
+  let sheen_roughness = clamp(uniforms.physical_params2.w * sheen_roughness_sample, 0.0001, 1.0);
+  let anisotropy = clamp(uniforms.physical_params3.x, 0.0, 1.0);
+  let anisotropy_rotation = uniforms.physical_params3.y;
+  let thickness = max(uniforms.physical_params3.z * thickness_sample, 0.0);
+  let attenuation_distance = max(uniforms.physical_params3.w, 0.0);
+
+  if use_shadow_material {
+    let shadow_alpha = alpha * (1.0 - sample_shadow(input.world_pos, N));
+    let mapped_shadow = apply_output_color_space(aces_filmic_tone_mapping(albedo));
+    let fogged_shadow = apply_fog(mapped_shadow, distance(input.world_pos, uniforms.camera_pos.xyz));
+    return output_color(fogged_shadow, shadow_alpha);
   }
   let T = normalize(tbn[0]);
   let B = normalize(tbn[1]);
-  let clearcoat_normal_sample = textureSample(t_clearcoat_normal, s_ao, uv).rgb;
+  let clearcoat_normal_sample = textureSample(t_clearcoat_normal, s_clearcoat_normal_map, transform_clearcoat_normal_map_uv(uv, uv2)).rgb;
   var clearcoat_tangent_normal = clearcoat_normal_sample * 2.0 - vec3<f32>(1.0);
   clearcoat_tangent_normal.x *= uniforms.physical_params4.x;
   clearcoat_tangent_normal.y *= uniforms.physical_params4.y;
@@ -478,21 +929,36 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let V = normalize(uniforms.camera_pos.xyz - input.world_pos);
   let n_dot_v = max(dot(N, V), 0.0);
 
-  // Dielectric F0 from IOR (1.5 -> 0.04), metallic F0 = albedo.
+  // Dielectric F0 from IOR (1.5 -> 0.04), modulated by MeshPhysicalMaterial specular extensions.
   let dielectric_f0_scalar = pow((ior - 1.0) / (ior + 1.0), 2.0);
-  let f0 = mix(vec3<f32>(dielectric_f0_scalar), albedo, metallic);
+  let physical_specular_color = clamp(uniforms.physical_specular.rgb * physical_specular_color_sample, vec3<f32>(0.0), vec3<f32>(1.0));
+  let physical_specular_intensity = clamp(uniforms.physical_specular.w * physical_specular_intensity_sample, 0.0, 1.0);
+  let dielectric_f0 = min(vec3<f32>(dielectric_f0_scalar) * physical_specular_color, vec3<f32>(1.0)) * physical_specular_intensity;
+  let specular_f90 = mix(physical_specular_intensity, 1.0, metallic);
+  let f0 = mix(dielectric_f0, albedo, metallic);
+  let phong_specular_color = clamp(uniforms.physical_params2.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
+  let phong_shininess = max(uniforms.physical_params2.w, 0.0001);
+  var phong_specular_strength = 1.0;
+  if use_phong && uniforms.physical_params4.w > 0.5 {
+    phong_specular_strength = textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv2), 0).r;
+  }
 
   var lo = vec3<f32>(0.0);
 
   let has_ibl = uniforms.normal_map_params.w > 0.5;
+  let has_light_probe = uniforms.light_probe_params.x > 0.5;
+  var light_probe_diffuse = vec3<f32>(0.0);
+  if has_light_probe {
+    light_probe_diffuse = light_probe_irradiance(N);
+  }
 
-  if uniforms.num_lights == 0u && !has_ibl {
+  if uniforms.num_lights == 0u && !has_ibl && !has_light_probe {
     // No lights or IBL: render with a basic hemispherical ambient
     let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity;
     let sky_factor = 0.5 + 0.5 * N.y;
     let fallback_ambient = mix(vec3<f32>(0.1, 0.1, 0.12), vec3<f32>(0.4, 0.45, 0.5), sky_factor);
     let total_ambient = max(ambient, fallback_ambient);
-    lo = albedo * total_ambient * ao;
+    lo = albedo * total_ambient * ao + light_map_diffuse;
   } else {
     // Direct lighting from scene lights
     let shadow_factor = sample_shadow(input.world_pos, N);
@@ -519,6 +985,18 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
         if i == shadow_light_index {
           attenuation *= shadow_factor;
         }
+      } else if light.light_type == 4u {
+        // RectAreaLight approximation: finite one-sided area emitter from the
+        // light center. This is intentionally cheaper than Three.js' LUT path.
+        let light_vec = light.position.xyz - input.world_pos;
+        let dist = length(light_vec);
+        L = light_vec / max(dist, 0.0001);
+        let width = max(light.params.x, 0.0);
+        let height = max(light.params.y, 0.0);
+        let area = max(width * height, 0.0001);
+        let light_dir = normalize(light.direction.xyz);
+        let facing = max(dot(light_dir, -L), 0.0);
+        attenuation = facing * area / max(dist * dist + area, 0.0001);
       } else {
         // Point or Spot
         let light_vec = light.position.xyz - input.world_pos;
@@ -574,7 +1052,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
             n_dot_l,
           );
         }
-        let F = fresnel_schlick(h_dot_v, f0);
+        let F = fresnel_schlick_f90(h_dot_v, f0, specular_f90);
 
         let specular = (D * G * F) / (4.0 * n_dot_v * n_dot_l + 0.0001);
 
@@ -596,6 +1074,23 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
         }
 
         lo = lo + (k_d * albedo / PI + physical_specular) * radiance * n_dot_l;
+      } else if use_phong {
+        // MeshPhongMaterial: non-physical Blinn-Phong direct lighting.
+        let phong_f = fresnel_schlick(h_dot_v, phong_specular_color);
+        let phong_d = (phong_shininess * 0.5 + 1.0) * pow(n_dot_h, phong_shininess) / PI;
+        let phong_specular = phong_f * (0.25 * phong_d) * phong_specular_strength;
+        lo = lo + (albedo / PI + phong_specular) * radiance * n_dot_l;
+      } else if use_toon {
+        // MeshToonMaterial: gradientMap samples the red ramp channel at dot(N, L) * 0.5 + 0.5.
+        let toon_coord = dot(N, L) * 0.5 + 0.5;
+        var toon_irradiance: f32;
+        if uniforms.light_probe_params.y > 0.5 {
+          toon_irradiance = textureSample(t_physical_sheen, s_physical, vec2<f32>(toon_coord, 0.0)).r;
+        } else {
+          let toon_width = fwidth(toon_coord) * 0.5;
+          toon_irradiance = mix(0.7, 1.0, smoothstep(0.7 - toon_width, 0.7 + toon_width, toon_coord));
+        }
+        lo = lo + toon_irradiance * albedo / PI * radiance;
       } else {
         // MeshLambertMaterial: diffuse-only
         lo = lo + albedo / PI * radiance * n_dot_l;
@@ -610,7 +1105,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       let irradiance = textureSample(t_irradiance, s_ibl, N).rgb;
 
       if use_specular {
-        let F_ibl = fresnel_schlick_roughness(n_dot_v, f0, roughness);
+        let F_ibl = fresnel_schlick_roughness_f90(n_dot_v, f0, specular_f90, roughness);
         let k_s_ibl = F_ibl;
         let k_d_ibl = (vec3<f32>(1.0) - k_s_ibl) * (1.0 - metallic);
         let diffuse_ibl = k_d_ibl * irradiance * albedo;
@@ -644,6 +1139,10 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity * albedo;
       lo = lo + ambient * ao;
     }
+    if has_light_probe {
+      lo = lo + albedo * light_probe_diffuse * ao;
+    }
+    lo = lo + light_map_diffuse;
   }
 
   if use_specular && transmission > 0.0001 {
@@ -661,14 +1160,15 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   }
 
   // Emissive
-  let emissive_sample = textureSample(t_emissive, s_emissive, uv).rgb;
+  let emissive_sample = decode_emissive_map_sample(textureSample(t_emissive, s_emissive, transform_emissive_map_uv(uv, uv2))).rgb;
   lo = lo + uniforms.emissive.rgb * emissive_sample;
 
-  // Tone mapping (ACES Filmic, matches three.js) and gamma correction
+  // Tone mapping (ACES Filmic, matches three.js) and output color conversion.
   let mapped = aces_filmic_tone_mapping(lo);
-  let gamma_corrected = pow(mapped, vec3<f32>(1.0 / 2.2));
+  let output_mapped = apply_output_color_space(mapped);
+  let fogged = apply_fog(output_mapped, distance(input.world_pos, uniforms.camera_pos.xyz));
 
-  return vec4<f32>(gamma_corrected, alpha);
+  return output_color(fogged, alpha);
 }
 
 // ACES Filmic tone mapping, ported from three.js (Narkowicz fit with
@@ -698,6 +1198,13 @@ fn aces_filmic_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
   color = aces_output * color;
   return clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
 }
+
+fn apply_output_color_space(color: vec3<f32>) -> vec3<f32> {
+  if uniforms.output_params.x > 0.5 {
+    return color;
+  }
+  return pow(color, vec3<f32>(1.0 / 2.2));
+}
 "#;
 
 pub fn custom_shader_source(fragment_body: &str) -> String {
@@ -706,6 +1213,7 @@ pub fn custom_shader_source(fragment_body: &str) -> String {
 
 const CUSTOM_FRAGMENT_SHADER: &str = r#"
 const MAX_LIGHTS: u32 = 16u;
+const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
   light_type: u32,
@@ -720,6 +1228,7 @@ struct GpuLight {
 
 struct Uniforms {
   mvp: mat4x4<f32>,
+  view: mat4x4<f32>,
   model: mat4x4<f32>,
   normal_matrix: mat4x4<f32>,
   camera_pos: vec4<f32>,
@@ -730,10 +1239,26 @@ struct Uniforms {
   ambient_intensity: f32,
   num_lights: u32,
   ambient_color: vec4<f32>,
+  light_probe: array<vec4<f32>, 9>,
+  light_probe_params: vec4<f32>,
   normal_map_params: vec4<f32>,
   ibl_params: vec4<f32>,
   ao_params: vec4<f32>,
   render_params: vec4<f32>,
+  output_params: vec4<f32>,
+  // texture_transform1.w = base texture uses secondary UV stream.
+  // texture_transform2.w = base texture is sRGB and must be decoded to linear before shading.
+  texture_transform1: vec4<f32>,
+  texture_transform2: vec4<f32>,
+  alpha_map_transform1: vec4<f32>,
+  alpha_map_transform2: vec4<f32>,
+  map_transform_rows: array<vec4<f32>, 12>,
+  physical_map_transform_rows: array<vec4<f32>, 20>,
+  clipping_planes: array<vec4<f32>, 8>,
+  // x = union plane count, y = total plane count, z = alpha hash enabled, w = premultiplied alpha.
+  clipping_params: vec4<f32>,
+  fog_color: vec4<f32>,
+  fog_params: vec4<f32>,
   light_space_matrices: array<mat4x4<f32>, 6>,
   shadow_params: vec4<f32>,
   shadow_params2: vec4<f32>,
@@ -743,6 +1268,7 @@ struct Uniforms {
   physical_params3: vec4<f32>,
   physical_params4: vec4<f32>,
   attenuation_color: vec4<f32>,
+  physical_specular: vec4<f32>,
   lights: array<GpuLight, 16>,
 };
 
@@ -760,6 +1286,7 @@ struct VertexInput {
   @location(2) tangent: vec4<f32>,
   @location(3) color: vec4<f32>,
   @location(4) uv: vec2<f32>,
+  @location(5) uv2: vec2<f32>,
 };
 
 struct VertexOutput {
@@ -770,6 +1297,7 @@ struct VertexOutput {
   @location(3) tangent_w: f32,
   @location(4) color: vec4<f32>,
   @location(5) uv: vec2<f32>,
+  @location(6) uv2: vec2<f32>,
 };
 
 @vertex
@@ -783,17 +1311,85 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   output.tangent_w = input.tangent.w;
   output.color = input.color;
   output.uv = input.uv;
+  output.uv2 = input.uv2;
   return output;
+}
+
+fn srgb_to_linear_channel(value: f32) -> f32 {
+  if value <= 0.04045 {
+    return value / 12.92;
+  }
+  return pow((value + 0.055) / 1.055, 2.4);
+}
+
+fn srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
+  return vec3<f32>(
+    srgb_to_linear_channel(color.r),
+    srgb_to_linear_channel(color.g),
+    srgb_to_linear_channel(color.b),
+  );
+}
+
+fn decode_color_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.texture_transform2.w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
+fn is_clipped_by_planes(world_pos: vec3<f32>) -> bool {
+  let total_count = min(u32(uniforms.clipping_params.y), MAX_CLIPPING_PLANES);
+  let union_count = min(u32(uniforms.clipping_params.x), total_count);
+
+  for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+    if i < union_count {
+      let plane = uniforms.clipping_planes[i];
+      if dot(plane.xyz, world_pos) + plane.w < 0.0 {
+        return true;
+      }
+    }
+  }
+
+  if union_count < total_count {
+    var clipped = true;
+    for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+      if i >= union_count && i < total_count {
+        let plane = uniforms.clipping_planes[i];
+        clipped = clipped && (dot(plane.xyz, world_pos) + plane.w < 0.0);
+      }
+    }
+    if clipped {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
+  let pixel = floor(position.xy);
+  return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
 }
 
 @fragment
 fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
+  if is_clipped_by_planes(input.world_pos) {
+    discard;
+  }
+
   let uv = vec2<f32>(input.uv.x, 1.0 - input.uv.y);
-  let texture_color = textureSample(t_diffuse, s_diffuse, uv);
+  let uv2 = vec2<f32>(input.uv2.x, 1.0 - input.uv2.y);
+  let map_uv = select(uv, uv2, uniforms.texture_transform1.w > 0.5);
+  let uv1 = vec3<f32>(map_uv, 1.0);
+  let transformed_uv = vec2<f32>(dot(uniforms.texture_transform1.xyz, uv1), dot(uniforms.texture_transform2.xyz, uv1));
+  let texture_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, transformed_uv));
   let base_color = texture_color * input.color * uniforms.base_color;
   let alpha = base_color.a;
   let alpha_cutoff = uniforms.emissive.w;
   if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
+    discard;
+  }
+  if uniforms.clipping_params.z > 0.5 && alpha < alpha_hash_threshold(input.position) {
     discard;
   }
   var normal = normalize(input.world_normal);
@@ -859,5 +1455,113 @@ fn fs_post(input: PostVertexOutput) -> @location(0) vec4<f32> {
 
   color = mix(color, vec3<f32>(1.0) - color, clamp(uniforms.params2.y, 0.0, 1.0));
   return vec4<f32>(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), sample.a);
+}
+"#;
+
+pub const BACKGROUND_SHADER: &str = r#"
+struct BackgroundUniforms {
+  // transform1.xyz / transform2.xyz = texture transform rows.
+  // transform1.w = background intensity.
+  transform1: vec4<f32>,
+  // transform2.w integer flags: +1 = texture is sRGB, +2 = LinearSRGBColorSpace output.
+  // transform2.w fractional lane stores 2D background blur amount / 4.
+  transform2: vec4<f32>,
+};
+
+@group(0) @binding(0)
+var t_background: texture_2d<f32>;
+@group(0) @binding(1)
+var s_background: sampler;
+@group(0) @binding(2)
+var<uniform> uniforms: BackgroundUniforms;
+
+struct BackgroundVertexOutput {
+  @builtin(position) position: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_background(@builtin(vertex_index) vertex_index: u32) -> BackgroundVertexOutput {
+  var positions = array<vec2<f32>, 3>(
+    vec2<f32>(-1.0, -3.0),
+    vec2<f32>( 3.0,  1.0),
+    vec2<f32>(-1.0,  1.0),
+  );
+  let pos = positions[vertex_index];
+  var out: BackgroundVertexOutput;
+  out.position = vec4<f32>(pos, 0.0, 1.0);
+  out.uv = pos * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);
+  return out;
+}
+
+fn transform_background_uv(uv: vec2<f32>) -> vec2<f32> {
+  let uv1 = vec3<f32>(uv, 1.0);
+  return vec2<f32>(dot(uniforms.transform1.xyz, uv1), dot(uniforms.transform2.xyz, uv1));
+}
+
+fn background_srgb_to_linear_channel(value: f32) -> f32 {
+  if value <= 0.04045 {
+    return value / 12.92;
+  }
+  return pow((value + 0.055) / 1.055, 2.4);
+}
+
+fn background_srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
+  return vec3<f32>(
+    background_srgb_to_linear_channel(color.r),
+    background_srgb_to_linear_channel(color.g),
+    background_srgb_to_linear_channel(color.b),
+  );
+}
+
+fn background_texture_is_srgb() -> bool {
+  let flags = floor(uniforms.transform2.w);
+  let srgb_flag = flags - floor(flags * 0.5) * 2.0;
+  return srgb_flag > 0.5;
+}
+
+fn apply_background_output_color_space(color: vec3<f32>) -> vec3<f32> {
+  if floor(uniforms.transform2.w) > 1.5 {
+    return color;
+  }
+  return pow(color, vec3<f32>(1.0 / 2.2));
+}
+
+fn background_blur_amount() -> f32 {
+  return fract(uniforms.transform2.w) * 4.0;
+}
+
+fn sample_background(uv: vec2<f32>) -> vec4<f32> {
+  let transformed_uv = transform_background_uv(uv);
+  let blur = background_blur_amount();
+  if blur <= 0.001 {
+    return textureSample(t_background, s_background, transformed_uv);
+  }
+
+  let dimensions = vec2<f32>(textureDimensions(t_background, 0));
+  let texel = vec2<f32>(1.0) / max(dimensions, vec2<f32>(1.0));
+  let offset = texel * (1.0 + blur * 8.0);
+  var color = textureSample(t_background, s_background, transformed_uv) * 0.25;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>( offset.x, 0.0)) * 0.125;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>(-offset.x, 0.0)) * 0.125;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>(0.0,  offset.y)) * 0.125;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>(0.0, -offset.y)) * 0.125;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>( offset.x,  offset.y)) * 0.0625;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>(-offset.x,  offset.y)) * 0.0625;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>( offset.x, -offset.y)) * 0.0625;
+  color += textureSample(t_background, s_background, transformed_uv + vec2<f32>(-offset.x, -offset.y)) * 0.0625;
+  return color;
+}
+
+@fragment
+fn fs_background(input: BackgroundVertexOutput) -> @location(0) vec4<f32> {
+  let sample = sample_background(input.uv);
+  var color = sample.rgb;
+  if background_texture_is_srgb() {
+    color = background_srgb_to_linear(color);
+  }
+  color *= uniforms.transform1.w;
+  color = apply_background_output_color_space(color);
+  return vec4<f32>(color, sample.a);
 }
 "#;

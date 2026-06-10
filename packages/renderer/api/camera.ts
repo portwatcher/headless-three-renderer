@@ -38,6 +38,10 @@ export function cameraViewProjection(camera: ThreeCameraLike): Mat4 {
   return multiplyMatrices(OPENGL_TO_WGPU_CLIP, multiplyMatrices(projection, view))
 }
 
+export function cameraViewMatrix(camera: ThreeCameraLike): Mat4 {
+  return matrixElements(camera.matrixWorldInverse, 'camera.matrixWorldInverse')
+}
+
 export function cameraWorldPosition(camera: ThreeCameraLike): number[] {
   if (camera.matrixWorld?.elements) {
     const e = camera.matrixWorld.elements

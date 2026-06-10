@@ -64,48 +64,78 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 ## Supported Three.js Surface
 
+See the versioned [compatibility matrix](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/compatibility.md) for the public support contract, known gaps, and platform package status.
+
 The public API accepts only Three.js-like objects:
 
 - `scene`: a `THREE.Scene`.
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
-- `options.background`: `[r, g, b]`, `[r, g, b, a]`, or a `THREE.Color`. Defaults to `scene.background` when it is a color.
+- `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D texture. Defaults to `scene.background`.
+- `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and 2D texture backgrounds.
+- `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported 2D texture backgrounds.
+- `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws.
+- `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes.
+- `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and 2D texture background output conversion.
 - `options.target`: a target-like object populated with raw RGBA8 readback data.
 - `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`).
 
 ### Geometry & Scene
 
 - `THREE.Mesh` and `THREE.SkinnedMesh`
+- `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
 - geometry groups with material arrays
 - mesh world transforms
+- `THREE.LOD` camera-distance level selection
 - vertex colors
-- scene background color
+- scene background color and 2D texture backgrounds with `backgroundIntensity` and 2D texture blur; cube/equirect backgrounds fail clearly until native support lands
+- render-option viewport and scissor rectangles in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 
 ### Materials & Textures
 
 - material base color and opacity
-- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture
+- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
+- base, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
+- material and 2D texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`
+- base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
-- `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, and environment-backed or scene-color transmission / refraction
-- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, transmission, and thickness
-- custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`
-- metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`)
-- normal map with configurable `normalScale`
-- emissive color, intensity, and emissive map
-- occlusion map (`material.aoMap`) applied to indirect lighting
+- `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and environment-backed or scene-color transmission / refraction
+- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, packed texture-group sampler settings, and sheen/specular color maps include sRGB color-space decode
+- custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
+- metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with `texture.channel` UV selection and wrap/filter sampler settings
+- normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with `texture.channel` UV selection and wrap/filter sampler settings
+- `MeshNormalMaterial` and `MeshMatcapMaterial` normal-map output
+- `material.flatShading` per-face normals for triangle meshes without normal maps
+- `MeshMatcapMaterial.map` color maps with `texture.channel` UV selection and transforms
+- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, `texture.channel` UV selection, and texture transforms
+- `MeshToonMaterial.gradientMap` red-channel diffuse ramps
+- `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
+- `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides
+- `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
+- emissive color, intensity, and emissive map, with `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings
+- light maps with `lightMapIntensity`, `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
+- occlusion map (`material.aoMap`) applied to indirect lighting, with `texture.channel` UV selection and wrap/filter sampler settings
+- alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with `texture.channel` UV selection and wrap/filter sampler settings
+- `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, and wrap/filter sampler settings
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
+- `material.fog = false` opt-out for scene fog
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with separate no-depth-write pipeline
+- material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
+- unsupported `alphaToCoverage` and `clipShadows` material states fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
+- dashed line material segments preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases
 
 Texture image data can be:
 
 - Raw RGBA8 pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
+
+Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGBA data or an encoded PNG/JPEG/WebP image before rendering.
 
 ### Lights
 
@@ -114,8 +144,9 @@ Texture image data can be:
 - `THREE.PointLight` — omnidirectional light with distance/decay attenuation
 - `THREE.SpotLight` — cone light with angle, penumbra, distance, and decay
 - `THREE.HemisphereLight` — sky/ground gradient ambient light
+- `THREE.RectAreaLight` — one-sided finite-area direct-light approximation
 
-Lights are automatically extracted from the scene. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation. Up to 16 lights per scene. When no lights are present, meshes render with a hemispherical ambient fallback.
+Lights are automatically extracted from the scene. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 16 lights per scene. When no lights are present, meshes render with a hemispherical ambient fallback.
 
 ### Image-Based Lighting (IBL)
 
@@ -211,6 +242,8 @@ Built-in post-processing can be enabled with `options.postProcessing`. Supported
 
 Materials can provide a WGSL fragment body with `material.userData.headlessThreeRenderer.fragmentWgsl`. The body runs inside the renderer's standard vertex, uniform, color, UV, and base-texture setup and returns a `vec4<f32>`.
 
+Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not translated directly; provide the headless WGSL fragment override above or use a built-in material.
+
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Non-dashed `LineBasicMaterial.map` samples line UVs, including alpha-tested texture alpha.
