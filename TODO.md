@@ -52,7 +52,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Add golden-image parity tests | High | Use browser Three.js/WebGLRenderer only as an offline/reference test generator. Production runtime remains Node + `wgpu`. |
-| Build a curated scene corpus | High | Initial generated invariant corpus covers transparent materials, skinning, morphs, IBL, shadows, points/lines, LOD/groups, and pathological geometry. Remaining work is committed glTF Sample Assets, VRM/VRMA fixtures, and browser-generated references. |
+| Build a curated scene corpus | High | Initial generated invariant corpus covers transparent materials, skinning, morphs, IBL, shadows, points/lines, LOD/groups, and pathological geometry; a minimal committed glTF fixture covers `GLTFLoader` integration. Remaining work is committed glTF Sample Assets, VRM/VRMA fixtures, and browser-generated references. |
 
 ## P1 - Scene Graph And Object Coverage
 
@@ -119,7 +119,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 |---|---:|---|
 | Document Node loader setup | High | Node `GLTFLoader` setup is documented for local files, `FileLoader`/`fetch`, encoded image buffers, path resolution, and optional image polyfills. Remaining work is keeping examples synced with future helper APIs. |
 | Provide asset loading helpers | Medium | `createEncodedImageTextureLoader`, `EncodedImageTextureLoader`, `installLocalFileFetch`, and `resolveLocalAssetPath` help Node loaders expose renderer-supported encoded texture buffers. Remaining work is broader helper coverage for embedded images, KTX2/Basis pre-decode, and higher-level glTF/VRM loading. |
-| Add end-to-end glTF/VRM examples | High | `examples/render-gltf.mjs` renders a local glTF/GLB asset fully in Node using the exported loader helpers. Remaining work is committed sample assets, VRM/VRMA-specific examples, and fixture-backed example tests. |
+| Add end-to-end glTF/VRM examples | High | `examples/render-gltf.mjs` renders a local glTF/GLB asset fully in Node using the exported loader helpers, and tests now render a committed minimal glTF fixture through `GLTFLoader`. Remaining work is committed glTF Sample Assets plus VRM/VRMA-specific examples and fixtures. |
 
 ## Acceptance Criteria For "Fully Supports Three.js Scenes"
 

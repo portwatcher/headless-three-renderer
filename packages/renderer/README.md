@@ -32,7 +32,7 @@ const imageBuffer = render(scene, camera, {
 fs.writeFileSync('render.png', imageBuffer)
 ```
 
-With `GLTFLoader`, render the loaded Three.js scene directly:
+With `GLTFLoader`, add the loaded root to a `THREE.Scene` before rendering:
 
 ```js
 import fs from 'node:fs'
@@ -41,12 +41,14 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { render } from '@headless-three/renderer'
 
 const gltf = await new GLTFLoader().loadAsync('./model.glb')
+const scene = new THREE.Scene()
+scene.add(gltf.scene)
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
 camera.position.set(2, 1.5, 4)
 camera.lookAt(0, 0, 0)
 
-const imageBuffer = render(gltf.scene, camera, {
+const imageBuffer = render(scene, camera, {
   width: 1024,
   height: 1024,
 })
@@ -218,13 +220,15 @@ mixer.update(1.5) // seek to 1.5 seconds
 
 // Update world matrices then render
 vrm.update(0)
-vrm.scene.updateMatrixWorld(true)
+const scene = new THREE.Scene()
+scene.add(vrm.scene)
+scene.updateMatrixWorld(true)
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20)
 camera.position.set(0, 1.2, 3)
 camera.lookAt(0, 1, 0)
 
-const imageBuffer = render(vrm.scene, camera, {
+const imageBuffer = render(scene, camera, {
   width: 1024,
   height: 1024,
 })
