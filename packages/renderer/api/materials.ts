@@ -126,6 +126,7 @@ function extractMaterialEnvironmentMap(
 ): { envMap: EnvironmentMapInfo; materials: WeakSet<ThreeMaterialLike>; rotation?: ThreeMaterialLike['envMapRotation'] } | null {
   let envTex: ThreeTextureLike | null = null
   let envRotation: ThreeMaterialLike['envMapRotation'] | undefined
+  let allowRefractionMapping = false
   const materials = new WeakSet<ThreeMaterialLike>()
 
   const visit = (object: ThreeObject3DLike): void => {
@@ -150,6 +151,9 @@ function extractMaterialEnvironmentMap(
         )
       }
       envTex = materialEnvMap
+      if (isRefractionEnvironmentMapping(materialEnvMap.mapping)) {
+        allowRefractionMapping = true
+      }
       materials.add(material)
     }
 
@@ -161,7 +165,7 @@ function extractMaterialEnvironmentMap(
   visit(scene as unknown as ThreeObject3DLike)
   if (!envTex) return null
 
-  const envMap = extractEnvironmentMapFromTexture(envTex, 'material.envMap', 1)
+  const envMap = extractEnvironmentMapFromTexture(envTex, 'material.envMap', 1, { allowRefraction: allowRefractionMapping })
   return envMap ? { envMap, materials, rotation: envRotation } : null
 }
 
@@ -181,7 +185,13 @@ function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): bool
 }
 
 function assertSupportedMaterialEnvironmentMap(material: ThreeMaterialLike): void {
-  assertSupportedEnvironmentTexture(material.envMap!, 'material.envMap')
+  const usesRefraction = isRefractionEnvironmentMapping(material.envMap!.mapping)
+  if (usesRefraction && material.isMeshBasicMaterial !== true) {
+    throw new Error(
+      'material.envMap refraction mappings are only supported for MeshBasicMaterial by @headless-three/renderer yet. Use a reflection mapping, remove material.envMap, or render this material separately.',
+    )
+  }
+  assertSupportedEnvironmentTexture(material.envMap!, 'material.envMap', { allowRefraction: usesRefraction })
   const combine = material.combine ?? MultiplyOperation
   if (![MultiplyOperation, MixOperation, AddOperation].includes(combine)) {
     throw new Error(
@@ -211,8 +221,9 @@ function extractEnvironmentMapFromTexture(
   envTex: ThreeTextureLike,
   label: string,
   intensity: number,
+  options: { allowRefraction?: boolean } = {},
 ): EnvironmentMapInfo | null {
-  assertSupportedEnvironmentTexture(envTex, label)
+  assertSupportedEnvironmentTexture(envTex, label, options)
   if (isCubeEnvironmentTexture(envTex)) {
     const cube = cubeTextureToEquirectangular(envTex, label)
     return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex) }
@@ -347,6 +358,10 @@ export function extractPbrProperties(
     props.environmentMapReflectivity = Number.isFinite(material.reflectivity)
       ? material.reflectivity!
       : 1
+    props.environmentMapRefraction = isRefractionEnvironmentMapping(material.envMap?.mapping)
+    props.environmentMapRefractionRatio = Number.isFinite(material.refractionRatio)
+      ? material.refractionRatio!
+      : 0.98
   } else if (context.materialEnvironmentSource === 'material') {
     props.useEnvironmentMap = false
   }
@@ -1115,7 +1130,7 @@ function isCubeBackgroundTexture(map: ThreeTextureLike): boolean {
 }
 
 function isCubeEnvironmentTexture(map: ThreeTextureLike): boolean {
-  return map.isCubeTexture === true || map.mapping === CubeReflectionMapping
+  return map.isCubeTexture === true || map.mapping === CubeReflectionMapping || map.mapping === CubeRefractionMapping
 }
 
 function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
@@ -1352,13 +1367,18 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
   }
 }
 
-function assertSupportedEnvironmentTexture(map: ThreeTextureLike, label: string): void {
+function isRefractionEnvironmentMapping(mapping: number | undefined): boolean {
+  return mapping === CubeRefractionMapping || mapping === EquirectangularRefractionMapping
+}
+
+function assertSupportedEnvironmentTexture(
+  map: ThreeTextureLike,
+  label: string,
+  options: { allowRefraction?: boolean } = {},
+): void {
   assertSupportedTextureInput(map, label)
-  if (
-    map.mapping === CubeRefractionMapping ||
-    map.mapping === EquirectangularRefractionMapping ||
-    map.mapping === CubeUVReflectionMapping
-  ) {
+  const usesRefraction = isRefractionEnvironmentMapping(map.mapping)
+  if ((usesRefraction && options.allowRefraction !== true) || map.mapping === CubeUVReflectionMapping) {
     throw new Error(
       `${label} uses refraction or PMREM/CubeUV environment mapping, which is not supported by @headless-three/renderer yet. Provide an equirectangular or six-face cube reflection texture and let the renderer precompute IBL, or pre-convert the source before rendering.`,
     )

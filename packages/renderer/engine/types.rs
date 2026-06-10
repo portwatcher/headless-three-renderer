@@ -739,6 +739,10 @@ pub struct SceneMesh {
     pub environment_map_combine: Option<u32>,
     /// Legacy material environment reflectivity multiplier.
     pub environment_map_reflectivity: Option<f64>,
+    /// Whether the material environment map uses refraction instead of reflection.
+    pub environment_map_refraction: Option<bool>,
+    /// Legacy material environment refraction ratio.
+    pub environment_map_refraction_ratio: Option<f64>,
     /// Primitive topology: `"triangles"` (default), `"lines"` (LineList), or `"points"`.
     pub topology: Option<String>,
     /// WGSL fragment shader body for the custom material path.

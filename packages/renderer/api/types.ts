@@ -847,6 +847,8 @@ export interface NativeSceneMesh {
   environmentMapIntensity?: number
   environmentMapCombine?: number
   environmentMapReflectivity?: number
+  environmentMapRefraction?: boolean
+  environmentMapRefractionRatio?: number
   topology?: string
   /** WGSL fragment body used by the custom material path. */
   customFragmentShader?: string
@@ -1015,6 +1017,8 @@ export interface PbrProperties {
   environmentMapIntensity?: number
   environmentMapCombine?: number
   environmentMapReflectivity?: number
+  environmentMapRefraction?: boolean
+  environmentMapRefractionRatio?: number
   specularColorMap?: Buffer
   specularColorMapWidth?: number
   specularColorMapHeight?: number

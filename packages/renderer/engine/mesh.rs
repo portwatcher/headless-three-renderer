@@ -113,6 +113,8 @@ pub struct PreparedMesh {
     pub environment_map_intensity: Option<f32>,
     pub environment_map_combine: u32,
     pub environment_map_reflectivity: f32,
+    pub environment_map_refraction: bool,
+    pub environment_map_refraction_ratio: f32,
     pub topology: Topology,
     pub custom_fragment_shader: Option<String>,
     pub texture_transform: [f32; 6],
@@ -1282,6 +1284,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         Some(value) => finite_f32(value, "mesh environmentMapReflectivity")?,
         None => 1.0,
     };
+    let environment_map_refraction = mesh.environment_map_refraction.unwrap_or(false);
+    let environment_map_refraction_ratio = match mesh.environment_map_refraction_ratio {
+        Some(value) => finite_f32(value, "mesh environmentMapRefractionRatio")?,
+        None => 0.98,
+    };
 
     Ok(PreparedMesh {
         vertices,
@@ -1359,6 +1366,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         environment_map_intensity,
         environment_map_combine,
         environment_map_reflectivity,
+        environment_map_refraction,
+        environment_map_refraction_ratio,
         topology,
         custom_fragment_shader: mesh
             .custom_fragment_shader

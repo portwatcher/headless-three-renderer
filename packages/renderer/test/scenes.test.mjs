@@ -1222,6 +1222,40 @@ test('MeshBasicMaterial material envMap uses legacy combine modes', () => {
   assert.ok(mixFull.g > mixFull.r + 40, `MixOperation should replace with green env reflection (${mixFull.r}, ${mixFull.g})`)
 })
 
+test('MeshBasicMaterial material envMap supports refraction mapping', () => {
+  function renderBasicEnvironmentMapping(mapping) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = splitEnvironmentTexture()
+    envMap.mapping = mapping
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+      refractionRatio: 0.5,
+      side: THREE.DoubleSide,
+    })
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
+    mesh.rotation.y = 0.5
+    scene.add(mesh)
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const reflected = renderBasicEnvironmentMapping(THREE.EquirectangularReflectionMapping)
+  const refracted = renderBasicEnvironmentMapping(THREE.EquirectangularRefractionMapping)
+  assert.ok(reflected.g > reflected.r + 15, `reflection should sample the green environment half (${reflected.r}, ${reflected.g})`)
+  assert.ok(refracted.r > refracted.g + 15, `refraction should sample the red environment half (${refracted.r}, ${refracted.g})`)
+})
+
 test('scene environment does not affect MeshBasicMaterial without material envMap', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -1313,6 +1347,9 @@ test('unsupported material envMap inputs fail clearly', () => {
   const envMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
   })
+  const refractionEnvMap = Object.assign(solidTexture(255, 255, 255), {
+    mapping: THREE.EquirectangularRefractionMapping,
+  })
 
   const unsupportedMaterial = new THREE.MeshMatcapMaterial({ color: 0xffffff })
   unsupportedMaterial.envMap = envMap
@@ -1325,6 +1362,21 @@ test('unsupported material envMap inputs fail clearly', () => {
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
       /material\.envMap.*only supported/i,
       'MeshMatcapMaterial envMap',
+    )
+  }
+
+  {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshPhongMaterial({ color: 0xffffff, envMap: refractionEnvMap }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /refraction mappings are only supported for MeshBasicMaterial/i,
+      'MeshPhongMaterial refraction envMap',
     )
   }
 
