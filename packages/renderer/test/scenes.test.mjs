@@ -1635,6 +1635,46 @@ test('CustomBlending honors custom factors and equation', () => {
   assert.ok(mean.b > 180, `ReverseSubtractEquation should preserve the blue destination channel (${mean.b})`)
 })
 
+test('CustomBlending honors constant color and alpha factors', () => {
+  function renderConstantBlend(blendSrc, blendColor, blendAlpha) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        blending: THREE.CustomBlending,
+        blendEquation: THREE.AddEquation,
+        blendSrc,
+        blendDst: THREE.ZeroFactor,
+        blendEquationAlpha: THREE.AddEquation,
+        blendSrcAlpha: THREE.OneFactor,
+        blendDstAlpha: THREE.ZeroFactor,
+        blendColor,
+        blendAlpha,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const colorConstant = renderConstantBlend(THREE.ConstantColorFactor, new THREE.Color(0, 1, 0), 0.2)
+  assert.ok(colorConstant.g > colorConstant.r + 40, `ConstantColorFactor should use blendColor green over red (${colorConstant.g} vs ${colorConstant.r})`)
+  assert.ok(colorConstant.g > colorConstant.b + 40, `ConstantColorFactor should use blendColor green over blue (${colorConstant.g} vs ${colorConstant.b})`)
+
+  const alphaConstant = renderConstantBlend(THREE.ConstantAlphaFactor, new THREE.Color(0, 0, 1), 0.35)
+  assert.ok(
+    Math.abs(alphaConstant.r - alphaConstant.g) < 12 && Math.abs(alphaConstant.g - alphaConstant.b) < 12,
+    `ConstantAlphaFactor should use blendAlpha as the RGB constant (${alphaConstant.r}, ${alphaConstant.g}, ${alphaConstant.b})`,
+  )
+  assert.ok(alphaConstant.r > 20, `ConstantAlphaFactor should keep visible source contribution (${alphaConstant.r})`)
+})
+
 test('InstancedMesh expands instance matrices and colors', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
