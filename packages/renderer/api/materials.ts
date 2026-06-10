@@ -779,6 +779,11 @@ function assertSupportedMaterialState(material: ThreeMaterialLike): void {
       'material.clipShadows is not supported by @headless-three/renderer yet. Shadow-pass clipping is not translated; disable clipShadows or pre-bake the clipped shadow caster before rendering.',
     )
   }
+  if (material.envMap != null) {
+    throw new Error(
+      'material.envMap reflection/refraction maps are not supported by @headless-three/renderer yet. Use scene.environment or scene-level reflection probes for supported IBL, or bake the material reflection before rendering.',
+    )
+  }
   if (
     (Number.isFinite(material.iridescence) && material.iridescence! > 0) ||
     material.iridescenceMap != null ||

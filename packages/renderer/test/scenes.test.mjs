@@ -734,6 +734,28 @@ test('MeshPhongMaterial specularMap honors nearest texture filters', () => {
   assert.ok(linear.r > nearest.r + 25, `LinearFilter should blend in the enabled specular texel (${linear.r} vs ${nearest.r})`)
 })
 
+test('material envMap reflection inputs fail clearly', () => {
+  const envMap = Object.assign(solidTexture(255, 255, 255), {
+    mapping: THREE.EquirectangularReflectionMapping,
+  })
+  const cases = [
+    new THREE.MeshPhongMaterial({ color: 0xffffff, envMap }),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, envMap }),
+  ]
+
+  for (const material of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), material))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /material\.envMap.*not supported/i,
+      material.type,
+    )
+  }
+})
+
 test('MeshToonMaterial renders broad toon diffuse bands', () => {
   function renderMaterial(material) {
     const scene = new THREE.Scene()

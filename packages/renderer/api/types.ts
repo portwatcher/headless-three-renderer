@@ -127,6 +127,10 @@ export interface ThreeMaterialLike {
   blendAlpha?: number
   premultipliedAlpha?: boolean
   map?: ThreeTextureLike | null
+  envMap?: ThreeTextureLike | null
+  combine?: number
+  reflectivity?: number
+  refractionRatio?: number
   metalness?: number
   roughness?: number
   clearcoat?: number

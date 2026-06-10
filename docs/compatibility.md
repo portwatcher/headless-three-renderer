@@ -57,7 +57,7 @@ Status keys:
 |---|---|---|
 | `MeshBasicMaterial` | Supported | Unlit path. |
 | `MeshLambertMaterial` | Supported | Diffuse-only lighting path. |
-| `MeshPhongMaterial` | Partial | Blinn-Phong direct lighting with `specular`, `shininess`, and `specularMap` strength is supported. Environment/reflection-map parity, combine modes, and exact transform/color-space edge cases remain planned. |
+| `MeshPhongMaterial` | Partial | Blinn-Phong direct lighting with `specular`, `shininess`, and `specularMap` strength is supported. Material-level `envMap` fails clearly; use scene-level environment/reflection probes for supported IBL. Combine modes and exact transform/color-space edge cases remain planned. |
 | `MeshStandardMaterial` | Supported | PBR metallic/roughness path. |
 | `MeshPhysicalMaterial` | Partial | Clearcoat, sheen, anisotropy, specular intensity/color, transmission, IOR, thickness, attenuation, and related maps are supported. Iridescence and dispersion fail clearly; transmission roughness behavior and several edge cases remain planned. |
 | `MeshNormalMaterial` | Supported | View-space normal color output is supported, including `flatShading`, tangent-space normal maps, and bump maps. CPU-baked displacement affects triangle geometry. |
@@ -89,7 +89,7 @@ Status keys:
 | Texture color-space parity | Partial | Base color, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`; base color maps honor `flipY`; material and 2D texture background output conversion supports `THREE.SRGBColorSpace`/`THREE.LinearSRGBColorSpace`; and standard material shaders honor `premultipliedAlpha`. Remaining slot parity and exact WebGLRenderer color-management state parity remain planned. |
 | Texture sampler settings | Partial | Base color/matcap, background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, and packed physical-extension texture groups honor wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`. Generated mip chains, anisotropy, and conflicting per-channel sampler settings inside the same packed physical texture remain planned. |
 | Additional texture slots | Partial | Unsupported iridescence-related physical map slots fail clearly. Adding those slots remains planned. |
-| Additional material classes | Partial | Remaining class work is mostly deeper parity for supported classes plus unsupported/custom material strategies documented above. `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and built-in material `onBeforeCompile` customizations fail clearly unless a headless WGSL fragment override is provided. |
+| Additional material classes | Partial | Remaining class work is mostly deeper parity for supported classes plus unsupported/custom material strategies documented above. Material-level `envMap`, `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and built-in material `onBeforeCompile` customizations fail clearly unless a documented alternative path is used. |
 | Compressed textures | Unsupported | KTX2/Basis/`THREE.CompressedTexture` inputs fail with a clear pre-decode error. Decode to RGBA `DataTexture` data or an encoded PNG/JPEG/WebP image before rendering. |
 
 ## Lighting, Shadows, And IBL
