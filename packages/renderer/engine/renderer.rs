@@ -3482,6 +3482,7 @@ fn map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 12] {
     rows[4][3] = if mesh.emissive_map_is_srgb { 1.0 } else { 0.0 };
     rows[5][3] = if mesh.emissive_map_uses_uv2 { 1.0 } else { 0.0 };
     rows[8][3] = if mesh.light_map_is_srgb { 1.0 } else { 0.0 };
+    rows[11][3] = if mesh.specular_map_uses_uv2 { 1.0 } else { 0.0 };
     rows
 }
 

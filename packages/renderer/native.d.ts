@@ -251,6 +251,8 @@ export interface SceneMesh {
   specularMapAnisotropy?: number
   /** Specular map UV transform `[a, c, tx, b, d, ty]`. */
   specularMapTransform?: Array<number>
+  /** Whether specular map sampling uses the secondary UV stream. */
+  specularMapUsesUv2?: boolean
   /** Metallic factor (0..1). Defaults to 0. */
   metallic?: number
   /** Roughness factor (0..1). Defaults to 1. */

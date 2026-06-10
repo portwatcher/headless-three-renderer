@@ -227,6 +227,8 @@ pub struct SceneMesh {
     pub specular_map_anisotropy: Option<f64>,
     /// Specular map UV transform `[a, c, tx, b, d, ty]`.
     pub specular_map_transform: Option<Vec<f64>>,
+    /// Whether specular map sampling uses the secondary UV stream.
+    pub specular_map_uses_uv2: Option<bool>,
     /// Metallic factor (0..1). Defaults to 0.
     pub metallic: Option<f64>,
     /// Roughness factor (0..1). Defaults to 1.

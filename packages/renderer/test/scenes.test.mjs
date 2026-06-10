@@ -822,6 +822,50 @@ test('MeshPhongMaterial specularMap samples the selected secondary UV channel', 
   assert.ok(mean.r > 35, `specularMap.channel should sample uv1's enabled texel (${mean.r})`)
 })
 
+test('MeshPhongMaterial specularMap keeps primary UVs when another map uses a secondary channel', () => {
+  const specularMap = rgbaTexture([
+    0, 0, 0, 255,
+    255, 0, 0, 255,
+  ], 2, 1)
+  specularMap.magFilter = THREE.NearestFilter
+  specularMap.minFilter = THREE.NearestFilter
+
+  const normalMap = rgbaTexture([
+    128, 128, 255, 255,
+    128, 128, 255, 255,
+  ], 2, 1)
+  normalMap.channel = 1
+  normalMap.magFilter = THREE.NearestFilter
+  normalMap.minFilter = THREE.NearestFilter
+
+  const geometry = constantUvPlane(0.75, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 4,
+      normalMap,
+      specularMap,
+    }),
+  ))
+
+  const light = new THREE.DirectionalLight(0xffffff, 8)
+  light.position.set(0, 0, 3)
+  scene.add(light)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > 35, `specularMap channel 0 should stay on primary UVs (${mean.r})`)
+})
+
 test('MeshPhongMaterial specularMap applies texture UV transforms', () => {
   const specularMap = rgbaTexture([
     0, 0, 0, 255,

@@ -552,8 +552,9 @@ fn transform_light_map_uv(uv: vec2<f32>) -> vec2<f32> {
   return transform_slot_uv(uv, 8u);
 }
 
-fn transform_specular_map_uv(uv: vec2<f32>) -> vec2<f32> {
-  return transform_slot_uv(uv, 10u);
+fn transform_specular_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let specular_uv = select(uv, uv2, uniforms.map_transform_rows[11u].w > 0.5);
+  return transform_slot_uv(specular_uv, 10u);
 }
 
 fn transform_physical_slot_uv(uv: vec2<f32>, row_index: u32) -> vec2<f32> {
@@ -979,7 +980,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let phong_shininess = max(uniforms.physical_params2.w, 0.0001);
   var phong_specular_strength = 1.0;
   if use_phong && uniforms.physical_params4.w > 0.5 {
-    phong_specular_strength = textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv2), 0).r;
+    phong_specular_strength = textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv, uv2), 0).r;
   }
 
   var lo = vec3<f32>(0.0);

@@ -504,6 +504,7 @@ export function extractPbrProperties(material: ThreeMaterialLike | undefined): P
     props.specularMapMinFilter = filterModeToString(material.specularMap?.minFilter)
     props.specularMapAnisotropy = textureAnisotropy(material.specularMap)
     props.specularMapTransform = textureTransform(material.specularMap)
+    props.specularMapUsesUv2 = textureUvChannel(material.specularMap) > 0
   }
 
   const emissiveMapInfo = extractTextureFromSlot(material.emissiveMap)
