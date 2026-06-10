@@ -114,7 +114,7 @@ The public API accepts only Three.js-like objects:
 - material base color and opacity
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
 - base, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
-- material and 2D texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`
+- material and 2D texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; 2D texture backgrounds decode `THREE.SRGBColorSpace`
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and environment-backed or scene-color transmission / refraction

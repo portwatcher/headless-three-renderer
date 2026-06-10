@@ -4740,6 +4740,25 @@ test('background textures apply UV transforms', () => {
   assert.ok(mean.g > mean.r + 40, `background texture offset should shift the sampled texel from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('background textures decode sRGB colorSpace before output conversion', () => {
+  function renderColorSpace(colorSpace) {
+    const background = solidTexture(128, 128, 128)
+    background.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = background
+    return meanRgba(renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 50, `linear background texture should remain brighter than decoded sRGB (${linear.r} vs ${srgb.r})`)
+})
+
 test('cube and equirect background texture mappings fail clearly', () => {
   const camera = makeCamera()
   const cases = [
