@@ -4852,6 +4852,63 @@ test('physical transmission samples the already-rendered scene color', () => {
   assert.ok(mean.r > mean.g + 30, `transmission should reveal red scene color (${mean.r} vs ${mean.g})`)
 })
 
+test('physical transmission roughness softens scene-color refraction', () => {
+  const width = 64
+  const height = 64
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function makeScene(roughness) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const left = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    left.position.set(-0.8, 0, -0.1)
+    scene.add(left)
+
+    const right = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    right.position.set(0.8, 0, -0.1)
+    scene.add(right)
+
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(3, 3),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness,
+        transmission: 1,
+        thickness: 0,
+        ior: 1.5,
+      }),
+    ))
+    return scene
+  }
+
+  function centerEdgeContrast(rgba) {
+    const left = meanRegion(rgba, width, height, 25, 20, 31, 44)
+    const right = meanRegion(rgba, width, height, 33, 20, 39, 44)
+    return Math.abs((left.r - left.b) - (right.r - right.b))
+  }
+
+  const smooth = renderRgba(makeScene(0.02), camera, { width, height })
+  const rough = renderRgba(makeScene(0.95), camera, { width, height })
+  const smoothContrast = centerEdgeContrast(smooth)
+  const roughContrast = centerEdgeContrast(rough)
+
+  assert.ok(smoothContrast > 80, `smooth transmission should preserve the sharp red/blue edge (${smoothContrast.toFixed(1)})`)
+  assert.ok(
+    roughContrast < smoothContrast - 20,
+    `rough transmission should reduce scene-color edge contrast (${roughContrast.toFixed(1)} vs ${smoothContrast.toFixed(1)})`,
+  )
+})
+
 test('directional cascaded shadow hints render successfully', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.05, 0.05, 0.05)

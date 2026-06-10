@@ -479,6 +479,36 @@ fn volume_attenuation(distance: f32, attenuation_color: vec3<f32>, attenuation_d
   return exp(-coefficient * distance);
 }
 
+fn apply_ior_to_roughness(roughness: f32, ior: f32) -> f32 {
+  return roughness * clamp(ior * 2.0 - 2.0, 0.0, 1.0);
+}
+
+fn sample_transmission_scene_color(scene_uv: vec2<f32>, roughness: f32, ior: f32) -> vec3<f32> {
+  let clamped_uv = clamp(scene_uv, vec2<f32>(0.0), vec2<f32>(1.0));
+  let base = textureSample(t_scene_color, s_scene_color, clamped_uv).rgb;
+  let transmission_roughness = apply_ior_to_roughness(roughness, ior);
+  if transmission_roughness < 0.05 {
+    return base;
+  }
+
+  let dimensions = vec2<f32>(textureDimensions(t_scene_color, 0));
+  let texel_size = 1.0 / max(dimensions, vec2<f32>(1.0));
+  let lod_radius = exp2(log2(max(max(dimensions.x, dimensions.y), 2.0)) * transmission_roughness);
+  let radius = max(1.0, lod_radius * 0.35);
+  let offset = texel_size * radius;
+
+  var color = base * 0.28;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + vec2<f32>( offset.x, 0.0), vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.12;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + vec2<f32>(-offset.x, 0.0), vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.12;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + vec2<f32>(0.0,  offset.y), vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.12;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + vec2<f32>(0.0, -offset.y), vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.12;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + offset, vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.06;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv - offset, vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.06;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + vec2<f32>( offset.x, -offset.y), vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.06;
+  color += textureSample(t_scene_color, s_scene_color, clamp(clamped_uv + vec2<f32>(-offset.x,  offset.y), vec2<f32>(0.0), vec2<f32>(1.0))).rgb * 0.06;
+  return color;
+}
+
 // Three.js-compatible distance attenuation
 fn get_distance_attenuation(light_distance: f32, cutoff_distance: f32, decay_exponent: f32) -> f32 {
   var falloff = 1.0 / max(pow(light_distance, decay_exponent), 0.01);
@@ -1197,7 +1227,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     let transmittance = volume_attenuation(thickness, uniforms.attenuation_color.rgb, attenuation_distance);
     let scene_offset = refracted_dir.xy * thickness * 0.04;
     let scene_uv = clamp(screen_uv + scene_offset, vec2<f32>(0.0), vec2<f32>(1.0));
-    var transmitted_light = textureSample(t_scene_color, s_scene_color, scene_uv).rgb * transmittance;
+    var transmitted_light = sample_transmission_scene_color(scene_uv, roughness, ior) * transmittance;
     if has_ibl {
       let max_lod = 4.0;
       let environment_refraction = textureSampleLevel(t_prefilter, s_ibl, refracted_dir, roughness * max_lod).rgb * transmittance;
