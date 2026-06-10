@@ -224,6 +224,10 @@ function nonBackgroundBounds(rgba, width, height, bg, tolerance = 2) {
     }
   }
   return {
+    minX: maxX >= minX ? minX : 0,
+    minY: maxY >= minY ? minY : 0,
+    maxX,
+    maxY,
     width: maxX >= minX ? maxX - minX + 1 : 0,
     height: maxY >= minY ? maxY - minY + 1 : 0,
   }
@@ -1699,6 +1703,66 @@ test('SpriteMaterial honors sprite scale and material rotation', () => {
   const vertical = nonBackgroundBounds(renderRotatedSprite(Math.PI / 2), 96, 96, [0, 0, 0])
   assert.ok(horizontal.width > horizontal.height * 2, `unrotated sprite should be wide (${horizontal.width}x${horizontal.height})`)
   assert.ok(vertical.height > vertical.width * 2, `rotated sprite should be tall (${vertical.width}x${vertical.height})`)
+})
+
+test('SpriteMaterial sizeAttenuation=false keeps perspective sprite size depth independent', () => {
+  function renderSprite(z, sizeAttenuation) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.SpriteMaterial({ color: 0xffffff, sizeAttenuation })
+    const sprite = new THREE.Sprite(material)
+    sprite.position.z = z
+    sprite.scale.set(0.2, 0.2, 1)
+    scene.add(sprite)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return nonBackgroundBounds(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, [0, 0, 0])
+  }
+
+  const nearAttenuated = renderSprite(0, true)
+  const farAttenuated = renderSprite(-3, true)
+  const nearFixed = renderSprite(0, false)
+  const farFixed = renderSprite(-3, false)
+
+  assert.ok(
+    nearAttenuated.width >= farAttenuated.width * 1.7,
+    `default perspective sprite should shrink with distance (${nearAttenuated.width} vs ${farAttenuated.width})`,
+  )
+  assert.ok(
+    Math.abs(nearFixed.width - farFixed.width) <= 2,
+    `sizeAttenuation=false sprite should keep width stable with distance (${nearFixed.width} vs ${farFixed.width})`,
+  )
+  assert.ok(
+    Math.abs(nearFixed.height - farFixed.height) <= 2,
+    `sizeAttenuation=false sprite should keep height stable with distance (${nearFixed.height} vs ${farFixed.height})`,
+  )
+})
+
+test('Sprite center shifts billboard anchoring around object position', () => {
+  function renderCenteredSprite(centerX, centerY) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+    sprite.center.set(centerX, centerY)
+    sprite.scale.set(0.8, 0.8, 1)
+    scene.add(sprite)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return nonBackgroundBounds(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, [0, 0, 0])
+  }
+
+  const centered = renderCenteredSprite(0.5, 0.5)
+  const lowerLeft = renderCenteredSprite(0, 0)
+  const upperRight = renderCenteredSprite(1, 1)
+
+  assert.ok(lowerLeft.minX > centered.minX + 10, `center=(0,0) should anchor the sprite to the right of its origin (${lowerLeft.minX} vs ${centered.minX})`)
+  assert.ok(lowerLeft.maxY < centered.maxY - 10, `center=(0,0) should anchor the sprite above its origin (${lowerLeft.maxY} vs ${centered.maxY})`)
+  assert.ok(upperRight.maxX < centered.maxX - 10, `center=(1,1) should anchor the sprite to the left of its origin (${upperRight.maxX} vs ${centered.maxX})`)
+  assert.ok(upperRight.minY > centered.minY + 10, `center=(1,1) should anchor the sprite below its origin (${upperRight.minY} vs ${centered.minY})`)
 })
 
 test('Sprite shadow flags fail clearly', () => {

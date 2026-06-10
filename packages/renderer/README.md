@@ -101,6 +101,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
 - `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
+- `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, and main-pass clipping
 - geometry groups with material arrays
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection
