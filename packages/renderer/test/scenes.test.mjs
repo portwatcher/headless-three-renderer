@@ -1188,6 +1188,77 @@ test('MeshPhongMaterial material envMap feeds specular reflection', () => {
   assert.ok(reflected > disabled + 40, `material envMap should add Phong reflection (${reflected} vs ${disabled})`)
 })
 
+test('MeshPhongMaterial material envMap honors legacy combine and reflectivity', () => {
+  function renderPhongMaterialEnvironment(combine, reflectivity = 1) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = solidTexture(0, 255, 0)
+    envMap.mapping = THREE.EquirectangularReflectionMapping
+    const material = new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 120,
+      envMap,
+      combine,
+      reflectivity,
+    })
+    material.envMapIntensity = 0.5
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const disabled = renderPhongMaterialEnvironment(THREE.MultiplyOperation, 0)
+  const multiply = renderPhongMaterialEnvironment(THREE.MultiplyOperation)
+  const add = renderPhongMaterialEnvironment(THREE.AddOperation)
+
+  assert.ok(multiply.g > disabled.g + 10, `reflectivity should scale Phong env reflection (${multiply.g} vs ${disabled.g})`)
+  assert.ok(add.g > multiply.g + 10, `AddOperation should add extra Phong env reflection (${add.g} vs ${multiply.g})`)
+})
+
+test('MeshLambertMaterial material envMap honors legacy mix reflectivity', () => {
+  function renderLambertMaterialEnvironment(reflectivity) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = solidTexture(0, 255, 0)
+    envMap.mapping = THREE.EquirectangularReflectionMapping
+    const material = new THREE.MeshLambertMaterial({
+      color: 0xff0000,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity,
+    })
+    material.envMapIntensity = 0.5
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const light = new THREE.DirectionalLight(0xffffff, 4)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const disabled = renderLambertMaterialEnvironment(0)
+  const mixed = renderLambertMaterialEnvironment(1)
+
+  assert.ok(disabled.r > disabled.g + 20, `reflectivity 0 should preserve direct Lambert color (${disabled.r}, ${disabled.g})`)
+  assert.ok(mixed.g > mixed.r + 20, `MixOperation should replace Lambert output with green env reflection (${mixed.r}, ${mixed.g})`)
+})
+
 test('MeshBasicMaterial material envMap uses legacy combine modes', () => {
   function renderBasicMaterialEnvironment(combine, reflectivity = 1) {
     const scene = new THREE.Scene()

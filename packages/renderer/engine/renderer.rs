@@ -42,7 +42,7 @@ pub struct Uniforms {
     pub normal_map_params: [f32; 4],
     /// x = env_intensity, y = shading_model, z = camera near, w = camera far
     pub ibl_params: [f32; 4],
-    /// x = legacy env combine, y = reflectivity, z = basic env mode (0=off, 1=reflect, 2=refract), w = refraction ratio
+    /// x = legacy env combine, y = reflectivity, z = material env mode (0=off, 1=reflect, 2=refract), w = refraction ratio
     pub env_map_params: [f32; 4],
     /// x = ao_map_intensity, y = has_ao_map, z = has_alpha_map, w = has_light_map
     pub ao_params: [f32; 4],
@@ -2301,8 +2301,11 @@ impl GpuRenderer {
             env_map_params: [
                 mesh.environment_map_combine as f32,
                 mesh.environment_map_reflectivity,
-                if mesh.shading_model == ShadingModel::Basic
-                    && mesh.use_environment_map == Some(true)
+                if mesh.use_environment_map == Some(true)
+                    && matches!(
+                        mesh.shading_model,
+                        ShadingModel::Basic | ShadingModel::Lambert | ShadingModel::Phong
+                    )
                 {
                     if mesh.environment_map_refraction {
                         2.0

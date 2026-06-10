@@ -198,23 +198,6 @@ function assertSupportedMaterialEnvironmentMap(material: ThreeMaterialLike): voi
       'material.envMap combine must be MultiplyOperation, MixOperation, or AddOperation for @headless-three/renderer.',
     )
   }
-  if (
-    (material.isMeshPhongMaterial === true || material.isMeshLambertMaterial === true)
-    && combine !== MultiplyOperation
-  ) {
-    throw new Error(
-      'MeshPhongMaterial and MeshLambertMaterial material.envMap combine modes other than MultiplyOperation are not supported by @headless-three/renderer yet.',
-    )
-  }
-  if (
-    (material.isMeshPhongMaterial === true || material.isMeshLambertMaterial === true)
-    && Number.isFinite(material.reflectivity)
-    && Math.abs(material.reflectivity! - 1) > 1e-6
-  ) {
-    throw new Error(
-      'MeshPhongMaterial and MeshLambertMaterial material.envMap reflectivity values other than 1 are not supported by @headless-three/renderer yet.',
-    )
-  }
 }
 
 function extractEnvironmentMapFromTexture(

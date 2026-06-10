@@ -38,7 +38,7 @@ struct Uniforms {
   normal_map_params: vec4<f32>,
   // x = env_intensity, y = shading_model (0=standard PBR, 1=basic/unlit, 2=lambert, 3=normal, 4=matcap, 5=phong, 6=depth, 7=toon, 8=distance, 9=shadow), z = camera near, w = camera far
   ibl_params: vec4<f32>,
-  // x = legacy env combine (0=multiply, 1=mix, 2=add), y = reflectivity, z = basic env mode (0=off, 1=reflect, 2=refract), w = refraction ratio
+  // x = legacy env combine (0=multiply, 1=mix, 2=add), y = reflectivity, z = material env mode (0=off, 1=reflect, 2=refract), w = refraction ratio
   env_map_params: vec4<f32>,
   // x = ao_map_intensity, y = has_ao_map, z = has_alpha_map, w = has_light_map
   ao_params: vec4<f32>,
@@ -967,6 +967,9 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let use_phong = shading_model == 5u;
   let use_toon = shading_model == 7u;
   let use_shadow_material = shading_model == 9u;
+  let use_lambert = !use_specular && !use_phong && !use_toon && !use_shadow_material;
+  let legacy_material_env = uniforms.env_map_params.z > 0.5 && (use_phong || use_lambert);
+  let legacy_env_reflectivity = select(1.0, uniforms.env_map_params.y, legacy_material_env);
 
   let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, transform_metallic_roughness_map_uv(uv, uv2));
   let metallic = uniforms.metallic * mr_sample.b;
@@ -1233,11 +1236,11 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
         let phong_roughness = clamp(sqrt(2.0 / (phong_shininess + 2.0)), 0.0, 1.0);
         let reflected = textureSampleLevel(t_prefilter, s_ibl, R, phong_roughness * max_lod).rgb;
         let diffuse_ibl = irradiance * albedo * ao;
-        let specular_ibl = reflected * phong_specular_color * phong_specular_strength;
+        let specular_ibl = reflected * phong_specular_color * phong_specular_strength * legacy_env_reflectivity;
         lo = lo + (diffuse_ibl + specular_ibl) * env_intensity;
       } else {
         // Lambert: diffuse IBL only
-        lo = lo + irradiance * albedo * env_intensity * ao;
+        lo = lo + irradiance * albedo * env_intensity * ao * legacy_env_reflectivity;
       }
     } else {
       // Ambient (non-IBL fallback when lights are present)
@@ -1267,6 +1270,21 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   // Emissive
   let emissive_sample = decode_emissive_map_sample(textureSample(t_emissive, s_emissive, transform_emissive_map_uv(uv, uv2))).rgb;
   lo = lo + uniforms.emissive.rgb * emissive_sample;
+
+  if legacy_material_env {
+    let combine = u32(uniforms.env_map_params.x + 0.5);
+    if combine != 0u || abs(legacy_env_reflectivity - 1.0) > 0.0001 {
+      let legacy_env_color = textureSampleLevel(t_prefilter, s_ibl, reflect(-V, N), 0.0).rgb * uniforms.ibl_params.x;
+      let legacy_strength = legacy_env_reflectivity * select(1.0, phong_specular_strength, use_phong);
+      if combine == 2u {
+        lo = lo + legacy_env_color * legacy_strength;
+      } else if combine == 1u {
+        lo = mix(lo, legacy_env_color, legacy_strength);
+      } else {
+        lo = mix(lo, lo * legacy_env_color, legacy_strength);
+      }
+    }
+  }
 
   // Tone mapping (ACES Filmic, matches three.js) and output color conversion.
   let mapped = aces_filmic_tone_mapping(lo);
