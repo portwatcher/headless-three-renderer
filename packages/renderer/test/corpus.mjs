@@ -6,6 +6,7 @@ export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
     skinnedMorphCorpus(),
+    avatarLikeCorpus(),
     physicalIblShadowCorpus(),
     instancedLinesPointsCorpus(),
     lodAndGroupsCorpus(),
@@ -43,6 +44,17 @@ function environmentTexture() {
     16, 24, 40, 255,
   ])
   const texture = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+  texture.needsUpdate = true
+  return texture
+}
+
+function gradientTexture() {
+  const texture = new THREE.DataTexture(new Uint8Array([
+    88, 88, 120, 255,
+    255, 226, 178, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
   texture.needsUpdate = true
   return texture
 }
@@ -116,6 +128,116 @@ function skinnedMorphCorpus() {
     camera: makeCamera([0.2, 0.1, 2.5]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [13, 15, 20],
+  }
+}
+
+function avatarLikeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.06, 0.07, 0.1)
+  scene.environment = environmentTexture()
+  scene.environmentIntensity = 0.8
+  scene.fog = new THREE.Fog(0x111827, 3.5, 7)
+  scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x443322, 0.6))
+
+  const key = new THREE.DirectionalLight(0xffffff, 1.1)
+  key.position.set(2.5, 3.5, 2)
+  key.target.position.set(0, 0.45, 0)
+  scene.add(key, key.target)
+
+  const bodyGeometry = new THREE.BoxGeometry(0.58, 1.24, 0.28, 1, 2, 1)
+  const position = bodyGeometry.getAttribute('position')
+  const vertexCount = position.count
+  const skinIndex = new Uint16Array(vertexCount * 4)
+  const skinWeight = new Float32Array(vertexCount * 4)
+  const morph = new Float32Array(vertexCount * 3)
+  for (let i = 0; i < vertexCount; i += 1) {
+    const y = position.getY(i)
+    const topWeight = Math.max(0, Math.min(1, (y + 0.15) / 0.9))
+    skinIndex[i * 4] = 0
+    skinIndex[i * 4 + 1] = 1
+    skinWeight[i * 4] = 1 - topWeight
+    skinWeight[i * 4 + 1] = topWeight
+    if (y > 0.15) {
+      morph[i * 3] = position.getX(i) * 0.08
+      morph[i * 3 + 1] = 0.04
+    }
+  }
+  bodyGeometry.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4))
+  bodyGeometry.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4))
+  bodyGeometry.morphTargetsRelative = true
+  bodyGeometry.morphAttributes.position = [new THREE.BufferAttribute(morph, 3)]
+
+  const body = new THREE.SkinnedMesh(bodyGeometry, new THREE.MeshToonMaterial({
+    color: 0x8fc7ff,
+    gradientMap: gradientTexture(),
+  }))
+  const hips = new THREE.Bone()
+  hips.name = 'hips'
+  hips.position.y = -0.55
+  const chest = new THREE.Bone()
+  chest.name = 'chest'
+  chest.position.y = 0.85
+  chest.rotation.z = -0.12
+  hips.add(chest)
+  body.add(hips)
+  body.bind(new THREE.Skeleton([hips, chest]))
+  body.morphTargetInfluences = [0.55]
+  body.rotation.y = -0.25
+  scene.add(body)
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.34, 20, 12),
+    new THREE.MeshPhongMaterial({
+      color: 0xffd8b8,
+      specular: 0x222222,
+      shininess: 24,
+    }),
+  )
+  head.position.set(0, 0.88, 0.02)
+  head.rotation.y = -0.25
+  scene.add(head)
+
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.38, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.62),
+    new THREE.MeshBasicMaterial({
+      color: 0x2f2448,
+      transparent: true,
+      opacity: 0.78,
+      side: THREE.DoubleSide,
+      alphaHash: true,
+    }),
+  )
+  hair.position.set(0, 0.98, -0.02)
+  hair.rotation.y = -0.25
+  scene.add(hair)
+
+  const eyeGeometry = new THREE.BufferGeometry()
+  eyeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.12, 0.92, 0.34,
+    0.12, 0.92, 0.34,
+  ]), 3))
+  scene.add(new THREE.Points(eyeGeometry, new THREE.PointsMaterial({
+    color: 0x102033,
+    size: 5,
+    sizeAttenuation: false,
+  })))
+
+  const outline = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(0.66, 1.32, 0.34)),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 }),
+  )
+  outline.position.y = 0.02
+  outline.rotation.y = -0.25
+  scene.add(outline)
+
+  return {
+    name: 'avatar-like-skinned-toon',
+    scene,
+    camera: makeCamera([0.95, 0.75, 3.2], [0, 0.25, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [15, 18, 26],
+    backgroundTolerance: 8,
+    minNonBackgroundRatio: 0.035,
   }
 }
 

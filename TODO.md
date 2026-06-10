@@ -53,7 +53,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Add golden-image parity tests | High | Use browser Three.js/WebGLRenderer only as an offline/reference test generator. Production runtime remains Node + `wgpu`. |
-| Build a curated scene corpus | High | Initial generated invariant corpus covers transparent materials, skinning, morphs, IBL, shadows, points/lines, LOD/groups, and pathological geometry in CI; committed glTF fixtures cover `GLTFLoader` geometry/material loading plus encoded data-URI texture loading in CI. Remaining work is committed glTF Sample Assets, VRM/VRMA fixtures, and browser-generated references. |
+| Build a curated scene corpus | High | Initial generated invariant corpus covers transparent materials, skinning, morphs, avatar-style toon/skinned combinations, IBL, shadows, points/lines, LOD/groups, and pathological geometry in CI; committed glTF fixtures cover `GLTFLoader` geometry/material loading plus encoded data-URI texture loading in CI. Remaining work is committed glTF Sample Assets, external VRM/VRMA fixtures, and browser-generated references. |
 
 ## P1 - Scene Graph And Object Coverage
 
@@ -120,7 +120,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 |---|---:|---|
 | Document Node loader setup | High | Node `GLTFLoader` setup is documented for local files, `FileLoader`/`fetch`, encoded image buffers, PNG/JPEG/WebP data URI and Blob URL images, GLB bufferView image handling, path resolution, and optional image polyfills. Remaining work is keeping examples synced with future helper APIs. |
 | Provide asset loading helpers | Medium | `createEncodedImageTextureLoader`, `EncodedImageTextureLoader`, `installLocalFileFetch`, and `resolveLocalAssetPath` help Node loaders expose renderer-supported encoded texture buffers from local files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs used by GLB bufferView images. Remaining work is broader helper coverage for KTX2/Basis pre-decode and higher-level glTF/VRM loading. |
-| Add end-to-end glTF/VRM examples | High | `examples/render-gltf.mjs` renders a local glTF/GLB asset fully in Node using the exported loader helpers, and tests now render committed geometry/material and encoded-texture glTF fixtures through `GLTFLoader`. Remaining work is committed glTF Sample Assets plus VRM/VRMA-specific examples and fixtures. |
+| Add end-to-end glTF/VRM examples | High | `examples/render-gltf.mjs` renders a local glTF/GLB asset fully in Node using the exported loader helpers, tests render committed geometry/material and encoded-texture glTF fixtures through `GLTFLoader`, and the generated corpus includes a synthetic avatar-style toon/skinned scene. Remaining work is committed glTF Sample Assets plus VRM/VRMA-specific examples and external fixtures. |
 
 ## Acceptance Criteria For "Fully Supports Three.js Scenes"
 
