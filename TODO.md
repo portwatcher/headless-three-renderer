@@ -31,6 +31,7 @@ Already supported in the current implementation:
 - Environment IBL from equirectangular `scene.environment`/reflection probes.
 - Scene background colors and 2D texture backgrounds, including `backgroundIntensity` and approximate 2D texture `backgroundBlurriness`; non-default background/environment rotations fail clearly.
 - Render-option viewport and scissor rectangles in output pixel coordinates.
+- Flat auxiliary `options.renderMode` passes for white masks and RGB object IDs.
 - Directional, spot, point, and directional cascaded shadow maps for a single shadow-casting light; additional shadow-casting lights fail clearly.
 - ACES Filmic tone mapping, output color-space controls, simple post-processing, custom WGSL fragment bodies, lines, and point billboards.
 - `THREE.Sprite`/`SpriteMaterial` CPU billboard expansion with color, opacity, texture maps, center, scale, rotation, size attenuation, layers, and render ordering.
@@ -101,7 +102,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Multiple render targets | Medium | Multiple color attachment targets fail clearly. Remaining work is native MRT support for masks, normals, IDs, and deferred-style workflows. |
 | MSAA controls | Medium | Render-option and target sample counts greater than 1 fail clearly. Remaining work is configurable sample count and resolve behavior. |
 | Viewport/scissor support | Medium | Render-option viewport/scissor rectangles are supported in output pixel coordinates; remaining work is exact WebGLRenderer state-machine parity and broader tiled-render ergonomics. |
-| Object ID/mask render modes | Low | Useful for server-side pipelines, segmentation, and picking. |
+| Object ID/mask render modes | Low | Initial `options.renderMode: "mask"` and `"object-id"` passes are supported for flat segmentation output. Remaining work is alpha-map cutout parity, optional reverse lookup metadata, and MRT integration. |
 
 ## P2 - Performance And Scale
 

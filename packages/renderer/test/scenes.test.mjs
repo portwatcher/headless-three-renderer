@@ -133,6 +133,18 @@ function countRegionPixels(rgba, width, height, x0, y0, x1, y1, predicate) {
   return count
 }
 
+function objectIdBytes(id) {
+  const masked = Math.max(1, Math.trunc(id)) & 0xffffff
+  const value = masked === 0 ? 1 : masked
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
+}
+
+function assertRgbClose(mean, expected, label) {
+  assert.ok(Math.abs(mean.r - expected[0]) <= 1, `${label} red should be ${expected[0]}, got ${mean.r}`)
+  assert.ok(Math.abs(mean.g - expected[1]) <= 1, `${label} green should be ${expected[1]}, got ${mean.g}`)
+  assert.ok(Math.abs(mean.b - expected[2]) <= 1, `${label} blue should be ${expected[2]}, got ${mean.b}`)
+}
+
 function maxLuminance(rgba) {
   let max = 0
   for (let i = 0; i < rgba.length; i += 4) {
@@ -207,6 +219,65 @@ test('MeshBasicMaterial renders foreground pixels distinct from background', () 
   const ratio = nonBackgroundRatio(rgba, BG)
   assert.ok(ratio > 0.05, `expected mesh to cover >5% of frame, got ${(ratio * 100).toFixed(1)}%`)
   assert.ok(ratio < 0.95, `expected background to be visible, got ${(ratio * 100).toFixed(1)}% non-bg`)
+})
+
+test('renderMode mask outputs white visible geometry over black', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ color: 0x0088ff })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'mask' })
+  const center = meanRegion(rgba, 64, 64, 28, 28, 36, 36)
+  const corner = meanRegion(rgba, 64, 64, 0, 0, 8, 8)
+  assert.ok(center.r > 250 && center.g > 250 && center.b > 250, `mask center should be white (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(corner.r < 2 && corner.g < 2 && corner.b < 2, `mask background should be black (${corner.r}, ${corner.g}, ${corner.b})`)
+})
+
+test('renderMode object-id outputs stable per-object RGB IDs', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  const left = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+  const right = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+  left.position.x = -0.5
+  right.position.x = 0.5
+  scene.add(left, right)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'object-id' })
+  const leftMean = meanRegion(rgba, 64, 64, 16, 28, 23, 36)
+  const rightMean = meanRegion(rgba, 64, 64, 41, 28, 48, 36)
+  const background = meanRegion(rgba, 64, 64, 0, 0, 8, 8)
+  assertRgbClose(leftMean, objectIdBytes(left.id + 1), 'left object id')
+  assertRgbClose(rightMean, objectIdBytes(right.id + 1), 'right object id')
+  assert.notDeepEqual(objectIdBytes(left.id + 1), objectIdBytes(right.id + 1))
+  assert.ok(background.r < 2 && background.g < 2 && background.b < 2, `object-id background should be black (${background.r}, ${background.g}, ${background.b})`)
+})
+
+test('renderMode alphaMap cutouts fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      alphaMap: solidTexture(255, 0, 255),
+      alphaTest: 0.5,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'mask' }),
+    /renderMode "mask".*alphaMap/i,
+  )
 })
 
 test('different materials produce visibly different outputs', async () => {

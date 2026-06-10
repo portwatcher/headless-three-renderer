@@ -4,6 +4,7 @@
 
 export type RenderOutputFormat = 'png' | 'rgba' | 'raw' | 'raw-rgba'
 export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'linear'
+export type RenderMode = 'color' | 'mask' | 'object-id'
 
 export interface ThreeColorLike {
   r: number
@@ -395,6 +396,8 @@ export interface RenderOptions {
   clippingPlanes?: ThreePlaneLike[] | null
   format?: RenderOutputFormat
   outputColorSpace?: RenderOutputColorSpace
+  /** Alternate flat render passes. Defaults to normal color rendering. */
+  renderMode?: RenderMode
   /** MSAA is not implemented yet; values greater than 1 fail clearly. */
   samples?: number
   /** MSAA is not implemented yet; values greater than 1 fail clearly. */

@@ -6,6 +6,9 @@ import type {
   RenderPixelRectLike,
   NativeRenderScene,
   NativeCamera,
+  NativeSceneMesh,
+  RenderMode,
+  Color4,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -28,6 +31,7 @@ export {
 export type {
   RenderOutputFormat,
   RenderOutputColorSpace,
+  RenderMode,
   ThreeColorLike,
   ThreeMatrix4Like,
   ThreeBufferAttributeLike,
@@ -116,6 +120,8 @@ function toNativeInput(
   validateThreeCamera(camera)
   validateUnsupportedSceneState(scene)
   validateUnsupportedRenderOptions(options)
+  const renderMode = normalizedRenderMode(options.renderMode)
+  const colorMode = renderMode === 'color'
 
   if (typeof scene.updateMatrixWorld === 'function') {
     scene.updateMatrixWorld(true)
@@ -125,20 +131,21 @@ function toNativeInput(
   }
 
   const size = resolveSize(camera, options)
-  const envMap = extractEnvironmentMap(scene)
+  const envMap = colorMode ? extractEnvironmentMap(scene) : null
   const hasBackgroundOverride = options.background !== undefined
-  const optionBackgroundTexture = hasBackgroundOverride
+  const optionBackgroundTexture = colorMode && hasBackgroundOverride
     ? extractBackgroundTexture(options.background, 'options.background')
     : null
-  const backgroundTexture = optionBackgroundTexture ?? (
-    hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background')
-  )
+  const backgroundTexture = colorMode
+    ? optionBackgroundTexture ?? (hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background'))
+    : null
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
+  const meshes = applyRenderMode(flattenScene(scene, camera, size.height, clippingPlanes), renderMode)
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
-    background: resolveBackground(scene, options),
-    backgroundIntensity: options.backgroundIntensity ?? scene.backgroundIntensity,
+    background: colorMode ? resolveBackground(scene, options) : [0, 0, 0, 1],
+    backgroundIntensity: colorMode ? options.backgroundIntensity ?? scene.backgroundIntensity : undefined,
     viewport: pixelRectToArray(options.viewport),
     scissor: pixelRectToArray(options.scissor),
     backgroundTexture: backgroundTexture?.data,
@@ -150,20 +157,20 @@ function toNativeInput(
     backgroundTextureMinFilter: backgroundTexture?.minFilter,
     backgroundTextureTransform: backgroundTexture?.transform,
     backgroundTextureColorSpace: backgroundTexture?.colorSpace,
-    backgroundTextureBlurriness: finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness),
+    backgroundTextureBlurriness: colorMode ? finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness) : undefined,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
-    meshes: flattenScene(scene, camera, size.height, clippingPlanes),
-    lights: extractLights(scene, camera),
-    ambientLight: extractAmbientLight(scene, camera) ?? undefined,
-    ambientIntensity: extractAmbientIntensity(scene, camera) ?? undefined,
-    lightProbe: extractLightProbe(scene, camera) ?? undefined,
+    meshes,
+    lights: colorMode ? extractLights(scene, camera) : [],
+    ambientLight: colorMode ? extractAmbientLight(scene, camera) ?? undefined : undefined,
+    ambientIntensity: colorMode ? extractAmbientIntensity(scene, camera) ?? undefined : undefined,
+    lightProbe: colorMode ? extractLightProbe(scene, camera) ?? undefined : undefined,
     environmentMap: envMap?.data,
     environmentMapWidth: envMap?.width,
     environmentMapHeight: envMap?.height,
     environmentMapIntensity: envMap?.intensity,
-    ...fogToNative(scene.fog),
-    ...postProcessingToNative(options.postProcessing),
+    ...(colorMode ? fogToNative(scene.fog) : {}),
+    ...(colorMode ? postProcessingToNative(options.postProcessing) : {}),
   }
   const nativeCamera: NativeCamera = {
     width: size.width,
@@ -176,6 +183,111 @@ function toNativeInput(
   }
 
   return { nativeScene, nativeCamera }
+}
+
+function normalizedRenderMode(mode: RenderOptions['renderMode']): RenderMode {
+  if (mode == null) return 'color'
+  if (mode === 'color' || mode === 'mask' || mode === 'object-id') return mode
+  throw new TypeError(
+    `options.renderMode must be "color", "mask", or "object-id"; received ${String(mode)}`,
+  )
+}
+
+function applyRenderMode(meshes: NativeSceneMesh[], mode: RenderMode): NativeSceneMesh[] {
+  if (mode === 'color') return meshes
+  return meshes.map((mesh, index) => renderModeMesh(mesh, mode, index))
+}
+
+function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'>, index: number): NativeSceneMesh {
+  if (mesh.alphaMap) {
+    throw new Error(
+      `options.renderMode "${mode}" does not support material.alphaMap cutouts yet. Use base texture alpha with alphaTest/alphaHash, or render the normal color pass until alphaMap support lands for mask and object-id passes.`,
+    )
+  }
+  const color = mode === 'mask'
+    ? [1, 1, 1, materialAlpha(mesh)] as Color4
+    : objectIdColor(mesh, index)
+  return {
+    positions: mesh.positions,
+    indices: mesh.indices,
+    normals: mesh.normals,
+    colors: mesh.colors,
+    color,
+    transform: mesh.transform,
+    uvs: mesh.uvs,
+    uvs2: mesh.uvs2,
+    texture: mesh.texture,
+    textureWidth: mesh.textureWidth,
+    textureHeight: mesh.textureHeight,
+    textureWrapS: mesh.textureWrapS,
+    textureWrapT: mesh.textureWrapT,
+    textureMagFilter: mesh.textureMagFilter,
+    textureMinFilter: mesh.textureMinFilter,
+    textureTransform: mesh.textureTransform,
+    textureColorSpace: mesh.textureColorSpace,
+    textureUsesUv2: mesh.textureUsesUv2,
+    alphaTest: mesh.alphaTest,
+    alphaHash: mesh.alphaHash,
+    premultipliedAlpha: mesh.premultipliedAlpha,
+    clippingPlanes: mesh.clippingPlanes,
+    clippingUnionCount: mesh.clippingUnionCount,
+    blending: 'none',
+    depthTest: mesh.depthTest,
+    depthWrite: true,
+    colorWrite: true,
+    polygonOffset: mesh.polygonOffset,
+    polygonOffsetFactor: mesh.polygonOffsetFactor,
+    polygonOffsetUnits: mesh.polygonOffsetUnits,
+    stencilWrite: mesh.stencilWrite,
+    stencilWriteMask: mesh.stencilWriteMask,
+    stencilFunc: mesh.stencilFunc,
+    stencilRef: mesh.stencilRef,
+    stencilFuncMask: mesh.stencilFuncMask,
+    stencilFail: mesh.stencilFail,
+    stencilZFail: mesh.stencilZFail,
+    stencilZPass: mesh.stencilZPass,
+    transparent: false,
+    side: mesh.side,
+    shadingModel: 'basic',
+    topology: mesh.topology,
+    customFragmentShader: renderModeFragment(color),
+    castShadow: false,
+    receiveShadow: false,
+    groupOrder: mesh.groupOrder,
+    renderOrder: mesh.renderOrder,
+    sortZ: mesh.sortZ,
+    sortIndex: mesh.sortIndex,
+    materialSortKey: mesh.materialSortKey,
+  }
+}
+
+function materialAlpha(mesh: NativeSceneMesh): number {
+  const alpha = mesh.color?.[3]
+  return typeof alpha === 'number' && Number.isFinite(alpha) ? Math.min(1, Math.max(0, alpha)) : 1
+}
+
+function objectIdColor(mesh: NativeSceneMesh, index: number): Color4 {
+  const sortIndex = typeof mesh.sortIndex === 'number' && Number.isSafeInteger(mesh.sortIndex) && mesh.sortIndex >= 0
+    ? mesh.sortIndex
+    : index
+  const id = (sortIndex + 1) & 0xffffff
+  const value = id === 0 ? 1 : id
+  return [
+    ((value >> 16) & 0xff) / 255,
+    ((value >> 8) & 0xff) / 255,
+    (value & 0xff) / 255,
+    materialAlpha(mesh),
+  ]
+}
+
+function renderModeFragment(color: Color4): string {
+  return `return vec4<f32>(${formatWgslFloat(color[0])}, ${formatWgslFloat(color[1])}, ${formatWgslFloat(color[2])}, 1.0);`
+}
+
+function formatWgslFloat(value: number): string {
+  if (value <= 0) return '0.0'
+  if (value >= 1) return '1.0'
+  return value.toFixed(10)
 }
 
 function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene> {
