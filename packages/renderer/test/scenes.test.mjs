@@ -79,6 +79,20 @@ function cubeTexture(faceColors) {
   return texture
 }
 
+function encodedCubeTexture() {
+  const faces = [
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4/5/hPwAH/QL+ppTFtAAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z/D/PwAG/gL+DHWJ3gAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg+P//PwAF/wL+Xg47rQAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg+M/wHwAEAQH/cetH5QAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+  ].map((base64) => Buffer.from(base64, 'base64'))
+  const texture = new THREE.CubeTexture(faces)
+  texture.needsUpdate = true
+  return texture
+}
+
 function constantUvPlane(u, v) {
   const geometry = new THREE.PlaneGeometry(2, 2)
   const uv = new Float32Array(geometry.getAttribute('uv').count * 2)
@@ -5583,6 +5597,34 @@ test('cube background textures decode sRGB colorSpace before output conversion',
   assert.ok(linear.r > srgb.r + 20, `linear cube background should render brighter than decoded sRGB cube texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('encoded cube background textures decode face images', () => {
+  const background = encodedCubeTexture()
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+
+  function renderFacing(target, yRotation = 0) {
+    const scene = new THREE.Scene()
+    scene.background = background
+    scene.backgroundRotation = new THREE.Euler(0, yRotation, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 0)
+    camera.lookAt(target)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 28, 28, 36, 36)
+  }
+
+  const negativeZ = renderFacing(new THREE.Vector3(0, 0, -1))
+  const positiveZ = renderFacing(new THREE.Vector3(0, 0, 1))
+  assert.ok(negativeZ.r > negativeZ.g + 80, `encoded -Z cube face should render red (${negativeZ.r} vs ${negativeZ.g})`)
+  assert.ok(positiveZ.g > positiveZ.r + 80, `encoded +Z cube face should render green (${positiveZ.g} vs ${positiveZ.r})`)
+
+  const rotatedNegativeZ = renderFacing(new THREE.Vector3(0, 0, -1), Math.PI)
+  assert.ok(rotatedNegativeZ.g > rotatedNegativeZ.r + 80, `rotated encoded cube background should render +Z green (${rotatedNegativeZ.g} vs ${rotatedNegativeZ.r})`)
+})
+
 test('render options accept cube DataTexture backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
@@ -5605,13 +5647,13 @@ test('render options accept cube DataTexture backgrounds', () => {
   assert.ok(mean.b > mean.r + 80, `options.background cube texture should override scene background (${mean.b} vs ${mean.r})`)
 })
 
-test('cube background textures require raw six-face images', () => {
+test('cube background textures require six face images', () => {
   const scene = new THREE.Scene()
   scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeReflectionMapping })
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /six raw RGBA face images/i,
+    /six raw or encoded face images/i,
   )
 })
 

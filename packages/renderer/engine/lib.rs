@@ -59,6 +59,25 @@ pub fn render_native(scene: RenderScene, camera: Camera) -> napi::Result<Buffer>
         .map_err(to_napi_error)
 }
 
+#[napi(object)]
+pub struct DecodedImage {
+    pub data: Buffer,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[napi]
+pub fn decode_image(data: Buffer) -> napi::Result<DecodedImage> {
+    let image = image::load_from_memory(&data)
+        .map_err(|error| napi::Error::from_reason(format!("failed to decode image: {error}")))?;
+    let rgba = image.to_rgba8();
+    Ok(DecodedImage {
+        width: rgba.width(),
+        height: rgba.height(),
+        data: Buffer::from(rgba.into_raw()),
+    })
+}
+
 fn to_napi_error(error: anyhow::Error) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }

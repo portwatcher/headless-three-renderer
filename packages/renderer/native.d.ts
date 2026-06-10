@@ -29,6 +29,14 @@ export interface Camera {
   cameraPosition?: Array<number>
 }
 
+export interface DecodedImage {
+  data: Buffer
+  width: number
+  height: number
+}
+
+export declare function decodeImage(data: Buffer): DecodedImage
+
 export declare function renderNative(scene: RenderScene, camera: Camera): Buffer
 
 export interface RenderScene {

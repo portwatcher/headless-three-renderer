@@ -82,7 +82,7 @@ The public API accepts only Three.js-like objects:
 - `scene`: a `THREE.Scene` or `THREE.Object3D` root.
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly until native support lands.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
-- `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/raw cube texture. Defaults to `scene.background`.
+- `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds.
 - `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws.
@@ -105,7 +105,7 @@ The public API accepts only Three.js-like objects:
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection
 - vertex colors
-- scene background color plus 2D, equirectangular, and raw six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular `environmentRotation`; PMREM/CubeUV backgrounds and unsupported background rotations fail clearly
+- scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular `environmentRotation`; PMREM/CubeUV backgrounds and unsupported background rotations fail clearly
 - render-option viewport and scissor rectangles in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 

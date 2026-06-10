@@ -2,6 +2,11 @@ import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextur
 import { clamp01 } from './math'
 import { colorLikeToArray } from './color'
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const native = require('../native.js') as {
+  decodeImage?(data: Buffer): { data?: Buffer | Uint8Array; width?: number; height?: number }
+}
+
 // Three.js wrapping constants
 const RepeatWrapping = 1000
 const MirroredRepeatWrapping = 1002
@@ -921,14 +926,14 @@ function isCubeBackgroundTexture(map: ThreeTextureLike): boolean {
 function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
   if (map.mapping === CubeUVReflectionMapping) {
     throw new Error(
-      `${label} uses PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a raw six-face CubeTexture, a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
+      `${label} uses PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a six-face CubeTexture, a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
     )
   }
 
   const faces = cubeFaceImages(map)
   if (!faces) {
     throw new Error(
-      `${label} uses a cube background texture without six raw RGBA face images. Provide a CubeTexture with six DataTexture-style face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
+      `${label} uses a cube background texture without six raw or encoded face images. Provide a CubeTexture with six DataTexture-style or encoded PNG/JPEG/WebP face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
     )
   }
 
@@ -987,9 +992,20 @@ function cubeFaceImages(map: ThreeTextureLike): TextureImageInput[] | null {
 
 function imageToRgbaTexture(image: TextureImageInput, label: string): { rgba: Uint8Array; width: number; height: number } {
   if (Buffer.isBuffer(image) || image instanceof Uint8Array) {
-    throw new Error(
-      `${label} is an encoded or dimensionless cube face image. Cube backgrounds currently require raw DataTexture-style face images with data, width, and height.`,
-    )
+    const buffer = Buffer.isBuffer(image)
+      ? image
+      : Buffer.from(image.buffer, image.byteOffset, image.byteLength)
+    const decoded = native.decodeImage?.(buffer)
+    if (!decoded?.data || !(decoded.width! > 0) || !(decoded.height! > 0)) {
+      throw new Error(`${label} encoded cube face image could not be decoded to RGBA pixels.`)
+    }
+    const rgba = decoded.data instanceof Uint8Array
+      ? decoded.data
+      : new Uint8Array(decoded.data)
+    if (rgba.byteLength !== decoded.width! * decoded.height! * 4) {
+      throw new Error(`${label} encoded cube face image decoded to an unexpected RGBA byte length.`)
+    }
+    return { rgba, width: decoded.width!, height: decoded.height! }
   }
   if (!image || !image.data || !(image.width! > 0) || !(image.height! > 0)) {
     throw new Error(`${label} must provide raw face data, width, and height for cube background rendering.`)

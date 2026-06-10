@@ -577,4 +577,5 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.NativeRenderer = nativeBinding.NativeRenderer
+module.exports.decodeImage = nativeBinding.decodeImage
 module.exports.renderNative = nativeBinding.renderNative
