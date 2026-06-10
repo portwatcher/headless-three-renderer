@@ -153,6 +153,8 @@ export interface SceneLight {
   shadowBias?: number
   /** Normal-offset bias in world space at the receiver. */
   shadowNormalBias?: number
+  /** PCF shadow radius multiplier. Defaults to 1. */
+  shadowRadius?: number
   /** Orthographic shadow-camera frustum bounds. */
   shadowCameraLeft?: number
   shadowCameraRight?: number

@@ -529,6 +529,8 @@ export interface NativeSceneLight {
   shadowBias?: number
   /** Normal-offset bias (world space units) applied at receivers. */
   shadowNormalBias?: number
+  /** PCF shadow radius multiplier. Defaults to 1. */
+  shadowRadius?: number
   /** Orthographic shadow-camera frustum bounds. */
   shadowCameraLeft?: number
   shadowCameraRight?: number

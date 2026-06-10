@@ -88,6 +88,8 @@ struct Uniforms {
   shadow_params2: vec4<f32>,
   // x/y/z = cascade split distances, w = shadow layer count.
   shadow_params3: vec4<f32>,
+  // x = PCF radius multiplier.
+  shadow_params4: vec4<f32>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
   // xyz = sheen color, w = sheen roughness
@@ -267,7 +269,7 @@ fn sample_shadow_layer(world_pos: vec3<f32>, layer: u32, world_normal: vec3<f32>
   var sum: f32 = 0.0;
   for (var dy = -1; dy <= 1; dy = dy + 1) {
     for (var dx = -1; dx <= 1; dx = dx + 1) {
-      let offset = vec2<f32>(f32(dx), f32(dy)) * texel;
+      let offset = vec2<f32>(f32(dx), f32(dy)) * texel * uniforms.shadow_params4.x;
       sum = sum + textureSampleCompareLevel(t_shadow, s_shadow, uv + offset, layer, reference);
     }
   }
@@ -1263,6 +1265,7 @@ struct Uniforms {
   shadow_params: vec4<f32>,
   shadow_params2: vec4<f32>,
   shadow_params3: vec4<f32>,
+  shadow_params4: vec4<f32>,
   physical_params1: vec4<f32>,
   physical_params2: vec4<f32>,
   physical_params3: vec4<f32>,

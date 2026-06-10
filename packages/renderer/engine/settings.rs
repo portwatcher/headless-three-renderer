@@ -41,6 +41,8 @@ pub struct ShadowCaster {
     pub bias: f32,
     /// World-space normal offset applied at the receiver.
     pub normal_bias: f32,
+    /// PCF radius multiplier.
+    pub radius: f32,
 }
 
 pub struct RenderSettings {
@@ -701,6 +703,7 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
                         map_height,
                         bias: light.shadow_bias.unwrap_or(0.0) as f32,
                         normal_bias: light.shadow_normal_bias.unwrap_or(0.0) as f32,
+                        radius: shadow_radius(light, &prefix)?,
                     }));
                 }
             }
@@ -718,6 +721,7 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
 
         let bias = light.shadow_bias.unwrap_or(0.0) as f32;
         let normal_bias = light.shadow_normal_bias.unwrap_or(0.0) as f32;
+        let radius = shadow_radius(light, &prefix)?;
 
         return Ok(Some(ShadowCaster {
             light_vps,
@@ -730,9 +734,18 @@ fn resolve_shadow_caster(scene: &RenderScene) -> Result<Option<ShadowCaster>> {
             map_height,
             bias,
             normal_bias,
+            radius,
         }));
     }
     Ok(None)
+}
+
+fn shadow_radius(light: &crate::types::SceneLight, prefix: &str) -> Result<f32> {
+    Ok(finite_f32(
+        light.shadow_radius.unwrap_or(1.0),
+        &format!("{prefix}.shadow.radius"),
+    )?
+    .max(0.0))
 }
 
 fn shadow_map_dimensions(

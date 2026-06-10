@@ -77,6 +77,8 @@ pub struct Uniforms {
     pub shadow_params2: [f32; 4],
     /// x/y/z = cascade split distances, w = shadow layer count.
     pub shadow_params3: [f32; 4],
+    /// x = PCF radius multiplier.
+    pub shadow_params4: [f32; 4],
     /// x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
     pub physical_params1: [f32; 4],
     /// xyz = sheen color, w = sheen roughness
@@ -2360,6 +2362,11 @@ impl GpuRenderer {
                     s.layer_count as f32,
                 ]
             }),
+            shadow_params4: settings
+                .shadow
+                .as_ref()
+                .map(|s| [s.radius, 0.0, 0.0, 0.0])
+                .unwrap_or([1.0, 0.0, 0.0, 0.0]),
             physical_params1: [
                 mesh.clearcoat,
                 mesh.clearcoat_roughness,

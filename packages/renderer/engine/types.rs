@@ -127,6 +127,8 @@ pub struct SceneLight {
     pub shadow_bias: Option<f64>,
     /// Normal-offset bias in world space at the receiver.
     pub shadow_normal_bias: Option<f64>,
+    /// PCF shadow radius multiplier. Defaults to 1.
+    pub shadow_radius: Option<f64>,
     /// Orthographic shadow-camera frustum bounds.
     pub shadow_camera_left: Option<f64>,
     pub shadow_camera_right: Option<f64>,
