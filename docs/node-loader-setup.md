@@ -46,14 +46,12 @@ function arrayBufferView(buffer) {
 }
 
 const gltf = await loadGltfFromFile('./model.gltf')
-const scene = new THREE.Scene()
-scene.add(gltf.scene)
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
 camera.position.set(2, 1.5, 4)
 camera.lookAt(0, 0, 0)
 
-const imageBuffer = render(scene, camera, { width: 1024, height: 1024 })
+const imageBuffer = render(gltf.scene, camera, { width: 1024, height: 1024 })
 await fs.writeFile('render.png', imageBuffer)
 ```
 

@@ -103,6 +103,18 @@ test('top-level render() function works without a Renderer instance', () => {
   assertValidPng(buf, { width: 64, height: 64 })
 })
 
+test('Object3D roots render without a wrapping Scene', () => {
+  const root = new THREE.Group()
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0x00ffaa })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const buf = render(root, camera, { width: 64, height: 64 })
+  assertValidPng(buf, { width: 64, height: 64 })
+})
+
 test('different sizes produce correctly sized outputs', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()))

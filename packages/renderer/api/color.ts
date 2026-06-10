@@ -1,4 +1,4 @@
-import type { Color4, ThreeColorLike, ThreeSceneLike, RenderOptions } from './types'
+import type { Color4, ThreeColorLike, ThreeSceneRootLike, RenderOptions } from './types'
 import { clamp01, assertFinite, areFiniteNumbers } from './math'
 
 export function colorLikeToArray(value: unknown): Color4 | null {
@@ -23,7 +23,7 @@ export function normalizeColorArray(values: number[]): Color4 {
   ]
 }
 
-export function resolveBackground(scene: ThreeSceneLike, options: RenderOptions): Color4 {
+export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions): Color4 {
   if (Array.isArray(options.background)) {
     return normalizeColorArray(options.background)
   }

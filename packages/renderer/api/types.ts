@@ -266,6 +266,7 @@ export interface ThreeSkeletonLike {
 }
 
 export interface ThreeObject3DLike {
+  isObject3D?: boolean
   visible?: boolean
   layers?: ThreeLayersLike
   renderOrder?: number
@@ -339,8 +340,8 @@ export interface ThreeObject3DLike {
   }
 }
 
-export interface ThreeSceneLike extends ThreeObject3DLike {
-  isScene: true
+export interface ThreeSceneRootLike extends ThreeObject3DLike {
+  isScene?: boolean
   background?: ThreeColorLike | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
@@ -357,6 +358,10 @@ export interface ThreeSceneLike extends ThreeObject3DLike {
   environmentIntensity?: number
   environmentRotation?: ThreeEulerLike | ArrayLike<number> | null
   updateMatrixWorld?(force?: boolean): void
+}
+
+export interface ThreeSceneLike extends ThreeSceneRootLike {
+  isScene: true
 }
 
 export interface ThreeCameraLike {

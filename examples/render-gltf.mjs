@@ -21,7 +21,7 @@ const width = positiveInteger(process.env.WIDTH, 1024)
 const height = positiveInteger(process.env.HEIGHT, width)
 
 const gltf = await loadGltfFromFile(inputPath)
-const scene = toRenderableScene(gltf.scene)
+const scene = gltf.scene
 const camera = findRenderableCamera(scene, width / height) ?? frameSceneCamera(scene, width / height)
 
 scene.updateMatrixWorld(true)
@@ -62,14 +62,6 @@ function findRenderableCamera(scene, aspect) {
     camera.updateProjectionMatrix()
   }
   return camera
-}
-
-function toRenderableScene(root) {
-  if (root?.isScene === true) return root
-  const scene = new THREE.Scene()
-  scene.name = root?.name ? `${root.name}Scene` : 'GLTFScene'
-  scene.add(root)
-  return scene
 }
 
 function frameSceneCamera(scene, aspect) {

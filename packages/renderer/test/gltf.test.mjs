@@ -30,8 +30,7 @@ test('committed glTF fixture loads through GLTFLoader and renders', async () => 
   camera.aspect = 1
   camera.updateProjectionMatrix()
 
-  const scene = toRenderableScene(gltf.scene)
-  scene.background = new THREE.Color(0.02, 0.02, 0.03)
+  const scene = gltf.scene
   scene.add(new THREE.AmbientLight(0xffffff, 0.6))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 3, 4)
@@ -39,7 +38,12 @@ test('committed glTF fixture loads through GLTFLoader and renders', async () => 
   scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
-  const rgba = new Renderer().render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+  const rgba = new Renderer().render(scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0.02, 0.02, 0.03],
+  })
   assert.equal(rgba.length, 96 * 96 * 4)
   assert.ok(nonBackgroundRatio(rgba, [5, 5, 8], 3) > 0.04, 'glTF triangle should render visible pixels')
 
@@ -65,13 +69,6 @@ async function loadGltfFixture(filePath) {
 
 function arrayBufferView(buffer) {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
-}
-
-function toRenderableScene(root) {
-  if (root?.isScene === true) return root
-  const scene = new THREE.Scene()
-  scene.add(root)
-  return scene
 }
 
 function findFirst(root, predicate) {

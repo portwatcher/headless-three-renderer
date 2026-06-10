@@ -2,7 +2,7 @@
 
 Headless `wgpu` renderer for Three.js scenes in Node.js.
 
-This package exists for Node.js environments where WebGL is not available. You build or load a normal Three.js scene, pass the `THREE.Scene` and `THREE.Camera` to this package, and the native addon renders it with `wgpu`.
+This package exists for Node.js environments where WebGL is not available. You build or load a normal Three.js scene graph, pass the `THREE.Scene` or `THREE.Object3D` root and `THREE.Camera` to this package, and the native addon renders it with `wgpu`.
 
 ```bash
 npm install @headless-three/renderer three
@@ -32,7 +32,7 @@ const imageBuffer = render(scene, camera, {
 fs.writeFileSync('render.png', imageBuffer)
 ```
 
-With `GLTFLoader`, add the loaded root to a `THREE.Scene` before rendering:
+With `GLTFLoader`, render the loaded root directly:
 
 ```js
 import fs from 'node:fs'
@@ -41,14 +41,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { render } from '@headless-three/renderer'
 
 const gltf = await new GLTFLoader().loadAsync('./model.glb')
-const scene = new THREE.Scene()
-scene.add(gltf.scene)
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
 camera.position.set(2, 1.5, 4)
 camera.lookAt(0, 0, 0)
 
-const imageBuffer = render(scene, camera, {
+const imageBuffer = render(gltf.scene, camera, {
   width: 1024,
   height: 1024,
 })
@@ -81,7 +79,7 @@ See the versioned [compatibility matrix](https://github.com/portwatcher/headless
 
 The public API accepts only Three.js-like objects:
 
-- `scene`: a `THREE.Scene`.
+- `scene`: a `THREE.Scene` or `THREE.Object3D` root.
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly until native support lands.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D texture. Defaults to `scene.background`.
@@ -220,15 +218,13 @@ mixer.update(1.5) // seek to 1.5 seconds
 
 // Update world matrices then render
 vrm.update(0)
-const scene = new THREE.Scene()
-scene.add(vrm.scene)
-scene.updateMatrixWorld(true)
+vrm.scene.updateMatrixWorld(true)
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20)
 camera.position.set(0, 1.2, 3)
 camera.lookAt(0, 1, 0)
 
-const imageBuffer = render(scene, camera, {
+const imageBuffer = render(vrm.scene, camera, {
   width: 1024,
   height: 1024,
 })

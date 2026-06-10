@@ -1,5 +1,5 @@
 import type {
-  ThreeSceneLike,
+  ThreeSceneRootLike,
   ThreeCameraLike,
   RenderOptions,
   RenderTargetLike,
@@ -42,6 +42,7 @@ export type {
   ThreeBoneLike,
   ThreeSkeletonLike,
   ThreeObject3DLike,
+  ThreeSceneRootLike,
   ThreeSceneLike,
   ThreeCameraLike,
   RenderOptions,
@@ -56,7 +57,7 @@ export class Renderer {
     this.native = new native.NativeRenderer()
   }
 
-  render(scene: ThreeSceneLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
+  render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
     const { buffer, nativeScene } = this.renderNative(scene, camera, options)
     if (options.target) {
       writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!)
@@ -65,7 +66,7 @@ export class Renderer {
   }
 
   renderToTarget(
-    scene: ThreeSceneLike,
+    scene: ThreeSceneRootLike,
     camera: ThreeCameraLike,
     target: RenderTargetLike = {},
     options: RenderOptions = {},
@@ -76,7 +77,7 @@ export class Renderer {
   }
 
   private renderNative(
-    scene: ThreeSceneLike,
+    scene: ThreeSceneRootLike,
     camera: ThreeCameraLike,
     options: RenderOptions,
   ): { buffer: Buffer; nativeScene: NativeRenderScene } {
@@ -85,7 +86,7 @@ export class Renderer {
   }
 }
 
-export function render(scene: ThreeSceneLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
+export function render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
   const { nativeScene, nativeCamera } = toNativeInput(scene, camera, options)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   if (options.target) {
@@ -95,7 +96,7 @@ export function render(scene: ThreeSceneLike, camera: ThreeCameraLike, options: 
 }
 
 export function renderToTarget(
-  scene: ThreeSceneLike,
+  scene: ThreeSceneRootLike,
   camera: ThreeCameraLike,
   target: RenderTargetLike = {},
   options: RenderOptions = {},
@@ -107,11 +108,11 @@ export function renderToTarget(
 }
 
 function toNativeInput(
-  scene: ThreeSceneLike,
+  scene: ThreeSceneRootLike,
   camera: ThreeCameraLike,
   options: RenderOptions,
 ): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera } {
-  validateThreeScene(scene)
+  validateThreeSceneRoot(scene)
   validateThreeCamera(camera)
   validateUnsupportedSceneState(scene)
   validateUnsupportedRenderOptions(options)
@@ -177,7 +178,7 @@ function toNativeInput(
   return { nativeScene, nativeCamera }
 }
 
-function fogToNative(fog: ThreeSceneLike['fog']): Partial<NativeRenderScene> {
+function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene> {
   if (!fog) return {}
   const color = colorLikeToArray(fog.color)
   if (fog.isFogExp2) {
@@ -229,7 +230,7 @@ function booleanOrNumber(value: unknown): number | undefined {
   return finiteOrUndefined(value)
 }
 
-function validateUnsupportedSceneState(scene: ThreeSceneLike): void {
+function validateUnsupportedSceneState(scene: ThreeSceneRootLike): void {
   if (hasNonZeroRotation(scene.backgroundRotation)) {
     throw new Error(
       'scene.backgroundRotation is not supported by @headless-three/renderer yet. Leave backgroundRotation at its default zero rotation or pre-rotate the background texture before rendering.',
@@ -329,9 +330,10 @@ function writeRenderTarget(
   return target
 }
 
-function validateThreeScene(scene: unknown): asserts scene is ThreeSceneLike {
-  if (!scene || (scene as any).isScene !== true) {
-    throw new TypeError('render(scene, camera) expects scene to be a THREE.Scene')
+function validateThreeSceneRoot(scene: unknown): asserts scene is ThreeSceneRootLike {
+  const root = scene as any
+  if (!root || (root.isScene !== true && root.isObject3D !== true)) {
+    throw new TypeError('render(scene, camera) expects scene to be a THREE.Scene or THREE.Object3D root')
   }
 }
 

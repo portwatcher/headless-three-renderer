@@ -12,7 +12,7 @@ Status keys:
 
 | Feature | Status | Notes |
 |---|---|---|
-| `render(scene, camera, options)` | Supported | Returns PNG by default or raw RGBA when `options.format` is `'rgba'`. |
+| `render(scene, camera, options)` | Supported | Accepts a `THREE.Scene` or `THREE.Object3D` root and returns PNG by default or raw RGBA when `options.format` is `'rgba'`. |
 | `Renderer` reusable instance | Supported | Reuses the native renderer object across calls. |
 | `renderToTarget()` / `options.target` | Supported | Populates target-like `{ width, height, data, texture.image.data }` fields with RGBA8 for a single color output. Unsupported target depth, MRT, and MSAA fields fail clearly. |
 | Post-processing options | Supported | Exposure, contrast, saturation, vignette, grayscale, and invert. |
@@ -22,7 +22,7 @@ Status keys:
 
 | Feature | Status | Notes |
 |---|---|---|
-| `THREE.Scene` traversal | Supported | Honors `visible === false` on ancestors. |
+| Scene graph root traversal | Supported | Accepts `THREE.Scene` or `THREE.Object3D` roots and honors `visible === false` on ancestors. |
 | `THREE.Mesh` | Supported | Indexed and non-indexed `BufferGeometry`, groups, material arrays, transforms, normals, UVs, and vertex colors. |
 | `THREE.SkinnedMesh` | Supported | CPU skinning from skeleton bones and inverse bind matrices. |
 | `THREE.InstancedMesh` | Supported | CPU-expanded per instance with `instanceMatrix` and `instanceColor`; this favors compatibility over native GPU instancing performance. |

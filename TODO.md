@@ -15,7 +15,7 @@ Current state: strong alpha for mesh-centric still rendering.
 
 Already supported in the current implementation:
 
-- `THREE.Scene` + `THREE.Camera` input, PNG/RGBA output, reusable renderer, and target-like raw RGBA output.
+- `THREE.Scene` or `THREE.Object3D` root + `THREE.Camera` input, PNG/RGBA output, reusable renderer, and target-like raw RGBA output.
 - Meshes, skinned meshes, sprites, geometry groups, vertex colors, indices, normals, UVs, and object world transforms.
 - `THREE.InstancedMesh` CPU expansion with `instanceMatrix` and `instanceColor`.
 - `THREE.InstancedBufferGeometry` CPU expansion for mesh, point, and line geometry with common per-instance offset and color attributes, including dashed line expansion.

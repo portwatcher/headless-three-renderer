@@ -1,4 +1,4 @@
-import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneLike } from './types'
+import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneRootLike } from './types'
 import { clamp01 } from './math'
 import { colorLikeToArray } from './color'
 
@@ -63,7 +63,7 @@ export interface EnvironmentMapInfo {
  * Supports DataTexture (equirectangular) with Uint8, Float16, Float32 pixel data.
  * Passes raw typed-array bytes to Rust which handles format detection.
  */
-export function extractEnvironmentMap(scene: ThreeSceneLike): EnvironmentMapInfo | null {
+export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMapInfo | null {
   const probe = extractReflectionProbe(scene)
   const envTex = scene.environment ?? probe?.texture
   if (!envTex) return null
@@ -138,7 +138,7 @@ export function extractEnvironmentMap(scene: ThreeSceneLike): EnvironmentMapInfo
   return null
 }
 
-function extractReflectionProbe(scene: ThreeSceneLike): { texture: ThreeTextureLike; intensity?: number } | null {
+function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: number } | null {
   const hints = scene.userData?.headlessThreeRenderer ?? scene.userData?.headlessRenderer ?? {}
   const probes = hints.reflectionProbes ?? hints.probes
   const probe = hints.reflectionProbe ?? (Array.isArray(probes) ? probes[0] : undefined)
@@ -845,7 +845,7 @@ export function extractTextureData(material: ThreeMaterialLike | undefined): Tex
 }
 
 export function extractBackgroundTexture(
-  background: ThreeSceneLike['background'] | ThreeTextureLike | number[] | undefined,
+  background: ThreeSceneRootLike['background'] | ThreeTextureLike | number[] | undefined,
   label = 'background',
 ): TextureInfo | null {
   const map = textureLike(background)
