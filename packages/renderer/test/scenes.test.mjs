@@ -2557,6 +2557,36 @@ test('explicit texture mipmaps fail clearly', () => {
   )
 })
 
+test('unsupported texture inputs fail clearly for background and environment slots', () => {
+  const compressedTexture = {
+    isTexture: true,
+    isCompressedTexture: true,
+    image: { width: 4, height: 4 },
+    mipmaps: [{ data: new Uint8Array(16), width: 4, height: 4 }],
+  }
+  const anisotropicTexture = solidTexture(255, 255, 255)
+  anisotropicTexture.anisotropy = 4
+  const mipmappedTexture = solidTexture(255, 255, 255)
+  mipmappedTexture.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
+
+  const cases = [
+    ['compressed background', (scene) => { scene.background = compressedTexture }, /compressed texture.*pre-decode/i],
+    ['compressed environment', (scene) => { scene.environment = compressedTexture }, /compressed texture.*pre-decode/i],
+    ['anisotropic background', (scene) => { scene.background = anisotropicTexture }, /texture anisotropy.*not supported/i],
+    ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
+  ]
+
+  for (const [name, setup, pattern] of cases) {
+    const scene = new THREE.Scene()
+    setup(scene)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('base color maps decode sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
