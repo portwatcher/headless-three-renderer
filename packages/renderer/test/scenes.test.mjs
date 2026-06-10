@@ -4389,6 +4389,45 @@ test('MeshPhysicalMaterial specular intensity and color affect direct specular',
   assert.ok(green.g > green.r + 0.1, `green specularColor should tint the highlight green (${green.g} vs ${green.r})`)
 })
 
+test('MeshPhysicalMaterial transmission volume attenuation honors color and distance', () => {
+  function renderAttenuated(attenuationColor, attenuationDistance) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        ior: 1.5,
+        thickness: 8,
+        attenuationColor: new THREE.Color(attenuationColor),
+        attenuationDistance,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const blueShort = renderAttenuated(0x0505ff, 1)
+  const blueLong = renderAttenuated(0x0505ff, 100)
+  const redShort = renderAttenuated(0xff0505, 1)
+
+  assert.ok(blueShort.b > blueShort.r + 80, `short blue attenuation should tint transmission blue (${blueShort.b} vs ${blueShort.r})`)
+  assert.ok(blueLong.r > blueShort.r + 60, `long attenuation distance should preserve more transmitted red (${blueLong.r} vs ${blueShort.r})`)
+  assert.ok(redShort.r > redShort.b + 80, `red attenuationColor should tint the same volume red (${redShort.r} vs ${redShort.b})`)
+})
+
 test('MeshPhysicalMaterial iridescence and dispersion fail clearly', () => {
   const cases = []
 
