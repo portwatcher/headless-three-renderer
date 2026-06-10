@@ -176,6 +176,28 @@ test('rgba format returns raw pixel buffer of the expected byte length', () => {
   assert.equal(buf.length, SIZE * SIZE * 4, 'rgba buffer must be width*height*4 bytes')
 })
 
+test('ArrayCamera and CubeCamera inputs fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.1, 0.1, 0.1)
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xff00ff })))
+
+  const subCamera = makeCamera()
+  const arrayCamera = new THREE.ArrayCamera([subCamera])
+  arrayCamera.projectionMatrix.copy(subCamera.projectionMatrix)
+  arrayCamera.matrixWorldInverse.copy(subCamera.matrixWorldInverse)
+  assert.throws(
+    () => renderRgba(scene, arrayCamera),
+    /ArrayCamera.*not supported/i,
+  )
+
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(16)
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  assert.throws(
+    () => renderRgba(scene, cubeCamera),
+    /CubeCamera.*not supported/i,
+  )
+})
+
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)

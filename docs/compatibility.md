@@ -43,6 +43,7 @@ Status keys:
 |---|---|---|
 | Perspective cameras | Supported | Uses the camera projection and inverse world matrices. |
 | Orthographic/custom projection cameras | Supported | Any camera with `projectionMatrix` and `matrixWorldInverse`. |
+| Array/cube cameras | Unsupported | `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly. Planned. |
 | Scene background color | Supported | `THREE.Color` scene background or `options.background`, including `scene.backgroundIntensity` and `options.backgroundIntensity`. |
 | Background textures/cubemaps | Partial | 2D texture backgrounds from `scene.background` or `options.background` are rendered with wrap modes, UV transforms, background intensity, approximate `backgroundBlurriness`, and output color-space conversion. Cube/equirect background mappings fail clearly; rendering cube/equirect backgrounds and exact mapping/color-space/blur parity remain planned. |
 | Output color space | Partial | `options.outputColorSpace` supports `THREE.SRGBColorSpace` (`"srgb"`, default) and `THREE.LinearSRGBColorSpace` (`"srgb-linear"`) for material and 2D texture background output conversion. Exact WebGLRenderer color-management state parity remains planned. |

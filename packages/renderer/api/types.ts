@@ -346,6 +346,8 @@ export interface ThreeCameraLike {
   matrixWorldInverse: ThreeMatrix4Like
   matrixWorld?: ThreeMatrix4Like
   isPerspectiveCamera?: boolean
+  isArrayCamera?: boolean
+  isCubeCamera?: boolean
   aspect?: number
   zoom?: number
   near?: number

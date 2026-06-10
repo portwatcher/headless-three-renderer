@@ -96,7 +96,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 
 | Task | Impact | Notes |
 |---|---:|---|
-| Array/cube camera support | Medium | Needed for some environment capture and stereo-ish workflows. |
+| Array/cube camera support | Medium | `THREE.ArrayCamera` and `THREE.CubeCamera` fail clearly. Remaining work is native support for environment capture and stereo-ish workflows. |
 | Render target depth output | Medium | Target `depthTexture` requests fail clearly. Remaining work is exposing depth texture/readback for downstream tools. |
 | Multiple render targets | Medium | Multiple color attachment targets fail clearly. Remaining work is native MRT support for masks, normals, IDs, and deferred-style workflows. |
 | MSAA controls | Medium | Render-option and target sample counts greater than 1 fail clearly. Remaining work is configurable sample count and resolve behavior. |

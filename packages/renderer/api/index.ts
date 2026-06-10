@@ -293,10 +293,21 @@ function validateThreeScene(scene: unknown): asserts scene is ThreeSceneLike {
 }
 
 function validateThreeCamera(camera: unknown): asserts camera is ThreeCameraLike {
-  if (!camera || (camera as any).isCamera !== true) {
+  const cameraLike = camera as any
+  if (cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera') {
+    throw new Error(
+      'THREE.CubeCamera is not supported by @headless-three/renderer yet. Render each cube face with a regular camera until cube camera support lands.',
+    )
+  }
+  if (!camera || cameraLike.isCamera !== true) {
     throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera')
   }
-  if (!(camera as any).projectionMatrix || !(camera as any).matrixWorldInverse) {
+  if (cameraLike.isArrayCamera === true || Array.isArray(cameraLike.cameras)) {
+    throw new Error(
+      'THREE.ArrayCamera is not supported by @headless-three/renderer yet. Render each sub-camera separately until array camera support lands.',
+    )
+  }
+  if (!cameraLike.projectionMatrix || !cameraLike.matrixWorldInverse) {
     throw new TypeError('THREE.Camera must have projectionMatrix and matrixWorldInverse')
   }
 }
