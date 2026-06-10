@@ -2,6 +2,8 @@ import type { ThreeCameraLike, ThreeObject3DLike, NativeSceneLight } from './typ
 import { colorLikeToArray } from './color'
 import { objectLayersMatchCamera } from './layers'
 
+type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
+
 export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike): NativeSceneLight[] | undefined {
   const lights: NativeSceneLight[] = []
   visitLights(scene, camera, lights)
@@ -171,11 +173,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
   const shadow = light.shadow
-  const mapSize = shadow?.mapSize
-  out.shadowMapSize = Math.max(
-    32,
-    Math.floor(mapSize?.x ?? mapSize?.width ?? 512),
-  )
+  out.shadowMapSize = shadowMapSizeOrDefault(shadow?.mapSize)
   if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
   if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
 
@@ -190,6 +188,17 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   }
 
   applyShadowCascadeOptions(out, light)
+}
+
+function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike): number {
+  const width = numberOrNull(mapSize?.x ?? mapSize?.width)
+  const height = numberOrNull(mapSize?.y ?? mapSize?.height)
+  if (width != null && height != null && Math.floor(width) !== Math.floor(height)) {
+    throw new Error(
+      `Non-square light.shadow.mapSize values are not supported by @headless-three/renderer yet (${Math.floor(width)}x${Math.floor(height)}). Use a square shadow map size until rectangular shadow maps are supported.`,
+    )
+  }
+  return Math.max(32, Math.floor(width ?? height ?? 512))
 }
 
 function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {

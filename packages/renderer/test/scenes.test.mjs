@@ -3695,6 +3695,30 @@ test('multiple shadow-casting lights fail clearly', () => {
   )
 })
 
+test('non-square shadow map sizes fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const receiver = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff }),
+  )
+  receiver.receiveShadow = true
+  scene.add(receiver)
+
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.position.set(3, 4, 2)
+  light.target.position.set(0, 0, 0)
+  light.castShadow = true
+  light.shadow.mapSize.set(512, 256)
+  scene.add(light)
+  scene.add(light.target)
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /non-square light\.shadow\.mapSize.*not supported/i,
+  )
+})
+
 test('ShadowMaterial is transparent except for received shadows', () => {
   function renderShadowMaterial(castShadow) {
     const scene = new THREE.Scene()

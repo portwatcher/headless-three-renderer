@@ -86,7 +86,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Multiple shadow-casting lights | Very high | A single shadow-casting directional/spot/point light is supported; additional visible shadow-casting lights fail clearly. Remaining work is native multi-shadow-map rendering. |
-| Shadow behavior parity | High | Match Three.js `shadow.camera`, map size, bias, normal bias, radius/blur behavior, cast/receive rules, transparency and alpha-tested casters. |
+| Shadow behavior parity | High | Common `shadow.camera`, square map size, bias, normal bias, cast/receive rules, and alpha-tested casters are supported; non-square shadow map sizes fail clearly. Remaining work is rectangular map sizes, radius/blur behavior, transparency parity, and deeper golden-tested behavior. |
 | `RectAreaLight` | Medium | One-sided finite-area approximation is supported for direct lighting. Remaining work is exact Three.js LTC/LUT parity and golden tests. |
 | `LightProbe` support | Medium | Three.js `LightProbe` spherical harmonics contribute diffuse indirect lighting; remaining work is exact golden-tested parity with all material/environment combinations. |
 | Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate 2D texture `backgroundBlurriness` are supported; non-default background/environment rotations fail clearly. Remaining work is native rotation, cube/equirect blur, and exact background/environment mapping controls. |
