@@ -4855,6 +4855,42 @@ test('LineBasicMaterial map RGB multiplies line color from UVs', () => {
   assert.ok(greenPixels > 2, `secondary line map texel should tint line green (${greenPixels})`)
 })
 
+test('LineBasicMaterial map samples the selected secondary UV channel', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.channel = 1
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geom.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Line(
+    geom,
+    new THREE.LineBasicMaterial({ color: 0xffffff, map }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(greenPixels > 2, `line map channel=1 should sample uv1 green texel (${greenPixels})`)
+})
+
 test('LineDashedMaterial renders fewer visible line pixels than a solid line', () => {
   function makeScene(material) {
     const geom = new THREE.BufferGeometry().setFromPoints([

@@ -592,6 +592,8 @@ function appendLineOrPoints(
   const positions = readVec3Attribute(position)
   const uvAttribute = getAttribute(geometry, 'uv')
   const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
+  const uvChannels = readUvChannels(geometry, uvs)
+  const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
   const vertexColors = getAttribute(geometry, 'color')
   const indexAttr = geometry.index ? readIndexAttribute(geometry.index) : null
   const vertexCount = position.count
@@ -607,6 +609,7 @@ function appendLineOrPoints(
   let indices: number[] | null = null
   let outputPositions = positions
   let outputUvs: number[] | undefined = topology === 'lines' ? uvs ?? undefined : undefined
+  let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? secondaryUvs ?? undefined : undefined
   let outputColors: number[] | undefined
   const color = materialColor(material)
   const useVertexColors = vertexColors && material?.vertexColors !== false
@@ -642,6 +645,7 @@ function appendLineOrPoints(
       if (dashed.positions.length < 6) return
       outputPositions = dashed.positions
       outputUvs = dashed.uvs
+      outputSecondaryUvs = undefined
       outputColors = dashed.colors
       indices = null
     } else {
@@ -650,6 +654,7 @@ function appendLineOrPoints(
       if (instancedGeometryCount > 1 || instancedPositionOffset) {
         outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
         outputUvs = uvs ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount) : undefined
+        outputSecondaryUvs = secondaryUvs ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount) : undefined
         indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
       }
     }
@@ -670,6 +675,7 @@ function appendLineOrPoints(
     positions: outputPositions,
     indices: indices ?? undefined,
     uvs: topology === 'lines' ? outputUvs : undefined,
+    uvs2: topology === 'lines' ? outputSecondaryUvs : undefined,
     color,
     colors: outputColors,
     texture: textureInfo?.data,
