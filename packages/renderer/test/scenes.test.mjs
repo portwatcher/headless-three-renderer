@@ -3314,6 +3314,88 @@ test('Fog and FogExp2 affect material output', () => {
   assert.ok(exp2.b > exp2.r + 40, `FogExp2 should mix the red plane toward blue (${exp2.b} vs ${exp2.r})`)
 })
 
+test('Fog affects sprites, points, and lines with material fog opt-out', () => {
+  function renderObject(object) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.fog = new THREE.Fog(0x00ff00, 0, 1)
+    scene.add(object)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function makeSprite(fog) {
+    const material = new THREE.SpriteMaterial({ color: 0xff0000 })
+    material.fog = fog
+    const sprite = new THREE.Sprite(material)
+    sprite.scale.set(1.2, 1.2, 1)
+    return sprite
+  }
+
+  function makePoint(fog) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+    const material = new THREE.PointsMaterial({
+      color: 0xff0000,
+      size: 34,
+      sizeAttenuation: false,
+    })
+    material.fog = fog
+    return new THREE.Points(geometry, material)
+  }
+
+  function makeLine(fog) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1, 0, 0),
+      new THREE.Vector3(1, 0, 0),
+    ])
+    const material = new THREE.LineBasicMaterial({ color: 0xff0000 })
+    material.fog = fog
+    return new THREE.Line(geometry, material)
+  }
+
+  for (const [label, makeObject] of [
+    ['sprite', makeSprite],
+    ['point', makePoint],
+  ]) {
+    const fogged = meanRegion(renderObject(makeObject(true)), 64, 64, 24, 24, 40, 40)
+    const unfogged = meanRegion(renderObject(makeObject(false)), 64, 64, 24, 24, 40, 40)
+    assert.ok(fogged.g > fogged.r + 40, `${label} should be mixed toward green fog (${fogged.g} vs ${fogged.r})`)
+    assert.ok(
+      unfogged.r > unfogged.g + 40,
+      `${label} fog=false should keep the red material color (${unfogged.r} vs ${unfogged.g})`,
+    )
+  }
+
+  const foggedLine = renderObject(makeLine(true))
+  const unfoggedLine = renderObject(makeLine(false))
+  const greenLinePixels = countRegionPixels(
+    foggedLine,
+    64,
+    64,
+    8,
+    28,
+    56,
+    36,
+    (r, g, b) => g > r + 30 && g > b + 30,
+  )
+  const redLinePixels = countRegionPixels(
+    unfoggedLine,
+    64,
+    64,
+    8,
+    28,
+    56,
+    36,
+    (r, g, b) => r > g + 30 && r > b + 30,
+  )
+  assert.ok(greenLinePixels > 2, `line should be mixed toward green fog (${greenLinePixels})`)
+  assert.ok(redLinePixels > 2, `line fog=false should keep the red material color (${redLinePixels})`)
+})
+
 test('PBR scene with lights renders and shows lighting variation', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.05, 0.05, 0.05)

@@ -138,7 +138,7 @@ The public API accepts only Three.js-like objects:
 - `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, and wrap/filter sampler settings
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
-- `material.fog = false` opt-out for scene fog
+- `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
@@ -269,4 +269,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, and decode sRGB color maps. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Scene fog and `material.fog = false` are honored. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, and decode sRGB color maps. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.
