@@ -4448,6 +4448,43 @@ test('scene environmentRotation rotates equirectangular IBL', () => {
   assert.ok(rotated.g > rotated.r + 15, `rotated reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
 })
 
+test('scene environmentRotation rotates cube IBL', () => {
+  const environment = cubeTexture([
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+  ])
+
+  function renderWithRotation(yRotation) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = environment
+    scene.environmentIntensity = 4
+    scene.environmentRotation = new THREE.Euler(0, yRotation, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const unrotated = renderWithRotation(0)
+  const rotated = renderWithRotation(-Math.PI / 2)
+  const diff = meanAbsDiff(unrotated, rotated)
+  assert.ok(diff > 1.0, `rotated cube IBL should change the reflection, diff=${diff.toFixed(3)}`)
+})
+
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
     ['CubeUV scene environment', (scene) => {
