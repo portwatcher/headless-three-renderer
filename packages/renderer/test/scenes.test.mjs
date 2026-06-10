@@ -3565,6 +3565,39 @@ test('scene-level reflection probe feeds physical IBL when scene.environment is 
   assert.ok(diff > 0.5, `expected reflection probe to affect metallic IBL, diff=${diff.toFixed(3)}`)
 })
 
+test('unsupported environment and reflection probe mappings fail clearly', () => {
+  const cases = [
+    ['cube scene environment', (scene) => {
+      scene.environment = Object.assign(makeEnvironmentTexture(), { isCubeTexture: true })
+    }],
+    ['CubeUV scene environment', (scene) => {
+      scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping })
+    }],
+    ['refraction scene environment', (scene) => {
+      scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.EquirectangularRefractionMapping })
+    }],
+    ['cube reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: {
+          texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeReflectionMapping }),
+        },
+      }
+    }],
+  ]
+
+  for (const [name, setup] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    setup(scene)
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /PMREM\/CubeUV environment mapping.*not supported/i,
+      name,
+    )
+  }
+})
+
 test('physical transmission samples the already-rendered scene color', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)

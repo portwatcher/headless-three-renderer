@@ -106,7 +106,7 @@ Status keys:
 | Light limit | Partial | Up to 16 lights. |
 | Shadows | Partial | Directional, spot, point, and directional cascaded shadow maps are supported for one shadow-casting light; additional visible shadow-casting lights fail clearly. |
 | Shadow behavior parity | Partial | Supports common camera bounds, map size, bias, normal bias, cast/receive flags, and alpha-tested casters. Native multiple-shadow-map rendering and blur/radius parity remain planned. |
-| Equirectangular environment IBL | Supported | CPU precomputes diffuse irradiance, prefiltered specular, and BRDF LUT. |
+| Equirectangular environment IBL | Supported | CPU precomputes diffuse irradiance, prefiltered specular, and BRDF LUT from equirectangular inputs. Cube, refraction, and PMREM/CubeUV environment mappings fail clearly. |
 | Reflection probe hint | Supported | Uses `scene.userData.headlessThreeRenderer.reflectionProbe` or first probe in `reflectionProbes`. |
 | Environment intensity | Supported | `scene.environmentIntensity`. |
 | `LightProbe` | Partial | Spherical-harmonics coefficients from visible, camera-layer-matching `THREE.LightProbe` objects contribute diffuse indirect lighting. Exact golden-tested parity across every material/environment combination remains planned. |

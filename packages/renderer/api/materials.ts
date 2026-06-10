@@ -67,7 +67,8 @@ export function extractEnvironmentMap(scene: ThreeSceneLike): EnvironmentMapInfo
   const probe = extractReflectionProbe(scene)
   const envTex = scene.environment ?? probe?.texture
   if (!envTex) return null
-  assertSupportedTextureInput(envTex, 'scene.environment')
+  const label = scene.environment ? 'scene.environment' : 'reflectionProbe.texture'
+  assertSupportedEnvironmentTexture(envTex, label)
 
   const image = (envTex as any).image ?? (envTex as any).source?.data
   if (!image) return null
@@ -945,6 +946,21 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
   ) {
     throw new Error(
       `${label} uses a cube/equirectangular texture mapping, which is not supported as a background yet. Use a 2D UV-mapped texture or pre-render the background to a 2D image before rendering.`,
+    )
+  }
+}
+
+function assertSupportedEnvironmentTexture(map: ThreeTextureLike, label: string): void {
+  assertSupportedTextureInput(map, label)
+  if (
+    map.isCubeTexture === true ||
+    map.mapping === CubeReflectionMapping ||
+    map.mapping === CubeRefractionMapping ||
+    map.mapping === EquirectangularRefractionMapping ||
+    map.mapping === CubeUVReflectionMapping
+  ) {
+    throw new Error(
+      `${label} uses a cube, refraction, or PMREM/CubeUV environment mapping, which is not supported by @headless-three/renderer yet. Provide an equirectangular texture and let the renderer precompute IBL, or pre-convert the source before rendering.`,
     )
   }
 }

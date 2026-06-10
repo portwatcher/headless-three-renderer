@@ -90,7 +90,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | `RectAreaLight` | Medium | One-sided finite-area approximation is supported for direct lighting. Remaining work is exact Three.js LTC/LUT parity and golden tests. |
 | `LightProbe` support | Medium | Three.js `LightProbe` spherical harmonics contribute diffuse indirect lighting; remaining work is exact golden-tested parity with all material/environment combinations. |
 | Environment/background rotation controls | Medium | `scene.environmentIntensity`, `scene.backgroundIntensity`, `options.backgroundIntensity`, and approximate 2D texture `backgroundBlurriness` are supported; non-default background/environment rotations fail clearly. Remaining work is native rotation, cube/equirect blur, and exact background/environment mapping controls. |
-| PMREM compatibility | Medium | Decide whether to accept Three.js PMREM outputs, prefiltered cubemaps, or keep CPU precompute from source environment maps. |
+| PMREM compatibility | Medium | Cube, refraction, and PMREM/CubeUV environment inputs fail clearly. Remaining work is deciding whether to accept Three.js PMREM outputs, prefiltered cubemaps, or keep CPU precompute from source environment maps. |
 
 ## P2 - Cameras, Targets, And Render Pipeline Features
 
