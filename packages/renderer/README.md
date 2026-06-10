@@ -148,7 +148,7 @@ The public API accepts only Three.js-like objects:
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 use native anisotropic samplers for supported material/background texture slots when the effective sampler is linear-filtered
-- dashed line material segments honor dash/gap/scale settings and preserve map UV transforms, selected map UV channels, and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
+- dashed line material segments honor dash/gap/scale settings and custom `lineDistance` attributes, and preserve map UV transforms, selected map UV channels, and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
 - line material `linewidth` values other than 1 fail clearly until thick-line support lands
 
 Texture image data can be:
@@ -269,4 +269,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, and decode sRGB color maps. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, and decode sRGB color maps. Explicit `THREE.Points` shadow flags fail clearly until point shadow rendering is supported.

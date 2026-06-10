@@ -5302,6 +5302,56 @@ test('LineDashedMaterial scale changes dash coverage', () => {
   assert.ok(highScale < lowScale * 0.35, `higher scale should advance into the gap sooner (${highScale} vs ${lowScale})`)
 })
 
+test('LineDashedMaterial uses custom lineDistance attributes', () => {
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1.4, 0, 0,
+    -0.2, 0, 0,
+    0.2, 0, 0,
+    1.4, 0, 0,
+  ]), 3))
+  geom.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    0, 0.4,
+    0, 0.4,
+  ]), 1))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geom, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 0.5,
+    gapSize: 10,
+    scale: 1,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const leftPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    10,
+    44,
+    44,
+    52,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+  const rightPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    52,
+    44,
+    86,
+    52,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+  assert.ok(leftPixels > 2, `custom lineDistance should keep the left dashed segment visible (${leftPixels})`)
+  assert.ok(rightPixels > 2, `custom lineDistance should reset and keep the right dashed segment visible (${rightPixels})`)
+})
+
 test('line materials with non-default linewidth fail clearly', () => {
   const cases = [
     new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 }),
