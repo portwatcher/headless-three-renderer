@@ -5268,6 +5268,45 @@ test('LineDashedMaterial map alpha samples reconstructed dash UVs', () => {
   assert.ok(ratio > 0.0005, `dashed line UVs should sample the opaque map region (${ratio})`)
 })
 
+test('LineDashedMaterial map applies texture UV transforms', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.offset.set(0.5, 0)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+
+  const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    map,
+    dashSize: 0.5,
+    gapSize: 0.2,
+    scale: 1,
+  }))
+  line.computeLineDistances()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(line)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const image = renderRgba(scene, camera, { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(image, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(greenPixels > 2, `dashed line map offset should shift reconstructed UVs from red to green (${greenPixels})`)
+})
+
 test('LineDashedMaterial map samples the selected secondary UV channel', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
