@@ -4770,6 +4770,28 @@ test('background textures apply UV transforms', () => {
   assert.ok(mean.g > mean.r + 40, `background texture offset should shift the sampled texel from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('background textures honor horizontal wrap modes', () => {
+  function renderWrap(wrapS) {
+    const background = rgbaTexture([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 1)
+    background.magFilter = THREE.NearestFilter
+    background.minFilter = THREE.NearestFilter
+    background.offset.set(1, 0)
+    if (wrapS != null) background.wrapS = wrapS
+
+    const scene = new THREE.Scene()
+    scene.background = background
+    return meanRegion(renderRgba(scene, makeCamera(), { width: 64, height: 64 }), 64, 64, 8, 20, 24, 44)
+  }
+
+  const clamped = renderWrap(undefined)
+  const repeated = renderWrap(THREE.RepeatWrapping)
+  assert.ok(clamped.g > clamped.r + 80, `clamped offset should hold the green edge texel (${clamped.g} vs ${clamped.r})`)
+  assert.ok(repeated.r > repeated.g + 80, `repeated offset should wrap back to the red texel (${repeated.r} vs ${repeated.g})`)
+})
+
 test('background textures decode sRGB colorSpace before output conversion', () => {
   function renderColorSpace(colorSpace) {
     const background = solidTexture(128, 128, 128)
