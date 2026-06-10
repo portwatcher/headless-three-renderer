@@ -578,22 +578,32 @@ function appendLineOrPoints(
   if (topology === 'lines') {
     const source = indexAttr ?? rangeIndices(vertexCount)
     if (material?.isLineDashedMaterial === true) {
-      if (instancedGeometryCount > 1) {
-        throw new Error(
-          'LineDashedMaterial with InstancedBufferGeometry is not supported by @headless-three/renderer yet. Expand dashed line instances to regular line geometry before rendering.',
+      const dashed = instancedGeometryCount > 1 || instancedPositionOffset
+        ? dashedLineAttributesForInstances(
+          positions,
+          uvs,
+          useVertexColors ? vertexColors! : undefined,
+          color,
+          source,
+          drawStart,
+          drawEnd,
+          object,
+          getAttribute(geometry, 'lineDistance'),
+          material,
+          instancedGeometryCount,
+          instancedPositionOffset,
         )
-      }
-      const dashed = dashedLineAttributes(
-        positions,
-        uvs,
-        useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
-        source,
-        drawStart,
-        drawEnd,
-        object,
-        getAttribute(geometry, 'lineDistance'),
-        material,
-      )
+        : dashedLineAttributes(
+          positions,
+          uvs,
+          useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
+          source,
+          drawStart,
+          drawEnd,
+          object,
+          getAttribute(geometry, 'lineDistance'),
+          material,
+        )
       if (dashed.positions.length < 6) return
       outputPositions = dashed.positions
       outputUvs = dashed.uvs
@@ -1128,6 +1138,105 @@ function dashedLineAttributes(
     appendDashedSegment(out, positions, uvs, colors, segment, scale, dashSize, totalSize)
   }
   return out
+}
+
+function dashedLineAttributesForInstances(
+  positions: number[],
+  uvs: number[] | null,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  materialColor: Color4,
+  source: number[],
+  start: number,
+  end: number,
+  object: ThreeObject3DLike,
+  lineDistance: ThreeBufferAttributeLike | undefined,
+  material: { dashSize?: number; gapSize?: number; scale?: number },
+  instanceCount: number,
+  offsetAttribute: ThreeBufferAttributeLike | null,
+): DashedLineExpansion {
+  const out: DashedLineExpansion = {
+    positions: [],
+    uvs: uvs ? [] : undefined,
+    colors: vertexColors ? [] : undefined,
+  }
+  const baseColors = vertexColors && !isInstancedAttribute(vertexColors)
+    ? readColorAttribute(vertexColors, materialColor)
+    : undefined
+
+  for (let instance = 0; instance < instanceCount; instance += 1) {
+    const instancePositions = offsetAttribute
+      ? offsetVec3ValuesForInstance(positions, offsetAttribute, instance)
+      : positions
+    const instanceColors = vertexColors
+      ? baseColors ?? repeatedInstancedColorValues(vertexColors, materialColor, positions.length / 3, instance)
+      : undefined
+    const dashed = dashedLineAttributes(
+      instancePositions,
+      uvs,
+      instanceColors,
+      source,
+      start,
+      end,
+      object,
+      lineDistance,
+      material,
+    )
+    appendDashedLineExpansion(out, dashed)
+  }
+  return out
+}
+
+function offsetVec3ValuesForInstance(
+  values: number[],
+  offsetAttribute: ThreeBufferAttributeLike,
+  instance: number,
+): number[] {
+  const offsetIndex = instancedAttributeIndex(offsetAttribute, instance)
+  const ox = attributeComponent(offsetAttribute, offsetIndex, 0)
+  const oy = attributeComponent(offsetAttribute, offsetIndex, 1)
+  const oz = attributeComponent(offsetAttribute, offsetIndex, 2)
+  const out = new Array<number>(values.length)
+  for (let i = 0; i < values.length; i += 3) {
+    out[i] = values[i] + ox
+    out[i + 1] = values[i + 1] + oy
+    out[i + 2] = values[i + 2] + oz
+  }
+  return out
+}
+
+function repeatedInstancedColorValues(
+  attribute: ThreeBufferAttributeLike,
+  materialColor: Color4,
+  vertexCount: number,
+  instance: number,
+): number[] {
+  const sourceIndex = instancedAttributeIndex(attribute, instance)
+  const itemSize = attribute.itemSize ?? 3
+  const color = [
+    clamp01(attributeComponent(attribute, sourceIndex, 0) * materialColor[0]),
+    clamp01(attributeComponent(attribute, sourceIndex, 1) * materialColor[1]),
+    clamp01(attributeComponent(attribute, sourceIndex, 2) * materialColor[2]),
+    clamp01((itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3) : 1) * materialColor[3]),
+  ]
+  const out = new Array<number>(vertexCount * 4)
+  let dst = 0
+  for (let i = 0; i < vertexCount; i += 1) {
+    out[dst++] = color[0]
+    out[dst++] = color[1]
+    out[dst++] = color[2]
+    out[dst++] = color[3]
+  }
+  return out
+}
+
+function appendDashedLineExpansion(out: DashedLineExpansion, value: DashedLineExpansion): void {
+  appendNumberArray(out.positions, value.positions)
+  if (out.uvs && value.uvs) appendNumberArray(out.uvs, value.uvs)
+  if (out.colors && value.colors) appendNumberArray(out.colors, value.colors)
+}
+
+function appendNumberArray(out: number[], values: number[]): void {
+  for (const value of values) out.push(value)
 }
 
 function createDashedLineExpansion(uvs: number[] | null, colors: number[] | undefined): DashedLineExpansion {

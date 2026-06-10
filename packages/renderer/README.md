@@ -98,7 +98,7 @@ The public API accepts only Three.js-like objects:
 
 - `THREE.Mesh` and `THREE.SkinnedMesh`
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
-- `THREE.InstancedBufferGeometry` for mesh, point, and non-dashed line geometry with common offset/color attributes
+- `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
 - geometry groups with material arrays
 - mesh world transforms
@@ -145,7 +145,7 @@ The public API accepts only Three.js-like objects:
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 fail clearly until native anisotropic filtering lands
-- dashed line material segments preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases
+- dashed line material segments preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
 - line material `linewidth` values other than 1 fail clearly until thick-line support lands
 
 Texture image data can be:

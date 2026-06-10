@@ -4021,31 +4021,41 @@ test('LineSegments with InstancedBufferGeometry expand offsets and colors', () =
   assert.ok(greenPixels > 2, `right instanced line should render green pixels (${greenPixels})`)
 })
 
-test('LineDashedMaterial with InstancedBufferGeometry fails clearly', () => {
+test('LineDashedMaterial with InstancedBufferGeometry expands offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-    -0.5, 0, 0,
-    0.5, 0, 0,
-  ]), 3))
-  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
     -0.25, 0, 0,
     0.25, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.setAttribute('color', new THREE.InstancedBufferAttribute(new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
   ]), 3))
   geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, 1]), 1))
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Line(geometry, new THREE.LineDashedMaterial({
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineDashedMaterial({
     color: 0xffffff,
+    vertexColors: true,
     dashSize: 0.2,
     gapSize: 0.1,
   })))
 
-  assert.throws(
-    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /LineDashedMaterial with InstancedBufferGeometry.*not supported/i,
-  )
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 10, 42, 42, 54, (r, g, b) => r > g + 30 && r > b + 30)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 54, 42, 86, 54, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(redPixels > 2, `left instanced dashed line should render red pixels (${redPixels})`)
+  assert.ok(greenPixels > 2, `right instanced dashed line should render green pixels (${greenPixels})`)
 })
 
 test('points topology renders successfully', () => {
