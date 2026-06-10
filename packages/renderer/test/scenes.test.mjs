@@ -1378,6 +1378,34 @@ test('material depthWrite=false avoids occluding later depth-tested draws', () =
   assert.ok(disabledWrite.b > disabledWrite.r + 80, `depthWrite=false should let later blue draw pass (${disabledWrite.b} vs ${disabledWrite.r})`)
 })
 
+test('transparent materials honor default depthWrite=true', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const front = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.75, transparent: true }),
+  )
+  front.position.z = 0.2
+  front.renderOrder = 0
+  scene.add(front)
+
+  const behind = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, opacity: 0.75, transparent: true }),
+  )
+  behind.position.z = -0.2
+  behind.renderOrder = 1
+  scene.add(behind)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 60, `default transparent depthWrite should reject the later blue draw behind red (${mean.r} vs ${mean.b})`)
+})
+
 test('material colorWrite=false writes depth without changing color', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

@@ -137,7 +137,7 @@ The public API accepts only Three.js-like objects:
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
 - `material.fog = false` opt-out for scene fog
 - alpha test (`material.alphaTest`) with fragment discard
-- transparency sorting (back-to-front) with separate no-depth-write pipeline
+- transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - material-level `envMap` reflection/refraction inputs fail clearly; use `scene.environment` or reflection probes for supported IBL
 - unsupported `alphaToCoverage` and `clipShadows` material states fail clearly
