@@ -5252,6 +5252,33 @@ test('lines topology renders successfully', () => {
   assertValidPng(buf, { width: SIZE, height: SIZE })
 })
 
+test('LineLoop renders the implicit closing segment', () => {
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1, -0.8, 0),
+    new THREE.Vector3(1, -0.8, 0),
+    new THREE.Vector3(1, 0.8, 0),
+  ])
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineLoop(geom, new THREE.LineBasicMaterial({ color: 0xffffff })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const closingPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    20,
+    28,
+    36,
+    68,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+  assert.ok(closingPixels > 2, `LineLoop should render the closing segment (${closingPixels})`)
+})
+
 test('LineBasicMaterial opacity blends over the background', () => {
   const geom = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-1.5, 0, 0),
