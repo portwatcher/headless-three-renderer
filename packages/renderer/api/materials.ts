@@ -779,6 +779,20 @@ function assertSupportedMaterialState(material: ThreeMaterialLike): void {
       'material.clipShadows is not supported by @headless-three/renderer yet. Shadow-pass clipping is not translated; disable clipShadows or pre-bake the clipped shadow caster before rendering.',
     )
   }
+  if (
+    (Number.isFinite(material.iridescence) && material.iridescence! > 0) ||
+    material.iridescenceMap != null ||
+    material.iridescenceThicknessMap != null
+  ) {
+    throw new Error(
+      'MeshPhysicalMaterial iridescence is not supported by @headless-three/renderer yet. Disable iridescence or bake the effect into textures before rendering.',
+    )
+  }
+  if (Number.isFinite(material.dispersion) && material.dispersion! !== 0) {
+    throw new Error(
+      'MeshPhysicalMaterial dispersion is not supported by @headless-three/renderer yet. Disable dispersion or bake the effect into textures before rendering.',
+    )
+  }
 }
 
 function hasCustomOnBeforeCompile(material: ThreeMaterialLike): boolean {

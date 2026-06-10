@@ -138,6 +138,7 @@ The public API accepts only Three.js-like objects:
 - transparency sorting (back-to-front) with separate no-depth-write pipeline
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - unsupported `alphaToCoverage` and `clipShadows` material states fail clearly
+- unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - dashed line material segments preserve map UVs and interpolated vertex colors for common `LineDashedMaterial` cases
 - line material `linewidth` values other than 1 fail clearly until thick-line support lands

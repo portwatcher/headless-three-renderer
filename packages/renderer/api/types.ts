@@ -143,6 +143,12 @@ export interface ThreeMaterialLike {
   anisotropy?: number
   anisotropyRotation?: number
   anisotropyMap?: ThreeTextureLike | null
+  iridescence?: number
+  iridescenceMap?: ThreeTextureLike | null
+  iridescenceIOR?: number
+  iridescenceThicknessRange?: ArrayLike<number>
+  iridescenceThicknessMap?: ThreeTextureLike | null
+  dispersion?: number
   transmission?: number
   transmissionMap?: ThreeTextureLike | null
   ior?: number

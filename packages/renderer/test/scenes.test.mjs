@@ -2610,6 +2610,38 @@ test('MeshPhysicalMaterial specular intensity and color affect direct specular',
   assert.ok(green.g > green.r + 0.1, `green specularColor should tint the highlight green (${green.g} vs ${green.r})`)
 })
 
+test('MeshPhysicalMaterial iridescence and dispersion fail clearly', () => {
+  const cases = []
+
+  const iridescence = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+  iridescence.iridescence = 0.5
+  cases.push([iridescence, /iridescence.*not supported/i, 'iridescence'])
+
+  const iridescenceMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+  iridescenceMap.iridescenceMap = solidTexture(255, 255, 255)
+  cases.push([iridescenceMap, /iridescence.*not supported/i, 'iridescenceMap'])
+
+  const iridescenceThicknessMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+  iridescenceThicknessMap.iridescenceThicknessMap = solidTexture(255, 255, 255)
+  cases.push([iridescenceThicknessMap, /iridescence.*not supported/i, 'iridescenceThicknessMap'])
+
+  const dispersion = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+  dispersion.dispersion = 0.25
+  cases.push([dispersion, /dispersion.*not supported/i, 'dispersion'])
+
+  for (const [material, pattern, label] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), material))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      label,
+    )
+  }
+})
+
 test('physical extension maps apply texture UV transforms', () => {
   const transmissionMap = rgbaTexture([
     0, 0, 0, 255,
