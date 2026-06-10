@@ -1,14 +1,55 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { assertValidPng, parsePngDimensions } from './helpers.mjs'
 
-const { Renderer, render } = pkg
+const {
+  Renderer,
+  createEncodedImageTextureLoader,
+  installLocalFileFetch,
+  render,
+  resolveLocalAssetPath,
+} = pkg
 
 test('module exports Renderer class and render function', () => {
   assert.equal(typeof Renderer, 'function')
   assert.equal(typeof render, 'function')
+  assert.equal(typeof createEncodedImageTextureLoader, 'function')
+  assert.equal(typeof installLocalFileFetch, 'function')
+  assert.equal(typeof resolveLocalAssetPath, 'function')
+})
+
+test('Node loader helpers expose encoded image buffers and local file fetch', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'headless-three-loader-'))
+  try {
+    const imagePath = path.join(dir, 'tex.png')
+    const imageBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l6g+WQAAAABJRU5ErkJggg==',
+      'base64',
+    )
+    await writeFile(imagePath, imageBytes)
+
+    const loader = createEncodedImageTextureLoader(dir)
+    const texture = await new Promise((resolve, reject) => {
+      loader.load('tex.png', resolve, undefined, reject)
+    })
+
+    assert.equal(texture.isTexture, true)
+    assert.deepEqual(Buffer.from(texture.image), imageBytes)
+    assert.equal(texture.source.data, texture.image)
+    assert.equal(resolveLocalAssetPath('tex.png', dir), imagePath)
+
+    installLocalFileFetch()
+    const response = await fetch(pathToFileURL(imagePath).href)
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), imageBytes)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('renders a simple scene and returns a PNG buffer of the requested size', () => {

@@ -119,7 +119,7 @@ Status keys:
 | Smoke tests | Supported | Module load, simple renders, output dimensions, reusable renderer. |
 | Conformance invariants | Supported | Scene-level render invariants for materials, PBR, IBL, shadows, post-processing, lines, points, layers, and render order. |
 | Packed artifact verification | Supported | CI packs the package and current-platform native binary, installs them in a clean temp project, and renders a scene. |
-| Node loader setup docs | Supported | Local `GLTFLoader` setup is documented for file paths, external buffers, encoded image files, and optional image polyfills. |
+| Node loader setup docs/helpers | Supported | Local `GLTFLoader` setup is documented for file paths, external buffers, encoded image files, and optional image polyfills. The package exports Node helpers for encoded image texture loading and local `file://` fetch bridging. |
 | Golden-image parity corpus | Partial | The repo has scene invariants but not a committed browser-generated golden corpus yet. |
 | Curated external asset corpus | Unsupported | Planned for glTF Sample Assets, VRM/VRMA, and pathological geometry fixtures. |
 

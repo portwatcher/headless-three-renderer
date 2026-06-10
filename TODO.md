@@ -118,7 +118,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Document Node loader setup | High | Node `GLTFLoader` setup is documented for local files, `FileLoader`/`fetch`, encoded image buffers, path resolution, and optional image polyfills. Remaining work is keeping examples synced with future helper APIs. |
-| Provide asset loading helpers | Medium | Optional helpers can normalize texture image data into the renderer-supported form. |
+| Provide asset loading helpers | Medium | `createEncodedImageTextureLoader`, `EncodedImageTextureLoader`, `installLocalFileFetch`, and `resolveLocalAssetPath` help Node loaders expose renderer-supported encoded texture buffers. Remaining work is broader helper coverage for embedded images, KTX2/Basis pre-decode, and higher-level glTF/VRM loading. |
 | Add end-to-end glTF/VRM examples | High | Keep simple examples in the repo that run fully in Node. |
 
 ## Acceptance Criteria For "Fully Supports Three.js Scenes"

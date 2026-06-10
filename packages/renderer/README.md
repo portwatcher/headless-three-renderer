@@ -65,6 +65,12 @@ const renderer = new Renderer()
 const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 ```
 
+It also exports Node loader helpers:
+
+- `createEncodedImageTextureLoader(rootDir)` / `EncodedImageTextureLoader`: a `LoadingManager` image handler for local PNG/JPEG/WebP files that exposes encoded buffers directly to renderer-supported texture slots.
+- `installLocalFileFetch()`: a small `file://` fetch bridge for Three.js `FileLoader` when loading local external glTF buffers.
+- `resolveLocalAssetPath(url, rootDir)`: shared path resolution for local loader helpers.
+
 ## Supported Three.js Surface
 
 See the versioned [compatibility matrix](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/compatibility.md) for the public support contract, known gaps, and platform package status.

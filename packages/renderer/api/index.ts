@@ -18,6 +18,13 @@ import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLig
 import { extractBackgroundTexture, extractEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
 
+export {
+  EncodedImageTextureLoader,
+  createEncodedImageTextureLoader,
+  installLocalFileFetch,
+  resolveLocalAssetPath,
+} from './loaders'
+
 export type {
   RenderOutputFormat,
   RenderOutputColorSpace,
