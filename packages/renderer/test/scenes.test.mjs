@@ -2167,24 +2167,30 @@ test('Sprite center shifts billboard anchoring around object position', () => {
   assert.ok(upperRight.minY > centered.minY + 10, `center=(1,1) should anchor the sprite below its origin (${upperRight.minY} vs ${centered.minY})`)
 })
 
-test('Sprite shadow flags fail clearly', () => {
-  const cases = [
-    ['castShadow', /THREE\.Sprite castShadow.*not supported/i],
-    ['receiveShadow', /THREE\.Sprite receiveShadow.*not supported/i],
-  ]
+test('Sprite unsupported shadow paths fail clearly', () => {
+  const receiveScene = new THREE.Scene()
+  const receiver = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+  receiver.receiveShadow = true
+  receiveScene.add(receiver)
+  assert.throws(
+    () => renderRgba(receiveScene, makeCamera(), { width: 64, height: 64 }),
+    /THREE\.Sprite receiveShadow.*not supported/i,
+    'receiveShadow',
+  )
 
-  for (const [property, pattern] of cases) {
-    const scene = new THREE.Scene()
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
-    sprite[property] = true
-    scene.add(sprite)
-
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      pattern,
-      property,
-    )
-  }
+  const pointLightScene = new THREE.Scene()
+  const caster = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+  caster.castShadow = true
+  pointLightScene.add(caster)
+  const light = new THREE.PointLight(0xffffff, 1)
+  light.position.set(2, 4, 2)
+  light.castShadow = true
+  pointLightScene.add(light)
+  assert.throws(
+    () => renderRgba(pointLightScene, makeCamera(), { width: 64, height: 64 }),
+    /THREE\.Sprite point-light castShadow.*not supported/i,
+    'point-light castShadow',
+  )
 })
 
 test('camera layers filter renderable objects', () => {
@@ -3484,6 +3490,51 @@ test('alpha-tested shadow casters honor alphaMap cutouts', () => {
   const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
   const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
   assert.ok(cutoutLum > opaqueLum + 30, `alphaMap cutout should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
+})
+
+test('SpriteMaterial casts directional shadows from expanded billboards', () => {
+  function renderSpriteShadow(castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+    sprite.position.set(0, 4, 0)
+    sprite.scale.set(4, 4, 1)
+    sprite.castShadow = castShadow
+    scene.add(sprite)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const unshadowed = renderSpriteShadow(false)
+  const shadowed = renderSpriteShadow(true)
+  const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+  const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+  assert.ok(shadowedLum < unshadowedLum - 15, `sprite billboard shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
 })
 
 test('PointsMaterial casts directional shadows from expanded billboards', () => {

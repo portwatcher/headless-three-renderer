@@ -115,7 +115,7 @@ function visitObject(
     } else if (object.isPoints === true && object.geometry) {
       appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if (object.isSprite === true) {
-      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, materialContext)
+      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     }
   }
 
@@ -517,9 +517,10 @@ function appendSprite(
   groupOrder: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
 ): void {
-  assertUnsupportedBillboardShadows(object, 'THREE.Sprite')
+  assertUnsupportedSpriteShadows(object, shadowMaterialMode)
 
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
@@ -590,7 +591,7 @@ function appendSprite(
     textureUsesUv2: textureInfo?.usesUv2,
     transform: IDENTITY_4X4.slice(),
     transparent: material?.transparent !== false,
-    castShadow: undefined,
+    castShadow: object.castShadow === true ? true : undefined,
     receiveShadow: undefined,
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
@@ -725,12 +726,15 @@ function appendPoints(
   }
 }
 
-function assertUnsupportedBillboardShadows(object: ThreeObject3DLike, label: string): void {
-  if (object.castShadow === true) {
-    throw new Error(`${label} castShadow is not supported by @headless-three/renderer yet. Disable castShadow or expand the billboard to mesh geometry before rendering shadows.`)
-  }
+function assertUnsupportedSpriteShadows(
+  object: ThreeObject3DLike,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
+): void {
   if (object.receiveShadow === true) {
-    throw new Error(`${label} receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the billboard to mesh geometry before rendering shadows.`)
+    throw new Error('THREE.Sprite receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the sprite to mesh geometry before receiving shadows.')
+  }
+  if (object.castShadow === true && shadowMaterialMode === 'distance') {
+    throw new Error('THREE.Sprite point-light castShadow is not supported by @headless-three/renderer yet. Use directional or spot shadow maps, or expand sprites to mesh geometry for point-light shadows.')
   }
 }
 

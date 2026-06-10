@@ -101,7 +101,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
 - `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
-- `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, and main-pass clipping
+- `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, and directional/spot shadow casting
 - geometry groups with material arrays
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection
@@ -249,7 +249,7 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `Object3D.customDepthMaterial` is honored for directional/spot shadow caster alpha-tested and displacement inputs, and `customDistanceMaterial` is honored for point-light shadow caster alpha-tested and displacement inputs. `THREE.Points` can cast directional/spot shadows from expanded billboard quads; `THREE.Points.receiveShadow`, point-light point shadows, and `THREE.Sprite` shadow flags fail clearly until those paths land. Additional shadow-casting lights and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular cube-face support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `Object3D.customDepthMaterial` is honored for directional/spot shadow caster alpha-tested and displacement inputs, and `customDistanceMaterial` is honored for point-light shadow caster alpha-tested and displacement inputs. `THREE.Sprite` and `THREE.Points` can cast directional/spot shadows from expanded billboard quads; `THREE.Sprite.receiveShadow`, `THREE.Points.receiveShadow`, point-light sprite shadows, and point-light point shadows fail clearly until those paths land. Additional shadow-casting lights and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular cube-face support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
 
 Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has `{ left, right, top, bottom, near, far, split }` bounds.
 
