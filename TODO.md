@@ -36,7 +36,7 @@ Already supported in the current implementation:
 - ACES Filmic tone mapping, output color-space controls, simple post-processing, custom WGSL fragment bodies, lines, and point billboards.
 - `THREE.Sprite`/`SpriteMaterial` CPU billboard expansion with color, opacity, texture maps, center, scale, rotation, size attenuation, layers, and render ordering; explicit sprite shadow flags fail clearly.
 - `LineDashedMaterial` dash/gap patterns for common line, line segment, line loop, and instanced line cases.
-- Object/camera layer filtering for renderable objects and lights, plus native draw-order keys for group order, `renderOrder`, material id, projected z, and object/insertion ties.
+- Object/camera layer filtering for renderable objects and lights, plus native draw-order keys for group order, `renderOrder`, material id, projected geometry bounding-sphere z, and object/insertion ties.
 - `THREE.LOD` auto-update selection for the active camera.
 - `THREE.Fog` and `THREE.FogExp2` in standard material shaders, using camera-distance fog.
 
@@ -60,7 +60,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | `InstancedBufferGeometry` edge cases | High | Basic mesh, point, line, and dashed-line CPU expansion supports common per-instance offset/color attributes; remaining work is arbitrary custom vertex attributes and shader integration. |
-| `renderOrder` and sorting edge cases | High | Group order, `renderOrder`, material id, projected z, and object/insertion ties are honored; remaining work is exact Three.js bounding-sphere z, materialVariant, transmissive buckets, and custom sort callback parity. |
+| `renderOrder` and sorting edge cases | High | Group order, `renderOrder`, material id, projected geometry bounding-sphere z, and object/insertion ties are honored; remaining work is `materialVariant`, transmissive buckets, and custom sort callback parity. |
 | Sprites and billboards | High | `THREE.Sprite`/`SpriteMaterial` CPU billboards support scale, rotation, opacity, texture maps, layers, render ordering, and main-pass clipping; explicit shadow flags fail clearly. Remaining work is sprite shadow rendering and exact WebGL edge-case parity. |
 | Points material parity | Medium | `PointsMaterial` CPU billboards support size, perspective size attenuation, maps, alpha maps, vertex colors, main-pass clipping, and common instanced geometry offset/color attributes; explicit shadow flags fail clearly. Remaining work is hardware cap behavior, circular point-sprite edge cases, and point shadow rendering. |
 | Line material parity edge cases | Medium | Current lines support unlit color, vertex colors, common instanced geometry offset/color attributes, and `LineBasicMaterial.map` texture alpha/UVs; `LineDashedMaterial` dash/gap patterns render for common non-instanced and instanced cases with reconstructed map UVs and interpolated vertex colors. Non-default `linewidth` fails clearly. Remaining work is thick-line support and broader line material option parity. |

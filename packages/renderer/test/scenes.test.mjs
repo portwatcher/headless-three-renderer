@@ -1284,6 +1284,41 @@ test('Group renderOrder supplies groupOrder for transparent children', () => {
   assert.ok(mean.r > mean.b + 10, `higher groupOrder red plane should render on top (${mean.r} vs ${mean.b})`)
 })
 
+test('transparent sort depth uses geometry bounding sphere center', () => {
+  function offsetPlane(zOffset, color) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -1, -1, zOffset,
+      1, -1, zOffset,
+      1, 1, zOffset,
+      -1, 1, zOffset,
+    ]), 3))
+    geometry.setIndex([0, 1, 2, 0, 2, 3])
+
+    return new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+      }),
+    )
+  }
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(offsetPlane(0.45, 0xff0000))
+  scene.add(offsetPlane(-0.45, 0x0000ff))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 20, `near red geometry center should sort over far blue despite matching object origins (${mean.r} vs ${mean.b})`)
+})
+
 test('material depthTest=false renders over earlier depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

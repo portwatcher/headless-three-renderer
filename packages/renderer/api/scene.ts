@@ -739,9 +739,10 @@ function projectedObjectZ(object: ThreeObject3DLike, camera: ThreeCameraLike, tr
   const projection = camera.projectionMatrix?.elements
   if (!view || view.length < 16 || !projection || projection.length < 16) return 0
 
-  const x = world[12]
-  const y = world[13]
-  const z = world[14]
+  const center = objectSortCenter(object)
+  const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12]
+  const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13]
+  const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14]
   const vx = view[0] * x + view[4] * y + view[8] * z + view[12]
   const vy = view[1] * x + view[5] * y + view[9] * z + view[13]
   const vz = view[2] * x + view[6] * y + view[10] * z + view[14]
@@ -749,6 +750,34 @@ function projectedObjectZ(object: ThreeObject3DLike, camera: ThreeCameraLike, tr
   const clipZ = projection[2] * vx + projection[6] * vy + projection[10] * vz + projection[14] * vw
   const clipW = projection[3] * vx + projection[7] * vy + projection[11] * vz + projection[15] * vw
   return clipW === 0 ? clipZ : clipZ / clipW
+}
+
+function objectSortCenter(object: ThreeObject3DLike): [number, number, number] {
+  const geometry = object.geometry
+  if (!geometry) return [0, 0, 0]
+
+  if (geometry.boundingSphere == null && typeof geometry.computeBoundingSphere === 'function') {
+    try {
+      geometry.computeBoundingSphere()
+    } catch {
+      return [0, 0, 0]
+    }
+  }
+
+  return vec3Like(geometry.boundingSphere?.center) ?? [0, 0, 0]
+}
+
+function vec3Like(value: { x?: number; y?: number; z?: number } | ArrayLike<number> | undefined): [number, number, number] | null {
+  if (!value) return null
+  const objectValue = value as { x?: unknown; y?: unknown; z?: unknown }
+  const x = typeof objectValue.x === 'number' ? objectValue.x : (value as ArrayLike<unknown>)[0]
+  const y = typeof objectValue.y === 'number' ? objectValue.y : (value as ArrayLike<unknown>)[1]
+  const z = typeof objectValue.z === 'number' ? objectValue.z : (value as ArrayLike<unknown>)[2]
+  return typeof x === 'number' && Number.isFinite(x)
+    && typeof y === 'number' && Number.isFinite(y)
+    && typeof z === 'number' && Number.isFinite(z)
+    ? [x, y, z]
+    : null
 }
 
 function columnLength3(matrix: ArrayLike<number>, start: number): number {

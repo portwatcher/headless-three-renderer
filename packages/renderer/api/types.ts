@@ -21,6 +21,11 @@ export interface ThreeMatrix3Like {
   elements: ArrayLike<number>
 }
 
+export interface ThreeSphereLike {
+  center?: { x?: number; y?: number; z?: number } | ArrayLike<number>
+  radius?: number
+}
+
 export interface ThreeBufferAttributeLike {
   count: number
   itemSize?: number
@@ -47,6 +52,8 @@ export interface ThreeBufferGeometryLike {
   groups?: Array<{ start: number; count: number; materialIndex?: number }>
   drawRange?: { start?: number; count?: number }
   getAttribute?(name: string): ThreeBufferAttributeLike | undefined
+  boundingSphere?: ThreeSphereLike | null
+  computeBoundingSphere?(): void
   morphAttributes?: Record<string, ThreeBufferAttributeLike[] | undefined>
   morphTargetsRelative?: boolean
 }
