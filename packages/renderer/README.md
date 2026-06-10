@@ -137,7 +137,7 @@ The public API accepts only Three.js-like objects:
 - light maps with `lightMapIntensity`, `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
 - occlusion map (`material.aoMap`) applied to indirect lighting, with `texture.channel` UV selection and wrap/filter sampler settings
 - alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with `texture.channel` UV selection and wrap/filter sampler settings
-- `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, and wrap/filter sampler settings
+- `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level environment/reflection-probe specular reflections
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
@@ -146,7 +146,7 @@ The public API accepts only Three.js-like objects:
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
-- material-level `envMap` reflection/refraction inputs fail clearly; use `scene.environment` or reflection probes for supported IBL
+- material-level `envMap` reflection/refraction inputs fail clearly; use `scene.environment` or reflection probes for supported IBL, including approximate `MeshPhongMaterial` specular environment reflections
 - unsupported `alphaToCoverage` material state fails clearly
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge

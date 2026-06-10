@@ -1130,6 +1130,38 @@ test('MeshPhongMaterial specularMap honors nearest texture filters', () => {
   assert.ok(linear.r > nearest.r + 25, `LinearFilter should blend in the enabled specular texel (${linear.r} vs ${nearest.r})`)
 })
 
+test('MeshPhongMaterial scene environment feeds specular reflection', () => {
+  function renderPhongEnvironment(specularMap, useEnvironment) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (useEnvironment) {
+      const environment = solidTexture(255, 255, 255)
+      environment.mapping = THREE.EquirectangularReflectionMapping
+      scene.environment = environment
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 48, 24),
+      new THREE.MeshPhongMaterial({
+        color: 0x000000,
+        specular: 0xffffff,
+        shininess: 120,
+        specularMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  const noEnvironment = maxLuminance(renderPhongEnvironment(null, false))
+  const environment = maxLuminance(renderPhongEnvironment(null, true))
+  const maskedEnvironment = maxLuminance(renderPhongEnvironment(solidTexture(0, 0, 0), true))
+  assert.ok(environment > noEnvironment + 40, `scene environment should add a Phong reflection (${environment} vs ${noEnvironment})`)
+  assert.ok(environment > maskedEnvironment + 40, `specularMap should suppress Phong environment reflection (${environment} vs ${maskedEnvironment})`)
+})
+
 test('material envMap reflection inputs fail clearly', () => {
   const envMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,

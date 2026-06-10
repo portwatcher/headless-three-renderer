@@ -1207,6 +1207,14 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
         }
 
         lo = lo + (diffuse_ibl + specular_ibl) * env_intensity * ao;
+      } else if use_phong {
+        let R = reflect(-V, N);
+        let max_lod = 4.0; // PREFILTER_MIP_LEVELS - 1
+        let phong_roughness = clamp(sqrt(2.0 / (phong_shininess + 2.0)), 0.0, 1.0);
+        let reflected = textureSampleLevel(t_prefilter, s_ibl, R, phong_roughness * max_lod).rgb;
+        let diffuse_ibl = irradiance * albedo * ao;
+        let specular_ibl = reflected * phong_specular_color * phong_specular_strength;
+        lo = lo + (diffuse_ibl + specular_ibl) * env_intensity;
       } else {
         // Lambert: diffuse IBL only
         lo = lo + irradiance * albedo * env_intensity * ao;
