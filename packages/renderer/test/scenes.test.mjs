@@ -2988,6 +2988,35 @@ test('base color maps honor texture flipY', () => {
   assert.ok(flipped.g > flipped.r + 40, `flipY=true should sample the opposite texture row as green (${flipped.g} vs ${flipped.r})`)
 })
 
+test('base color maps honor explicit texture matrices', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.matrixAutoUpdate = false
+  map.matrix.set(
+    1, 0, 0.5,
+    0, 1, 0,
+    0, 0, 1,
+  )
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    constantUvPlane(0.25, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, map }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 22, 22, 42, 42)
+  assert.ok(mean.g > mean.r + 80, `explicit texture matrix should shift the base map to green (${mean.g} vs ${mean.r})`)
+})
+
 test('base color maps honor nearest texture filters', () => {
   function renderWithFilter(filter) {
     const map = rgbaTexture([
@@ -6421,6 +6450,26 @@ test('background textures apply UV transforms', () => {
 
   const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   assert.ok(mean.g > mean.r + 40, `background texture offset should shift the sampled texel from red to green (${mean.g} vs ${mean.r})`)
+})
+
+test('background textures honor explicit texture matrices', () => {
+  const background = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+  background.matrixAutoUpdate = false
+  background.matrix.set(
+    0, 0, 0.25,
+    0, 0, 0.5,
+    0, 0, 1,
+  )
+
+  const scene = new THREE.Scene()
+  scene.background = background
+  const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+  assert.ok(mean.r > mean.g + 80, `explicit background matrix should pin sampling to the red texel (${mean.r} vs ${mean.g})`)
 })
 
 test('background textures honor horizontal wrap modes', () => {
