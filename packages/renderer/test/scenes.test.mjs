@@ -242,18 +242,63 @@ test('rgba format returns raw pixel buffer of the expected byte length', () => {
   assert.equal(buf.length, SIZE * SIZE * 4, 'rgba buffer must be width*height*4 bytes')
 })
 
-test('ArrayCamera and CubeCamera inputs fail clearly', () => {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0.1, 0.1, 0.1)
-  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xff00ff })))
+function makeLayeredArrayCamera(width = 64, height = 64) {
+  const leftCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  leftCamera.position.set(0, 0, 3)
+  leftCamera.lookAt(0, 0, 0)
+  leftCamera.layers.set(1)
+  leftCamera.viewport = new THREE.Vector4(0, 0, width / 2, height)
 
-  const subCamera = makeCamera()
-  const arrayCamera = new THREE.ArrayCamera([subCamera])
-  arrayCamera.projectionMatrix.copy(subCamera.projectionMatrix)
-  arrayCamera.matrixWorldInverse.copy(subCamera.matrixWorldInverse)
+  const rightCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  rightCamera.position.set(0, 0, 3)
+  rightCamera.lookAt(0, 0, 0)
+  rightCamera.layers.set(2)
+  rightCamera.viewport = new THREE.Vector4(width / 2, 0, width / 2, height)
+
+  return new THREE.ArrayCamera([leftCamera, rightCamera])
+}
+
+function makeLayeredSplitScene() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  const red = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+  red.layers.set(1)
+  scene.add(red)
+  const green = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+  green.layers.set(2)
+  scene.add(green)
+  return scene
+}
+
+test('ArrayCamera renders sub-camera viewports', () => {
+  const scene = makeLayeredSplitScene()
+  const arrayCamera = makeLayeredArrayCamera()
+
+  const rgba = renderRgba(scene, arrayCamera, { width: 64, height: 64 })
+  const left = meanRegion(rgba, 64, 64, 8, 20, 24, 44)
+  const right = meanRegion(rgba, 64, 64, 40, 20, 56, 44)
+  assert.ok(left.r > left.g + 80 && left.r > left.b + 80, `left ArrayCamera viewport should render the red layer (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.g > right.r + 80 && right.g > right.b + 80, `right ArrayCamera viewport should render the green layer (${right.r}, ${right.g}, ${right.b})`)
+
+  const target = { texture: {}, depthTexture: {} }
+  renderToTarget(scene, arrayCamera, target, { width: 64, height: 64 })
+  assert.equal(target.data.length, 64 * 64 * 4)
+  assert.equal(target.depthTexture.image.data.length, 64 * 64 * 4)
+  const targetLeft = meanRegion(target.data, 64, 64, 8, 20, 24, 44)
+  const targetRight = meanRegion(target.data, 64, 64, 40, 20, 56, 44)
+  const depthLeft = meanRegion(target.depthTexture.image.data, 64, 64, 8, 20, 24, 44)
+  const depthRight = meanRegion(target.depthTexture.image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(targetLeft.r > targetLeft.g + 80, `target left ArrayCamera viewport should render red (${targetLeft.r}, ${targetLeft.g})`)
+  assert.ok(targetRight.g > targetRight.r + 80, `target right ArrayCamera viewport should render green (${targetRight.g}, ${targetRight.r})`)
+  assert.ok(depthLeft.r > 0 && depthRight.r > 0, `ArrayCamera depth target should include both viewports (${depthLeft.r}, ${depthRight.r})`)
+})
+
+test('ArrayCamera PNG output and CubeCamera inputs fail clearly', () => {
+  const scene = makeLayeredSplitScene()
+  const arrayCamera = makeLayeredArrayCamera()
   assert.throws(
-    () => renderRgba(scene, arrayCamera),
-    /ArrayCamera.*not supported/i,
+    () => new Renderer().render(scene, arrayCamera, { width: 64, height: 64 }),
+    /ArrayCamera.*raw RGBA output/i,
   )
 
   const cubeTarget = new THREE.WebGLCubeRenderTarget(16)

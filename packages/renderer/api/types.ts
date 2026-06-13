@@ -401,6 +401,8 @@ export interface ThreeCameraLike {
   isPerspectiveCamera?: boolean
   isArrayCamera?: boolean
   isCubeCamera?: boolean
+  cameras?: ThreeCameraLike[]
+  viewport?: RenderPixelRectLike | ({ x?: number; y?: number; z?: number; w?: number } & Record<string, unknown>) | null
   aspect?: number
   zoom?: number
   near?: number

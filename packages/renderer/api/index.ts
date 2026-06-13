@@ -67,6 +67,19 @@ export class Renderer {
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
+    if (isArrayCamera(camera)) {
+      const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
+        scene,
+        camera,
+        options,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      if (options.target) {
+        writeRenderTarget(options.target, buffer, width, height, objectIdEntries, depthData)
+      }
+      return buffer
+    }
+
     const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, options)
     if (options.target) {
       const depthData = renderTargetDepthBuffer(
@@ -87,6 +100,16 @@ export class Renderer {
     options: RenderOptions = {},
   ): RenderTargetLike {
     const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
+    if (isArrayCamera(camera)) {
+      const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
+        scene,
+        camera,
+        targetOptions,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      return writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
+    }
+
     const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, targetOptions)
     const depthData = renderTargetDepthBuffer(
       target,
@@ -108,6 +131,14 @@ export class Renderer {
 }
 
 export function render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
+  if (isArrayCamera(camera)) {
+    const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, options, native.renderNative)
+    if (options.target) {
+      writeRenderTarget(options.target, buffer, width, height, objectIdEntries, depthData)
+    }
+    return buffer
+  }
+
   const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   if (options.target) {
@@ -124,6 +155,11 @@ export function renderToTarget(
   options: RenderOptions = {},
 ): RenderTargetLike {
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
+  if (isArrayCamera(camera)) {
+    const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, targetOptions, native.renderNative)
+    return writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
+  }
+
   const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, targetOptions)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   const depthData = renderTargetDepthBuffer(target, nativeScene, nativeCamera, native.renderNative)
@@ -383,6 +419,162 @@ function renderTargetDepthBuffer(
   return renderNativeScene(depthReadbackScene(nativeScene), nativeCamera)
 }
 
+type RenderNativeScene = (scene: NativeRenderScene, camera: NativeCamera) => Buffer
+
+type PixelRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function renderArrayCamera(
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  options: RenderOptions,
+  renderNativeScene: RenderNativeScene,
+): { buffer: Buffer; width: number; height: number; objectIdEntries?: RenderObjectIdEntry[]; depthData?: Buffer } {
+  validateThreeSceneRoot(scene)
+  validateArrayCameraOutput(camera, options)
+  validateUnsupportedRenderOptions(options)
+
+  const size = resolveSize(camera, options)
+  const subCameras = arraySubCameras(camera)
+  const objectIdEntryMap = new Map<number, RenderObjectIdEntry>()
+  let colorBuffer: Buffer | undefined
+  let depthBuffer: Buffer | undefined
+
+  for (const subCamera of subCameras) {
+    const viewport = resolveSubCameraViewport(subCamera, options.viewport, size.width, size.height)
+    const copyRect = viewport ?? { x: 0, y: 0, width: size.width, height: size.height }
+    const subOptions: RenderOptions = {
+      ...options,
+      width: size.width,
+      height: size.height,
+      format: 'rgba',
+      viewport: viewport ?? undefined,
+    }
+    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, subCamera, subOptions)
+    const subBuffer = renderNativeScene(nativeScene, nativeCamera)
+    if (colorBuffer == null) {
+      colorBuffer = Buffer.from(subBuffer)
+    } else {
+      copyPixelRect(subBuffer, colorBuffer, size.width, copyRect)
+    }
+
+    if (objectIdEntries) {
+      for (const entry of objectIdEntries) {
+        objectIdEntryMap.set(entry.encodedId, entry)
+      }
+    }
+
+    const subDepth = renderTargetDepthBuffer(options.target, nativeScene, nativeCamera, renderNativeScene)
+    if (subDepth) {
+      if (depthBuffer == null) {
+        depthBuffer = Buffer.from(subDepth)
+      } else {
+        copyPixelRect(subDepth, depthBuffer, size.width, copyRect)
+      }
+    }
+  }
+
+  return {
+    buffer: colorBuffer!,
+    width: size.width,
+    height: size.height,
+    objectIdEntries: objectIdEntryMap.size > 0
+      ? [...objectIdEntryMap.values()].sort((a, b) => a.encodedId - b.encodedId)
+      : undefined,
+    depthData: depthBuffer,
+  }
+}
+
+function validateArrayCameraOutput(camera: ThreeCameraLike, options: RenderOptions): void {
+  const cameraLike = camera as any
+  if (cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera') {
+    throw new Error(
+      'THREE.CubeCamera is not supported by @headless-three/renderer yet. Render each cube face with a regular camera until cube camera support lands.',
+    )
+  }
+  if (!camera || cameraLike.isCamera !== true) {
+    throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera')
+  }
+  if (options.format != null && options.format !== 'rgba') {
+    throw new Error(
+      'THREE.ArrayCamera rendering currently supports raw RGBA output only. Use render(..., arrayCamera, { format: "rgba" }) or renderToTarget(...) until PNG array-camera composition is supported.',
+    )
+  }
+  if (options.format == null && options.target == null) {
+    throw new Error(
+      'THREE.ArrayCamera rendering currently requires raw RGBA output. Use render(..., arrayCamera, { format: "rgba" }) or renderToTarget(...).',
+    )
+  }
+}
+
+function arraySubCameras(camera: ThreeCameraLike): ThreeCameraLike[] {
+  const cameras = (camera as any).cameras
+  if (!Array.isArray(cameras) || cameras.length === 0) {
+    throw new Error('THREE.ArrayCamera requires at least one sub-camera in camera.cameras.')
+  }
+  for (const subCamera of cameras) {
+    validateThreeCamera(subCamera)
+  }
+  return cameras
+}
+
+function resolveSubCameraViewport(
+  camera: ThreeCameraLike,
+  fallback: RenderPixelRectLike | null | undefined,
+  width: number,
+  height: number,
+): PixelRect | undefined {
+  const viewport = cameraViewport(camera) ?? fallback
+  return viewport ? normalizePixelRect(viewport, width, height, 'THREE.ArrayCamera sub-camera viewport') : undefined
+}
+
+function cameraViewport(camera: ThreeCameraLike): RenderPixelRectLike | undefined {
+  const viewport = camera.viewport as any
+  if (viewport == null) return undefined
+  if (typeof viewport.length === 'number') {
+    return [viewport[0], viewport[1], viewport[2], viewport[3]]
+  }
+  return {
+    x: viewport.x,
+    y: viewport.y,
+    width: viewport.width ?? viewport.z,
+    height: viewport.height ?? viewport.w,
+  }
+}
+
+function normalizePixelRect(rect: RenderPixelRectLike, targetWidth: number, targetHeight: number, label: string): PixelRect {
+  const [rawX, rawY, rawWidth, rawHeight] = pixelRectComponents(rect)
+  const x = Math.round(rawX)
+  const y = Math.round(rawY)
+  const width = Math.round(rawWidth)
+  const height = Math.round(rawHeight)
+  if (![x, y, width, height].every(Number.isFinite)) {
+    throw new TypeError(`${label} must contain finite x, y, width, and height values.`)
+  }
+  if (x < 0 || y < 0) {
+    throw new TypeError(`${label} x and y must be greater than or equal to 0.`)
+  }
+  if (width <= 0 || height <= 0) {
+    throw new TypeError(`${label} width and height must be greater than 0.`)
+  }
+  if (x + width > targetWidth || y + height > targetHeight) {
+    throw new TypeError(`${label} must fit inside the render target.`)
+  }
+  return { x, y, width, height }
+}
+
+function copyPixelRect(source: Buffer, destination: Buffer, imageWidth: number, rect: PixelRect): void {
+  const rowBytes = rect.width * 4
+  for (let row = 0; row < rect.height; row += 1) {
+    const offset = ((rect.y + row) * imageWidth + rect.x) * 4
+    source.copy(destination, offset, offset, offset + rowBytes)
+  }
+}
+
 function depthReadbackScene(scene: NativeRenderScene): NativeRenderScene {
   return {
     ...scene,
@@ -501,12 +693,16 @@ function postProcessingToNative(post: RenderOptions['postProcessing']): Partial<
 
 function pixelRectToArray(rect: RenderPixelRectLike | null | undefined): number[] | undefined {
   if (!rect) return undefined
+  return pixelRectComponents(rect)
+}
+
+function pixelRectComponents(rect: RenderPixelRectLike): number[] {
   if (typeof (rect as ArrayLike<number>).length === 'number') {
     const values = rect as ArrayLike<number>
     return [values[0], values[1], values[2], values[3]]
   }
-  const values = rect as { x?: number; y?: number; width?: number; height?: number }
-  return [values.x!, values.y!, values.width!, values.height!]
+  const values = rect as { x?: number; y?: number; width?: number; height?: number; z?: number; w?: number }
+  return [values.x!, values.y!, values.width ?? values.z!, values.height ?? values.w!]
 }
 
 function finiteOrUndefined(value: unknown): number | undefined {
@@ -817,6 +1013,11 @@ function validateThreeSceneRoot(scene: unknown): asserts scene is ThreeSceneRoot
   if (!root || (root.isScene !== true && root.isObject3D !== true)) {
     throw new TypeError('render(scene, camera) expects scene to be a THREE.Scene or THREE.Object3D root')
   }
+}
+
+function isArrayCamera(camera: unknown): camera is ThreeCameraLike {
+  const cameraLike = camera as any
+  return cameraLike?.isArrayCamera === true || Array.isArray(cameraLike?.cameras)
 }
 
 function validateThreeCamera(camera: unknown): asserts camera is ThreeCameraLike {
