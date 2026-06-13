@@ -6,6 +6,7 @@ import type {
   RenderOptions,
   RenderTargetLike,
   RenderTargetTextureLike,
+  RenderTargetImageLike,
   RenderPixelRectLike,
   NativeRenderScene,
   NativeCamera,
@@ -464,6 +465,7 @@ type PixelRect = {
 
 const WEBGL_COORDINATE_SYSTEM = 2000
 const CUBE_FACE_COUNT = 6
+const FloatType = 1015
 
 function renderCubeCamera(
   scene: ThreeSceneRootLike,
@@ -1127,7 +1129,7 @@ function writeRenderTarget(
   }
 
   if (target.depthTexture != null && depthData) {
-    writeRenderTargetTexture(target.depthTexture, depthData, width, height)
+    writeRenderTargetTexture(target.depthTexture, depthTextureData(target.depthTexture, depthData), width, height)
   }
 
   if (objectIdEntries) {
@@ -1143,7 +1145,7 @@ function writeRenderTarget(
 
 function writeRenderTargetTexture(
   texture: RenderTargetTextureLike,
-  data: Buffer,
+  data: NonNullable<RenderTargetImageLike['data']>,
   width: number,
   height: number,
 ): void {
@@ -1162,6 +1164,17 @@ function writeRenderTargetTexture(
     sourceData.width = width
     sourceData.height = height
   }
+}
+
+function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): NonNullable<RenderTargetImageLike['data']> {
+  if (texture.type === FloatType) {
+    const depth = new Float32Array(rgbaDepth.length / 4)
+    for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
+      depth[p] = rgbaDepth[i] / 255
+    }
+    return depth
+  }
+  return rgbaDepth
 }
 
 function validateThreeSceneRoot(scene: unknown): asserts scene is ThreeSceneRootLike {
@@ -1193,7 +1206,7 @@ function validateThreeCamera(camera: unknown): asserts camera is ThreeCameraLike
   }
   if (cameraLike.isArrayCamera === true || Array.isArray(cameraLike.cameras)) {
     throw new Error(
-      'THREE.ArrayCamera is not supported by @headless-three/renderer yet. Render each sub-camera separately until array camera support lands.',
+      'THREE.ArrayCamera cannot be used where a regular THREE.Camera is required. Pass the ArrayCamera as the top-level camera.',
     )
   }
   if (!cameraLike.projectionMatrix || !cameraLike.matrixWorldInverse) {

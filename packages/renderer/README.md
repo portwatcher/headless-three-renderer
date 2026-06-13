@@ -258,7 +258,7 @@ Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatibl
 
 ### Render Targets & Post-Processing
 
-`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8. A target `depthTexture` object receives RGBA8 normalized depth readback for the same viewport/scissor and visible depth-tested geometry, including alpha-tested cutouts. Multiple color attachments and 4x MSAA sample counts resolve into target readback buffers; unsupported sample counts fail clearly.
+`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8. A target `depthTexture` object receives normalized depth readback for the same viewport/scissor and visible depth-tested geometry, including alpha-tested cutouts; `THREE.FloatType` depth textures receive scalar `Float32Array` data, while default depth targets receive RGBA8 bytes. Multiple color attachments and 4x MSAA sample counts resolve into target readback buffers; unsupported sample counts fail clearly.
 
 Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert.
 

@@ -168,6 +168,20 @@ function meanRegion(rgba, width, height, x0, y0, x1, y1) {
   }
 }
 
+function meanScalarRegion(data, width, height, x0, y0, x1, y1) {
+  let sum = 0
+  let count = 0
+  for (let y = y0; y < y1; y += 1) {
+    assert.ok(y >= 0 && y < height)
+    for (let x = x0; x < x1; x += 1) {
+      assert.ok(x >= 0 && x < width)
+      sum += data[y * width + x]
+      count += 1
+    }
+  }
+  return sum / count
+}
+
 function countRegionPixels(rgba, width, height, x0, y0, x1, y1, predicate) {
   let count = 0
   for (let y = y0; y < y1; y += 1) {
@@ -6550,6 +6564,42 @@ test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
   )
   assert.ok(Math.abs(leftDepth.r - leftDepth.g) <= 1, 'depth red and green channels should match')
   assert.ok(Math.abs(leftDepth.r - leftDepth.b) <= 1, 'depth red and blue channels should match')
+})
+
+test('renderToTarget populates FloatType depthTexture with normalized scalar depth', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const near = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  near.position.set(-0.7, 0, 1)
+
+  const far = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  far.position.set(0.7, 0, -3)
+  scene.add(near, far)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = { type: THREE.FloatType, source: { data: {} } }
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+
+  assert.ok(depthTexture.image.data instanceof Float32Array, 'FloatType depthTexture should receive Float32Array data')
+  assert.equal(depthTexture.image.data.length, 64 * 64)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.source.data.width, 64)
+  assert.equal(depthTexture.source.data.height, 64)
+
+  const leftDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
+  const rightDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
+  assert.ok(leftDepth > rightDepth + 0.3, `near float depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+  assert.ok(leftDepth <= 1 && rightDepth >= 0, `float depth values should be normalized (${leftDepth}, ${rightDepth})`)
 })
 
 test('renderToTarget depthTexture honors scissor clipping', () => {
