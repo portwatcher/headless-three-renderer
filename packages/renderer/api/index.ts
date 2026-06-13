@@ -491,12 +491,18 @@ function renderCubeCamera(
     height,
     format: 'rgba',
   }
-  const faces = subCameras.map((subCamera) => {
+  const faces: Buffer[] = []
+  const depthFaces: NonNullable<RenderTargetImageLike['data']>[] = []
+  for (const subCamera of subCameras) {
     const { nativeScene, nativeCamera } = toNativeInput(scene, subCamera, faceOptions)
-    return Buffer.from(renderNativeScene(nativeScene, nativeCamera))
-  })
+    faces.push(Buffer.from(renderNativeScene(nativeScene, nativeCamera)))
+    const depthFace = renderTargetDepthBuffer(target, nativeScene, nativeCamera, renderNativeScene)
+    if (depthFace) {
+      depthFaces.push(cloneTargetData(depthTextureData(target.depthTexture!, depthFace)))
+    }
+  }
 
-  writeCubeRenderTarget(target, faces, width, height)
+  writeCubeRenderTarget(target, faces, width, height, depthFaces.length > 0 ? depthFaces : undefined)
 
   const buffer = outputFormat === 'png' ? native.encodePng(faces[0], width, height) : faces[0]
   return { buffer, target, width, height, faces }
@@ -554,7 +560,13 @@ function resolveCubeTargetSize(target: RenderTargetLike, options: RenderOptions)
   return { width: width!, height: height! }
 }
 
-function writeCubeRenderTarget(target: RenderTargetLike, faces: Buffer[], width: number, height: number): RenderTargetLike {
+function writeCubeRenderTarget(
+  target: RenderTargetLike,
+  faces: Buffer[],
+  width: number,
+  height: number,
+  depthFaces?: NonNullable<RenderTargetImageLike['data']>[],
+): RenderTargetLike {
   if (faces.length !== CUBE_FACE_COUNT) {
     throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered faces, received ${faces.length}.`)
   }
@@ -562,15 +574,28 @@ function writeCubeRenderTarget(target: RenderTargetLike, faces: Buffer[], width:
   target.height = height
   target.data = faces[0]
 
-  const texture = ensureCubeTargetTexture(target)
+  writeCubeTextureFaces(ensureCubeTargetTexture(target), faces, width, height)
+  if (target.depthTexture && depthFaces) {
+    if (depthFaces.length !== CUBE_FACE_COUNT) {
+      throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered depth faces, received ${depthFaces.length}.`)
+    }
+    writeCubeTextureFaces(target.depthTexture, depthFaces, width, height)
+  }
+  return target
+}
+
+function writeCubeTextureFaces(
+  texture: RenderTargetTextureLike,
+  faces: NonNullable<RenderTargetImageLike['data']>[],
+  width: number,
+  height: number,
+): void {
   const images = faces.map((data) => ({ data, width, height, depth: 1 }))
   texture.image = images
-
   if (texture.source) {
     texture.source.data = images
   }
   texture.needsUpdate = true
-  return target
 }
 
 function cubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {
@@ -1175,6 +1200,14 @@ function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): 
     return depth
   }
   return rgbaDepth
+}
+
+function cloneTargetData(data: NonNullable<RenderTargetImageLike['data']>): NonNullable<RenderTargetImageLike['data']> {
+  if (Buffer.isBuffer(data)) return Buffer.from(data)
+  if (data instanceof Float32Array) return new Float32Array(data)
+  if (data instanceof Uint16Array) return new Uint16Array(data)
+  if (data instanceof Uint8ClampedArray) return new Uint8ClampedArray(data)
+  return new Uint8Array(data)
 }
 
 function validateThreeSceneRoot(scene: unknown): asserts scene is ThreeSceneRootLike {

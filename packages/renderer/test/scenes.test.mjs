@@ -340,6 +340,10 @@ test('CubeCamera renders cube target faces', () => {
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
   assertValidPng(new Renderer().render(scene, cubeCamera, { width: 32, height: 32 }), { width: 32, height: 32 })
 
+  cubeTarget.depthTexture = {
+    type: THREE.FloatType,
+    source: { data: Array.from({ length: 6 }, () => ({})) },
+  }
   const returned = renderToTarget(scene, cubeCamera, cubeTarget)
   assert.equal(returned, cubeTarget)
   assert.equal(cubeTarget.texture.image.length, 6)
@@ -354,6 +358,13 @@ test('CubeCamera renders cube target faces', () => {
   assert.ok(pz.r > pz.g + 80 && pz.b > pz.g + 80, `+Z face should capture magenta (${pz.r}, ${pz.g}, ${pz.b})`)
   assert.notStrictEqual(cubeTarget.texture.image[0], cubeTarget.texture.image[1])
   assert.strictEqual(cubeTarget.texture.source.data, cubeTarget.texture.image)
+
+  assert.equal(cubeTarget.depthTexture.image.length, 6)
+  assert.ok(cubeTarget.depthTexture.image[0].data instanceof Float32Array, 'cube depth face should use Float32Array data')
+  assert.equal(cubeTarget.depthTexture.image[0].data.length, 32 * 32)
+  assert.strictEqual(cubeTarget.depthTexture.source.data, cubeTarget.depthTexture.image)
+  const depthPx = meanScalarRegion(cubeTarget.depthTexture.image[0].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(depthPx > 0 && depthPx <= 1, `cube depth face should contain normalized depth (${depthPx})`)
 })
 
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {
