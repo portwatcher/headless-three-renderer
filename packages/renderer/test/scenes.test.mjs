@@ -6509,6 +6509,33 @@ test('custom WGSL fragment material affects rendered output', () => {
   assert.ok(mean.b > mean.r + 5, `custom shader should raise blue over red (${mean.b} vs ${mean.r})`)
 })
 
+test('custom WGSL fragment material can read the expanded light budget', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  material.userData.headlessThreeRenderer = {
+    fragmentWgsl: `
+      if uniforms.num_lights == 32u && uniforms.lights[31].color_intensity.r > 0.5 {
+        return vec4<f32>(0.0, 1.0, 0.0, alpha);
+      }
+      return vec4<f32>(1.0, 0.0, 0.0, alpha);
+    `,
+  }
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+  for (let i = 0; i < 32; i += 1) {
+    const light = new THREE.PointLight(i === 31 ? 0xff0000 : 0xffffff, 1)
+    light.position.set((i % 8) - 3.5, 2, Math.floor(i / 8) - 1.5)
+    scene.add(light)
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 40, `custom WGSL should read light slot 31 and render green (${mean.g} vs ${mean.r})`)
+})
+
 test('ShaderMaterial without headless WGSL override fails clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
