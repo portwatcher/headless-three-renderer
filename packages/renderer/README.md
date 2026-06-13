@@ -119,7 +119,7 @@ The public API accepts only Three.js-like objects:
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, toon gradient, matcap color-map, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
-- `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, and roughness-aware environment-backed or scene-color transmission / refraction
+- `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, IOR, attenuation, approximate dispersion, and roughness-aware environment-backed or scene-color transmission / refraction
 - physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, texture transforms including explicit matrices, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
 - custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with `texture.channel` UV selection and wrap/filter sampler settings
@@ -148,7 +148,7 @@ The public API accepts only Three.js-like objects:
 - material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
 - single shared material-level reflection/refraction `envMap` inputs are supported for `MeshBasicMaterial`, and shared reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material env-map classes/options, non-Basic refraction mappings, PMREM/CubeUV mappings, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly
-- unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
+- unsupported `MeshPhysicalMaterial` iridescence inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 use native anisotropic samplers for supported material/background texture slots when the effective sampler is linear-filtered
 - dashed line material segments honor dash/gap/scale settings and custom `lineDistance` attributes, and preserve map UV transforms including explicit matrices, selected map UV channels, and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
@@ -169,8 +169,9 @@ Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-proces
 - `THREE.SpotLight` — cone light with angle, penumbra, distance, and decay
 - `THREE.HemisphereLight` — sky/ground gradient ambient light
 - `THREE.RectAreaLight` — one-sided finite-area direct-light approximation
+- `THREE.LightProbe` — diffuse spherical-harmonics indirect lighting
 
-Lights are automatically extracted from the scene. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 16 lights per scene. One visible directional, spot, or point light may cast shadows; additional shadow-casting lights fail clearly until native multi-shadow-map rendering lands. When no lights are present, meshes render with a hemispherical ambient fallback.
+Lights are automatically extracted from the scene. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 32 direct lights per scene are supported. One visible directional, spot, or point light may cast shadows; additional shadow-casting lights fail clearly until native multi-shadow-map rendering lands. When no lights are present, meshes render with a hemispherical ambient fallback.
 
 ### Image-Based Lighting (IBL)
 
