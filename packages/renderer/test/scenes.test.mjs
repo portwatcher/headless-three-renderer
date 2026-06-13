@@ -403,6 +403,48 @@ test('CubeCamera renders active mip target faces', () => {
   assert.ok(depthPx > 0, `cube depth mip face should contain scalar depth (${depthPx})`)
 })
 
+test('CubeCamera captured target textures can be reused as cube inputs', () => {
+  const captureTarget = {}
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(32))
+  renderToTarget(makeCubeCaptureScene(), cubeCamera, captureTarget, { width: 32, height: 32 })
+  assert.equal(captureTarget.texture.isCubeTexture, true)
+  assert.strictEqual(captureTarget.texture.source.data, captureTarget.texture.image)
+
+  const backgroundScene = new THREE.Scene()
+  backgroundScene.background = captureTarget.texture
+  const backgroundCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  backgroundCamera.position.set(0, 0, 0)
+  backgroundCamera.lookAt(new THREE.Vector3(1, 0, 0))
+  const background = meanRegion(renderRgba(backgroundScene, backgroundCamera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 28, 28, 36, 36)
+  assert.ok(background.r > background.g + 80 && background.r > background.b + 80, `captured +X cube background should render red (${background.r}, ${background.g}, ${background.b})`)
+
+  function makeEnvironmentScene(environment) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (environment) {
+      scene.environment = environment
+      scene.environmentIntensity = 4
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+    ))
+    return scene
+  }
+
+  const environmentCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  environmentCamera.position.set(0, 0, 3)
+  environmentCamera.lookAt(0, 0, 0)
+  const noEnvironment = renderRgba(makeEnvironmentScene(null), environmentCamera, { width: 64, height: 64 })
+  const withEnvironment = renderRgba(makeEnvironmentScene(captureTarget.texture), environmentCamera, { width: 64, height: 64 })
+  const diff = meanAbsDiff(noEnvironment, withEnvironment)
+  assert.ok(diff > 1, `captured cube environment should affect metallic IBL, diff=${diff.toFixed(3)}`)
+})
+
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)

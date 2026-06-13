@@ -643,6 +643,7 @@ function writeCubeRenderTarget(
   target.data = faces[0]
 
   const texture = ensureCubeTargetTexture(target)
+  texture.isCubeTexture = true
   writeCubeTextureFaces(texture, faces, faceWidth, faceHeight, activeMipmapLevel)
   texture.needsPMREMUpdate = true
   if (target.depthTexture && depthFaces) {
@@ -664,9 +665,8 @@ function writeCubeTextureFaces(
   const images = faces.map((data) => ({ data, width, height, depth: 1 }))
   if (activeMipmapLevel === 0) {
     texture.image = images
-    if (texture.source) {
-      texture.source.data = images
-    }
+    texture.source ??= {}
+    texture.source.data = images
   } else {
     const mipmaps = texture.mipmaps ?? (texture.mipmaps = [])
     for (let level = 0; level <= activeMipmapLevel; level += 1) {
@@ -690,7 +690,8 @@ function cubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike | 
 function ensureCubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike {
   const texture = cubeTargetTexture(target)
   if (texture) return texture
-  const created: RenderTargetTextureLike = { image: Array.from({ length: CUBE_FACE_COUNT }, () => ({})) }
+  const images = Array.from({ length: CUBE_FACE_COUNT }, () => ({}))
+  const created: RenderTargetTextureLike = { image: images, source: { data: images }, isCubeTexture: true }
   target.texture = created
   return created
 }
