@@ -5001,6 +5001,38 @@ test('LightProbe honors camera layer filtering', () => {
   assert.ok(mean.g > mean.b + 40, `camera layer should tint diffuse lighting green (${mean.g} vs ${mean.b})`)
 })
 
+test('LightProbe contributes diffuse lighting across lit material models', () => {
+  function renderMaterial(material) {
+    const probe = new THREE.LightProbe(undefined, 1.5)
+    for (const coefficient of probe.sh.coefficients) {
+      coefficient.set(0, 0, 0)
+    }
+    probe.sh.coefficients[0].set(1, 0, 0)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(probe)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const cases = [
+    ['Lambert', new THREE.MeshLambertMaterial({ color: 0xffffff })],
+    ['Phong', new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 20 })],
+    ['Toon', new THREE.MeshToonMaterial({ color: 0xffffff })],
+  ]
+
+  for (const [name, material] of cases) {
+    const mean = renderMaterial(material)
+    assert.ok(mean.r > mean.g + 25, `${name} should receive red LightProbe diffuse lighting (${mean.r} vs ${mean.g})`)
+    assert.ok(mean.r > mean.b + 25, `${name} should receive red LightProbe diffuse lighting (${mean.r} vs ${mean.b})`)
+  }
+})
+
 test('RectAreaLight approximates finite one-sided area lighting', () => {
   function renderRectArea(width, height, targetZ) {
     const scene = new THREE.Scene()
