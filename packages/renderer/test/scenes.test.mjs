@@ -4494,6 +4494,7 @@ test('unsupported texture inputs fail clearly for background and environment slo
   const cases = [
     ['compressed background', (scene) => { scene.background = compressedTexture }, /compressed texture.*pre-decode/i],
     ['compressed environment', (scene) => { scene.environment = compressedTexture }, /compressed texture.*pre-decode/i],
+    ['mipmapped background', (scene) => { scene.background = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
     ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
   ]
 
@@ -6569,32 +6570,72 @@ test('custom WGSL fragment material can read the expanded light budget', () => {
 })
 
 test('ShaderMaterial without headless WGSL override fails clearly', () => {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.ShaderMaterial({
+  const cases = [
+    ['ShaderMaterial', new THREE.ShaderMaterial({
       vertexShader: 'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: 'void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }',
-    }),
-  ))
+    }), /ShaderMaterial.*fragmentWgsl/i],
+    ['RawShaderMaterial', new THREE.RawShaderMaterial(), /RawShaderMaterial.*fragmentWgsl/i],
+    ['NodeMaterial', Object.assign(new THREE.MeshBasicMaterial({ color: 0xffffff }), {
+      isNodeMaterial: true,
+      type: 'MeshBasicNodeMaterial',
+    }), /NodeMaterial.*fragmentWgsl/i],
+  ]
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  assert.throws(
-    () => renderRgba(scene, camera, { width: 64, height: 64 }),
-    /ShaderMaterial.*fragmentWgsl/i,
-  )
+  for (const [name, material, pattern] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
 })
 
-test('ShaderMaterial can opt into custom WGSL fragment output', () => {
+test('ShaderMaterial, RawShaderMaterial, and NodeMaterial can opt into custom WGSL fragment output', () => {
+  function renderCustom(material) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    material.userData.headlessThreeRenderer = {
+      fragmentWgsl: 'return vec4<f32>(0.0, 1.0, 0.0, alpha);',
+    }
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const cases = [
+    ['ShaderMaterial', new THREE.ShaderMaterial()],
+    ['RawShaderMaterial', new THREE.RawShaderMaterial()],
+    ['NodeMaterial', Object.assign(new THREE.MeshBasicMaterial({ color: 0xffffff }), {
+      isNodeMaterial: true,
+      type: 'MeshBasicNodeMaterial',
+    })],
+  ]
+
+  for (const [name, material] of cases) {
+    const mean = renderCustom(material)
+    assert.ok(mean.g > mean.r + 40, `${name} WGSL override should render green output (${mean.g} vs ${mean.r})`)
+    assert.ok(mean.g > mean.b + 40, `${name} WGSL override should render green output (${mean.g} vs ${mean.b})`)
+  }
+})
+
+test('ShaderMaterial custom WGSL preserves output alpha', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
   const material = new THREE.ShaderMaterial()
   material.userData.headlessThreeRenderer = {
-    fragmentWgsl: 'return vec4<f32>(0.0, 1.0, 0.0, alpha);',
+    fragmentWgsl: 'return vec4<f32>(0.0, 1.0, 0.0, alpha * 0.5);',
   }
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
 
@@ -6602,9 +6643,9 @@ test('ShaderMaterial can opt into custom WGSL fragment output', () => {
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
   assert.ok(mean.g > mean.r + 40, `ShaderMaterial WGSL override should render green output (${mean.g} vs ${mean.r})`)
-  assert.ok(mean.g > mean.b + 40, `ShaderMaterial WGSL override should render green output (${mean.g} vs ${mean.b})`)
+  assert.ok(mean.a > 120 && mean.a < 140, `ShaderMaterial WGSL override should preserve returned alpha (${mean.a})`)
 })
 
 test('material onBeforeCompile customizations fail clearly', () => {
