@@ -485,7 +485,9 @@ function renderCubeCamera(
   }
   validateUnsupportedRenderTargetOptions(target)
 
-  const { width, height } = resolveCubeTargetSize(target, options)
+  const { width: targetWidth, height: targetHeight } = resolveCubeTargetSize(target, options)
+  const activeMipmapLevel = resolveCubeMipmapLevel(camera, targetWidth)
+  const { width, height } = cubeMipmapSize(targetWidth, targetHeight, activeMipmapLevel)
   const outputFormat = options.format ?? (options.target ? 'rgba' : 'png')
   const subCameras = cubeSubCameras(camera)
   const faceOptions: RenderOptions = {
@@ -494,6 +496,8 @@ function renderCubeCamera(
     width,
     height,
     format: 'rgba',
+    viewport: cubeMipmapViewport(options, target, activeMipmapLevel),
+    scissor: cubeMipmapScissor(options, target, activeMipmapLevel),
   }
   const faces: Buffer[] = []
   const depthFaces: NonNullable<RenderTargetImageLike['data']>[] = []
@@ -506,7 +510,16 @@ function renderCubeCamera(
     }
   }
 
-  writeCubeRenderTarget(target, faces, width, height, depthFaces.length > 0 ? depthFaces : undefined)
+  writeCubeRenderTarget(
+    target,
+    faces,
+    targetWidth,
+    targetHeight,
+    width,
+    height,
+    activeMipmapLevel,
+    depthFaces.length > 0 ? depthFaces : undefined,
+  )
 
   const buffer = outputFormat === 'png' ? native.encodePng(faces[0], width, height) : faces[0]
   return { buffer, target, width, height, faces }
@@ -515,9 +528,6 @@ function renderCubeCamera(
 function validateCubeCamera(camera: ThreeCubeCameraLike, options: RenderOptions): void {
   if (!isCubeCamera(camera)) {
     throw new TypeError('render(scene, camera) expected a THREE.CubeCamera-compatible object.')
-  }
-  if (camera.activeMipmapLevel != null && camera.activeMipmapLevel !== 0) {
-    throw new Error('THREE.CubeCamera activeMipmapLevel values other than 0 are not supported by @headless-three/renderer yet.')
   }
   if (options.format != null && options.format !== 'png' && options.format !== 'rgba') {
     throw new Error(`unsupported CubeCamera output format \`${options.format}\`; expected \`png\` or \`rgba\``)
@@ -564,26 +574,82 @@ function resolveCubeTargetSize(target: RenderTargetLike, options: RenderOptions)
   return { width: width!, height: height! }
 }
 
+function resolveCubeMipmapLevel(camera: ThreeCubeCameraLike, targetSize: number): number {
+  const level = camera.activeMipmapLevel ?? 0
+  if (!Number.isInteger(level) || level < 0) {
+    throw new TypeError(`THREE.CubeCamera activeMipmapLevel must be a non-negative integer; received ${String(level)}.`)
+  }
+  const maxLevel = Math.floor(Math.log2(targetSize))
+  if (level > maxLevel) {
+    throw new Error(
+      `THREE.CubeCamera activeMipmapLevel ${level} exceeds the maximum mip level ${maxLevel} for a ${targetSize}x${targetSize} cube target.`,
+    )
+  }
+  return level
+}
+
+function cubeMipmapSize(width: number, height: number, activeMipmapLevel: number): { width: number; height: number } {
+  if (activeMipmapLevel === 0) return { width, height }
+  return {
+    width: Math.max(1, width >> activeMipmapLevel),
+    height: Math.max(1, height >> activeMipmapLevel),
+  }
+}
+
+function cubeMipmapViewport(
+  options: RenderOptions,
+  target: RenderTargetLike,
+  activeMipmapLevel: number,
+): RenderPixelRectLike | null | undefined {
+  if (options.viewport !== undefined) return options.viewport
+  return cubeMipmapRect(target.viewport, activeMipmapLevel)
+}
+
+function cubeMipmapScissor(
+  options: RenderOptions,
+  target: RenderTargetLike,
+  activeMipmapLevel: number,
+): RenderPixelRectLike | null | undefined {
+  if (options.scissor !== undefined) return options.scissor
+  return target.scissorTest === true ? cubeMipmapRect(target.scissor, activeMipmapLevel) : undefined
+}
+
+function cubeMipmapRect(rect: RenderPixelRectLike | null | undefined, activeMipmapLevel: number): RenderPixelRectLike | null | undefined {
+  if (!rect || activeMipmapLevel === 0) return rect
+  const [x, y, width, height] = pixelRectComponents(rect)
+  return {
+    x,
+    y,
+    width: Math.max(1, Math.floor(width / 2 ** activeMipmapLevel)),
+    height: Math.max(1, Math.floor(height / 2 ** activeMipmapLevel)),
+  }
+}
+
 function writeCubeRenderTarget(
   target: RenderTargetLike,
   faces: Buffer[],
-  width: number,
-  height: number,
+  targetWidth: number,
+  targetHeight: number,
+  faceWidth: number,
+  faceHeight: number,
+  activeMipmapLevel: number,
   depthFaces?: NonNullable<RenderTargetImageLike['data']>[],
 ): RenderTargetLike {
   if (faces.length !== CUBE_FACE_COUNT) {
     throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered faces, received ${faces.length}.`)
   }
-  target.width = width
-  target.height = height
+  target.width = targetWidth
+  target.height = targetHeight
   target.data = faces[0]
 
-  writeCubeTextureFaces(ensureCubeTargetTexture(target), faces, width, height)
+  const texture = ensureCubeTargetTexture(target)
+  writeCubeTextureFaces(texture, faces, faceWidth, faceHeight, activeMipmapLevel)
+  texture.needsPMREMUpdate = true
   if (target.depthTexture && depthFaces) {
     if (depthFaces.length !== CUBE_FACE_COUNT) {
       throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered depth faces, received ${depthFaces.length}.`)
     }
-    writeCubeTextureFaces(target.depthTexture, depthFaces, width, height)
+    writeCubeTextureFaces(target.depthTexture, depthFaces, faceWidth, faceHeight, activeMipmapLevel)
   }
   return target
 }
@@ -593,11 +659,24 @@ function writeCubeTextureFaces(
   faces: NonNullable<RenderTargetImageLike['data']>[],
   width: number,
   height: number,
+  activeMipmapLevel: number,
 ): void {
   const images = faces.map((data) => ({ data, width, height, depth: 1 }))
-  texture.image = images
-  if (texture.source) {
-    texture.source.data = images
+  if (activeMipmapLevel === 0) {
+    texture.image = images
+    if (texture.source) {
+      texture.source.data = images
+    }
+  } else {
+    const mipmaps = texture.mipmaps ?? (texture.mipmaps = [])
+    for (let level = 0; level <= activeMipmapLevel; level += 1) {
+      mipmaps[level] ??= {}
+    }
+    const mipmap = mipmaps[activeMipmapLevel]
+    mipmap.image = images
+    mipmap.width = width
+    mipmap.height = height
+    mipmap.depth = 1
   }
   texture.needsUpdate = true
 }

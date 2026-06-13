@@ -458,12 +458,14 @@ export interface RenderOptions {
 
 export interface RenderTargetTextureLike {
   image?: RenderTargetImageLike | RenderTargetImageLike[]
+  mipmaps?: Array<RenderTargetImageLike & { image?: RenderTargetImageLike | RenderTargetImageLike[] }>
   source?: {
     data?: RenderTargetImageLike | RenderTargetImageLike[]
   }
   isCubeTexture?: boolean
   type?: number
   needsUpdate?: boolean
+  needsPMREMUpdate?: boolean
 }
 
 export interface RenderTargetImageLike {

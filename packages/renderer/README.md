@@ -80,7 +80,7 @@ See the versioned [compatibility matrix](https://github.com/portwatcher/headless
 The public API accepts only Three.js-like objects:
 
 - `scene`: a `THREE.Scene` or `THREE.Object3D` root.
-- `camera`: a `THREE.Camera`, including perspective and orthographic cameras. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`; cube mip targets and exact WebGL face semantics remain limited.
+- `camera`: a `THREE.Camera`, including perspective and orthographic cameras. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, and nonzero `activeMipmapLevel` writes the active mip entry; exact WebGL face semantics remain limited.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds.

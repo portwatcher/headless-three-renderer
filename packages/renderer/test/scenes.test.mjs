@@ -367,6 +367,42 @@ test('CubeCamera renders cube target faces', () => {
   assert.ok(depthPx > 0 && depthPx <= 1, `cube depth face should contain normalized depth (${depthPx})`)
 })
 
+test('CubeCamera renders active mip target faces', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+
+  renderToTarget(scene, cubeCamera, cubeTarget)
+  const basePositiveX = cubeTarget.texture.image[0]
+
+  cubeCamera.activeMipmapLevel = 1
+  cubeTarget.depthTexture = { type: THREE.UnsignedShortType, mipmaps: [] }
+  const returned = renderToTarget(scene, cubeCamera, cubeTarget)
+  assert.equal(returned, cubeTarget)
+  assert.equal(cubeTarget.width, 32)
+  assert.equal(cubeTarget.height, 32)
+  assert.equal(cubeTarget.data.length, 16 * 16 * 4)
+  assert.strictEqual(cubeTarget.texture.image[0], basePositiveX)
+  assert.equal(cubeTarget.texture.image[0].data.length, 32 * 32 * 4)
+
+  const mip = cubeTarget.texture.mipmaps[1]
+  assert.equal(mip.image.length, 6)
+  assert.equal(mip.image[0].width, 16)
+  assert.equal(mip.image[0].height, 16)
+  assert.equal(mip.image[0].data.length, 16 * 16 * 4)
+  assert.ok(cubeTarget.texture.pmremVersion > 0, 'cube target texture should request PMREM refresh')
+
+  const px = meanRegion(mip.image[0].data, 16, 16, 5, 5, 11, 11)
+  assert.ok(px.r > px.g + 80 && px.r > px.b + 80, `+X mip face should capture red (${px.r}, ${px.g}, ${px.b})`)
+
+  const depthMip = cubeTarget.depthTexture.mipmaps[1]
+  assert.equal(depthMip.image.length, 6)
+  assert.ok(depthMip.image[0].data instanceof Uint16Array, 'cube depth mip face should use Uint16Array data')
+  assert.equal(depthMip.image[0].data.length, 16 * 16)
+  const depthPx = meanScalarRegion(depthMip.image[0].data, 16, 16, 5, 5, 11, 11)
+  assert.ok(depthPx > 0, `cube depth mip face should contain scalar depth (${depthPx})`)
+})
+
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)
