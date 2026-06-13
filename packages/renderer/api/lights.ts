@@ -3,7 +3,7 @@ import { colorLikeToArray } from './color'
 import { objectLayersMatchCamera } from './layers'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
-const MAX_NATIVE_LIGHTS = 16
+const MAX_NATIVE_LIGHTS = 32
 
 export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike): NativeSceneLight[] | undefined {
   const lights: NativeSceneLight[] = []

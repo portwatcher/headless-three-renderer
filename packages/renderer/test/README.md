@@ -16,7 +16,7 @@ The tests require the native binary (`headless_three_renderer.*.node`) to be bui
 - **`smoke.test.mjs`** — module loads, `Renderer` can be constructed, basic scenes render to correctly-sized PNG buffers, renderer instances are reusable.
 - **`gltf.test.mjs`** — committed local glTF fixtures load geometry/materials and encoded data-URI textures through `GLTFLoader` and render through the documented Node loader setup.
 - **`corpus.test.mjs`** — generated representative scenes render without crashes and produce visible non-background pixels for transparent layers, skinned/morphed geometry, avatar-style toon/skinned combinations, physical IBL + shadows, instanced points/lines, LOD/groups, and pathological geometry.
-- **`scale.test.mjs`** — many-mesh, texture-heavy, and supported 16-light budget scenes render, and larger visible non-ambient light sets fail clearly.
+- **`scale.test.mjs`** — many-mesh, texture-heavy, and supported 32-light budget scenes render, and larger visible non-ambient light sets fail clearly.
 - **`scenes.test.mjs`** — scene-level invariants: `rgba` format produces `width * height * 4` bytes, meshes cover reasonable portions of the frame, different materials produce different pixel statistics, PBR scenes show lighting gradients, line/point topologies render without error, empty scene renders background color.
 
 The harness intentionally tests **invariants** (dimensions, color statistics, non-emptiness) rather than exact pixel matches, so the same suite passes across Metal / Vulkan / DX12 / llvmpipe without per-platform snapshot drift.

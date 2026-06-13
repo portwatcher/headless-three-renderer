@@ -4,7 +4,7 @@ use bytemuck::{Pod, Zeroable};
 use crate::types::RenderScene;
 use crate::util::{parse_color, parse_vec3};
 
-pub const MAX_LIGHTS: usize = 16;
+pub const MAX_LIGHTS: usize = 32;
 
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]

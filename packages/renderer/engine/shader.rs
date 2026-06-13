@@ -1,6 +1,6 @@
 pub const SHADER: &str = r#"
 const PI: f32 = 3.14159265359;
-const MAX_LIGHTS: u32 = 16u;
+const MAX_LIGHTS: u32 = 32u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -1364,7 +1364,7 @@ pub fn custom_shader_source(fragment_body: &str) -> String {
 }
 
 const CUSTOM_FRAGMENT_SHADER: &str = r#"
-const MAX_LIGHTS: u32 = 16u;
+const MAX_LIGHTS: u32 = 32u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {

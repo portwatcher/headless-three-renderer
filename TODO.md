@@ -27,7 +27,7 @@ Already supported in the current implementation:
 - Material `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes (`NoBlending`, `NormalBlending`, `AdditiveBlending`, `SubtractiveBlending`, and `MultiplyBlending`), and custom blend equations/factors in the main pass.
 - Material-local `clippingPlanes`, `THREE.ClippingGroup`, plus render-option global `clippingPlanes`, up to eight world-space planes, including local/group `clipIntersection`, group `clipShadows`, and `options.localClippingEnabled` opt-out.
 - Clearcoat, sheen, anisotropy, specular intensity/color, roughness-aware scene-color transmission/thickness, IOR, attenuation, and related physical material maps.
-- Ambient, directional, point, spot, hemisphere, RectAreaLight approximation, and LightProbe diffuse lighting, up to 16 direct lights.
+- Ambient, directional, point, spot, hemisphere, RectAreaLight approximation, and LightProbe diffuse lighting, up to 32 direct lights.
 - Environment IBL from equirectangular or cube `scene.environment`/reflection probes, plus single shared material-level env maps for supported IBL material paths, including `MeshBasicMaterial` legacy combine/reflectivity/refraction handling and `MeshPhongMaterial`/`MeshLambertMaterial` legacy combine/reflectivity handling.
 - Scene background colors plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds, including `backgroundIntensity`, approximate texture `backgroundBlurriness`, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; unsupported background rotations fail clearly.
 - Render-option and render-target viewport/scissor rectangles in output pixel coordinates, plus 4x MSAA render-option/target sample counts resolved back to normal output and target readback buffers.
@@ -112,7 +112,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Persistent resource cache | High | Reuse GPU buffers, textures, pipelines, IBL maps, and bind groups across renders. |
 | Incremental scene updates | High | Avoid rebuilding every mesh/material/texture for animation frames. |
 | GPU skinning/morphing path | Medium | CPU baking is simple and correct enough for stills, but expensive for dense animated characters. |
-| Large scene memory budget tests | Medium | Scale regression tests render many meshes, many unique textures, and the supported 16-light budget in CI, scenes with more than 16 visible non-ambient lights fail clearly, and platform-specific scale budget notes are documented. Remaining work is larger memory ceilings. |
+| Large scene memory budget tests | Medium | Scale regression tests render many meshes, many unique textures, and the supported 32-light budget in CI, scenes with more than 32 visible non-ambient lights fail clearly, and platform-specific scale budget notes are documented. Remaining work is larger memory ceilings. |
 | Parallel texture decode/precompute | Medium | IBL and image decode can dominate render latency. |
 
 ## P2 - Node Loader Ergonomics
