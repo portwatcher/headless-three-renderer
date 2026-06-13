@@ -440,6 +440,7 @@ function renderArrayCamera(
 
   const size = resolveSize(camera, options)
   const subCameras = arraySubCameras(camera)
+  const outputFormat = options.format ?? (options.target ? 'rgba' : 'png')
   const objectIdEntryMap = new Map<number, RenderObjectIdEntry>()
   let colorBuffer: Buffer | undefined
   let depthBuffer: Buffer | undefined
@@ -479,7 +480,7 @@ function renderArrayCamera(
   }
 
   return {
-    buffer: colorBuffer!,
+    buffer: outputFormat === 'png' ? native.encodePng(colorBuffer!, size.width, size.height) : colorBuffer!,
     width: size.width,
     height: size.height,
     objectIdEntries: objectIdEntryMap.size > 0
@@ -499,15 +500,8 @@ function validateArrayCameraOutput(camera: ThreeCameraLike, options: RenderOptio
   if (!camera || cameraLike.isCamera !== true) {
     throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera')
   }
-  if (options.format != null && options.format !== 'rgba') {
-    throw new Error(
-      'THREE.ArrayCamera rendering currently supports raw RGBA output only. Use render(..., arrayCamera, { format: "rgba" }) or renderToTarget(...) until PNG array-camera composition is supported.',
-    )
-  }
-  if (options.format == null && options.target == null) {
-    throw new Error(
-      'THREE.ArrayCamera rendering currently requires raw RGBA output. Use render(..., arrayCamera, { format: "rgba" }) or renderToTarget(...).',
-    )
+  if (options.format != null && options.format !== 'png' && options.format !== 'rgba') {
+    throw new Error(`unsupported ArrayCamera output format \`${options.format}\`; expected \`png\` or \`rgba\``)
   }
 }
 

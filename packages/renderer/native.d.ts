@@ -37,6 +37,8 @@ export interface DecodedImage {
 
 export declare function decodeImage(data: Buffer): DecodedImage
 
+export declare function encodePng(data: Buffer, width: number, height: number): Buffer
+
 export declare function renderNative(scene: RenderScene, camera: Camera): Buffer
 
 export interface RenderScene {

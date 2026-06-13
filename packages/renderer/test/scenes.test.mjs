@@ -293,13 +293,10 @@ test('ArrayCamera renders sub-camera viewports', () => {
   assert.ok(depthLeft.r > 0 && depthRight.r > 0, `ArrayCamera depth target should include both viewports (${depthLeft.r}, ${depthRight.r})`)
 })
 
-test('ArrayCamera PNG output and CubeCamera inputs fail clearly', () => {
+test('ArrayCamera supports PNG output and CubeCamera inputs fail clearly', () => {
   const scene = makeLayeredSplitScene()
   const arrayCamera = makeLayeredArrayCamera()
-  assert.throws(
-    () => new Renderer().render(scene, arrayCamera, { width: 64, height: 64 }),
-    /ArrayCamera.*raw RGBA output/i,
-  )
+  assertValidPng(new Renderer().render(scene, arrayCamera, { width: 64, height: 64 }), { width: 64, height: 64 })
 
   const cubeTarget = new THREE.WebGLCubeRenderTarget(16)
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)

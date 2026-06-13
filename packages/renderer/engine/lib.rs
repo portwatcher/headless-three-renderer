@@ -14,6 +14,7 @@ use napi_derive::napi;
 
 use renderer::GpuRenderer;
 use types::{Camera, RenderScene};
+use util::encode_png;
 
 const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth24PlusStencil8;
@@ -76,6 +77,20 @@ pub fn decode_image(data: Buffer) -> napi::Result<DecodedImage> {
         height: rgba.height(),
         data: Buffer::from(rgba.into_raw()),
     })
+}
+
+#[napi(js_name = "encodePng")]
+pub fn encode_png_binding(data: Buffer, width: u32, height: u32) -> napi::Result<Buffer> {
+    let expected_len = width as usize * height as usize * 4;
+    if data.len() != expected_len {
+        return Err(napi::Error::from_reason(format!(
+            "encodePng expected RGBA data length {expected_len} for {width}x{height}, received {} bytes",
+            data.len()
+        )));
+    }
+    encode_png(&data, width, height)
+        .map(Buffer::from)
+        .map_err(to_napi_error)
 }
 
 fn to_napi_error(error: anyhow::Error) -> napi::Error {
