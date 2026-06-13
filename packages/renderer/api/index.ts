@@ -202,6 +202,7 @@ function toNativeInput(
     backgroundTextureBlurriness: colorMode ? finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness) : undefined,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
+    sampleCount: resolveSampleCount(options),
     meshes,
     lights,
     ambientLight: colorMode ? extractAmbientLight(scene, camera) ?? undefined : undefined,
@@ -401,6 +402,7 @@ function depthReadbackScene(scene: NativeRenderScene): NativeRenderScene {
     backgroundTextureBlurriness: undefined,
     format: 'rgba',
     outputColorSpace: 'srgb-linear',
+    sampleCount: 1,
     meshes: scene.meshes?.map(depthReadbackMesh),
     lights: [],
     ambientLight: undefined,
@@ -729,11 +731,26 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
 }
 
 function assertSupportedSampleCount(value: unknown, label: string): void {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 1) {
+  if (value == null) return
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || Math.floor(value) !== value) {
     throw new Error(
-      `MSAA sample counts greater than 1 are not supported by @headless-three/renderer yet (${label}=${value}). Use the default single-sample render path until MSAA support lands.`,
+      `${label} must be a non-negative integer sample count; received ${String(value)}.`,
     )
   }
+  if (value > 1 && value !== 4) {
+    throw new Error(
+      `MSAA sample count ${value} is not supported by @headless-three/renderer yet (${label}=${value}). Use 4 for 4x MSAA or the default single-sample render path.`,
+    )
+  }
+}
+
+function resolveSampleCount(options: RenderOptions): number {
+  const requested = options.target?.sampleCount
+    ?? options.target?.samples
+    ?? options.sampleCount
+    ?? options.samples
+    ?? 1
+  return requested > 1 ? requested : 1
 }
 
 function writeRenderTarget(

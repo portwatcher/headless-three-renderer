@@ -430,9 +430,9 @@ export interface RenderOptions {
   outputColorSpace?: RenderOutputColorSpace
   /** Alternate flat render passes. Defaults to normal color rendering. */
   renderMode?: RenderMode
-  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   samples?: number
-  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   sampleCount?: number
   target?: RenderTargetLike
   postProcessing?: PostProcessingOptions
@@ -462,9 +462,9 @@ export interface RenderTargetLike {
   objectIdMap?: Record<string, RenderObjectIdEntry>
   /** Optional RGBA8 normalized depth readback texture-like target. */
   depthTexture?: RenderTargetTextureLike
-  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   samples?: number
-  /** MSAA is not implemented yet; values greater than 1 fail clearly. */
+  /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   sampleCount?: number
   isWebGLMultipleRenderTargets?: boolean
   image?: {
@@ -885,6 +885,7 @@ export interface NativeRenderScene {
   backgroundTextureBlurriness?: number
   format?: string
   outputColorSpace?: string
+  sampleCount?: number
   meshes?: NativeSceneMesh[]
   lights?: NativeSceneLight[]
   ambientLight?: number[]

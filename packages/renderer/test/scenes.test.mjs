@@ -6517,7 +6517,55 @@ test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
   assert.ok(visible.r > 80, `opaque alphaMap region should write visible mesh depth (${visible.r})`)
 })
 
-test('unsupported render target MRT and MSAA requests fail clearly', () => {
+test('MSAA sampleCount 4 resolves antialiased color output and render targets', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -1, -1, 0,
+    1, -1, 0,
+    -1, 1, 0,
+  ], 3))
+  geometry.setIndex([0, 1, 2])
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const single = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  const msaa = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    sampleCount: 4,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  function intermediateCoverage(rgba) {
+    return countRegionPixels(rgba, 64, 64, 0, 0, 64, 64, (r, g, b) => {
+      return r > 20 && r < 180 && Math.abs(r - g) < 3 && Math.abs(r - b) < 3
+    })
+  }
+
+  const singleCoverage = intermediateCoverage(single)
+  const msaaCoverage = intermediateCoverage(msaa)
+  assert.ok(msaaCoverage > singleCoverage + 20, `4x MSAA should add resolved edge coverage (${msaaCoverage} vs ${singleCoverage})`)
+
+  const target = { texture: {}, samples: 4 }
+  renderToTarget(scene, camera, target, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(target.data.length, 64 * 64 * 4)
+  assert.equal(target.texture.image.data, target.data)
+})
+
+test('unsupported render target MRT and invalid MSAA requests fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0x00ffaa })))
@@ -6527,8 +6575,8 @@ test('unsupported render target MRT and MSAA requests fail clearly', () => {
     [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'texture array'],
     [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
     [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],
-    [{ samples: 4 }, /MSAA sample counts.*not supported/i, 'target samples'],
-    [{ sampleCount: 4 }, /MSAA sample counts.*not supported/i, 'target sampleCount'],
+    [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
+    [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
   ]
 
   for (const [target, pattern, label] of targetCases) {
@@ -6539,10 +6587,10 @@ test('unsupported render target MRT and MSAA requests fail clearly', () => {
     )
   }
 
-  for (const options of [{ samples: 4 }, { sampleCount: 4 }]) {
+  for (const options of [{ samples: 2 }, { sampleCount: 8 }]) {
     assert.throws(
       () => renderRgba(scene, camera, { width: 32, height: 32, ...options }),
-      /MSAA sample counts.*not supported/i,
+      /MSAA sample count .*not supported/i,
       JSON.stringify(options),
     )
   }

@@ -57,6 +57,7 @@ pub struct RenderSettings {
     pub background_texture: Option<BackgroundTexture>,
     pub output_format: OutputFormat,
     pub output_color_space: OutputColorSpace,
+    pub sample_count: u32,
     pub view: Mat4,
     pub view_projection: Mat4,
     pub camera_pos: Vec3,
@@ -248,6 +249,7 @@ impl RenderSettings {
 
         let output_format = OutputFormat::from_scene(scene)?;
         let output_color_space = OutputColorSpace::from_scene(scene)?;
+        let sample_count = resolve_sample_count(scene.sample_count)?;
         let lights = prepare_lights(scene)?;
         let ambient_color = parse_color(
             scene.ambient_light.as_deref(),
@@ -289,6 +291,7 @@ impl RenderSettings {
             background_texture,
             output_format,
             output_color_space,
+            sample_count,
             view,
             view_projection,
             camera_pos,
@@ -484,6 +487,16 @@ impl OutputFormat {
             "rgba" | "raw" | "raw-rgba" => Ok(Self::Rgba),
             other => bail!("unsupported scene.format `{other}`; expected `png` or `rgba`"),
         }
+    }
+}
+
+fn resolve_sample_count(value: Option<u32>) -> Result<u32> {
+    match value.unwrap_or(1) {
+        0 | 1 => Ok(1),
+        4 => Ok(4),
+        other => bail!(
+            "unsupported scene.sampleCount `{other}`; expected 1 for single-sample rendering or 4 for 4x MSAA"
+        ),
     }
 }
 

@@ -121,16 +121,21 @@ pub struct GpuRenderer {
     shader: wgpu::ShaderModule,
     /// Opaque pipelines keyed by `MeshSide` (Front, Back, Double).
     pipelines: [wgpu::RenderPipeline; 3],
+    pipelines_msaa4: [wgpu::RenderPipeline; 3],
     /// Transparent pipelines (no depth write) keyed by `MeshSide`.
     transparent_pipelines: [wgpu::RenderPipeline; 3],
+    transparent_pipelines_msaa4: [wgpu::RenderPipeline; 3],
     /// Line / point pipelines: [opaque, transparent] for each.
     line_pipelines: [wgpu::RenderPipeline; 2],
+    line_pipelines_msaa4: [wgpu::RenderPipeline; 2],
     point_pipelines: [wgpu::RenderPipeline; 2],
+    point_pipelines_msaa4: [wgpu::RenderPipeline; 2],
     pipeline_layout: wgpu::PipelineLayout,
     post_layout: wgpu::BindGroupLayout,
     background_layout: wgpu::BindGroupLayout,
     post_pipeline: wgpu::RenderPipeline,
     background_pipeline: wgpu::RenderPipeline,
+    background_pipeline_msaa4: wgpu::RenderPipeline,
     uniform_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
     normal_map_layout: wgpu::BindGroupLayout,
@@ -1102,7 +1107,10 @@ impl GpuRenderer {
         ];
 
         let vertex_buffers = [Vertex::layout()];
-        let make_pipeline = |topology: Topology, side: MeshSide, transparent: bool| {
+        let make_pipeline = |topology: Topology,
+                             side: MeshSide,
+                             transparent: bool,
+                             sample_count: u32| {
             let label = match (topology, side, transparent) {
                 (Topology::Triangles, MeshSide::Front, false) => "pipeline (tri front)",
                 (Topology::Triangles, MeshSide::Back, false) => "pipeline (tri back)",
@@ -1152,7 +1160,7 @@ impl GpuRenderer {
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
-                multisample: wgpu::MultisampleState::default(),
+                multisample: multisample_state(sample_count),
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: Some("fs_main"),
@@ -1165,22 +1173,40 @@ impl GpuRenderer {
         };
 
         let pipelines = [
-            make_pipeline(Topology::Triangles, MeshSide::Front, false),
-            make_pipeline(Topology::Triangles, MeshSide::Back, false),
-            make_pipeline(Topology::Triangles, MeshSide::Double, false),
+            make_pipeline(Topology::Triangles, MeshSide::Front, false, 1),
+            make_pipeline(Topology::Triangles, MeshSide::Back, false, 1),
+            make_pipeline(Topology::Triangles, MeshSide::Double, false, 1),
+        ];
+        let pipelines_msaa4 = [
+            make_pipeline(Topology::Triangles, MeshSide::Front, false, 4),
+            make_pipeline(Topology::Triangles, MeshSide::Back, false, 4),
+            make_pipeline(Topology::Triangles, MeshSide::Double, false, 4),
         ];
         let transparent_pipelines = [
-            make_pipeline(Topology::Triangles, MeshSide::Front, true),
-            make_pipeline(Topology::Triangles, MeshSide::Back, true),
-            make_pipeline(Topology::Triangles, MeshSide::Double, true),
+            make_pipeline(Topology::Triangles, MeshSide::Front, true, 1),
+            make_pipeline(Topology::Triangles, MeshSide::Back, true, 1),
+            make_pipeline(Topology::Triangles, MeshSide::Double, true, 1),
+        ];
+        let transparent_pipelines_msaa4 = [
+            make_pipeline(Topology::Triangles, MeshSide::Front, true, 4),
+            make_pipeline(Topology::Triangles, MeshSide::Back, true, 4),
+            make_pipeline(Topology::Triangles, MeshSide::Double, true, 4),
         ];
         let line_pipelines = [
-            make_pipeline(Topology::Lines, MeshSide::Front, false),
-            make_pipeline(Topology::Lines, MeshSide::Front, true),
+            make_pipeline(Topology::Lines, MeshSide::Front, false, 1),
+            make_pipeline(Topology::Lines, MeshSide::Front, true, 1),
+        ];
+        let line_pipelines_msaa4 = [
+            make_pipeline(Topology::Lines, MeshSide::Front, false, 4),
+            make_pipeline(Topology::Lines, MeshSide::Front, true, 4),
         ];
         let point_pipelines = [
-            make_pipeline(Topology::Points, MeshSide::Front, false),
-            make_pipeline(Topology::Points, MeshSide::Front, true),
+            make_pipeline(Topology::Points, MeshSide::Front, false, 1),
+            make_pipeline(Topology::Points, MeshSide::Front, true, 1),
+        ];
+        let point_pipelines_msaa4 = [
+            make_pipeline(Topology::Points, MeshSide::Front, false, 4),
+            make_pipeline(Topology::Points, MeshSide::Front, true, 4),
         ];
 
         let screen_color_targets = [Some(color_target_state(None, true))];
@@ -1225,49 +1251,60 @@ impl GpuRenderer {
                 bind_group_layouts: &[Some(&background_layout)],
                 immediate_size: 0,
             });
-        let background_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("headless-three-renderer background pipeline"),
-            layout: Some(&background_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &background_shader,
-                entry_point: Some("vs_background"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &background_shader,
-                entry_point: Some("fs_background"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &screen_color_targets,
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        let make_background_pipeline = |sample_count: u32, label: &'static str| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&background_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &background_shader,
+                    entry_point: Some("vs_background"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &[],
+                },
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    unclipped_depth: false,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: multisample_state(sample_count),
+                fragment: Some(wgpu::FragmentState {
+                    module: &background_shader,
+                    entry_point: Some("fs_background"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &screen_color_targets,
+                }),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        let background_pipeline =
+            make_background_pipeline(1, "headless-three-renderer background pipeline");
+        let background_pipeline_msaa4 =
+            make_background_pipeline(4, "headless-three-renderer background pipeline msaa4");
 
         Ok(Self {
             device,
             queue,
             shader,
             pipelines,
+            pipelines_msaa4,
             transparent_pipelines,
+            transparent_pipelines_msaa4,
             line_pipelines,
+            line_pipelines_msaa4,
             point_pipelines,
+            point_pipelines_msaa4,
             pipeline_layout,
             post_layout,
             background_layout,
             post_pipeline,
             background_pipeline,
+            background_pipeline_msaa4,
             uniform_layout,
             texture_layout,
             normal_map_layout,
@@ -1324,12 +1361,30 @@ impl GpuRenderer {
             view_formats: &[],
         });
         let color_view = color_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let msaa_color_texture = if settings.sample_count > 1 {
+            Some(self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("headless-three-renderer msaa color texture"),
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: settings.sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: COLOR_FORMAT,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            }))
+        } else {
+            None
+        };
+        let msaa_color_view = msaa_color_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let render_color_view = msaa_color_view.as_ref().unwrap_or(&color_view);
 
         let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("headless-three-renderer depth texture"),
             size: texture_size,
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: settings.sample_count,
             dimension: wgpu::TextureDimension::D2,
             format: DEPTH_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -1402,9 +1457,13 @@ impl GpuRenderer {
 
         if let Some(background) = &background_gpu {
             let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                view: &color_view,
+                view: render_color_view,
                 depth_slice: None,
-                resolve_target: None,
+                resolve_target: if settings.sample_count > 1 {
+                    Some(&color_view)
+                } else {
+                    None
+                },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(background_clear),
                     store: wgpu::StoreOp::Store,
@@ -1420,7 +1479,7 @@ impl GpuRenderer {
                 multiview_mask: None,
             });
             apply_output_region(&mut pass, settings);
-            pass.set_pipeline(&self.background_pipeline);
+            pass.set_pipeline(self.background_pipeline_for(settings.sample_count));
             pass.set_bind_group(0, &background.bind_group, &[]);
             pass.draw(0..3, 0..1);
         }
@@ -1431,9 +1490,13 @@ impl GpuRenderer {
                 None => wgpu::LoadOp::Clear(background_clear),
             };
             let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                view: &color_view,
+                view: render_color_view,
                 depth_slice: None,
-                resolve_target: None,
+                resolve_target: if settings.sample_count > 1 {
+                    Some(&color_view)
+                } else {
+                    None
+                },
                 ops: wgpu::Operations {
                     load: color_load,
                     store: wgpu::StoreOp::Store,
@@ -1472,7 +1535,7 @@ impl GpuRenderer {
                 } else {
                     let key = pipeline_key(mesh);
                     if current_pipeline != Some(key) {
-                        pass.set_pipeline(self.pipeline_for(key, false));
+                        pass.set_pipeline(self.pipeline_for(key, false, settings.sample_count));
                         current_pipeline = Some(key);
                     }
                 }
@@ -1531,9 +1594,13 @@ impl GpuRenderer {
                 self.create_shadow_scene_bind_group(&shadow_view, &scene_color_view);
 
             let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-                view: &color_view,
+                view: render_color_view,
                 depth_slice: None,
-                resolve_target: None,
+                resolve_target: if settings.sample_count > 1 {
+                    Some(&color_view)
+                } else {
+                    None
+                },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
@@ -1571,7 +1638,7 @@ impl GpuRenderer {
                 } else {
                     let key = pipeline_key(mesh);
                     if current_pipeline != Some(key) {
-                        pass.set_pipeline(self.pipeline_for(key, true));
+                        pass.set_pipeline(self.pipeline_for(key, true, settings.sample_count));
                         current_pipeline = Some(key);
                     }
                 }
@@ -2091,6 +2158,7 @@ impl GpuRenderer {
         &self,
         mesh: &PreparedMesh,
         fragment_body: &str,
+        sample_count: u32,
     ) -> Result<wgpu::RenderPipeline> {
         let source = custom_shader_source(fragment_body);
         let shader = self
@@ -2102,14 +2170,20 @@ impl GpuRenderer {
         Ok(self.create_material_pipeline(
             &shader,
             mesh,
+            sample_count,
             "headless-three-renderer custom material pipeline",
         ))
     }
 
-    fn create_state_override_pipeline(&self, mesh: &PreparedMesh) -> wgpu::RenderPipeline {
+    fn create_state_override_pipeline(
+        &self,
+        mesh: &PreparedMesh,
+        sample_count: u32,
+    ) -> wgpu::RenderPipeline {
         self.create_material_pipeline(
             &self.shader,
             mesh,
+            sample_count,
             "headless-three-renderer material state override pipeline",
         )
     }
@@ -2118,6 +2192,7 @@ impl GpuRenderer {
         &self,
         shader: &wgpu::ShaderModule,
         mesh: &PreparedMesh,
+        sample_count: u32,
         label: &'static str,
     ) -> wgpu::RenderPipeline {
         let color_targets = [Some(wgpu::ColorTargetState {
@@ -2167,7 +2242,7 @@ impl GpuRenderer {
                     stencil: stencil_state(mesh),
                     bias: depth_bias_state(mesh),
                 }),
-                multisample: wgpu::MultisampleState::default(),
+                multisample: multisample_state(sample_count),
                 fragment: Some(wgpu::FragmentState {
                     module: shader,
                     entry_point: Some("fs_main"),
@@ -3058,9 +3133,11 @@ impl GpuRenderer {
         };
 
         let pipeline_override = match mesh.custom_fragment_shader.as_deref() {
-            Some(fragment_body) => Some(self.create_custom_pipeline(mesh, fragment_body)?),
+            Some(fragment_body) => {
+                Some(self.create_custom_pipeline(mesh, fragment_body, settings.sample_count)?)
+            }
             None if requires_pipeline_override(mesh) => {
-                Some(self.create_state_override_pipeline(mesh))
+                Some(self.create_state_override_pipeline(mesh, settings.sample_count))
             }
             None => None,
         };
@@ -3126,6 +3203,14 @@ fn apply_output_region(pass: &mut wgpu::RenderPass<'_>, settings: &RenderSetting
     }
     if let Some(scissor) = settings.scissor {
         pass.set_scissor_rect(scissor.x, scissor.y, scissor.width, scissor.height);
+    }
+}
+
+fn multisample_state(sample_count: u32) -> wgpu::MultisampleState {
+    wgpu::MultisampleState {
+        count: sample_count,
+        mask: !0,
+        alpha_to_coverage_enabled: false,
     }
 }
 
@@ -3413,17 +3498,41 @@ fn uses_constant_factor(state: CustomBlendState) -> bool {
 }
 
 impl GpuRenderer {
-    fn pipeline_for(&self, key: PipelineKey, transparent: bool) -> &wgpu::RenderPipeline {
+    fn background_pipeline_for(&self, sample_count: u32) -> &wgpu::RenderPipeline {
+        if sample_count == 4 {
+            &self.background_pipeline_msaa4
+        } else {
+            &self.background_pipeline
+        }
+    }
+
+    fn pipeline_for(
+        &self,
+        key: PipelineKey,
+        transparent: bool,
+        sample_count: u32,
+    ) -> &wgpu::RenderPipeline {
+        let msaa4 = sample_count == 4;
         match key {
             PipelineKey::Tri(side) => {
                 let idx = side_index(side);
-                if transparent {
+                if transparent && msaa4 {
+                    &self.transparent_pipelines_msaa4[idx]
+                } else if transparent {
                     &self.transparent_pipelines[idx]
+                } else if msaa4 {
+                    &self.pipelines_msaa4[idx]
                 } else {
                     &self.pipelines[idx]
                 }
             }
+            PipelineKey::Line if msaa4 => {
+                &self.line_pipelines_msaa4[if transparent { 1 } else { 0 }]
+            }
             PipelineKey::Line => &self.line_pipelines[if transparent { 1 } else { 0 }],
+            PipelineKey::Point if msaa4 => {
+                &self.point_pipelines_msaa4[if transparent { 1 } else { 0 }]
+            }
             PipelineKey::Point => &self.point_pipelines[if transparent { 1 } else { 0 }],
         }
     }
