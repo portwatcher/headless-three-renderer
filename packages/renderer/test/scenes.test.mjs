@@ -270,6 +270,27 @@ function makeLayeredSplitScene() {
   return scene
 }
 
+function makeCubeCaptureScene() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const addPlane = (position, rotation, color) => {
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+    )
+    plane.position.set(...position)
+    plane.rotation.set(...rotation)
+    scene.add(plane)
+  }
+  addPlane([2, 0, 0], [0, Math.PI / 2, 0], 0xff0000)
+  addPlane([-2, 0, 0], [0, Math.PI / 2, 0], 0x00ff00)
+  addPlane([0, 2, 0], [Math.PI / 2, 0, 0], 0x0000ff)
+  addPlane([0, -2, 0], [Math.PI / 2, 0, 0], 0xffff00)
+  addPlane([0, 0, 2], [0, 0, 0], 0xff00ff)
+  addPlane([0, 0, -2], [0, 0, 0], 0x00ffff)
+  return scene
+}
+
 test('ArrayCamera renders sub-camera viewports', () => {
   const scene = makeLayeredSplitScene()
   const arrayCamera = makeLayeredArrayCamera()
@@ -293,17 +314,32 @@ test('ArrayCamera renders sub-camera viewports', () => {
   assert.ok(depthLeft.r > 0 && depthRight.r > 0, `ArrayCamera depth target should include both viewports (${depthLeft.r}, ${depthRight.r})`)
 })
 
-test('ArrayCamera supports PNG output and CubeCamera inputs fail clearly', () => {
+test('ArrayCamera supports PNG output', () => {
   const scene = makeLayeredSplitScene()
   const arrayCamera = makeLayeredArrayCamera()
   assertValidPng(new Renderer().render(scene, arrayCamera, { width: 64, height: 64 }), { width: 64, height: 64 })
+})
 
-  const cubeTarget = new THREE.WebGLCubeRenderTarget(16)
+test('CubeCamera renders cube target faces', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
-  assert.throws(
-    () => renderRgba(scene, cubeCamera),
-    /CubeCamera.*not supported/i,
-  )
+  assertValidPng(new Renderer().render(scene, cubeCamera, { width: 32, height: 32 }), { width: 32, height: 32 })
+
+  const returned = renderToTarget(scene, cubeCamera, cubeTarget)
+  assert.equal(returned, cubeTarget)
+  assert.equal(cubeTarget.texture.image.length, 6)
+
+  const px = meanRegion(cubeTarget.texture.image[0].data, 32, 32, 12, 12, 20, 20)
+  const nx = meanRegion(cubeTarget.texture.image[1].data, 32, 32, 12, 12, 20, 20)
+  const py = meanRegion(cubeTarget.texture.image[2].data, 32, 32, 12, 12, 20, 20)
+  const pz = meanRegion(cubeTarget.texture.image[4].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(px.r > px.g + 80 && px.r > px.b + 80, `+X face should capture red (${px.r}, ${px.g}, ${px.b})`)
+  assert.ok(nx.g > nx.r + 60 && nx.g > nx.b + 60, `-X face should capture green (${nx.r}, ${nx.g}, ${nx.b})`)
+  assert.ok(py.b > py.r + 80 && py.b > py.g + 80, `+Y face should capture blue (${py.r}, ${py.g}, ${py.b})`)
+  assert.ok(pz.r > pz.g + 80 && pz.b > pz.g + 80, `+Z face should capture magenta (${pz.r}, ${pz.g}, ${pz.b})`)
+  assert.notStrictEqual(cubeTarget.texture.image[0], cubeTarget.texture.image[1])
+  assert.strictEqual(cubeTarget.texture.source.data, cubeTarget.texture.image)
 })
 
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {

@@ -414,6 +414,20 @@ export interface ThreeCameraLike {
   updateMatrixWorld?(force?: boolean): void
 }
 
+export interface ThreeCubeCameraLike {
+  isObject3D?: boolean
+  isCubeCamera?: boolean
+  type?: string
+  renderTarget?: RenderTargetLike
+  children?: ThreeCameraLike[]
+  coordinateSystem?: number | null
+  activeMipmapLevel?: number
+  updateCoordinateSystem?(): void
+  updateMatrixWorld?(force?: boolean): void
+}
+
+export type ThreeRenderCameraLike = ThreeCameraLike | ThreeCubeCameraLike
+
 export interface RenderOptions {
   width?: number
   height?: number
@@ -441,18 +455,19 @@ export interface RenderOptions {
 }
 
 export interface RenderTargetTextureLike {
-  image?: {
-    data?: Buffer
-    width?: number
-    height?: number
-  }
+  image?: RenderTargetImageLike | RenderTargetImageLike[]
   source?: {
-    data?: {
-      data?: Buffer
-      width?: number
-      height?: number
-    }
+    data?: RenderTargetImageLike | RenderTargetImageLike[]
   }
+  isCubeTexture?: boolean
+  needsUpdate?: boolean
+}
+
+export interface RenderTargetImageLike {
+  data?: Buffer
+  width?: number
+  height?: number
+  depth?: number
 }
 
 export interface RenderTargetLike {

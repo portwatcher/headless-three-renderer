@@ -1,6 +1,8 @@
 import type {
   ThreeSceneRootLike,
   ThreeCameraLike,
+  ThreeCubeCameraLike,
+  ThreeRenderCameraLike,
   RenderOptions,
   RenderTargetLike,
   RenderTargetTextureLike,
@@ -53,6 +55,8 @@ export type {
   ThreeSceneRootLike,
   ThreeSceneLike,
   ThreeCameraLike,
+  ThreeCubeCameraLike,
+  ThreeRenderCameraLike,
   RenderOptions,
   RenderTargetLike,
   RenderObjectIdEntry,
@@ -66,7 +70,17 @@ export class Renderer {
     this.native = new native.NativeRenderer()
   }
 
-  render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
+  render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+    if (isCubeCamera(camera)) {
+      const { buffer } = renderCubeCamera(
+        scene,
+        camera,
+        options,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      return buffer
+    }
+
     if (isArrayCamera(camera)) {
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
@@ -95,11 +109,21 @@ export class Renderer {
 
   renderToTarget(
     scene: ThreeSceneRootLike,
-    camera: ThreeCameraLike,
+    camera: ThreeRenderCameraLike,
     target: RenderTargetLike = {},
     options: RenderOptions = {},
   ): RenderTargetLike {
     const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
+    if (isCubeCamera(camera)) {
+      const { target: cubeTarget } = renderCubeCamera(
+        scene,
+        camera,
+        targetOptions,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      return cubeTarget
+    }
+
     if (isArrayCamera(camera)) {
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
@@ -130,7 +154,12 @@ export class Renderer {
   }
 }
 
-export function render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): Buffer {
+export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+  if (isCubeCamera(camera)) {
+    const { buffer } = renderCubeCamera(scene, camera, options, native.renderNative)
+    return buffer
+  }
+
   if (isArrayCamera(camera)) {
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, options, native.renderNative)
     if (options.target) {
@@ -150,11 +179,16 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeCameraLike, optio
 
 export function renderToTarget(
   scene: ThreeSceneRootLike,
-  camera: ThreeCameraLike,
+  camera: ThreeRenderCameraLike,
   target: RenderTargetLike = {},
   options: RenderOptions = {},
 ): RenderTargetLike {
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
+  if (isCubeCamera(camera)) {
+    const { target: cubeTarget } = renderCubeCamera(scene, camera, targetOptions, native.renderNative)
+    return cubeTarget
+  }
+
   if (isArrayCamera(camera)) {
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, targetOptions, native.renderNative)
     return writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
@@ -428,6 +462,129 @@ type PixelRect = {
   height: number
 }
 
+const WEBGL_COORDINATE_SYSTEM = 2000
+const CUBE_FACE_COUNT = 6
+
+function renderCubeCamera(
+  scene: ThreeSceneRootLike,
+  camera: ThreeCubeCameraLike,
+  options: RenderOptions,
+  renderNativeScene: RenderNativeScene,
+): { buffer: Buffer; target: RenderTargetLike; width: number; height: number; faces: Buffer[] } {
+  validateThreeSceneRoot(scene)
+  validateCubeCamera(camera, options)
+  const target = options.target ?? camera.renderTarget
+  if (!target) {
+    throw new Error('THREE.CubeCamera rendering requires a WebGLCubeRenderTarget via camera.renderTarget or options.target.')
+  }
+  validateUnsupportedRenderTargetOptions(target)
+
+  const { width, height } = resolveCubeTargetSize(target, options)
+  const outputFormat = options.format ?? (options.target ? 'rgba' : 'png')
+  const subCameras = cubeSubCameras(camera)
+  const faceOptions: RenderOptions = {
+    ...options,
+    target,
+    width,
+    height,
+    format: 'rgba',
+  }
+  const faces = subCameras.map((subCamera) => {
+    const { nativeScene, nativeCamera } = toNativeInput(scene, subCamera, faceOptions)
+    return Buffer.from(renderNativeScene(nativeScene, nativeCamera))
+  })
+
+  writeCubeRenderTarget(target, faces, width, height)
+
+  const buffer = outputFormat === 'png' ? native.encodePng(faces[0], width, height) : faces[0]
+  return { buffer, target, width, height, faces }
+}
+
+function validateCubeCamera(camera: ThreeCubeCameraLike, options: RenderOptions): void {
+  if (!isCubeCamera(camera)) {
+    throw new TypeError('render(scene, camera) expected a THREE.CubeCamera-compatible object.')
+  }
+  if (camera.activeMipmapLevel != null && camera.activeMipmapLevel !== 0) {
+    throw new Error('THREE.CubeCamera activeMipmapLevel values other than 0 are not supported by @headless-three/renderer yet.')
+  }
+  if (options.format != null && options.format !== 'png' && options.format !== 'rgba') {
+    throw new Error(`unsupported CubeCamera output format \`${options.format}\`; expected \`png\` or \`rgba\``)
+  }
+}
+
+function cubeSubCameras(camera: ThreeCubeCameraLike): ThreeCameraLike[] {
+  if (typeof camera.updateCoordinateSystem === 'function' && camera.coordinateSystem !== WEBGL_COORDINATE_SYSTEM) {
+    camera.coordinateSystem = WEBGL_COORDINATE_SYSTEM
+    camera.updateCoordinateSystem()
+  }
+  if (typeof camera.updateMatrixWorld === 'function') {
+    camera.updateMatrixWorld(true)
+  }
+
+  const children = camera.children
+  if (!Array.isArray(children) || children.length < CUBE_FACE_COUNT) {
+    throw new Error('THREE.CubeCamera requires six internal perspective cameras.')
+  }
+  const subCameras = children.slice(0, CUBE_FACE_COUNT)
+  for (const subCamera of subCameras) {
+    validateThreeCamera(subCamera)
+    if (typeof subCamera.updateMatrixWorld === 'function') {
+      subCamera.updateMatrixWorld(true)
+    }
+  }
+  return subCameras
+}
+
+function resolveCubeTargetSize(target: RenderTargetLike, options: RenderOptions): { width: number; height: number } {
+  const texture = cubeTargetTexture(target)
+  const firstImage = Array.isArray(texture?.image) ? texture.image[0] : undefined
+  const width = options.width ?? target.width ?? firstImage?.width
+  const height = options.height ?? target.height ?? firstImage?.height ?? width
+  if (!Number.isInteger(width) || width! <= 0) {
+    throw new TypeError('THREE.CubeCamera target width must be a positive integer.')
+  }
+  if (!Number.isInteger(height) || height! <= 0) {
+    throw new TypeError('THREE.CubeCamera target height must be a positive integer.')
+  }
+  if (width !== height) {
+    throw new TypeError('THREE.CubeCamera target faces must be square.')
+  }
+  return { width: width!, height: height! }
+}
+
+function writeCubeRenderTarget(target: RenderTargetLike, faces: Buffer[], width: number, height: number): RenderTargetLike {
+  if (faces.length !== CUBE_FACE_COUNT) {
+    throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered faces, received ${faces.length}.`)
+  }
+  target.width = width
+  target.height = height
+  target.data = faces[0]
+
+  const texture = ensureCubeTargetTexture(target)
+  const images = faces.map((data) => ({ data, width, height, depth: 1 }))
+  texture.image = images
+
+  if (texture.source) {
+    texture.source.data = images
+  }
+  texture.needsUpdate = true
+  return target
+}
+
+function cubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {
+  return Array.isArray(target.texture)
+    ? target.texture[0]
+    : target.texture ?? target.textures?.[0]
+}
+
+function ensureCubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike {
+  const texture = cubeTargetTexture(target)
+  if (texture) return texture
+  const created: RenderTargetTextureLike = { image: Array.from({ length: CUBE_FACE_COUNT }, () => ({})) }
+  target.texture = created
+  return created
+}
+
 function renderArrayCamera(
   scene: ThreeSceneRootLike,
   camera: ThreeCameraLike,
@@ -494,7 +651,7 @@ function validateArrayCameraOutput(camera: ThreeCameraLike, options: RenderOptio
   const cameraLike = camera as any
   if (cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera') {
     throw new Error(
-      'THREE.CubeCamera is not supported by @headless-three/renderer yet. Render each cube face with a regular camera until cube camera support lands.',
+      'THREE.CubeCamera cannot be used as an ArrayCamera sub-camera. Pass the CubeCamera as the top-level camera with a cube render target.',
     )
   }
   if (!camera || cameraLike.isCamera !== true) {
@@ -990,15 +1147,20 @@ function writeRenderTargetTexture(
   width: number,
   height: number,
 ): void {
-  const textureImage = texture.image ?? (texture.image = {})
+  const textureImage = Array.isArray(texture.image)
+    ? texture.image[0] ?? (texture.image[0] = {})
+    : texture.image ?? (texture.image = {})
   textureImage.data = data
   textureImage.width = width
   textureImage.height = height
 
   if (texture.source?.data) {
-    texture.source.data.data = data
-    texture.source.data.width = width
-    texture.source.data.height = height
+    const sourceData = Array.isArray(texture.source.data)
+      ? texture.source.data[0] ?? (texture.source.data[0] = {})
+      : texture.source.data
+    sourceData.data = data
+    sourceData.width = width
+    sourceData.height = height
   }
 }
 
@@ -1014,11 +1176,16 @@ function isArrayCamera(camera: unknown): camera is ThreeCameraLike {
   return cameraLike?.isArrayCamera === true || Array.isArray(cameraLike?.cameras)
 }
 
+function isCubeCamera(camera: unknown): camera is ThreeCubeCameraLike {
+  const cameraLike = camera as any
+  return cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera'
+}
+
 function validateThreeCamera(camera: unknown): asserts camera is ThreeCameraLike {
   const cameraLike = camera as any
   if (cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera') {
     throw new Error(
-      'THREE.CubeCamera is not supported by @headless-three/renderer yet. Render each cube face with a regular camera until cube camera support lands.',
+      'THREE.CubeCamera cannot be used where a regular THREE.Camera is required. Pass the CubeCamera as the top-level camera with a cube render target.',
     )
   }
   if (!camera || cameraLike.isCamera !== true) {
