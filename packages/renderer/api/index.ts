@@ -251,13 +251,15 @@ function toNativeInput(
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)
+  const viewport = effectiveViewport(options)
+  const scissor = effectiveScissor(options)
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
     background: colorMode ? resolveBackground(scene, options) : [0, 0, 0, 1],
     backgroundIntensity: colorMode ? options.backgroundIntensity ?? scene.backgroundIntensity : undefined,
-    viewport: pixelRectToArray(options.viewport),
-    scissor: pixelRectToArray(options.scissor),
+    viewport: pixelRectToArray(viewport),
+    scissor: pixelRectToArray(scissor),
     backgroundTexture: backgroundTexture?.data,
     backgroundTextureWidth: backgroundTexture?.width,
     backgroundTextureHeight: backgroundTexture?.height,
@@ -874,6 +876,15 @@ function postProcessingToNative(post: RenderOptions['postProcessing']): Partial<
 function pixelRectToArray(rect: RenderPixelRectLike | null | undefined): number[] | undefined {
   if (!rect) return undefined
   return pixelRectComponents(rect)
+}
+
+function effectiveViewport(options: RenderOptions): RenderPixelRectLike | null | undefined {
+  return options.viewport !== undefined ? options.viewport : options.target?.viewport
+}
+
+function effectiveScissor(options: RenderOptions): RenderPixelRectLike | null | undefined {
+  if (options.scissor !== undefined) return options.scissor
+  return options.target?.scissorTest === true ? options.target.scissor : undefined
 }
 
 function pixelRectComponents(rect: RenderPixelRectLike): number[] {

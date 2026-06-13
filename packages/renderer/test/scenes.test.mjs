@@ -6673,6 +6673,41 @@ test('renderToTarget depthTexture honors scissor clipping', () => {
   assert.ok(outsideTop.r < 2, `above scissor should keep background depth (${outsideTop.r})`)
 })
 
+test('renderToTarget uses target viewport and scissor fields', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = {}
+  const target = {
+    texture: {},
+    depthTexture,
+    viewport: new THREE.Vector4(16, 16, 40, 32),
+    scissor: new THREE.Vector4(24, 20, 24, 24),
+    scissorTest: true,
+  }
+  renderToTarget(scene, camera, target, { width: 64, height: 64 })
+
+  const inside = meanRegion(target.data, 64, 64, 30, 26, 42, 38)
+  const viewportOutside = meanRegion(target.data, 64, 64, 4, 26, 12, 38)
+  const scissorOutside = meanRegion(target.data, 64, 64, 18, 26, 22, 38)
+  assert.ok(inside.r > inside.b + 80, `target viewport/scissor region should contain the red mesh (${inside.r} vs ${inside.b})`)
+  assert.ok(viewportOutside.b > viewportOutside.r + 80, `outside target viewport should retain blue background (${viewportOutside.b} vs ${viewportOutside.r})`)
+  assert.ok(scissorOutside.b > scissorOutside.r + 80, `outside target scissor should retain blue background (${scissorOutside.b} vs ${scissorOutside.r})`)
+
+  const depthInside = meanRegion(depthTexture.image.data, 64, 64, 30, 26, 42, 38)
+  const depthOutside = meanRegion(depthTexture.image.data, 64, 64, 18, 26, 22, 38)
+  assert.ok(depthInside.r > 0, `target viewport/scissor depth should contain visible geometry (${depthInside.r})`)
+  assert.ok(depthOutside.r < 2, `outside target scissor depth should keep background depth (${depthOutside.r})`)
+})
+
 test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

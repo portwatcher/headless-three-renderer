@@ -107,7 +107,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.LOD` camera-distance level selection
 - vertex colors
 - scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; PMREM/CubeUV backgrounds and unsupported background rotations fail clearly
-- render-option viewport and scissor rectangles in output pixel coordinates
+- render-option viewport/scissor rectangles and render-target viewport/scissor fields in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 
 ### Materials & Textures

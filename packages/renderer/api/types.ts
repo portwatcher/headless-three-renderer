@@ -127,6 +127,8 @@ export type RenderPixelRectLike = {
   y?: number
   width?: number
   height?: number
+  z?: number
+  w?: number
 } | ArrayLike<number>
 
 export interface ThreeLayersLike {
@@ -474,6 +476,9 @@ export interface RenderTargetImageLike {
 export interface RenderTargetLike {
   width?: number
   height?: number
+  viewport?: RenderPixelRectLike | null
+  scissor?: RenderPixelRectLike | null
+  scissorTest?: boolean
   texture?: RenderTargetTextureLike | RenderTargetTextureLike[]
   textures?: RenderTargetTextureLike[]
   objectIdEntries?: RenderObjectIdEntry[]
