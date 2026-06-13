@@ -465,6 +465,8 @@ type PixelRect = {
 
 const WEBGL_COORDINATE_SYSTEM = 2000
 const CUBE_FACE_COUNT = 6
+const UnsignedShortType = 1012
+const UnsignedIntType = 1014
 const FloatType = 1015
 
 function renderCubeCamera(
@@ -1192,6 +1194,20 @@ function writeRenderTargetTexture(
 }
 
 function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): NonNullable<RenderTargetImageLike['data']> {
+  if (texture.type === UnsignedShortType) {
+    const depth = new Uint16Array(rgbaDepth.length / 4)
+    for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
+      depth[p] = Math.round((rgbaDepth[i] / 255) * 0xffff)
+    }
+    return depth
+  }
+  if (texture.type === UnsignedIntType) {
+    const depth = new Uint32Array(rgbaDepth.length / 4)
+    for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
+      depth[p] = Math.round((rgbaDepth[i] / 255) * 0xffffffff)
+    }
+    return depth
+  }
   if (texture.type === FloatType) {
     const depth = new Float32Array(rgbaDepth.length / 4)
     for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
@@ -1205,6 +1221,7 @@ function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): 
 function cloneTargetData(data: NonNullable<RenderTargetImageLike['data']>): NonNullable<RenderTargetImageLike['data']> {
   if (Buffer.isBuffer(data)) return Buffer.from(data)
   if (data instanceof Float32Array) return new Float32Array(data)
+  if (data instanceof Uint32Array) return new Uint32Array(data)
   if (data instanceof Uint16Array) return new Uint16Array(data)
   if (data instanceof Uint8ClampedArray) return new Uint8ClampedArray(data)
   return new Uint8Array(data)

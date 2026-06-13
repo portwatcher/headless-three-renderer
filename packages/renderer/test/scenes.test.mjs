@@ -6613,6 +6613,39 @@ test('renderToTarget populates FloatType depthTexture with normalized scalar dep
   assert.ok(leftDepth <= 1 && rightDepth >= 0, `float depth values should be normalized (${leftDepth}, ${rightDepth})`)
 })
 
+test('renderToTarget populates THREE.DepthTexture with unsigned scalar depth', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const near = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  near.position.set(-0.7, 0, 1)
+
+  const far = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  far.position.set(0.7, 0, -3)
+  scene.add(near, far)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = new THREE.DepthTexture(64, 64)
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+
+  assert.ok(depthTexture.image.data instanceof Uint32Array, 'DepthTexture should receive Uint32Array data for UnsignedIntType')
+  assert.equal(depthTexture.image.data.length, 64 * 64)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+
+  const leftDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
+  const rightDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
+  assert.ok(leftDepth > rightDepth + 1_000_000_000, `near unsigned depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+})
+
 test('renderToTarget depthTexture honors scissor clipping', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
