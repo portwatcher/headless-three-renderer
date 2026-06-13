@@ -3206,22 +3206,37 @@ test('material alphaHash produces stochastic coverage without transparent blendi
   assert.ok(greenPixels > 120, `alphaHash should reveal green pixels through hashed discards (${greenPixels})`)
 })
 
-test('material alphaToCoverage fails clearly', () => {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ color: 0xff0000, alphaToCoverage: true }),
-  ))
+test('material alphaToCoverage uses MSAA coverage from output alpha', () => {
+  function renderCoverage(alphaToCoverage, sampleCount = 4) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        opacity: 0.5,
+        transparent: false,
+        alphaToCoverage,
+      }),
+    ))
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      sampleCount,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
 
-  assert.throws(
-    () => renderRgba(scene, camera, { width: 64, height: 64 }),
-    /alphaToCoverage.*not supported/i,
-  )
+  const noCoverage = renderCoverage(false)
+  const coverage = renderCoverage(true)
+  const singleSample = renderCoverage(true, 1)
+  assert.ok(noCoverage.r > 170, `opaque non-A2C path should keep bright RGB despite opacity alpha (${noCoverage.r})`)
+  assert.ok(Math.abs(singleSample.r - noCoverage.r) < 5, `single-sample alphaToCoverage should not alter RGB coverage (${singleSample.r} vs ${noCoverage.r})`)
+  assert.ok(coverage.r > 30 && coverage.r < noCoverage.r - 80, `4x alphaToCoverage should resolve partial RGB coverage (${coverage.r} vs ${noCoverage.r})`)
 })
 
 test('material clippingPlanes discard the negative plane side', () => {

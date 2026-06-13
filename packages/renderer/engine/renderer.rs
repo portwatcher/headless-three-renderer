@@ -1160,7 +1160,7 @@ impl GpuRenderer {
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
-                multisample: multisample_state(sample_count),
+                multisample: multisample_state(sample_count, false),
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: Some("fs_main"),
@@ -1271,7 +1271,7 @@ impl GpuRenderer {
                     conservative: false,
                 },
                 depth_stencil: None,
-                multisample: multisample_state(sample_count),
+                multisample: multisample_state(sample_count, false),
                 fragment: Some(wgpu::FragmentState {
                     module: &background_shader,
                     entry_point: Some("fs_background"),
@@ -2242,7 +2242,7 @@ impl GpuRenderer {
                     stencil: stencil_state(mesh),
                     bias: depth_bias_state(mesh),
                 }),
-                multisample: multisample_state(sample_count),
+                multisample: multisample_state(sample_count, mesh.alpha_to_coverage),
                 fragment: Some(wgpu::FragmentState {
                     module: shader,
                     entry_point: Some("fs_main"),
@@ -3136,7 +3136,7 @@ impl GpuRenderer {
             Some(fragment_body) => {
                 Some(self.create_custom_pipeline(mesh, fragment_body, settings.sample_count)?)
             }
-            None if requires_pipeline_override(mesh) => {
+            None if requires_pipeline_override(mesh, settings.sample_count) => {
                 Some(self.create_state_override_pipeline(mesh, settings.sample_count))
             }
             None => None,
@@ -3206,11 +3206,11 @@ fn apply_output_region(pass: &mut wgpu::RenderPass<'_>, settings: &RenderSetting
     }
 }
 
-fn multisample_state(sample_count: u32) -> wgpu::MultisampleState {
+fn multisample_state(sample_count: u32, alpha_to_coverage: bool) -> wgpu::MultisampleState {
     wgpu::MultisampleState {
         count: sample_count,
         mask: !0,
-        alpha_to_coverage_enabled: false,
+        alpha_to_coverage_enabled: alpha_to_coverage && sample_count > 1,
     }
 }
 
@@ -3229,7 +3229,7 @@ fn pipeline_key(mesh: &GpuMesh) -> PipelineKey {
     }
 }
 
-fn requires_pipeline_override(mesh: &PreparedMesh) -> bool {
+fn requires_pipeline_override(mesh: &PreparedMesh, sample_count: u32) -> bool {
     let default_depth_write = !mesh.is_transparent;
     let default_blending = if mesh.is_transparent {
         BlendMode::Normal
@@ -3241,6 +3241,7 @@ fn requires_pipeline_override(mesh: &PreparedMesh) -> bool {
         || !mesh.color_write
         || mesh.polygon_offset
         || mesh.stencil_write
+        || (mesh.alpha_to_coverage && sample_count > 1)
         || (mesh.premultiplied_alpha
             && effective_blend_mode(mesh.blending, mesh.is_transparent) != BlendMode::None)
         || effective_blend_mode(mesh.blending, mesh.is_transparent) != default_blending

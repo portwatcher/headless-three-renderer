@@ -84,6 +84,7 @@ pub struct PreparedMesh {
     pub depth_packing: DepthPacking,
     pub alpha_test: f32,
     pub alpha_hash: bool,
+    pub alpha_to_coverage: bool,
     pub premultiplied_alpha: bool,
     pub fog: bool,
     pub clipping_planes: [[f32; 4]; MAX_CLIPPING_PLANES],
@@ -1212,6 +1213,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
 
     let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
     let alpha_hash = mesh.alpha_hash.unwrap_or(false);
+    let alpha_to_coverage = mesh.alpha_to_coverage.unwrap_or(false);
     let premultiplied_alpha = mesh.premultiplied_alpha.unwrap_or(false);
     let fog = mesh.fog.unwrap_or(true);
     let (clipping_planes, clipping_plane_count, clipping_union_count) = parse_clipping_planes(
@@ -1337,6 +1339,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         depth_packing: DepthPacking::from_three_constant(mesh.depth_packing),
         alpha_test,
         alpha_hash,
+        alpha_to_coverage,
         premultiplied_alpha,
         fog,
         clipping_planes,

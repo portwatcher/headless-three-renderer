@@ -808,6 +808,7 @@ export interface NativeSceneMesh {
   alphaMapUsesUv2?: boolean
   alphaTest?: number
   alphaHash?: boolean
+  alphaToCoverage?: boolean
   premultipliedAlpha?: boolean
   flatShading?: boolean
   fog?: boolean
@@ -1162,6 +1163,7 @@ export interface PbrProperties {
   alphaMapUsesUv2?: boolean
   alphaTest?: number
   alphaHash?: boolean
+  alphaToCoverage?: boolean
   premultipliedAlpha?: boolean
   flatShading?: boolean
   fog?: boolean

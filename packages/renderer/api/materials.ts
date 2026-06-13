@@ -750,6 +750,9 @@ export function extractPbrProperties(
   if (material.alphaHash === true) {
     props.alphaHash = true
   }
+  if (material.alphaToCoverage === true) {
+    props.alphaToCoverage = true
+  }
   if (material.premultipliedAlpha === true) {
     props.premultipliedAlpha = true
   }
@@ -1001,11 +1004,6 @@ function assertSupportedMaterialState(
   material: ThreeMaterialLike,
   context: MaterialExtractionContext,
 ): void {
-  if (material.alphaToCoverage === true) {
-    throw new Error(
-      'material.alphaToCoverage is not supported by @headless-three/renderer yet. Disable alphaToCoverage or use alphaTest/alphaHash for explicit coverage behavior before rendering.',
-    )
-  }
   if (material.envMap != null && context.materialEnvironmentMaps?.has(material) !== true) {
     throw new Error(
       'material.envMap is only supported for MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',

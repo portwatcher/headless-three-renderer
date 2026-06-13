@@ -675,6 +675,8 @@ pub struct SceneMesh {
     pub alpha_test: Option<f64>,
     /// Whether to apply stochastic alpha hashing before depth/color writes.
     pub alpha_hash: Option<bool>,
+    /// Whether to enable MSAA alpha-to-coverage when the render sample count is greater than 1.
+    pub alpha_to_coverage: Option<bool>,
     /// Whether fragment RGB output is multiplied by output alpha before blending.
     pub premultiplied_alpha: Option<bool>,
     /// Flattened world-space clipping planes `[nx, ny, nz, constant, ...]`, up to 8 planes.

@@ -715,6 +715,8 @@ export interface SceneMesh {
   alphaTest?: number
   /** Whether to apply stochastic alpha hashing before depth/color writes. */
   alphaHash?: boolean
+  /** Whether to enable MSAA alpha-to-coverage when the render sample count is greater than 1. */
+  alphaToCoverage?: boolean
   /** Whether fragment RGB output is multiplied by output alpha before blending. */
   premultipliedAlpha?: boolean
   /**

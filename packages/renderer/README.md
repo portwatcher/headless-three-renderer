@@ -145,10 +145,9 @@ The public API accepts only Three.js-like objects:
 - `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
-- material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
+- material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes
 - single shared material-level reflection/refraction `envMap` inputs are supported for `MeshBasicMaterial`, and shared reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material env-map classes/options, non-Basic refraction mappings, PMREM/CubeUV mappings, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly
-- unsupported `alphaToCoverage` material state fails clearly
 - unsupported `MeshPhysicalMaterial` iridescence and dispersion inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 use native anisotropic samplers for supported material/background texture slots when the effective sampler is linear-filtered
@@ -259,7 +258,7 @@ Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatibl
 
 ### Render Targets & Post-Processing
 
-`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8. A target `depthTexture` object receives RGBA8 normalized depth readback for the same viewport/scissor and visible depth-tested geometry, including alpha-tested cutouts. Multiple color attachments and sample counts greater than 1 fail clearly until MRT and MSAA support land.
+`renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8. A target `depthTexture` object receives RGBA8 normalized depth readback for the same viewport/scissor and visible depth-tested geometry, including alpha-tested cutouts. Multiple color attachments and 4x MSAA sample counts resolve into target readback buffers; unsupported sample counts fail clearly.
 
 Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert.
 
