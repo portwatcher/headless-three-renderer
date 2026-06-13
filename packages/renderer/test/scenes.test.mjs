@@ -5358,7 +5358,7 @@ test('MeshPhysicalMaterial transmission volume attenuation honors color and dist
   assert.ok(redShort.r > redShort.b + 80, `red attenuationColor should tint the same volume red (${redShort.r} vs ${redShort.b})`)
 })
 
-test('MeshPhysicalMaterial iridescence and dispersion fail clearly', () => {
+test('MeshPhysicalMaterial iridescence inputs fail clearly', () => {
   const cases = []
 
   const iridescence = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
@@ -5372,10 +5372,6 @@ test('MeshPhysicalMaterial iridescence and dispersion fail clearly', () => {
   const iridescenceThicknessMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
   iridescenceThicknessMap.iridescenceThicknessMap = solidTexture(255, 255, 255)
   cases.push([iridescenceThicknessMap, /iridescence.*not supported/i, 'iridescenceThicknessMap'])
-
-  const dispersion = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-  dispersion.dispersion = 0.25
-  cases.push([dispersion, /dispersion.*not supported/i, 'dispersion'])
 
   for (const [material, pattern, label] of cases) {
     const scene = new THREE.Scene()
@@ -7300,6 +7296,62 @@ test('physical transmission roughness softens scene-color refraction', () => {
   assert.ok(
     roughContrast < smoothContrast - 20,
     `rough transmission should reduce scene-color edge contrast (${roughContrast.toFixed(1)} vs ${smoothContrast.toFixed(1)})`,
+  )
+})
+
+test('physical transmission dispersion separates transmitted color channels', () => {
+  const width = 64
+  const height = 64
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function makeScene(dispersion) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const left = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    left.position.set(-0.8, 0, -0.2)
+    scene.add(left)
+
+    const right = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    right.position.set(0.8, 0, -0.2)
+    scene.add(right)
+
+    const glass = new THREE.Mesh(
+      new THREE.SphereGeometry(0.95, 48, 24),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness: 0.02,
+        transmission: 1,
+        thickness: 40,
+        ior: 2.2,
+        dispersion,
+      }),
+    )
+    scene.add(glass)
+    return scene
+  }
+
+  const normal = renderRgba(makeScene(0), camera, { width, height })
+  const dispersed = renderRgba(makeScene(10), camera, { width, height })
+  const diff = meanAbsDiff(normal, dispersed)
+  const normalEdge = meanRegion(normal, width, height, 28, 22, 36, 42)
+  const dispersedEdge = meanRegion(dispersed, width, height, 28, 22, 36, 42)
+  const normalSeparation = Math.abs(normalEdge.r - normalEdge.b)
+  const dispersedSeparation = Math.abs(dispersedEdge.r - dispersedEdge.b)
+
+  assert.ok(diff > 10, `dispersion should affect transmitted color, diff=${diff.toFixed(2)}`)
+  assert.ok(
+    Math.abs(dispersedSeparation - normalSeparation) > 20,
+    `dispersion should change edge channel separation (${dispersedSeparation.toFixed(1)} vs ${normalSeparation.toFixed(1)})`,
   )
 })
 

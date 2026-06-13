@@ -68,6 +68,7 @@ pub struct PreparedMesh {
     pub anisotropy: f32,
     pub anisotropy_rotation: f32,
     pub transmission: f32,
+    pub dispersion: f32,
     pub ior: f32,
     pub thickness: f32,
     pub attenuation_distance: f32,
@@ -1130,6 +1131,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         "mesh anisotropyRotation",
     )?;
     let transmission = clamp01(mesh.transmission.unwrap_or(0.0)) as f32;
+    let dispersion = finite_f32(mesh.dispersion.unwrap_or(0.0), "mesh dispersion")?.max(0.0);
     let ior = mesh.ior.unwrap_or(1.5).clamp(1.0, 2.333) as f32;
     let thickness = mesh.thickness.unwrap_or(0.0).max(0.0) as f32;
     let attenuation_distance = mesh
@@ -1323,6 +1325,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         anisotropy,
         anisotropy_rotation,
         transmission,
+        dispersion,
         ior,
         thickness,
         attenuation_distance,

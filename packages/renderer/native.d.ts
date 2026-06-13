@@ -429,6 +429,8 @@ export interface SceneMesh {
   transmissionMapTransform?: Array<number>
   /** Whether transmission map sampling uses the secondary UV stream. */
   transmissionMapUsesUv2?: boolean
+  /** MeshPhysicalMaterial dispersion factor. Defaults to 0. */
+  dispersion?: number
   /** Index of refraction for physical materials. Defaults to 1.5. */
   ior?: number
   /** Transmission volume thickness in model units. Defaults to 0. */

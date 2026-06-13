@@ -467,6 +467,9 @@ export function extractPbrProperties(
   if (Number.isFinite(material.transmission)) {
     props.transmission = clamp01(material.transmission!)
   }
+  if (Number.isFinite(material.dispersion)) {
+    props.dispersion = Math.max(0, material.dispersion!)
+  }
   const transmissionMapInfo = extractTextureFromSlot(material.transmissionMap)
   if (transmissionMapInfo) {
     props.transmissionMap = transmissionMapInfo.data
@@ -1016,11 +1019,6 @@ function assertSupportedMaterialState(
   ) {
     throw new Error(
       'MeshPhysicalMaterial iridescence is not supported by @headless-three/renderer yet. Disable iridescence or bake the effect into textures before rendering.',
-    )
-  }
-  if (Number.isFinite(material.dispersion) && material.dispersion! !== 0) {
-    throw new Error(
-      'MeshPhysicalMaterial dispersion is not supported by @headless-three/renderer yet. Disable dispersion or bake the effect into textures before rendering.',
     )
   }
 }

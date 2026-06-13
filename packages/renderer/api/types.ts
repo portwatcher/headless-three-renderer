@@ -677,6 +677,7 @@ export interface NativeSceneMesh {
   transmissionMapAnisotropy?: number
   transmissionMapTransform?: number[]
   transmissionMapUsesUv2?: boolean
+  dispersion?: number
   ior?: number
   thickness?: number
   thicknessMap?: Buffer
@@ -1024,6 +1025,7 @@ export interface PbrProperties {
   transmissionMapAnisotropy?: number
   transmissionMapTransform?: number[]
   transmissionMapUsesUv2?: boolean
+  dispersion?: number
   ior?: number
   thickness?: number
   thicknessMap?: Buffer

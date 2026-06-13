@@ -89,7 +89,7 @@ pub struct Uniforms {
     pub physical_params3: [f32; 4],
     /// x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map, matcap map sRGB flag, or toon gradient map sRGB flag depending on shading model.
     pub physical_params4: [f32; 4],
-    /// xyz = attenuation color or distance reference position, w = reserved
+    /// xyz = attenuation color or distance reference position, w = dispersion for physical materials.
     pub attenuation_color: [f32; 4],
     /// xyz = MeshPhysicalMaterial specular color factor, w = specular intensity.
     pub physical_specular: [f32; 4],
@@ -2558,7 +2558,7 @@ impl GpuRenderer {
                     mesh.attenuation_color[0],
                     mesh.attenuation_color[1],
                     mesh.attenuation_color[2],
-                    0.0,
+                    mesh.dispersion,
                 ]
             },
             physical_specular: [

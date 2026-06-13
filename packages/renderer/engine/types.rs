@@ -395,6 +395,8 @@ pub struct SceneMesh {
     pub transmission_map_transform: Option<Vec<f64>>,
     /// Whether transmission map sampling uses the secondary UV stream.
     pub transmission_map_uses_uv2: Option<bool>,
+    /// MeshPhysicalMaterial dispersion factor. Defaults to 0.
+    pub dispersion: Option<f64>,
     /// Index of refraction for physical materials. Defaults to 1.5.
     pub ior: Option<f64>,
     /// Transmission volume thickness in model units. Defaults to 0.

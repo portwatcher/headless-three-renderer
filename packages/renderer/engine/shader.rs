@@ -100,7 +100,7 @@ struct Uniforms {
   physical_params3: vec4<f32>,
   // x/y = clearcoat normal scale, z = light_map_intensity, w = has_specular_map, matcap map sRGB flag, or toon gradient map sRGB flag depending on shading model.
   physical_params4: vec4<f32>,
-  // xyz = attenuation color or distance reference position
+  // xyz = attenuation color or distance reference position, w = dispersion for physical materials
   attenuation_color: vec4<f32>,
   // xyz = MeshPhysicalMaterial specular color factor, w = specular intensity.
   physical_specular: vec4<f32>,
@@ -1254,14 +1254,43 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   }
 
   if use_specular && transmission > 0.0001 {
+    let dispersion = max(uniforms.attenuation_color.w, 0.0);
     let refracted_dir = refract(-V, N, 1.0 / ior);
     let transmittance = volume_attenuation(thickness, uniforms.attenuation_color.rgb, attenuation_distance);
     let scene_offset = refracted_dir.xy * thickness * 0.04;
     let scene_uv = clamp(screen_uv + scene_offset, vec2<f32>(0.0), vec2<f32>(1.0));
-    var transmitted_light = sample_transmission_scene_color(scene_uv, roughness, ior) * transmittance;
+    let transmitted_sample = sample_transmission_scene_color(scene_uv, roughness, ior);
+    var transmitted_light = transmitted_sample * transmittance;
+    if dispersion > 0.0001 {
+      let half_spread = max(ior - 1.0, 0.0) * 0.025 * dispersion;
+      let ior_r = clamp(ior - half_spread, 1.0, 2.333);
+      let ior_b = clamp(ior + half_spread, 1.0, 2.333);
+      let refracted_r = refract(-V, N, 1.0 / ior_r);
+      let refracted_b = refract(-V, N, 1.0 / ior_b);
+      let uv_r = clamp(screen_uv + refracted_r.xy * thickness * 0.04, vec2<f32>(0.0), vec2<f32>(1.0));
+      let uv_b = clamp(screen_uv + refracted_b.xy * thickness * 0.04, vec2<f32>(0.0), vec2<f32>(1.0));
+      transmitted_light = vec3<f32>(
+        sample_transmission_scene_color(uv_r, roughness, ior_r).r,
+        transmitted_sample.g,
+        sample_transmission_scene_color(uv_b, roughness, ior_b).b,
+      ) * transmittance;
+    }
     if has_ibl {
       let max_lod = 4.0;
-      let environment_refraction = textureSampleLevel(t_prefilter, s_ibl, refracted_dir, roughness * max_lod).rgb * transmittance;
+      let environment_sample = textureSampleLevel(t_prefilter, s_ibl, refracted_dir, roughness * max_lod).rgb;
+      var environment_refraction = environment_sample * transmittance;
+      if dispersion > 0.0001 {
+        let half_spread = max(ior - 1.0, 0.0) * 0.025 * dispersion;
+        let ior_r = clamp(ior - half_spread, 1.0, 2.333);
+        let ior_b = clamp(ior + half_spread, 1.0, 2.333);
+        let refracted_r = refract(-V, N, 1.0 / ior_r);
+        let refracted_b = refract(-V, N, 1.0 / ior_b);
+        environment_refraction = vec3<f32>(
+          textureSampleLevel(t_prefilter, s_ibl, refracted_r, roughness * max_lod).r,
+          environment_sample.g,
+          textureSampleLevel(t_prefilter, s_ibl, refracted_b, roughness * max_lod).b,
+        ) * transmittance;
+      }
       transmitted_light = mix(transmitted_light, environment_refraction, 0.35);
     }
     lo = mix(lo, transmitted_light, transmission);
