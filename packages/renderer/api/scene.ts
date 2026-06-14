@@ -520,7 +520,7 @@ function appendSprite(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
 ): void {
-  assertUnsupportedSpriteShadows(object, shadowMaterialMode)
+  assertUnsupportedSpriteShadows(object)
 
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
@@ -611,7 +611,7 @@ function appendPoints(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
 ): void {
-  assertUnsupportedPointShadows(object, shadowMaterialMode)
+  assertUnsupportedPointShadows(object)
 
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -726,27 +726,15 @@ function appendPoints(
   }
 }
 
-function assertUnsupportedSpriteShadows(
-  object: ThreeObject3DLike,
-  shadowMaterialMode: ShadowMaterialMode | undefined,
-): void {
+function assertUnsupportedSpriteShadows(object: ThreeObject3DLike): void {
   if (object.receiveShadow === true) {
     throw new Error('THREE.Sprite receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the sprite to mesh geometry before receiving shadows.')
   }
-  if (object.castShadow === true && shadowMaterialMode === 'distance') {
-    throw new Error('THREE.Sprite point-light castShadow is not supported by @headless-three/renderer yet. Use directional or spot shadow maps, or expand sprites to mesh geometry for point-light shadows.')
-  }
 }
 
-function assertUnsupportedPointShadows(
-  object: ThreeObject3DLike,
-  shadowMaterialMode: ShadowMaterialMode | undefined,
-): void {
+function assertUnsupportedPointShadows(object: ThreeObject3DLike): void {
   if (object.receiveShadow === true) {
     throw new Error('THREE.Points receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the points to mesh geometry before receiving shadows.')
-  }
-  if (object.castShadow === true && shadowMaterialMode === 'distance') {
-    throw new Error('THREE.Points point-light castShadow is not supported by @headless-three/renderer yet. Use directional or spot shadow maps, or expand points to mesh geometry for point-light shadows.')
   }
 }
 

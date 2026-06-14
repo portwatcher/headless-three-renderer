@@ -2419,7 +2419,7 @@ test('Sprite center shifts billboard anchoring around object position', () => {
   assert.ok(upperRight.minY > centered.minY + 10, `center=(1,1) should anchor the sprite below its origin (${upperRight.minY} vs ${centered.minY})`)
 })
 
-test('Sprite unsupported shadow paths fail clearly', () => {
+test('Sprite receiveShadow fails clearly', () => {
   const receiveScene = new THREE.Scene()
   const receiver = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
   receiver.receiveShadow = true
@@ -2429,20 +2429,47 @@ test('Sprite unsupported shadow paths fail clearly', () => {
     /THREE\.Sprite receiveShadow.*not supported/i,
     'receiveShadow',
   )
+})
 
-  const pointLightScene = new THREE.Scene()
-  const caster = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
-  caster.castShadow = true
-  pointLightScene.add(caster)
-  const light = new THREE.PointLight(0xffffff, 1)
-  light.position.set(2, 4, 2)
-  light.castShadow = true
-  pointLightScene.add(light)
-  assert.throws(
-    () => renderRgba(pointLightScene, makeCamera(), { width: 64, height: 64 }),
-    /THREE\.Sprite point-light castShadow.*not supported/i,
-    'point-light castShadow',
-  )
+test('Sprite casts point-light shadows from expanded billboard quads', () => {
+  function renderSpriteShadow(castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+    caster.position.set(0, 2.2, 1.8)
+    caster.scale.set(2.8, 2.8, 1)
+    caster.castShadow = castShadow
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  const unshadowed = renderSpriteShadow(false)
+  const shadowed = renderSpriteShadow(true)
+  const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+  const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+  assert.ok(shadowedLum < unshadowedLum - 15, `sprite point-light shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
 })
 
 test('camera layers filter renderable objects', () => {
@@ -9082,7 +9109,7 @@ test('Points with InstancedBufferGeometry expand offsets and colors', () => {
   assert.ok(greenPixels > 20, `right instanced point should render green pixels (${greenPixels})`)
 })
 
-test('Points unsupported shadow paths fail clearly', () => {
+test('Points receiveShadow fails clearly', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
 
@@ -9095,20 +9122,51 @@ test('Points unsupported shadow paths fail clearly', () => {
     /THREE\.Points receiveShadow.*not supported/i,
     'receiveShadow',
   )
+})
 
-  const pointLightScene = new THREE.Scene()
-  const caster = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xffffff, size: 12 }))
-  caster.castShadow = true
-  pointLightScene.add(caster)
-  const light = new THREE.PointLight(0xffffff, 1)
-  light.position.set(2, 4, 2)
-  light.castShadow = true
-  pointLightScene.add(light)
-  assert.throws(
-    () => renderRgba(pointLightScene, makeCamera(), { width: 64, height: 64 }),
-    /THREE\.Points point-light castShadow.*not supported/i,
-    'point-light castShadow',
-  )
+test('Points cast point-light shadows from expanded billboard quads', () => {
+  function renderPointShadow(castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 2.2, 1.8]), 3))
+    const caster = new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 48,
+      sizeAttenuation: false,
+    }))
+    caster.castShadow = castShadow
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  const unshadowed = renderPointShadow(false)
+  const shadowed = renderPointShadow(true)
+  const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+  const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+  assert.ok(shadowedLum < unshadowedLum - 10, `point billboard point-light shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
 })
 
 test('empty scene renders the background color', () => {
