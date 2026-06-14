@@ -8239,6 +8239,37 @@ test('LineBasicMaterial map samples the selected secondary UV channel', () => {
   assert.ok(greenPixels > 2, `line map channel=1 should sample uv1 green texel (${greenPixels})`)
 })
 
+test('Line material arrays honor geometry groups', () => {
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1.5, 0, 0,
+    -0.3, 0, 0,
+    0.3, 0, 0,
+    1.5, 0, 0,
+  ]), 3))
+  geom.addGroup(0, 2, 0)
+  geom.addGroup(2, 2, 1)
+
+  const line = new THREE.LineSegments(geom, [
+    new THREE.LineBasicMaterial({ color: 0xff0000 }),
+    new THREE.LineDashedMaterial({ color: 0x00ff00, dashSize: 10, gapSize: 0, scale: 1 }),
+  ])
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(line)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 8, 40, 44, 56, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 88, 56, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(redPixels > 2, `left line group should use the red material (${redPixels})`)
+  assert.ok(greenPixels > 2, `right line group should use the green dashed material (${greenPixels})`)
+})
+
 test('LineDashedMaterial renders fewer visible line pixels than a solid line', () => {
   function makeScene(material) {
     const geom = new THREE.BufferGeometry().setFromPoints([

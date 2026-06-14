@@ -804,124 +804,124 @@ function appendLineOrPoints(
   const position = getAttribute(geometry, 'position')
   if (!position) return
 
-  const material = materialForGroup(object.material, 0)
-  if (material?.visible === false) return
-  if (topology === 'lines') {
-    assertSupportedLineMaterial(material)
-  }
-
   const positions = readVec3Attribute(position)
   const uvAttribute = getAttribute(geometry, 'uv')
   const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
   const uvChannels = readUvChannels(geometry, uvs)
-  const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
   const vertexColors = getAttribute(geometry, 'color')
   const indexAttr = geometry.index ? readIndexAttribute(geometry.index) : null
   const vertexCount = position.count
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
+  const groups = effectiveGroups(geometry, indexAttr, vertexCount)
 
-  const range = geometry.drawRange ?? {}
-  const sourceCount = indexAttr ? indexAttr.length : vertexCount
-  const drawStart = clampInteger(range.start ?? 0, 0, sourceCount)
-  const requestedCount = range.count == null || range.count === Infinity ? sourceCount : range.count
-  const drawEnd = clampInteger(drawStart + requestedCount, drawStart, sourceCount)
-
-  let indices: number[] | null = null
-  let outputPositions = positions
-  let outputUvs: number[] | undefined = topology === 'lines' ? uvs ?? undefined : undefined
-  let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? secondaryUvs ?? undefined : undefined
-  let outputColors: number[] | undefined
-  const color = materialColor(material)
-  const useVertexColors = vertexColors && material?.vertexColors !== false
-  const pbrProps = extractPbrProperties(material, materialContext)
-  const textureInfo = extractTextureData(material)
-  if (topology === 'lines') {
-    const source = indexAttr ?? rangeIndices(vertexCount)
-    if (material?.isLineDashedMaterial === true) {
-      const dashed = instancedGeometryCount > 1 || instancedPositionOffset
-        ? dashedLineAttributesForInstances(
-          positions,
-          uvs,
-          secondaryUvs,
-          useVertexColors ? vertexColors! : undefined,
-          color,
-          source,
-          drawStart,
-          drawEnd,
-          object,
-          getAttribute(geometry, 'lineDistance'),
-          material,
-          instancedGeometryCount,
-          instancedPositionOffset,
-        )
-        : dashedLineAttributes(
-          positions,
-          uvs,
-          secondaryUvs,
-          useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
-          source,
-          drawStart,
-          drawEnd,
-          object,
-          getAttribute(geometry, 'lineDistance'),
-          material,
-        )
-      if (dashed.positions.length < 6) return
-      outputPositions = dashed.positions
-      outputUvs = dashed.uvs
-      outputSecondaryUvs = dashed.uvs2
-      outputColors = dashed.colors
-      indices = null
-    } else {
-      indices = expandLineIndices(source, drawStart, drawEnd, object)
-      if (indices.length < 2) return
-      if (instancedGeometryCount > 1 || instancedPositionOffset) {
-        outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
-        outputUvs = uvs ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount) : undefined
-        outputSecondaryUvs = secondaryUvs ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount) : undefined
-        indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
-      }
+  for (const group of groups) {
+    const material = materialForGroup(object.material, group.materialIndex)
+    if (material?.visible === false) continue
+    if (topology === 'lines') {
+      assertSupportedLineMaterial(material)
     }
-  } else if (indexAttr) {
-    indices = indexAttr.slice(drawStart, drawEnd)
-    if (indices.length === 0) return
-  }
 
-  if (useVertexColors && material?.isLineDashedMaterial !== true) {
-    outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
-  }
-  const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
-  const clipping = clippingState(clippingContext, material, localClippingEnabled)
+    const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
+    let indices: number[] | null = null
+    let outputPositions = positions
+    let outputUvs: number[] | undefined = topology === 'lines' ? uvs ?? undefined : undefined
+    let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? secondaryUvs ?? undefined : undefined
+    let outputColors: number[] | undefined
+    const color = materialColor(material)
+    const useVertexColors = vertexColors && material?.vertexColors !== false
+    const pbrProps = extractPbrProperties(material, materialContext)
+    const textureInfo = extractTextureData(material)
+    const drawStart = group.start
+    const drawEnd = group.start + group.count
 
-  pushMesh(meshes, {
-    positions: outputPositions,
-    indices: indices ?? undefined,
-    uvs: topology === 'lines' ? outputUvs : undefined,
-    uvs2: topology === 'lines' ? outputSecondaryUvs : undefined,
-    color,
-    colors: outputColors,
-    texture: textureInfo?.data,
-    textureWidth: textureInfo?.width ?? undefined,
-    textureHeight: textureInfo?.height ?? undefined,
-    textureWrapS: textureInfo?.wrapS,
-    textureWrapT: textureInfo?.wrapT,
-    textureMagFilter: textureInfo?.magFilter,
-    textureMinFilter: textureInfo?.minFilter,
-    textureAnisotropy: textureInfo?.anisotropy,
-    textureTransform: textureInfo?.transform,
-    textureColorSpace: textureInfo?.colorSpace,
-    textureUsesUv2: textureInfo?.usesUv2,
-    transform: matrixElements(object.matrixWorld!, 'object.matrixWorld'),
-    transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
-    alphaTest: material && Number.isFinite(material.alphaTest) && material.alphaTest! > 0 ? material.alphaTest : undefined,
-    clipShadows: clipShadowsForMaterial(material, clippingContext),
-    ...pbrProps,
-    shadingModel: 'basic',
-    topology,
-    ...clipping,
-    ...sortInfo,
-  })
+    if (topology === 'lines') {
+      const source = indexAttr ?? rangeIndices(vertexCount)
+      if (material?.isLineDashedMaterial === true) {
+        const dashed = instancedGeometryCount > 1 || instancedPositionOffset
+          ? dashedLineAttributesForInstances(
+            positions,
+            uvs,
+            secondaryUvs,
+            useVertexColors ? vertexColors! : undefined,
+            color,
+            source,
+            drawStart,
+            drawEnd,
+            object,
+            getAttribute(geometry, 'lineDistance'),
+            material,
+            instancedGeometryCount,
+            instancedPositionOffset,
+          )
+          : dashedLineAttributes(
+            positions,
+            uvs,
+            secondaryUvs,
+            useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
+            source,
+            drawStart,
+            drawEnd,
+            object,
+            getAttribute(geometry, 'lineDistance'),
+            material,
+          )
+        if (dashed.positions.length < 6) continue
+        outputPositions = dashed.positions
+        outputUvs = dashed.uvs
+        outputSecondaryUvs = dashed.uvs2
+        outputColors = dashed.colors
+        indices = null
+      } else {
+        indices = expandLineIndices(source, drawStart, drawEnd, object)
+        if (indices.length < 2) continue
+        if (instancedGeometryCount > 1 || instancedPositionOffset) {
+          outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
+          outputUvs = uvs ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount) : undefined
+          outputSecondaryUvs = secondaryUvs ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount) : undefined
+          indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
+        }
+      }
+    } else if (indexAttr) {
+      indices = indexAttr.slice(drawStart, drawEnd)
+      if (indices.length === 0) continue
+    }
+
+    if (useVertexColors && material?.isLineDashedMaterial !== true) {
+      outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
+    }
+    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
+    const clipping = clippingState(clippingContext, material, localClippingEnabled)
+
+    pushMesh(meshes, {
+      positions: outputPositions,
+      indices: indices ?? undefined,
+      uvs: topology === 'lines' ? outputUvs : undefined,
+      uvs2: topology === 'lines' ? outputSecondaryUvs : undefined,
+      color,
+      colors: outputColors,
+      texture: textureInfo?.data,
+      textureWidth: textureInfo?.width ?? undefined,
+      textureHeight: textureInfo?.height ?? undefined,
+      textureWrapS: textureInfo?.wrapS,
+      textureWrapT: textureInfo?.wrapT,
+      textureMagFilter: textureInfo?.magFilter,
+      textureMinFilter: textureInfo?.minFilter,
+      textureAnisotropy: textureInfo?.anisotropy,
+      textureTransform: textureInfo?.transform,
+      textureColorSpace: textureInfo?.colorSpace,
+      textureUsesUv2: textureInfo?.usesUv2,
+      transform: matrixElements(object.matrixWorld!, 'object.matrixWorld'),
+      transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
+      alphaTest: material && Number.isFinite(material.alphaTest) && material.alphaTest! > 0 ? material.alphaTest : undefined,
+      clipShadows: clipShadowsForMaterial(material, clippingContext),
+      ...pbrProps,
+      shadingModel: 'basic',
+      topology,
+      ...clipping,
+      ...sortInfo,
+    })
+  }
 }
 
 function assertSupportedLineMaterial(material: ThreeMaterialLike | undefined): void {
