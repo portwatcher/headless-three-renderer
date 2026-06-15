@@ -484,6 +484,7 @@ type PixelRect = {
 
 const WEBGL_COORDINATE_SYSTEM = 2000
 const CUBE_FACE_COUNT = 6
+const UnsignedByteType = 1009
 const UnsignedShortType = 1012
 const UnsignedIntType = 1014
 const FloatType = 1015
@@ -1235,9 +1236,9 @@ function assertSupportedSampleCount(value: unknown, label: string): void {
 function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike | undefined): void {
   const type = depthTexture?.type
   if (type == null) return
-  if (type === UnsignedShortType || type === UnsignedIntType || type === FloatType || type === HalfFloatType) return
+  if (type === UnsignedByteType || type === UnsignedShortType || type === UnsignedIntType || type === FloatType || type === HalfFloatType) return
   throw new Error(
-    `target.depthTexture.type ${String(type)} is not supported by @headless-three/renderer yet. Use FloatType, HalfFloatType, UnsignedShortType, UnsignedIntType, or omit type for RGBA8 normalized depth readback.`,
+    `target.depthTexture.type ${String(type)} is not supported by @headless-three/renderer yet. Use FloatType, HalfFloatType, UnsignedByteType, UnsignedShortType, UnsignedIntType, or omit type for RGBA8 normalized depth readback.`,
   )
 }
 
@@ -1313,6 +1314,13 @@ function writeRenderTargetTexture(
 }
 
 function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): NonNullable<RenderTargetImageLike['data']> {
+  if (texture.type === UnsignedByteType) {
+    const depth = new Uint8Array(rgbaDepth.length / 4)
+    for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
+      depth[p] = rgbaDepth[i]
+    }
+    return depth
+  }
   if (texture.type === UnsignedShortType) {
     const depth = new Uint16Array(rgbaDepth.length / 4)
     for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
