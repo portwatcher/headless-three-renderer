@@ -8472,6 +8472,38 @@ test('scene-level reflection probe feeds physical IBL when scene.environment is 
   assert.ok(diff > 0.5, `expected reflection probe to affect metallic IBL, diff=${diff.toFixed(3)}`)
 })
 
+test('invalid environment intensity values fail clearly', () => {
+  const camera = makeCamera()
+
+  const scene = new THREE.Scene()
+  scene.environment = makeEnvironmentTexture()
+  scene.environmentIntensity = Number.NaN
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+  ))
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.environmentIntensity must be a finite number/i,
+  )
+
+  const probeScene = new THREE.Scene()
+  probeScene.userData.headlessThreeRenderer = {
+    reflectionProbe: {
+      texture: makeEnvironmentTexture(),
+      intensity: 'bright',
+    },
+  }
+  probeScene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+  ))
+  assert.throws(
+    () => renderRgba(probeScene, camera, { width: 32, height: 32 }),
+    /reflectionProbe\.intensity must be a finite number/i,
+  )
+})
+
 test('cube scene environments feed physical IBL', () => {
   function makeScene(environment) {
     const scene = new THREE.Scene()

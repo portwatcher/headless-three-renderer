@@ -139,7 +139,9 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMap
   const envTex = scene.environment ?? probe?.texture
   if (!envTex) return null
   const label = scene.environment ? 'scene.environment' : 'reflectionProbe.texture'
-  const intensity = probe?.intensity ?? (scene as any).environmentIntensity ?? 1.0
+  const intensity = probe?.intensity !== undefined
+    ? optionalFiniteNumber(probe.intensity, 'reflectionProbe.intensity') ?? 1.0
+    : optionalFiniteNumber((scene as any).environmentIntensity, 'scene.environmentIntensity') ?? 1.0
   return extractEnvironmentMapFromTexture(envTex, label, intensity)
 }
 
@@ -343,7 +345,7 @@ function extractEnvironmentMapFromTexture(
   throw unsupportedTextureImageError(label, 'environment map rendering')
 }
 
-function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: number } | null {
+function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: unknown } | null {
   const hints = scene.userData?.headlessThreeRenderer ?? scene.userData?.headlessRenderer ?? {}
   const probes = hints.reflectionProbes ?? hints.probes
   const probe = hints.reflectionProbe ?? (Array.isArray(probes) ? probes[0] : undefined)
@@ -351,7 +353,7 @@ function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeText
   if (!candidate) return null
   return {
     texture: candidate as ThreeTextureLike,
-    intensity: Number.isFinite(probe?.intensity) ? probe.intensity : undefined,
+    intensity: probe?.intensity,
   }
 }
 
@@ -1172,6 +1174,12 @@ export function textureUvChannel(texture: ThreeTextureLike | null | undefined): 
 
 function finiteNumberOrUndefined(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function optionalFiniteNumber(value: unknown, label: string): number | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
 }
 
 function vector3LikeToArray(value: unknown): number[] | undefined {
