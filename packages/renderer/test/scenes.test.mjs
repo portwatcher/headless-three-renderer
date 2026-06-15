@@ -9728,6 +9728,28 @@ test('backgroundBlurriness softens 2D texture backgrounds', () => {
   assert.ok(sharp.r > blurred.r + 20, `blurred background should soften the red texel (${sharp.r} vs ${blurred.r})`)
 })
 
+test('options.backgroundBlurriness overrides scene backgroundBlurriness', () => {
+  const texture = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = texture
+  scene.backgroundBlurriness = 0
+  const sharp = meanRegion(renderRgba(scene, makeCamera(), { width: 64, height: 64 }), 64, 64, 28, 20, 31, 44)
+  const blurred = meanRegion(renderRgba(scene, makeCamera(), {
+    width: 64,
+    height: 64,
+    backgroundBlurriness: 1,
+  }), 64, 64, 28, 20, 31, 44)
+
+  assert.ok(sharp.r > sharp.g + 120, `scene blurriness 0 should keep the red texel sharp (${sharp.r} vs ${sharp.g})`)
+  assert.ok(blurred.g > sharp.g + 80, `options.backgroundBlurriness should soften in the green texel (${blurred.g} vs ${sharp.g})`)
+})
+
 test('backgroundBlurriness softens equirectangular and cube texture backgrounds', () => {
   function renderBackground(background, blurriness) {
     const scene = new THREE.Scene()
