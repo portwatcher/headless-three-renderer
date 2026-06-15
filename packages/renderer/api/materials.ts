@@ -390,17 +390,11 @@ export function extractPbrProperties(
     && context.materialEnvironmentMaps?.has(material) === true
   if (usesMaterialEnvironmentMap) {
     props.useEnvironmentMap = true
-    props.environmentMapIntensity = Number.isFinite(material.envMapIntensity)
-      ? material.envMapIntensity!
-      : 1
+    props.environmentMapIntensity = finiteNumberOrDefault(material.envMapIntensity, 'material.envMapIntensity', 1)
     props.environmentMapCombine = material.combine ?? MultiplyOperation
-    props.environmentMapReflectivity = Number.isFinite(material.reflectivity)
-      ? material.reflectivity!
-      : 1
+    props.environmentMapReflectivity = finiteNumberOrDefault(material.reflectivity, 'material.reflectivity', 1)
     props.environmentMapRefraction = isRefractionEnvironmentMapping(material.envMap?.mapping)
-    props.environmentMapRefractionRatio = Number.isFinite(material.refractionRatio)
-      ? material.refractionRatio!
-      : 0.98
+    props.environmentMapRefractionRatio = finiteNumberOrDefault(material.refractionRatio, 'material.refractionRatio', 0.98)
   } else if (context.materialEnvironmentSource === 'material') {
     props.useEnvironmentMap = false
   }

@@ -1782,6 +1782,42 @@ test('material envMap fallback does not light unrelated materials', () => {
   assert.ok(mean.r + mean.g + mean.b < 5, `material envMap should not affect unrelated Phong material (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('invalid material envMap scalar values fail clearly', () => {
+  const cases = [
+    ['envMapIntensity', (material) => {
+      material.envMapIntensity = 'bright'
+    }, /material\.envMapIntensity must be a finite number/i],
+    ['reflectivity', (material) => {
+      material.reflectivity = Number.NaN
+    }, /material\.reflectivity must be a finite number/i],
+    ['refractionRatio', (material) => {
+      material.refractionRatio = Number.POSITIVE_INFINITY
+    }, /material\.refractionRatio must be a finite number/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = solidTexture(255, 255, 255)
+    envMap.mapping = name === 'refractionRatio'
+      ? THREE.EquirectangularRefractionMapping
+      : THREE.EquirectangularReflectionMapping
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      envMap,
+      combine: THREE.MixOperation,
+    })
+    mutate(material)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('unsupported material envMap inputs fail clearly', () => {
   const envMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
