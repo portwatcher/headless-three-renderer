@@ -5364,6 +5364,51 @@ test('mixed non-primary texture channels fail clearly', () => {
   )
 })
 
+test('unsupported texture sampler constants fail clearly', () => {
+  function assertMaterialSamplerFailure(configure, pattern, label) {
+    const map = solidTexture(255, 255, 255)
+    configure(map)
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+      pattern,
+      label,
+    )
+  }
+
+  assertMaterialSamplerFailure(
+    (map) => { map.wrapS = 999 },
+    /texture wrap mode 999.*not supported.*ClampToEdgeWrapping.*RepeatWrapping.*MirroredRepeatWrapping/i,
+    'wrapS',
+  )
+  assertMaterialSamplerFailure(
+    (map) => { map.magFilter = 999 },
+    /texture\.magFilter 999.*not supported.*NearestFilter.*LinearFilter/i,
+    'magFilter',
+  )
+  assertMaterialSamplerFailure(
+    (map) => { map.minFilter = 999 },
+    /texture\.minFilter 999.*not supported.*NearestFilter.*LinearFilter.*mipmap/i,
+    'minFilter',
+  )
+
+  const background = solidTexture(255, 255, 255)
+  background.wrapT = 999
+  const scene = new THREE.Scene()
+  scene.background = background
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /texture wrap mode 999.*not supported.*ClampToEdgeWrapping.*RepeatWrapping.*MirroredRepeatWrapping/i,
+    'background wrapT',
+  )
+})
+
 test('unsupported line texture channel indices fail clearly', () => {
   const map = solidTexture(255, 255, 255)
   map.channel = 4

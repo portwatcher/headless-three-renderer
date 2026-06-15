@@ -9,6 +9,7 @@ const native = require('../native.js') as {
 
 // Three.js wrapping constants
 const RepeatWrapping = 1000
+const ClampToEdgeWrapping = 1001
 const MirroredRepeatWrapping = 1002
 const NearestFilter = 1003
 const NearestMipmapNearestFilter = 1004
@@ -1560,13 +1561,17 @@ function textureLike(value: unknown): ThreeTextureLike | null {
   return null
 }
 
-function wrapModeToString(mode: number | undefined): string | undefined {
+function wrapModeToString(mode: unknown): string | undefined {
+  if (mode == null || mode === ClampToEdgeWrapping) return undefined // default = clamp
   if (mode === RepeatWrapping) return 'repeat'
   if (mode === MirroredRepeatWrapping) return 'mirror'
-  return undefined // default = clamp
+  throw new Error(
+    `texture wrap mode ${String(mode)} is not supported by @headless-three/renderer. Use ClampToEdgeWrapping, RepeatWrapping, or MirroredRepeatWrapping.`,
+  )
 }
 
-function filterModeToString(mode: number | undefined): string | undefined {
+function filterModeToString(mode: unknown): string | undefined {
+  if (mode == null) return undefined // default = linear
   if (
     mode === NearestFilter ||
     mode === NearestMipmapNearestFilter ||
@@ -1581,11 +1586,14 @@ function filterModeToString(mode: number | undefined): string | undefined {
   ) {
     return 'linear'
   }
-  return undefined // default = linear
+  throw new Error(
+    `texture.magFilter ${String(mode)} is not supported by @headless-three/renderer. Use NearestFilter or LinearFilter.`,
+  )
 }
 
 function minFilterModeToString(texture: ThreeTextureLike | null | undefined): string | undefined {
   const mode = texture?.minFilter
+  if (mode == null) return undefined
   const allowMipmaps = texture?.generateMipmaps !== false || hasExplicitMipmaps(texture)
   if (mode === NearestFilter) return 'nearest'
   if (mode === LinearFilter) return 'linear'
@@ -1593,7 +1601,9 @@ function minFilterModeToString(texture: ThreeTextureLike | null | undefined): st
   if (mode === NearestMipmapLinearFilter) return allowMipmaps ? 'nearest-mipmap-linear' : 'nearest'
   if (mode === LinearMipmapNearestFilter) return allowMipmaps ? 'linear-mipmap-nearest' : 'linear'
   if (mode === LinearMipmapLinearFilter) return allowMipmaps ? 'linear-mipmap-linear' : 'linear'
-  return undefined
+  throw new Error(
+    `texture.minFilter ${String(mode)} is not supported by @headless-three/renderer. Use NearestFilter, LinearFilter, or a Three.js mipmap minFilter constant.`,
+  )
 }
 
 function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'): TextureInfo | null {
