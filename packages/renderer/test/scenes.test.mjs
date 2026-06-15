@@ -2,9 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import pkg from '../dist/index.js'
+import lightsApi from '../dist/lights.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
 const { Renderer, renderToTarget } = pkg
+const { extractLights } = lightsApi
 
 const SIZE = 128
 const BG = [26, 26, 26] // 0.1 * 255
@@ -8096,6 +8098,68 @@ test('multiple shadow-casting lights fail clearly', () => {
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
     /multiple shadow-casting lights.*not supported/i,
   )
+})
+
+test('shadow bias options are extracted for native shadow lights', () => {
+  const makeLightCases = [
+    ['directional', () => {
+      const light = new THREE.DirectionalLight(0xffffff, 1)
+      light.position.set(4, 6, 3)
+      light.target.position.set(0, 0, 0)
+      return { light, extras: [light.target], mapSize: [320, 192] }
+    }],
+    ['spot', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.position.set(3, 5, 2)
+      light.target.position.set(0, 0, 0)
+      return { light, extras: [light.target], mapSize: [320, 192] }
+    }],
+    ['point', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.position.set(2, 4, 2)
+      return { light, extras: [], mapSize: [256, 256] }
+    }],
+  ]
+
+  for (const [lightType, makeLight] of makeLightCases) {
+    const scene = new THREE.Scene()
+    const { light, extras, mapSize } = makeLight()
+    light.castShadow = true
+    light.shadow.mapSize.set(mapSize[0], mapSize[1])
+    light.shadow.bias = -0.004
+    light.shadow.normalBias = 0.125
+    light.shadow.radius = 3.5
+    light.shadow.camera.near = 0.2
+    light.shadow.camera.far = 24
+    if ('left' in light.shadow.camera) {
+      light.shadow.camera.left = -5
+      light.shadow.camera.right = 4
+      light.shadow.camera.top = 6
+      light.shadow.camera.bottom = -3
+    }
+    scene.add(light, ...extras)
+    scene.updateMatrixWorld(true)
+
+    const extracted = extractLights(scene, makeCamera()) ?? []
+    assert.equal(extracted.length, 1, `${lightType} shadow light should be extracted`)
+    const nativeLight = extracted[0]
+    assert.equal(nativeLight.lightType, lightType)
+    assert.equal(nativeLight.castShadow, true)
+    assert.equal(nativeLight.shadowMapSize, Math.max(mapSize[0], mapSize[1]))
+    assert.equal(nativeLight.shadowMapWidth, mapSize[0])
+    assert.equal(nativeLight.shadowMapHeight, mapSize[1])
+    assert.equal(nativeLight.shadowBias, -0.004)
+    assert.equal(nativeLight.shadowNormalBias, 0.125)
+    assert.equal(nativeLight.shadowRadius, 3.5)
+    assert.equal(nativeLight.shadowCameraNear, 0.2)
+    assert.equal(nativeLight.shadowCameraFar, 24)
+    if (lightType === 'directional') {
+      assert.equal(nativeLight.shadowCameraLeft, -5)
+      assert.equal(nativeLight.shadowCameraRight, 4)
+      assert.equal(nativeLight.shadowCameraTop, 6)
+      assert.equal(nativeLight.shadowCameraBottom, -3)
+    }
+  }
 })
 
 test('rectangular directional shadow map sizes render shadows', () => {
