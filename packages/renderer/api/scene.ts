@@ -1300,8 +1300,9 @@ function clippingState(
   const localPlanes = localClippingEnabled
     ? extractClippingPlanes(material?.clippingPlanes, 'material.clippingPlanes', localBudget)
     : []
-  const localUnionPlanes = material?.clipIntersection === true ? [] : localPlanes
-  const localIntersectionPlanes = material?.clipIntersection === true ? localPlanes : []
+  const clipIntersection = optionalObjectBoolean(material?.clipIntersection, 'material.clipIntersection') === true
+  const localUnionPlanes = clipIntersection ? [] : localPlanes
+  const localIntersectionPlanes = clipIntersection ? localPlanes : []
   const unionPlanes = [...inheritedUnionPlanes, ...localUnionPlanes]
   const intersectionPlanes = [...inheritedIntersectionPlanes, ...localIntersectionPlanes]
   const planes = [...unionPlanes, ...intersectionPlanes]
@@ -1314,27 +1315,30 @@ function clippingState(
 }
 
 function clippingContextForObject(parent: ClippingContext, object: ThreeObject3DLike): ClippingContext {
-  if (object.isClippingGroup !== true || object.enabled === false) return parent
+  if (object.isClippingGroup !== true) return parent
+  if (optionalObjectBoolean(object.enabled, 'ClippingGroup.enabled') === false) return parent
+  const clipIntersection = optionalObjectBoolean(object.clipIntersection, 'ClippingGroup.clipIntersection') === true
+  const clipShadows = parent.clipShadows || optionalObjectBoolean(object.clipShadows, 'ClippingGroup.clipShadows') === true
   const currentCount = parent.unionPlanes.length + parent.intersectionPlanes.length
   const remainingBudget = Math.max(0, MAX_CLIPPING_PLANES - currentCount)
   const planes = extractClippingPlanes(object.clippingPlanes, 'ClippingGroup.clippingPlanes', remainingBudget)
   if (planes.length === 0) return parent
 
-  return object.clipIntersection === true
+  return clipIntersection
     ? {
       unionPlanes: parent.unionPlanes,
       intersectionPlanes: [...parent.intersectionPlanes, ...planes],
-      clipShadows: parent.clipShadows || object.clipShadows === true,
+      clipShadows,
     }
     : {
       unionPlanes: [...parent.unionPlanes, ...planes],
       intersectionPlanes: parent.intersectionPlanes,
-      clipShadows: parent.clipShadows || object.clipShadows === true,
+      clipShadows,
     }
 }
 
 function clipShadowsForMaterial(material: ThreeMaterialLike | undefined, clippingContext: ClippingContext): boolean | undefined {
-  return material?.clipShadows === true || clippingContext.clipShadows ? true : undefined
+  return optionalObjectBoolean(material?.clipShadows, 'material.clipShadows') === true || clippingContext.clipShadows ? true : undefined
 }
 
 function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh, sortItem: RenderSortItem): void {

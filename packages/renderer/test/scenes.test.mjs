@@ -4751,6 +4751,54 @@ test('clippingPlanes over the native plane budget fail clearly', () => {
   )
 })
 
+test('invalid clipping control boolean values fail clearly', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderMaterialWith(mutator) {
+    const scene = new THREE.Scene()
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+    mutator(material)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+    return () => renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function renderGroupWith(mutator) {
+    const scene = new THREE.Scene()
+    const group = new THREE.Group()
+    group.isClippingGroup = true
+    group.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+    mutator(group)
+    group.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+    scene.add(group)
+    return () => renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const cases = [
+    ['material clipIntersection', renderMaterialWith((material) => {
+      material.clipIntersection = 'yes'
+    }), /material\.clipIntersection must be a boolean/i],
+    ['material clipShadows', renderMaterialWith((material) => {
+      material.clipShadows = 'yes'
+    }), /material\.clipShadows must be a boolean/i],
+    ['group enabled', renderGroupWith((group) => {
+      group.enabled = 'yes'
+    }), /ClippingGroup\.enabled must be a boolean/i],
+    ['group clipIntersection', renderGroupWith((group) => {
+      group.clipIntersection = 'yes'
+    }), /ClippingGroup\.clipIntersection must be a boolean/i],
+    ['group clipShadows', renderGroupWith((group) => {
+      group.clipShadows = 'yes'
+    }), /ClippingGroup\.clipShadows must be a boolean/i],
+  ]
+
+  for (const [label, render, pattern] of cases) {
+    assert.throws(render, pattern, label)
+  }
+})
+
 test('invalid clippingPlane values fail clearly', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
