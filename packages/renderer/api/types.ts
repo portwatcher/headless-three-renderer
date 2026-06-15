@@ -223,6 +223,7 @@ export interface ThreeMaterialLike {
   clipIntersection?: boolean
   clipShadows?: boolean
   depthTest?: boolean
+  depthFunc?: number
   depthWrite?: boolean
   colorWrite?: boolean
   polygonOffset?: boolean
@@ -854,6 +855,7 @@ export interface NativeSceneMesh {
   blendColor?: number[]
   blendAlpha?: number
   depthTest?: boolean
+  depthFunc?: string
   depthWrite?: boolean
   colorWrite?: boolean
   polygonOffset?: boolean
@@ -1205,6 +1207,7 @@ export interface PbrProperties {
   blendColor?: number[]
   blendAlpha?: number
   depthTest?: boolean
+  depthFunc?: string
   depthWrite?: boolean
   colorWrite?: boolean
   polygonOffset?: boolean

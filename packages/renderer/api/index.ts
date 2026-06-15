@@ -378,6 +378,7 @@ function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'
     clippingUnionCount: mesh.clippingUnionCount,
     blending: 'none',
     depthTest: mesh.depthTest,
+    depthFunc: mesh.depthFunc,
     depthWrite: true,
     colorWrite: true,
     polygonOffset: mesh.polygonOffset,

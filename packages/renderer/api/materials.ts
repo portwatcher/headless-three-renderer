@@ -37,6 +37,16 @@ const DefaultIridescenceIor = 1.3
 const DefaultIridescenceThicknessMin = 100
 const DefaultIridescenceThicknessMax = 400
 
+// Three.js depth comparison constants
+const NeverDepth = 0
+const AlwaysDepth = 1
+const LessDepth = 2
+const LessEqualDepth = 3
+const EqualDepth = 4
+const GreaterEqualDepth = 5
+const GreaterDepth = 6
+const NotEqualDepth = 7
+
 // Three.js blending constants
 const NoBlending = 0
 const NormalBlending = 1
@@ -804,6 +814,10 @@ export function extractPbrProperties(
   if (typeof material.depthTest === 'boolean') {
     props.depthTest = material.depthTest
   }
+  const depthFunc = materialDepthFunc(material)
+  if (depthFunc) {
+    props.depthFunc = depthFunc
+  }
   if (typeof material.depthWrite === 'boolean') {
     props.depthWrite = material.depthWrite
   }
@@ -907,6 +921,32 @@ function materialBlending(material: ThreeMaterialLike): string | undefined {
       return 'custom'
     default:
       return undefined
+  }
+}
+
+function materialDepthFunc(material: ThreeMaterialLike): string | undefined {
+  if (material.depthFunc == null) return undefined
+  switch (material.depthFunc) {
+    case NeverDepth:
+      return 'never'
+    case AlwaysDepth:
+      return 'always'
+    case LessDepth:
+      return 'less'
+    case LessEqualDepth:
+      return 'less-equal'
+    case EqualDepth:
+      return 'equal'
+    case GreaterEqualDepth:
+      return 'greater-equal'
+    case GreaterDepth:
+      return 'greater'
+    case NotEqualDepth:
+      return 'not-equal'
+    default:
+      throw new Error(
+        `material.depthFunc ${String(material.depthFunc)} is not supported by @headless-three/renderer. Use a Three.js depth comparison constant such as LessEqualDepth, GreaterDepth, or AlwaysDepth.`,
+      )
   }
 }
 

@@ -706,6 +706,8 @@ pub struct SceneMesh {
     pub blend_alpha: Option<f64>,
     /// Whether depth testing is enabled. Defaults to true.
     pub depth_test: Option<bool>,
+    /// Depth comparison function. Defaults to `"less-equal"`.
+    pub depth_func: Option<String>,
     /// Whether passing fragments write depth. Defaults to true for opaque meshes and false for transparent meshes.
     pub depth_write: Option<bool>,
     /// Whether fragments write color. Defaults to true.

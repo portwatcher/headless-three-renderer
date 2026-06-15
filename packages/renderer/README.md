@@ -149,7 +149,7 @@ The public API accepts only Three.js-like objects:
 - `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
-- material render state: `depthTest`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
+- material render state: `depthTest`, `depthFunc`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes, and `CustomBlending` equations/factors
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes; over-budget global/group/material combinations beyond eight active planes fail clearly
 - single shared material-level reflection/refraction `envMap` inputs are supported for `MeshBasicMaterial`, and shared reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material classes, unsupported material env-map classes/options, non-Basic refraction mappings, PMREM/CubeUV mappings, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly
 - unsupported `MeshPhysicalMaterial` iridescence inputs fail clearly

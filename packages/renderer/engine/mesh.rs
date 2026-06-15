@@ -96,6 +96,7 @@ pub struct PreparedMesh {
     pub blending: BlendMode,
     pub custom_blend: Option<CustomBlendState>,
     pub depth_test: bool,
+    pub depth_func: StencilCompare,
     pub depth_write: bool,
     pub color_write: bool,
     pub polygon_offset: bool,
@@ -1228,6 +1229,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let blending = BlendMode::from_str_opt(mesh.blending.as_deref());
     let custom_blend = parse_custom_blend_state(mesh, blending, mesh_index)?;
     let depth_test = mesh.depth_test.unwrap_or(true);
+    let depth_func = parse_depth_func(mesh.depth_func.as_deref(), mesh_index)?;
     let default_depth_write = !is_transparent;
     let depth_write = depth_test && mesh.depth_write.unwrap_or(default_depth_write);
     let color_write = mesh.color_write.unwrap_or(true);
@@ -1353,6 +1355,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         blending,
         custom_blend,
         depth_test,
+        depth_func,
         depth_write,
         color_write,
         polygon_offset,
@@ -1596,6 +1599,22 @@ fn parse_blend_factor(value: u32, mesh_index: usize, field: &str) -> Result<Blen
         213 => Ok(BlendFactor::ConstantAlpha),
         214 => Ok(BlendFactor::OneMinusConstantAlpha),
         _ => bail!("scene.meshes[{mesh_index}].{field} has unsupported blend factor {value}"),
+    }
+}
+
+fn parse_depth_func(value: Option<&str>, mesh_index: usize) -> Result<StencilCompare> {
+    match value.unwrap_or("less-equal") {
+        "never" => Ok(StencilCompare::Never),
+        "less" => Ok(StencilCompare::Less),
+        "equal" => Ok(StencilCompare::Equal),
+        "less-equal" => Ok(StencilCompare::LessEqual),
+        "greater" => Ok(StencilCompare::Greater),
+        "not-equal" => Ok(StencilCompare::NotEqual),
+        "greater-equal" => Ok(StencilCompare::GreaterEqual),
+        "always" => Ok(StencilCompare::Always),
+        other => bail!(
+            "scene.meshes[{mesh_index}].depthFunc has unsupported compare function `{other}`"
+        ),
     }
 }
 

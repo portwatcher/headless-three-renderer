@@ -2840,6 +2840,56 @@ test('transparent materials honor default depthWrite=true', () => {
   assert.ok(mean.r > mean.b + 60, `default transparent depthWrite should reject the later blue draw behind red (${mean.r} vs ${mean.b})`)
 })
 
+test('material depthFunc controls depth comparison', () => {
+  function renderBehind(depthFunc) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const front = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    front.position.z = 0.2
+    front.renderOrder = 0
+    scene.add(front)
+
+    const behind = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff, depthFunc }),
+    )
+    behind.position.z = -0.2
+    behind.renderOrder = 1
+    scene.add(behind)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const lessEqual = renderBehind(THREE.LessEqualDepth)
+  const always = renderBehind(THREE.AlwaysDepth)
+  const greater = renderBehind(THREE.GreaterDepth)
+
+  assert.ok(lessEqual.r > lessEqual.b + 80, `LessEqualDepth should reject the later blue plane behind red (${lessEqual.r} vs ${lessEqual.b})`)
+  assert.ok(always.b > always.r + 80, `AlwaysDepth should render the later blue plane over red (${always.b} vs ${always.r})`)
+  assert.ok(greater.b > greater.r + 80, `GreaterDepth should pass the farther blue depth over red (${greater.b} vs ${greater.r})`)
+})
+
+test('unsupported material depthFunc values fail clearly', () => {
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  material.depthFunc = 999
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /material\.depthFunc 999.*not supported/i,
+  )
+})
+
 test('material colorWrite=false writes depth without changing color', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

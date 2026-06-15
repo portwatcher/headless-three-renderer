@@ -752,6 +752,8 @@ export interface SceneMesh {
   blendAlpha?: number
   /** Whether depth testing is enabled. Defaults to true. */
   depthTest?: boolean
+  /** Depth comparison function. Defaults to `"less-equal"`. */
+  depthFunc?: string
   /** Whether passing fragments write depth. Defaults to true for opaque meshes and false for transparent meshes. */
   depthWrite?: boolean
   /** Whether fragments write color. Defaults to true. */

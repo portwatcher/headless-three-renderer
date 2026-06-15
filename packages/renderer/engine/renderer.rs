@@ -2234,11 +2234,7 @@ impl GpuRenderer {
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH_FORMAT,
                     depth_write_enabled: Some(mesh.depth_write),
-                    depth_compare: Some(if mesh.depth_test {
-                        wgpu::CompareFunction::LessEqual
-                    } else {
-                        wgpu::CompareFunction::Always
-                    }),
+                    depth_compare: Some(depth_compare_function(mesh)),
                     stencil: stencil_state(mesh),
                     bias: depth_bias_state(mesh),
                 }),
@@ -3237,6 +3233,7 @@ fn requires_pipeline_override(mesh: &PreparedMesh, sample_count: u32) -> bool {
         BlendMode::None
     };
     !mesh.depth_test
+        || mesh.depth_func != StencilCompare::LessEqual
         || mesh.depth_write != default_depth_write
         || !mesh.color_write
         || mesh.polygon_offset
@@ -3245,6 +3242,14 @@ fn requires_pipeline_override(mesh: &PreparedMesh, sample_count: u32) -> bool {
         || (mesh.premultiplied_alpha
             && effective_blend_mode(mesh.blending, mesh.is_transparent) != BlendMode::None)
         || effective_blend_mode(mesh.blending, mesh.is_transparent) != default_blending
+}
+
+fn depth_compare_function(mesh: &PreparedMesh) -> wgpu::CompareFunction {
+    if mesh.depth_test {
+        stencil_compare(mesh.depth_func)
+    } else {
+        wgpu::CompareFunction::Always
+    }
 }
 
 fn depth_bias_state(mesh: &PreparedMesh) -> wgpu::DepthBiasState {
