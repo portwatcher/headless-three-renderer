@@ -12834,7 +12834,7 @@ test('PointsMaterial map decodes sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 15, `linear point map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
-test('PointsMaterial maps use point-sprite UVs instead of geometry UV attributes', () => {
+test('PointsMaterial maps use geometry UV attributes when present', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
@@ -12851,6 +12851,45 @@ test('PointsMaterial maps use point-sprite UVs instead of geometry UV attributes
   scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
     color: 0xffffff,
     map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const left = meanRegion(rgba, 96, 96, 28, 40, 42, 56)
+  const right = meanRegion(rgba, 96, 96, 54, 40, 68, 56)
+  assert.ok(left.g > left.r + 60, `geometry UV should sample green across the point left half (${left.g} vs ${left.r})`)
+  assert.ok(right.g > right.r + 60, `geometry UV should sample green across the point right half (${right.g} vs ${right.r})`)
+})
+
+test('PointsMaterial maps use point-sprite UVs when geometry UVs are absent', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const alphaMap = rgbaTexture([
+    255, 255, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.channel = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    alphaMap,
     size: 48,
     sizeAttenuation: false,
   })))

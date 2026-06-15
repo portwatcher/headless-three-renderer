@@ -692,6 +692,7 @@ function appendPoints(
 
   const positions = readVec3Attribute(position, 'geometry.attributes.position')
   const vertexColors = getAttribute(geometry, 'color')
+  const pointUvAttribute = getAttribute(geometry, 'uv')
   const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
@@ -702,6 +703,9 @@ function appendPoints(
   for (const group of groups) {
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
+    const pointUvs = pointUvAttribute && (material?.map || material?.alphaMap)
+      ? readVec2Attribute(pointUvAttribute, 'geometry.attributes.uv')
+      : null
 
     const baseColor = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
@@ -752,7 +756,11 @@ function appendPoints(
             center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
             center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
           )
-          outputUvs.push(u, v)
+          if (pointUvs) {
+            outputUvs.push(pointUvs[pointIndex * 2], pointUvs[pointIndex * 2 + 1])
+          } else {
+            outputUvs.push(u, v)
+          }
           if (pointColor) {
             outputColors!.push(pointColor[0], pointColor[1], pointColor[2], pointColor[3])
           }
@@ -766,6 +774,7 @@ function appendPoints(
     const textureInfo = extractTextureData(material)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
     const pbrProps = extractPbrProperties(material, materialContext)
+    pbrProps.alphaMapUsesUv2 = false
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
     const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
@@ -786,7 +795,7 @@ function appendPoints(
       textureAnisotropy: textureInfo?.anisotropy,
       textureTransform: textureInfo?.transform,
       textureColorSpace: textureInfo?.colorSpace,
-      textureUsesUv2: textureInfo?.usesUv2,
+      textureUsesUv2: false,
       transform: IDENTITY_4X4.slice(),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       topology: 'triangles',
