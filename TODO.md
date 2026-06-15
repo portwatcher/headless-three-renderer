@@ -112,7 +112,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Persistent resource cache | High | Reuse GPU buffers, textures, pipelines, IBL maps, and bind groups across renders. |
 | Incremental scene updates | High | Avoid rebuilding every mesh/material/texture for animation frames. |
 | GPU skinning/morphing path | Medium | CPU baking is simple and correct enough for stills, but expensive for dense animated characters. |
-| Large scene memory budget tests | Medium | Scale regression tests render many meshes, many unique raw and encoded textures, and the supported 32-light budget in CI; direct conformance covers clear failure for scenes with more than 32 visible non-ambient lights; and platform-specific scale budget notes are documented. Remaining work is larger memory ceilings. |
+| Large scene memory budget tests | Medium | Scale regression tests render many meshes, many unique raw and encoded textures, and the supported 64-light budget in CI; direct conformance covers clear failure for scenes with more than 64 visible non-ambient lights; and platform-specific scale budget notes are documented. Remaining work is larger memory ceilings. |
 | Parallel texture decode/precompute | Medium | IBL and image decode can dominate render latency. |
 
 ## P2 - Node Loader Ergonomics

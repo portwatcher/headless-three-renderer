@@ -1,6 +1,6 @@
 pub const SHADER: &str = r#"
 const PI: f32 = 3.14159265359;
-const MAX_LIGHTS: u32 = 32u;
+const MAX_LIGHTS: u32 = 64u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -104,7 +104,7 @@ struct Uniforms {
   attenuation_color: vec4<f32>,
   // xyz = MeshPhysicalMaterial specular color factor, w = specular intensity.
   physical_specular: vec4<f32>,
-  lights: array<GpuLight, 32>,
+  lights: array<GpuLight, 64>,
 };
 
 @group(0) @binding(0)
@@ -1369,7 +1369,7 @@ pub fn custom_shader_source(fragment_body: &str) -> String {
 }
 
 const CUSTOM_FRAGMENT_SHADER: &str = r#"
-const MAX_LIGHTS: u32 = 32u;
+const MAX_LIGHTS: u32 = 64u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -1428,7 +1428,7 @@ struct Uniforms {
   physical_params4: vec4<f32>,
   attenuation_color: vec4<f32>,
   physical_specular: vec4<f32>,
-  lights: array<GpuLight, 32>,
+  lights: array<GpuLight, 64>,
 };
 
 @group(0) @binding(0)

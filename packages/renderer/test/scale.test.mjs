@@ -50,9 +50,9 @@ function makeEncodedTexture(index) {
 
 function addSupportedLightBudget(scene) {
   scene.add(new THREE.AmbientLight(0xffffff, 0.08))
-  for (let i = 0; i < 32; i += 1) {
-    const angle = (i / 32) * Math.PI * 2
-    const light = new THREE.PointLight(new THREE.Color().setHSL(i / 32, 0.55, 0.65), 0.24, 6, 1.6)
+  for (let i = 0; i < 64; i += 1) {
+    const angle = (i / 64) * Math.PI * 2
+    const light = new THREE.PointLight(new THREE.Color().setHSL(i / 64, 0.55, 0.65), 0.12, 6, 1.6)
     light.position.set(Math.cos(angle) * 2.2, 1.2 + (i % 4) * 0.28, Math.sin(angle) * 2.2)
     scene.add(light)
   }
@@ -142,10 +142,10 @@ test('encoded texture budget renders many unique PNG buffer maps', () => {
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `encoded texture scene should retain decoded color (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
-test('more than 32 visible non-ambient lights fail clearly', () => {
+test('more than 64 visible non-ambient lights fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial({ color: 0xffffff })))
-  for (let i = 0; i < 33; i += 1) {
+  for (let i = 0; i < 65; i += 1) {
     const light = new THREE.PointLight(0xffffff, 0.2)
     light.position.set((i % 5) - 2, 2, Math.floor(i / 5) - 1)
     scene.add(light)
@@ -153,6 +153,6 @@ test('more than 32 visible non-ambient lights fail clearly', () => {
 
   assert.throws(
     () => new Renderer().render(scene, makeCamera(), { width: 32, height: 32, format: 'rgba' }),
-    /More than 32 visible non-ambient lights/i,
+    /More than 64 visible non-ambient lights/i,
   )
 })

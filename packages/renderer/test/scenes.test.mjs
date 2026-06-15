@@ -7195,15 +7195,15 @@ test('custom WGSL fragment material can read the expanded light budget', () => {
   const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
   material.userData.headlessThreeRenderer = {
     fragmentWgsl: `
-      if uniforms.num_lights == 32u && uniforms.lights[31].color_intensity.r > 0.5 {
+      if uniforms.num_lights == 64u && uniforms.lights[63].color_intensity.r > 0.5 {
         return vec4<f32>(0.0, 1.0, 0.0, alpha);
       }
       return vec4<f32>(1.0, 0.0, 0.0, alpha);
     `,
   }
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
-  for (let i = 0; i < 32; i += 1) {
-    const light = new THREE.PointLight(i === 31 ? 0xff0000 : 0xffffff, 1)
+  for (let i = 0; i < 64; i += 1) {
+    const light = new THREE.PointLight(i === 63 ? 0xff0000 : 0xffffff, 1)
     light.position.set((i % 8) - 3.5, 2, Math.floor(i / 8) - 1.5)
     scene.add(light)
   }
@@ -7213,7 +7213,7 @@ test('custom WGSL fragment material can read the expanded light budget', () => {
   camera.lookAt(0, 0, 0)
 
   const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
-  assert.ok(mean.g > mean.r + 40, `custom WGSL should read light slot 31 and render green (${mean.g} vs ${mean.r})`)
+  assert.ok(mean.g > mean.r + 40, `custom WGSL should read light slot 63 and render green (${mean.g} vs ${mean.r})`)
 })
 
 test('over native direct light budget fails clearly', () => {
@@ -7223,7 +7223,7 @@ test('over native direct light budget fails clearly', () => {
     new THREE.PlaneGeometry(2, 2),
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
   ))
-  for (let i = 0; i < 33; i += 1) {
+  for (let i = 0; i < 65; i += 1) {
     const light = new THREE.PointLight(0xffffff, 1)
     light.position.set((i % 8) - 3.5, 2, Math.floor(i / 8) - 2)
     scene.add(light)
@@ -7231,7 +7231,7 @@ test('over native direct light budget fails clearly', () => {
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /More than 32 visible non-ambient lights.*33 found/i,
+    /More than 64 visible non-ambient lights.*65 found/i,
   )
 })
 
