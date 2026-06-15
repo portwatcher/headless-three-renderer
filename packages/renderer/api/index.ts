@@ -660,6 +660,9 @@ function cubeMipmapScissor(
 function cubeMipmapRect(rect: RenderPixelRectLike | null | undefined, activeMipmapLevel: number): RenderPixelRectLike | null | undefined {
   if (!rect || activeMipmapLevel === 0) return rect
   const [x, y, width, height] = pixelRectComponents(rect)
+  if (![x, y, width, height].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+    return { x, y, width, height }
+  }
   return {
     x,
     y,

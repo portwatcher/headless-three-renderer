@@ -12712,4 +12712,13 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
     () => renderToTarget(scene, camera, { scissorTest: true, scissor: [0, 0, 16, 0] }, { width: 32, height: 32 }),
     /target\.scissor width and height must be greater than 0/i,
   )
+
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  cubeCamera.activeMipmapLevel = 1
+  cubeTarget.viewport = { x: 0, y: 0, width: '32', height: 32 }
+  assert.throws(
+    () => renderToTarget(scene, cubeCamera, cubeTarget),
+    /options\.viewport must contain finite x, y, width, and height values/i,
+  )
 })
