@@ -2,7 +2,7 @@
 
 // ── Three.js duck-typed interfaces ──────────────────────────────────
 
-export type RenderOutputFormat = 'png' | 'rgba' | 'raw' | 'raw-rgba'
+export type RenderOutputFormat = 'png' | 'rgba'
 export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'linear'
 export type RenderMode = 'color' | 'mask' | 'object-id'
 
