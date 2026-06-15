@@ -10355,6 +10355,9 @@ test('invalid shadow numeric values fail clearly', () => {
     ['mapSize.y', (light) => {
       light.shadow.mapSize.y = Number.NaN
     }, /light\.shadow\.mapSize\.y must be a finite number/i],
+    ['mapSize.x zero', (light) => {
+      light.shadow.mapSize.x = 0
+    }, /light\.shadow\.mapSize\.x must be positive/i],
     ['bias', (light) => {
       light.shadow.bias = 'biased'
     }, /light\.shadow\.bias must be a finite number/i],

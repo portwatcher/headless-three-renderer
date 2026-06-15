@@ -227,8 +227,8 @@ function shadowMapSizeComponent(
 ): number | undefined {
   if (!mapSize) return undefined
   const vectorValue = mapSize[vectorKey]
-  if (vectorValue != null) return optionalFiniteNumber(vectorValue, `light.shadow.mapSize.${vectorKey}`)
-  return optionalFiniteNumber(mapSize[dimensionKey], `light.shadow.mapSize.${dimensionKey}`)
+  if (vectorValue != null) return optionalPositiveFiniteNumber(vectorValue, `light.shadow.mapSize.${vectorKey}`)
+  return optionalPositiveFiniteNumber(mapSize[dimensionKey], `light.shadow.mapSize.${dimensionKey}`)
 }
 
 function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
@@ -285,6 +285,15 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalPositiveFiniteNumber(value: unknown, label: string): number | undefined {
+  const number = optionalFiniteNumber(value, label)
+  if (number === undefined) return undefined
+  if (number <= 0) {
+    throw new TypeError(`${label} must be positive.`)
+  }
+  return number
 }
 
 function requiredFiniteNumber(value: unknown, label: string): number {
