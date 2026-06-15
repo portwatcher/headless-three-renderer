@@ -11833,6 +11833,33 @@ test('invalid background control values fail clearly', () => {
   )
 })
 
+test('invalid background color values fail clearly', () => {
+  const camera = makeCamera()
+
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: [1, 'green', 0] }),
+    /options\.background\[1\] must be a finite number/i,
+  )
+
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: [1, 0] }),
+    /options\.background must be \[r, g, b\] or \[r, g, b, a\]/i,
+  )
+
+  const scene = new THREE.Scene()
+  scene.background = { isColor: true, r: 0, g: Number.NaN, b: 1 }
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.background\.g must be a finite number/i,
+  )
+
+  scene.background = solidTexture(0, 255, 0)
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, background: { r: 1, g: 0 } }),
+    /options\.background\.b must be a finite number/i,
+  )
+})
+
 test('empty scene renders a texture background', () => {
   const scene = new THREE.Scene()
   scene.background = solidTexture(0, 255, 0)

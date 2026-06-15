@@ -85,7 +85,7 @@ The public API accepts only Three.js-like objects:
 - `scene`: a `THREE.Scene` or `THREE.Object3D` root.
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. Invalid clipping distances fail clearly. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; exact WebGL face semantics remain limited.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`; invalid explicit dimensions fail clearly.
-- `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`.
+- `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`; invalid explicit color values fail clearly.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds; invalid values fail clearly.
 - `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds; invalid values fail clearly.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws; invalid rectangles fail clearly.
@@ -109,7 +109,7 @@ The public API accepts only Three.js-like objects:
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection, with invalid level distance/hysteresis values failing clearly
 - vertex colors
-- scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; invalid background control values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
+- scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; invalid background color/control values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
 - render-option viewport/scissor rectangles and render-target viewport/scissor fields in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 
