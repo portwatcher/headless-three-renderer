@@ -65,14 +65,18 @@ function renderFixture(fixture) {
   applyFixtureRenderRectangles(fixture, width, height)
   renderer.outputColorSpace = outputColorSpace(fixture.options.outputColorSpace)
 
-  const restoreRendererOptions = applyFixtureRendererOptions(fixture)
+  let restoreRendererOptions = () => {}
+  let restoreRenderMode = () => {}
   let dataUrl
   try {
+    restoreRendererOptions = applyFixtureRendererOptions(fixture)
+    restoreRenderMode = applyFixtureRenderMode(fixture)
     fixture.scene.updateMatrixWorld(true)
     fixture.camera.updateMatrixWorld(true)
     renderer.render(fixture.scene, fixture.camera)
     dataUrl = renderer.domElement.toDataURL('image/png')
   } finally {
+    restoreRenderMode()
     restoreRendererOptions()
   }
 
@@ -152,6 +156,32 @@ function applyFixtureRendererOptions(fixture) {
     renderer.setTransparentSort(null)
     renderer.clippingPlanes = previousClippingPlanes
     renderer.localClippingEnabled = previousLocalClippingEnabled
+  }
+}
+
+function applyFixtureRenderMode(fixture) {
+  const mode = fixture.options.renderMode ?? 'color'
+  if (mode === 'color') {
+    return () => {}
+  }
+  if (mode !== 'normal') {
+    throw new Error(`Browser reference generation only supports color and normal render modes; received ${mode}.`)
+  }
+  if (fixture.scene?.isScene !== true) {
+    throw new Error('Browser reference normal render mode requires a THREE.Scene fixture.')
+  }
+
+  const previousOverrideMaterial = fixture.scene.overrideMaterial
+  const previousBackground = fixture.scene.background
+  const normalMaterial = new THREE.MeshNormalMaterial()
+
+  fixture.scene.overrideMaterial = normalMaterial
+  fixture.scene.background = new THREE.Color(0, 0, 0)
+
+  return () => {
+    fixture.scene.overrideMaterial = previousOverrideMaterial
+    fixture.scene.background = previousBackground
+    normalMaterial.dispose()
   }
 }
 

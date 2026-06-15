@@ -15,6 +15,7 @@ export function createSceneCorpus() {
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
+    normalRenderModeCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -205,6 +206,32 @@ function linearOutputColorSpaceCorpus() {
       outputColorSpace: THREE.LinearSRGBColorSpace,
     },
     background: [46, 46, 46],
+    minNonBackgroundRatio: 0.08,
+  }
+}
+
+function normalRenderModeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.45, 1.45),
+    new THREE.MeshBasicMaterial({ color: 0xff6633 }),
+  )
+  mesh.rotation.y = Math.PI * 0.28
+  mesh.rotation.x = -Math.PI * 0.08
+  scene.add(mesh)
+
+  return {
+    name: 'normal-render-mode-tilted-plane',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      renderMode: 'normal',
+    },
+    background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
   }
 }
