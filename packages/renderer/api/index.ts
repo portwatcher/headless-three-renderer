@@ -333,13 +333,13 @@ function toNativeInput(
     )
     : undefined
   const backgroundTextureBlurriness = colorMode && backgroundTexture
-    ? optionalFiniteNumber(
+    ? optionalNormalizedFiniteNumber(
       hasBackgroundOverride ? options.backgroundBlurriness : options.backgroundBlurriness ?? scene.backgroundBlurriness,
       hasBackgroundOverride || options.backgroundBlurriness !== undefined ? 'options.backgroundBlurriness' : 'scene.backgroundBlurriness',
     )
     : undefined
   const backgroundIntensity = colorMode
-    ? optionalFiniteNumber(
+    ? optionalNonNegativeFiniteNumber(
       hasBackgroundOverride ? options.backgroundIntensity : options.backgroundIntensity ?? scene.backgroundIntensity,
       hasBackgroundOverride || options.backgroundIntensity !== undefined ? 'options.backgroundIntensity' : 'scene.backgroundIntensity',
     )
@@ -1144,6 +1144,15 @@ function optionalNonNegativeFiniteNumber(value: unknown, label: string): number 
   return number
 }
 
+function optionalNormalizedFiniteNumber(value: unknown, label: string): number | undefined {
+  const number = optionalFiniteNumber(value, label)
+  if (number === undefined) return undefined
+  if (number < 0 || number > 1) {
+    throw new TypeError(`${label} must be between 0 and 1.`)
+  }
+  return number
+}
+
 function fogClipDistances(fog: NonNullable<ThreeSceneRootLike['fog']>): Pick<NativeRenderScene, 'fogNear' | 'fogFar'> {
   const near = optionalFiniteNumber(fog.near, 'scene.fog.near')
   const far = optionalFiniteNumber(fog.far, 'scene.fog.far')
@@ -1365,8 +1374,8 @@ function hasNonZeroEulerRotation(rotation: EulerComponents): boolean {
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputFormat(options.format, 'options.format')
   assertSupportedOutputColorSpace(options.outputColorSpace)
-  assertFiniteNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
-  assertFiniteNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
+  assertNonNegativeNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
+  assertNormalizedNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
   assertFiniteNumberOption(options.environmentIntensity, 'options.environmentIntensity')
   assertEulerOption(options.backgroundRotation, 'options.backgroundRotation')
   assertEulerOption(options.environmentRotation, 'options.environmentRotation')
@@ -1601,6 +1610,20 @@ function assertFiniteNumberOption(value: unknown, label: string): void {
   if (value == null) return
   if (typeof value === 'number' && Number.isFinite(value)) return
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function assertNonNegativeNumberOption(value: unknown, label: string): void {
+  assertFiniteNumberOption(value, label)
+  if (typeof value === 'number' && value < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+}
+
+function assertNormalizedNumberOption(value: unknown, label: string): void {
+  assertFiniteNumberOption(value, label)
+  if (typeof value === 'number' && (value < 0 || value > 1)) {
+    throw new TypeError(`${label} must be between 0 and 1.`)
+  }
 }
 
 function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {

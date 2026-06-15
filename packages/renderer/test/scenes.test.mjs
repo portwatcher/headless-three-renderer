@@ -13918,11 +13918,20 @@ test('invalid background control values fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32, backgroundIntensity: Number.POSITIVE_INFINITY }),
     /options\.backgroundIntensity must be a finite number/i,
   )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, backgroundIntensity: -0.1 }),
+    /options\.backgroundIntensity must be non-negative/i,
+  )
 
   scene.backgroundIntensity = 'bright'
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
     /scene\.backgroundIntensity must be a finite number/i,
+  )
+  scene.backgroundIntensity = -0.1
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.backgroundIntensity must be non-negative/i,
   )
   scene.backgroundIntensity = 1
 
@@ -13930,12 +13939,21 @@ test('invalid background control values fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32, backgroundBlurriness: 'strong' }),
     /options\.backgroundBlurriness must be a finite number/i,
   )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, backgroundBlurriness: 1.5 }),
+    /options\.backgroundBlurriness must be between 0 and 1/i,
+  )
 
   scene.background = solidTexture(0, 255, 0)
   scene.backgroundBlurriness = 'soft'
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
     /scene\.backgroundBlurriness must be a finite number/i,
+  )
+  scene.backgroundBlurriness = -0.1
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.backgroundBlurriness must be between 0 and 1/i,
   )
 })
 
