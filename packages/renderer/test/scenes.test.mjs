@@ -3308,6 +3308,16 @@ test('invalid sort controls fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32, transparentSort: 1 }),
     /options\.transparentSort must be a function or null/i,
   )
+
+  const renderer = new Renderer()
+  assert.throws(
+    () => renderer.setOpaqueSort('front'),
+    /Renderer\.setOpaqueSort expects a function or null/i,
+  )
+  assert.throws(
+    () => renderer.setTransparentSort(1),
+    /Renderer\.setTransparentSort expects a function or null/i,
+  )
 })
 
 test('invalid renderOrder values fail clearly', () => {

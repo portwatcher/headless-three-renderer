@@ -95,10 +95,12 @@ export class Renderer {
   }
 
   setOpaqueSort(method: RenderSortFunction | null): void {
+    assertSortFunctionOrNull(method, 'Renderer.setOpaqueSort')
     this.opaqueSort = method
   }
 
   setTransparentSort(method: RenderSortFunction | null): void {
+    assertSortFunctionOrNull(method, 'Renderer.setTransparentSort')
     this.transparentSort = method
   }
 
@@ -1314,6 +1316,12 @@ function validateSortControls(options: RenderOptions): void {
   }
   if (options.transparentSort != null && typeof options.transparentSort !== 'function') {
     throw new TypeError('options.transparentSort must be a function or null.')
+  }
+}
+
+function assertSortFunctionOrNull(value: unknown, label: string): asserts value is RenderSortFunction | null {
+  if (value != null && typeof value !== 'function') {
+    throw new TypeError(`${label} expects a function or null.`)
   }
 }
 
