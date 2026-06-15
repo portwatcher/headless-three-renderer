@@ -10,7 +10,7 @@ in a plain Node process.
 Use `loadGltfFromFile()` for local `.gltf` or `.glb` files. It reads bytes from
 disk, installs the local `file://` fetch bridge used by Three.js `FileLoader`,
 and registers encoded PNG/JPEG/WebP image handlers so external files, data URI
-images, and GLB bufferView images expose renderer-supported buffers.
+images, and embedded GLB bufferView images expose renderer-supported buffers.
 
 ```js
 import fs from 'node:fs/promises'
@@ -109,18 +109,21 @@ manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
 manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
 ```
 
-For images embedded in GLB files or glTF bufferViews, `GLTFLoader` converts the
-bufferView into a `Blob` URL and then uses its internal image loader. On modern
-Node versions with `Blob`, `URL.createObjectURL`, and `fetch(blobUrl)` support,
-register the same encoded-buffer loader for Blob URLs:
+For images embedded in GLB files as PNG/JPEG/WebP bufferViews, the exported
+helpers normalize those embedded image references to data URIs before
+`GLTFLoader` parses the asset. This avoids the browser-only default image loader
+path that Three.js otherwise uses for bufferView images in Node.
+
+For custom flows that still produce Blob URLs, register the same encoded-buffer
+loader for Blob URLs:
 
 ```js
 manager.addHandler(/^blob:/i, encodedImages)
 ```
 
-If your Node version or loader stack does not provide Blob URL fetch support,
-install the needed polyfills or preprocess embedded images as external
-PNG/JPEG/WebP files or data URIs so the encoded-buffer loader can handle them.
+If your loader stack bypasses the exported helpers, preprocess embedded images
+as external PNG/JPEG/WebP files or data URIs so the encoded-buffer loader can
+handle them.
 
 After loading, texture slots should expose one of the renderer-supported image
 forms:

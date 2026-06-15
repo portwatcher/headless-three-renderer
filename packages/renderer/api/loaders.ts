@@ -18,7 +18,7 @@ export type ThreeLoadingManagerLike = {
   addHandler(regex: RegExp, loader: unknown): unknown
 }
 export type ThreeGltfLoaderLike = {
-  parse(data: ArrayBuffer, path: string, onLoad: (gltf: unknown) => void, onError?: (error: unknown) => void): void
+  parse(data: ArrayBuffer | string, path: string, onLoad: (gltf: unknown) => void, onError?: (error: unknown) => void): void
   register?(callback: unknown): unknown
 }
 type GltfLoaderCtor = new (manager?: ThreeLoadingManagerLike) => ThreeGltfLoaderLike
@@ -141,6 +141,7 @@ export async function createNodeGltfLoader(
   const { GLTFLoader } = await importGltfLoader()
   const loader = new GLTFLoader(loadingManager)
   await configureLoader?.(loader)
+  installEmbeddedGlbImageNormalizer(loader)
   return { encodedImages, loader, manager: loadingManager, rootDir: root }
 }
 
@@ -316,6 +317,108 @@ function registerEncodedImageHandlers(manager: ThreeLoadingManagerLike, encodedI
 
 function arrayBufferView(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
+}
+
+function installEmbeddedGlbImageNormalizer(loader: ThreeGltfLoaderLike): void {
+  const originalParse = loader.parse.bind(loader)
+  loader.parse = (data, parsePath, onLoad, onError) => {
+    originalParse(normalizeEmbeddedGlbImages(data), parsePath, onLoad, onError)
+  }
+}
+
+function normalizeEmbeddedGlbImages(data: ArrayBuffer | string): ArrayBuffer | string {
+  if (typeof data === 'string') return data
+  const bytes = Buffer.from(data)
+  const normalized = rewriteGlbBufferViewImages(bytes)
+  return normalized ? arrayBufferView(normalized) : data
+}
+
+function rewriteGlbBufferViewImages(bytes: Buffer): Buffer | null {
+  if (bytes.byteLength < 20 || bytes.readUInt32LE(0) !== 0x46546c67 || bytes.readUInt32LE(4) !== 2) {
+    return null
+  }
+
+  let offset = 12
+  let jsonChunk: Buffer | null = null
+  let binChunk: Buffer | null = null
+  while (offset + 8 <= bytes.byteLength) {
+    const chunkLength = bytes.readUInt32LE(offset)
+    const chunkType = bytes.readUInt32LE(offset + 4)
+    const chunkStart = offset + 8
+    const chunkEnd = chunkStart + chunkLength
+    if (chunkEnd > bytes.byteLength) return null
+    const chunk = bytes.subarray(chunkStart, chunkEnd)
+    if (chunkType === 0x4e4f534a) {
+      jsonChunk = chunk
+    } else if (chunkType === 0x004e4942 && binChunk === null) {
+      binChunk = chunk
+    }
+    offset = chunkEnd
+  }
+  if (!jsonChunk || !binChunk) return null
+
+  let json: any
+  try {
+    json = JSON.parse(jsonChunk.toString('utf8').trimEnd())
+  } catch {
+    return null
+  }
+
+  let changed = false
+  for (const image of Array.isArray(json.images) ? json.images : []) {
+    if (!image || !Number.isInteger(image.bufferView) || typeof image.mimeType !== 'string') continue
+    if (!/^image\/(?:png|jpe?g|webp)$/i.test(image.mimeType)) continue
+    const imageBytes = glbBufferViewBytes(json, binChunk, image.bufferView)
+    if (!imageBytes) continue
+    image.uri = `data:${image.mimeType};base64,${imageBytes.toString('base64')}`
+    delete image.bufferView
+    changed = true
+  }
+
+  return changed ? encodeGlb(json, binChunk) : null
+}
+
+function glbBufferViewBytes(json: any, binChunk: Buffer, index: number): Buffer | null {
+  const bufferView = json.bufferViews?.[index]
+  if (!bufferView || bufferView.buffer !== 0 || !Number.isFinite(bufferView.byteLength)) {
+    return null
+  }
+  const byteOffset = bufferView.byteOffset == null ? 0 : bufferView.byteOffset
+  if (!Number.isFinite(byteOffset)) return null
+  const start = Math.trunc(byteOffset)
+  const end = start + Math.trunc(bufferView.byteLength)
+  if (start < 0 || end < start || end > binChunk.byteLength) return null
+  return binChunk.subarray(start, end)
+}
+
+function encodeGlb(json: any, binChunk: Buffer): Buffer {
+  const jsonBytes = paddedChunk(Buffer.from(JSON.stringify(json), 'utf8'), 0x20)
+  const binBytes = paddedChunk(binChunk, 0x00)
+  const totalLength = 12 + 8 + jsonBytes.length + 8 + binBytes.length
+  const glb = Buffer.alloc(totalLength)
+  let offset = 0
+  offset = writeGlbUint32(glb, offset, 0x46546c67)
+  offset = writeGlbUint32(glb, offset, 2)
+  offset = writeGlbUint32(glb, offset, totalLength)
+  offset = writeGlbUint32(glb, offset, jsonBytes.length)
+  offset = writeGlbUint32(glb, offset, 0x4e4f534a)
+  jsonBytes.copy(glb, offset)
+  offset += jsonBytes.length
+  offset = writeGlbUint32(glb, offset, binBytes.length)
+  offset = writeGlbUint32(glb, offset, 0x004e4942)
+  binBytes.copy(glb, offset)
+  return glb
+}
+
+function paddedChunk(buffer: Buffer, fill: number): Buffer {
+  const padded = Buffer.alloc((buffer.length + 3) & ~3, fill)
+  buffer.copy(padded)
+  return padded
+}
+
+function writeGlbUint32(buffer: Buffer, offset: number, value: number): number {
+  buffer.writeUInt32LE(value, offset)
+  return offset + 4
 }
 
 function optionalBoolean(value: unknown, label: string): boolean | undefined {

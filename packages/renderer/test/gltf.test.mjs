@@ -70,6 +70,22 @@ test('committed textured glTF fixture loads data URI image and renders texture',
   assertTexturedQuadRendersTexture(gltf, 'textured quad')
 })
 
+test('loadGltfFromFile loads helper-normalized GLB bufferView images', async () => {
+  const source = JSON.parse(await readFile(TEXTURED_QUAD, 'utf8'))
+  const glbBytes = buildTexturedQuadGlb(source)
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'headless-three-glb-image-'))
+  try {
+    const modelPath = path.join(tmp, 'buffer-view-image.glb')
+    await writeFile(modelPath, glbBytes)
+
+    const gltf = await loadGltfFixture(modelPath)
+    assertTexturedQuadLoadsEncodedMap(gltf, 'GLB bufferView-image fixture')
+    assertTexturedQuadRendersTexture(gltf, 'GLB bufferView-image quad')
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
 test('committed vertex-color glTF fixture renders COLOR_0 attributes', async () => {
   const gltf = await loadGltfFixture(VERTEX_COLOR_QUAD)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
@@ -299,6 +315,77 @@ function assertTexturedQuadRendersTexture(gltf, label) {
 
 async function loadGltfFixture(filePath, options) {
   return await loadGltfFromFile(filePath, options)
+}
+
+function buildTexturedQuadGlb(source) {
+  const geometryBytes = decodeDataUriBuffer(source.buffers[0].uri, 'textured fixture geometry buffer')
+  const imageBytes = decodeDataUriBuffer(source.images[0].uri, 'textured fixture image')
+  const imageOffset = alignedLength(geometryBytes.length)
+  const binLength = imageOffset + imageBytes.length
+  const bin = Buffer.alloc(alignedLength(binLength))
+  geometryBytes.copy(bin, 0)
+  imageBytes.copy(bin, imageOffset)
+
+  const glb = structuredClone(source)
+  delete glb.buffers[0].uri
+  glb.buffers[0].byteLength = binLength
+  glb.bufferViews.push({
+    buffer: 0,
+    byteOffset: imageOffset,
+    byteLength: imageBytes.length,
+  })
+  glb.images[0] = {
+    name: source.images[0].name,
+    mimeType: source.images[0].mimeType,
+    bufferView: glb.bufferViews.length - 1,
+  }
+
+  return encodeGlb(glb, bin)
+}
+
+function decodeDataUriBuffer(uri, label) {
+  assert.equal(typeof uri, 'string', `${label} should be a data URI`)
+  const comma = uri.indexOf(',')
+  assert.notEqual(comma, -1, `${label} should contain a comma separator`)
+  const metadata = uri.slice(5, comma)
+  const payload = uri.slice(comma + 1)
+  return /(?:^|;)base64(?:;|$)/i.test(metadata)
+    ? Buffer.from(payload, 'base64')
+    : Buffer.from(decodeURIComponent(payload), 'utf8')
+}
+
+function encodeGlb(json, bin) {
+  const jsonChunk = paddedBuffer(Buffer.from(JSON.stringify(json), 'utf8'), 0x20)
+  const binChunk = paddedBuffer(bin, 0x00)
+  const totalLength = 12 + 8 + jsonChunk.length + 8 + binChunk.length
+  const glb = Buffer.alloc(totalLength)
+  let offset = 0
+  offset = writeUint32(glb, offset, 0x46546c67)
+  offset = writeUint32(glb, offset, 2)
+  offset = writeUint32(glb, offset, totalLength)
+  offset = writeUint32(glb, offset, jsonChunk.length)
+  offset = writeUint32(glb, offset, 0x4e4f534a)
+  jsonChunk.copy(glb, offset)
+  offset += jsonChunk.length
+  offset = writeUint32(glb, offset, binChunk.length)
+  offset = writeUint32(glb, offset, 0x004e4942)
+  binChunk.copy(glb, offset)
+  return glb
+}
+
+function paddedBuffer(buffer, fill) {
+  const padded = Buffer.alloc(alignedLength(buffer.length), fill)
+  buffer.copy(padded)
+  return padded
+}
+
+function alignedLength(length) {
+  return (length + 3) & ~3
+}
+
+function writeUint32(buffer, offset, value) {
+  buffer.writeUInt32LE(value, offset)
+  return offset + 4
 }
 
 function findFirst(root, predicate) {
