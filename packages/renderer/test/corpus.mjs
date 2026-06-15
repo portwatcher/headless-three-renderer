@@ -6,6 +6,7 @@ export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
     equirectangularBackgroundCorpus(),
+    arrayCameraViewportCorpus(),
     customSortGroupCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
@@ -86,6 +87,47 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function arrayCameraViewportCorpus() {
+  const width = CORPUS_RENDER_SIZE
+  const height = CORPUS_RENDER_SIZE
+  const leftCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  leftCamera.position.set(0, 0, 3)
+  leftCamera.lookAt(0, 0, 0)
+  leftCamera.layers.set(1)
+  leftCamera.viewport = new THREE.Vector4(0, 0, width / 2, height)
+
+  const rightCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  rightCamera.position.set(0, 0, 3)
+  rightCamera.lookAt(0, 0, 0)
+  rightCamera.layers.set(2)
+  rightCamera.viewport = new THREE.Vector4(width / 2, 0, width / 2, height)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.08)
+
+  const red = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff3333 }),
+  )
+  red.layers.set(1)
+  scene.add(red)
+
+  const green = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x33ff66 }),
+  )
+  green.layers.set(2)
+  scene.add(green)
+
+  return {
+    name: 'array-camera-viewport-split',
+    scene,
+    camera: new THREE.ArrayCamera([leftCamera, rightCamera]),
+    options: { width, height, format: 'rgba' },
+    background: [0, 0, 20],
   }
 }
 
