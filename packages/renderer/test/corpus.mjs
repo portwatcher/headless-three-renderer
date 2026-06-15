@@ -9,6 +9,7 @@ export function createSceneCorpus() {
     arrayCameraViewportCorpus(),
     viewportScissorCorpus(),
     customSortGroupCorpus(),
+    materialEnvMapCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -88,6 +89,42 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function materialEnvMapCorpus() {
+  const envMap = new THREE.DataTexture(new Uint8Array([
+    40, 220, 120, 255,
+    40, 220, 120, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  envMap.mapping = THREE.EquirectangularReflectionMapping
+  envMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.04, 0.04, 0.05)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.25))
+  const key = new THREE.DirectionalLight(0xffffff, 1.1)
+  key.position.set(2, 3, 4)
+  scene.add(key)
+
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.7, 24, 16),
+    new THREE.MeshPhongMaterial({
+      color: 0x884433,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 0.65,
+      shininess: 48,
+    }),
+  ))
+
+  return {
+    name: 'material-env-map-phong',
+    scene,
+    camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [10, 10, 13],
+    minNonBackgroundRatio: 0.02,
   }
 }
 
