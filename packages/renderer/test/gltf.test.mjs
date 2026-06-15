@@ -104,6 +104,23 @@ test('loadGltfFromFile rejects compressed GLB bufferView images with pre-decode 
   }
 })
 
+test('loadGltfFromFile rejects external compressed glTF image references with pre-decode guidance', async () => {
+  const source = JSON.parse(await readFile(TEXTURED_QUAD, 'utf8'))
+  source.images[0].uri = 'textures/albedo.ktx2'
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'headless-three-gltf-compressed-image-'))
+  try {
+    const modelPath = path.join(tmp, 'compressed-image-reference.gltf')
+    await writeFile(modelPath, JSON.stringify(source))
+
+    await assert.rejects(
+      () => loadGltfFixture(modelPath),
+      /glTF image URI.*compressed texture.*KTX2.*Basis.*pre-decode/i,
+    )
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
 test('committed vertex-color glTF fixture renders COLOR_0 attributes', async () => {
   const gltf = await loadGltfFixture(VERTEX_COLOR_QUAD)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)

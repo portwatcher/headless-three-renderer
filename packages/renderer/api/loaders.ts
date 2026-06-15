@@ -327,9 +327,15 @@ function installEmbeddedGlbImageNormalizer(loader: ThreeGltfLoaderLike): void {
 }
 
 function normalizeEmbeddedGlbImages(data: ArrayBuffer | string): ArrayBuffer | string {
-  if (typeof data === 'string') return data
+  if (typeof data === 'string') {
+    validateGltfTextImageReferences(data)
+    return data
+  }
   const bytes = Buffer.from(data)
   const normalized = rewriteGlbBufferViewImages(bytes)
+  if (!normalized) {
+    validateGltfTextImageReferences(bytes)
+  }
   return normalized ? arrayBufferView(normalized) : data
 }
 
@@ -366,13 +372,12 @@ function rewriteGlbBufferViewImages(bytes: Buffer): Buffer | null {
 
   let changed = false
   for (const image of Array.isArray(json.images) ? json.images : []) {
+    validateGltfImageUri(image)
     if (!image || !Number.isInteger(image.bufferView)) continue
     if (typeof image.mimeType !== 'string') {
       throw new Error('GLB bufferView image is missing mimeType. Embedded GLB images must declare PNG, JPEG, or WebP mimeType values.')
     }
-    if (!/^image\/(?:png|jpe?g|webp)$/i.test(image.mimeType)) {
-      throw unsupportedEmbeddedImageTypeError('GLB bufferView image', image.mimeType)
-    }
+    validateSupportedEmbeddedImageType('GLB bufferView image', image.mimeType)
     const imageBytes = glbBufferViewBytes(json, binChunk, image.bufferView)
     if (!imageBytes) continue
     image.uri = `data:${image.mimeType};base64,${imageBytes.toString('base64')}`
@@ -381,6 +386,48 @@ function rewriteGlbBufferViewImages(bytes: Buffer): Buffer | null {
   }
 
   return changed ? encodeGlb(json, binChunk) : null
+}
+
+function validateGltfTextImageReferences(data: Buffer | string): void {
+  const text = typeof data === 'string' ? data : data.toString('utf8')
+  if (!text.trimStart().startsWith('{')) return
+
+  let json: any
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return
+  }
+
+  for (const image of Array.isArray(json.images) ? json.images : []) {
+    validateGltfImageUri(image)
+    if (image && Number.isInteger(image.bufferView) && typeof image.mimeType === 'string') {
+      validateSupportedEmbeddedImageType('glTF bufferView image', image.mimeType)
+    }
+  }
+}
+
+function validateGltfImageUri(image: any): void {
+  const uri = typeof image?.uri === 'string' ? image.uri : null
+  if (!uri) return
+  const mimeType = imageMimeTypeFromUri(uri)
+  if (mimeType) {
+    validateSupportedEmbeddedImageType('glTF image URI', mimeType)
+  }
+}
+
+function imageMimeTypeFromUri(uri: string): string | null {
+  const dataUriMatch = uri.match(/^data:([^;,]+)/i)
+  if (dataUriMatch) return dataUriMatch[1].toLowerCase()
+  if (/\.ktx2(?:$|[?#])/i.test(uri)) return 'image/ktx2'
+  if (/\.basis(?:$|[?#])/i.test(uri)) return 'image/basis'
+  return null
+}
+
+function validateSupportedEmbeddedImageType(label: string, mimeType: string): void {
+  if (!/^image\/(?:png|jpe?g|webp)$/i.test(mimeType)) {
+    throw unsupportedEmbeddedImageTypeError(label, mimeType)
+  }
 }
 
 function unsupportedEmbeddedImageTypeError(label: string, mimeType: string): Error {

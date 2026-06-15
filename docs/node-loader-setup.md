@@ -132,8 +132,8 @@ forms:
 - `texture.source.data = Buffer | Uint8Array` for encoded PNG/JPEG/WebP bytes.
 - `texture.image = { data, width, height }` for raw one-channel, two-channel, RGB, or RGBA data.
 
-Compressed KTX2/Basis textures are not decoded by the renderer yet. Embedded
-compressed GLB image payloads fail during helper loading with pre-decode
+Compressed KTX2/Basis textures are not decoded by the renderer yet. External or
+embedded compressed image payloads fail during helper loading with pre-decode
 guidance; decode them to RGB/RGBA data or convert them to PNG/JPEG/WebP before
 rendering.
 
