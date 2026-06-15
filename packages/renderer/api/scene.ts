@@ -1913,7 +1913,8 @@ function secondaryUvsForMaterial(
 }
 
 function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | undefined): void {
-  if (object.isLOD !== true || !camera || object.autoUpdate === false) return
+  if (object.isLOD !== true || !camera) return
+  if (optionalObjectBoolean(object.autoUpdate, 'LOD.autoUpdate') === false) return
 
   const levels = object.levels
   const normalizedLevels = normalizeLodLevels(levels)

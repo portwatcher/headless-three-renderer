@@ -48,7 +48,7 @@ export function applyMorphTargets(
   }
   if (!hasEffect) return { positions, normals }
 
-  const isRelative = geometry.morphTargetsRelative !== false
+  const isRelative = optionalBoolean(geometry.morphTargetsRelative, 'geometry.morphTargetsRelative') !== false
   const vertexCount = positions.length / 3
 
   const morphedPositions = positions.slice()
@@ -121,4 +121,10 @@ function morphTargetInfluence(value: unknown, label: string): number {
   if (value == null) return 0
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
 }

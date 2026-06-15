@@ -4270,6 +4270,13 @@ test('invalid morph target influence values fail clearly', () => {
       /morphTargetInfluences\[0\] must be a finite number/i,
     )
   }
+
+  const invalidRelative = sceneWithInfluence(1)
+  invalidRelative.children[0].geometry.morphTargetsRelative = 'yes'
+  assert.throws(
+    () => renderRgba(invalidRelative, camera, { width: 64, height: 64 }),
+    /geometry\.morphTargetsRelative must be a boolean/i,
+  )
 })
 
 test('invalid skinning matrix values fail clearly', () => {
@@ -7401,6 +7408,9 @@ test('invalid LOD level values fail clearly', () => {
   camera.lookAt(0, 0, 0)
 
   const cases = [
+    ['autoUpdate', (lod) => {
+      lod.autoUpdate = 'yes'
+    }, /LOD\.autoUpdate must be a boolean/i],
     ['distance', (lod) => {
       lod.levels[1].distance = 'far'
     }, /LOD\.levels\[1\]\.distance must be a finite number/i],

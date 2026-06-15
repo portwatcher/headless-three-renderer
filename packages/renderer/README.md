@@ -113,7 +113,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar and size-attenuation values fail clearly
 - geometry groups with material arrays
 - mesh world transforms and object visibility flags, with invalid transform matrix or visibility values failing clearly
-- `THREE.LOD` camera-distance/zoom level selection, with invalid camera zoom or level distance/hysteresis values failing clearly
+- `THREE.LOD` camera-distance/zoom level selection, with invalid auto-update flags, camera zoom, or level distance/hysteresis values failing clearly
 - vertex colors, with invalid `material.vertexColors` values failing clearly
 - scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `scene.backgroundRotation`/`options.backgroundRotation`, `options.environmentIntensity`, and equirectangular/cube `scene.environmentRotation`/`options.environmentRotation`; invalid background color/control/rotation values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
 - render-option viewport/scissor rectangles and render-target viewport/scissor fields in output pixel coordinates, with malformed target scissor flags failing clearly
@@ -250,7 +250,7 @@ const imageBuffer = render(vrm.scene, camera, {
 
 ### Morph Targets / Blend Shapes
 
-Morph targets are applied on the CPU before rendering. Both **relative** (glTF default) and **absolute** (legacy Three.js) modes are supported. Position and normal morphs are applied based on `mesh.morphTargetInfluences`, with invalid influence values failing clearly. This is compatible with:
+Morph targets are applied on the CPU before rendering. Both **relative** (glTF default) and **absolute** (legacy Three.js) modes are supported. Position and normal morphs are applied based on `mesh.morphTargetInfluences`, with invalid influence values and malformed `geometry.morphTargetsRelative` values failing clearly. This is compatible with:
 
 - glTF morph targets via `GLTFLoader`
 - VRM blend shapes / expressions from `@pixiv/three-vrm`
