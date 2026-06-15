@@ -10,6 +10,7 @@ export function createSceneCorpus() {
     viewportScissorCorpus(),
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
+    globalClippingPlaneCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -89,6 +90,29 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function globalClippingPlaneCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.12)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff5533 }),
+  ))
+
+  return {
+    name: 'global-clipping-plane',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      clippingPlanes: [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)],
+    },
+    background: [0, 0, 31],
+    minNonBackgroundRatio: 0.05,
   }
 }
 

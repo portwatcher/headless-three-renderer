@@ -137,15 +137,21 @@ function rectangleFromOption(rectangle) {
 
 function applyFixtureRendererOptions(fixture) {
   const previousSortObjects = renderer.sortObjects
+  const previousClippingPlanes = renderer.clippingPlanes
+  const previousLocalClippingEnabled = renderer.localClippingEnabled
 
   renderer.sortObjects = fixture.options.sortObjects ?? true
   renderer.setOpaqueSort(fixture.options.opaqueSort ?? null)
   renderer.setTransparentSort(fixture.options.transparentSort ?? null)
+  renderer.clippingPlanes = fixture.options.clippingPlanes ?? []
+  renderer.localClippingEnabled = fixture.options.localClippingEnabled ?? false
 
   return () => {
     renderer.sortObjects = previousSortObjects
     renderer.setOpaqueSort(null)
     renderer.setTransparentSort(null)
+    renderer.clippingPlanes = previousClippingPlanes
+    renderer.localClippingEnabled = previousLocalClippingEnabled
   }
 }
 
