@@ -9805,6 +9805,15 @@ test('invalid environment and background rotation values fail clearly', () => {
     }),
     /options\.backgroundRotation\.x must be a finite number/i,
   )
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, {
+      width: 32,
+      height: 32,
+      renderMode: 'mask',
+      backgroundRotation: { x: 'left', y: 0, z: 0 },
+    }),
+    /options\.backgroundRotation\.x must be a finite number/i,
+  )
 
   const environmentScene = new THREE.Scene()
   environmentScene.background = new THREE.Color(0, 0, 0)
@@ -9833,6 +9842,23 @@ test('invalid environment and background rotation values fail clearly', () => {
       environmentRotation: [0, Number.NaN, 0],
     }),
     /options\.environmentRotation\[1\] must be a finite number/i,
+  )
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, {
+      width: 32,
+      height: 32,
+      renderMode: 'mask',
+      environmentRotation: [0, Number.NaN, 0],
+    }),
+    /options\.environmentRotation\[1\] must be a finite number/i,
+  )
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, {
+      width: 32,
+      height: 32,
+      environmentRotation: 0,
+    }),
+    /options\.environmentRotation must be a rotation object or array/i,
   )
 })
 

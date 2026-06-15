@@ -1282,6 +1282,8 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertFiniteNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
   assertFiniteNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
   assertFiniteNumberOption(options.environmentIntensity, 'options.environmentIntensity')
+  assertEulerOption(options.backgroundRotation, 'options.backgroundRotation')
+  assertEulerOption(options.environmentRotation, 'options.environmentRotation')
   if (options.localClippingEnabled != null && typeof options.localClippingEnabled !== 'boolean') {
     throw new TypeError('options.localClippingEnabled must be a boolean.')
   }
@@ -1305,6 +1307,14 @@ function assertRenderTargetLike(value: unknown, label: string): asserts value is
   if (value == null || typeof value !== 'object') {
     throw new TypeError(`${label} must be a target-like object.`)
   }
+}
+
+function assertEulerOption(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value !== 'object') {
+    throw new TypeError(`${label} must be a rotation object or array.`)
+  }
+  eulerComponents(value as ThreeEulerLike | ArrayLike<number>, label)
 }
 
 function validateSortControls(options: RenderOptions): void {

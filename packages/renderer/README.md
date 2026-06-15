@@ -91,9 +91,9 @@ The public API accepts only Three.js-like objects:
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, a supported 2D/equirectangular/cube texture, or `null` to clear `scene.background` for one render. Defaults to `scene.background`; option-supplied backgrounds use option-supplied background controls rather than scene background controls, and invalid explicit color values fail clearly.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds; invalid values fail clearly.
 - `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds; invalid values fail clearly.
-- `options.backgroundRotation`: overrides `scene.backgroundRotation` for supported equirectangular and cube texture backgrounds; invalid or unsupported rotations fail clearly.
+- `options.backgroundRotation`: overrides `scene.backgroundRotation` for supported equirectangular and cube texture backgrounds; explicit option rotation values are always validated, and invalid or unsupported rotations fail clearly.
 - `options.environmentIntensity`: overrides `scene.environmentIntensity` or reflection-probe intensity for supported scene environments; invalid values fail clearly.
-- `options.environmentRotation`: overrides `scene.environmentRotation` for supported scene environments; invalid values fail clearly.
+- `options.environmentRotation`: overrides `scene.environmentRotation` for supported scene environments; explicit option rotation values are always validated, and invalid values fail clearly.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws; invalid rectangles fail clearly.
 - `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws; invalid rectangles fail clearly.
 - `options.clippingPlanes`: global world-space clipping planes for the render.
