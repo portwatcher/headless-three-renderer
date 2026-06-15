@@ -6972,6 +6972,28 @@ test('unsupported array and 3D texture inputs fail clearly', () => {
   }
 })
 
+test('unsupported cube texture material slots fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({
+      map: cubeTexture([
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [255, 0, 255],
+        [0, 255, 255],
+      ]),
+    }),
+  ))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i,
+  )
+})
+
 test('malformed environment and reflection probe texture values fail clearly', () => {
   const cases = [
     ['string scene environment', (scene) => {

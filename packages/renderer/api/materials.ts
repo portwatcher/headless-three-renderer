@@ -1501,11 +1501,11 @@ function shaderMaterialKind(material: ThreeMaterialLike): string | undefined {
 
 export function extractTextureData(material: ThreeMaterialLike | undefined): TextureInfo | null {
   const slot = material?.isMeshMatcapMaterial ? material.matcap : material?.map
-  const base = extractTextureFromSlot(slot)
+  const label = material?.isMeshMatcapMaterial ? 'material.matcap' : 'material.map'
+  const base = extractTextureFromSlot(slot, label)
   if (!base) return null
 
   const map = slot as ThreeTextureLike | null | undefined
-  const label = material?.isMeshMatcapMaterial ? 'material.matcap' : 'material.map'
   return {
     ...base,
     wrapS: material?.isMeshMatcapMaterial ? undefined : wrapModeToString(map?.wrapS),
@@ -1782,6 +1782,7 @@ function minFilterModeToString(texture: ThreeTextureLike | null | undefined): st
 function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'): TextureInfo | null {
   if (!map) return null
   assertSupportedTextureInput(map, label, { allowMipmaps: true })
+  assertSupportedTwoDimensionalTextureSlot(map, label)
 
   const image = (map as any).image ?? (map as any).source?.data
   if (!image) return null
@@ -1970,6 +1971,19 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
   ) {
     throw new Error(
       `${label} uses a cube or PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a 2D/equirectangular texture or pre-render the background to a 2D image before rendering.`,
+    )
+  }
+}
+
+function assertSupportedTwoDimensionalTextureSlot(map: ThreeTextureLike, label: string): void {
+  if (
+    map.isCubeTexture === true ||
+    map.mapping === CubeReflectionMapping ||
+    map.mapping === CubeRefractionMapping ||
+    map.mapping === CubeUVReflectionMapping
+  ) {
+    throw new Error(
+      `${label} uses a cube or PMREM/CubeUV texture mapping, which is not supported for 2D material texture slots. Use a 2D texture for material maps or move cube textures to scene.environment, scene.background, or material.envMap where supported.`,
     )
   }
 }
