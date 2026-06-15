@@ -9477,6 +9477,12 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(texturesTarget.width, 16)
   assert.equal(texturesTarget.height, 8)
   assert.equal(texturesTarget.textures[0].image.data, texturesTarget.data)
+
+  const singleAttachmentMrtTarget = { isWebGLMultipleRenderTargets: true, textures: [{}] }
+  renderToTarget(scene, makeCamera(), singleAttachmentMrtTarget, { width: 8, height: 4 })
+  assert.equal(singleAttachmentMrtTarget.width, 8)
+  assert.equal(singleAttachmentMrtTarget.height, 4)
+  assert.equal(singleAttachmentMrtTarget.textures[0].image.data, singleAttachmentMrtTarget.data)
 })
 
 test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
@@ -9910,7 +9916,6 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: { source: { data: 'bad' } } }, /target\.texture\.source\.data must be an image-like object/i, 'texture source data container'],
     [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'texture array'],
     [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
-    [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.RedFormat } }, /target color texture format .*not supported.*RGBAFormat/i, 'color texture format'],
