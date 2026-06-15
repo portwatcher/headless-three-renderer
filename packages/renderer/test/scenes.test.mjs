@@ -6978,6 +6978,25 @@ test('custom WGSL fragment material can read the expanded light budget', () => {
   assert.ok(mean.g > mean.r + 40, `custom WGSL should read light slot 31 and render green (${mean.g} vs ${mean.r})`)
 })
 
+test('over native direct light budget fails clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  ))
+  for (let i = 0; i < 33; i += 1) {
+    const light = new THREE.PointLight(0xffffff, 1)
+    light.position.set((i % 8) - 3.5, 2, Math.floor(i / 8) - 2)
+    scene.add(light)
+  }
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /More than 32 visible non-ambient lights.*33 found/i,
+  )
+})
+
 test('ShaderMaterial without headless WGSL override fails clearly', () => {
   const cases = [
     ['ShaderMaterial', new THREE.ShaderMaterial({
