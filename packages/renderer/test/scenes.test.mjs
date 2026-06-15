@@ -9613,6 +9613,11 @@ test('invalid environment intensity values fail clearly', () => {
     /scene\.environmentIntensity must be a finite number/i,
   )
 
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, environmentIntensity: Number.POSITIVE_INFINITY }),
+    /options\.environmentIntensity must be a finite number/i,
+  )
+
   const probeScene = new THREE.Scene()
   probeScene.userData.headlessThreeRenderer = {
     reflectionProbe: {
@@ -9627,6 +9632,57 @@ test('invalid environment intensity values fail clearly', () => {
   assert.throws(
     () => renderRgba(probeScene, camera, { width: 32, height: 32 }),
     /reflectionProbe\.intensity must be a finite number/i,
+  )
+})
+
+test('options.environmentIntensity overrides scene and reflection-probe intensity', () => {
+  function addReflectivePlane(scene) {
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.15 }),
+    ))
+  }
+
+  function sampledRed(scene, options = {}) {
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+      ...options,
+    }), 64, 64, 24, 24, 40, 40).r
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const scene = new THREE.Scene()
+  addReflectivePlane(scene)
+  scene.environment = makeEnvironmentTexture()
+  scene.environmentIntensity = 0.15
+
+  const sceneIntensity = sampledRed(scene)
+  const optionIntensity = sampledRed(scene, { environmentIntensity: 4 })
+
+  const probeScene = new THREE.Scene()
+  addReflectivePlane(probeScene)
+  probeScene.userData.headlessThreeRenderer = {
+    reflectionProbe: {
+      texture: makeEnvironmentTexture(),
+      intensity: 0.15,
+    },
+  }
+  const probeIntensity = sampledRed(probeScene)
+  const optionProbeIntensity = sampledRed(probeScene, { environmentIntensity: 4 })
+
+  assert.ok(
+    optionIntensity > sceneIntensity + 35,
+    `options.environmentIntensity should brighten scene IBL (${optionIntensity} vs ${sceneIntensity})`,
+  )
+  assert.ok(
+    optionProbeIntensity > probeIntensity + 35,
+    `options.environmentIntensity should brighten reflection-probe IBL (${optionProbeIntensity} vs ${probeIntensity})`,
   )
 })
 

@@ -452,6 +452,7 @@ export interface RenderOptions {
   backgroundIntensity?: number
   backgroundBlurriness?: number
   backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null
+  environmentIntensity?: number
   environmentRotation?: ThreeEulerLike | ArrayLike<number> | null
   viewport?: RenderPixelRectLike | null
   scissor?: RenderPixelRectLike | null

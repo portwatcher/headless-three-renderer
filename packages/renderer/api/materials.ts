@@ -134,19 +134,24 @@ type TextureImageInput = {
  * Supports DataTexture (equirectangular) with Uint8, Float16, Float32 pixel data.
  * Normalizes 3-channel inputs to RGBA before handing bytes to the native IBL path.
  */
-export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMapInfo | null {
+export function extractEnvironmentMap(scene: ThreeSceneRootLike, intensityOverride?: number): EnvironmentMapInfo | null {
   const probe = extractReflectionProbe(scene)
   const envTex = scene.environment ?? probe?.texture
   if (!envTex) return null
   const label = scene.environment ? 'scene.environment' : 'reflectionProbe.texture'
-  const intensity = probe?.intensity !== undefined
-    ? optionalFiniteNumber(probe.intensity, 'reflectionProbe.intensity') ?? 1.0
-    : optionalFiniteNumber((scene as any).environmentIntensity, 'scene.environmentIntensity') ?? 1.0
+  let intensity: number
+  if (intensityOverride !== undefined) {
+    intensity = intensityOverride
+  } else if (probe?.intensity !== undefined) {
+    intensity = optionalFiniteNumber(probe.intensity, 'reflectionProbe.intensity') ?? 1.0
+  } else {
+    intensity = optionalFiniteNumber((scene as any).environmentIntensity, 'scene.environmentIntensity') ?? 1.0
+  }
   return extractEnvironmentMapFromTexture(envTex, label, intensity)
 }
 
-export function resolveEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMapResolution {
-  const sceneEnvMap = extractEnvironmentMap(scene)
+export function resolveEnvironmentMap(scene: ThreeSceneRootLike, intensityOverride?: number): EnvironmentMapResolution {
+  const sceneEnvMap = extractEnvironmentMap(scene, intensityOverride)
   if (sceneEnvMap) {
     return { envMap: sceneEnvMap }
   }

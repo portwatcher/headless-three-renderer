@@ -261,7 +261,7 @@ function toNativeInput(
   }
 
   const size = resolveSize(camera, options)
-  const environment = colorMode ? resolveEnvironmentMap(scene) : { envMap: null }
+  const environment = colorMode ? resolveEnvironmentMap(scene, options.environmentIntensity) : { envMap: null }
   const envMap = environment.envMap
   const hasEnvironmentRotationOverride = options.environmentRotation !== undefined
   const environmentRotation = environment.rotation ?? (
@@ -1280,6 +1280,7 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputColorSpace(options.outputColorSpace)
   assertFiniteNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
   assertFiniteNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
+  assertFiniteNumberOption(options.environmentIntensity, 'options.environmentIntensity')
   validateSortControls(options)
   validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')
