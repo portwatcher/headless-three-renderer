@@ -3696,6 +3696,46 @@ test('invalid instance counts fail clearly', () => {
   )
 })
 
+test('invalid morph target influence values fail clearly', () => {
+  function sceneWithInfluence(influence) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -0.75, -0.5, 0,
+      0.75, -0.5, 0,
+      0, 0.75, 0,
+    ]), 3))
+    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+    ]), 3))
+    geometry.morphTargetsRelative = true
+    geometry.morphAttributes.position = [new THREE.BufferAttribute(new Float32Array([
+      0, 0.25, 0,
+      0, 0.25, 0,
+      0, 0.25, 0,
+    ]), 3)]
+
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff }))
+    mesh.morphTargetInfluences = [influence]
+
+    const scene = new THREE.Scene()
+    scene.add(mesh)
+    return scene
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  for (const influence of [Number.NaN, Number.POSITIVE_INFINITY, 'active']) {
+    assert.throws(
+      () => renderRgba(sceneWithInfluence(influence), camera, { width: 64, height: 64 }),
+      /morphTargetInfluences\[0\] must be a finite number/i,
+    )
+  }
+})
+
 test('aoMap samples the selected UV channel', () => {
   function renderWithChannel(channel) {
     const aoMap = rgbaTexture([

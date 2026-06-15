@@ -19,7 +19,7 @@ Already supported in the current implementation:
 - Meshes, skinned meshes, sprites, geometry groups, vertex colors, indices, normals, UVs, and object world transforms.
 - `THREE.InstancedMesh` CPU expansion with `instanceMatrix` and `instanceColor`, with invalid explicit instance counts failing clearly.
 - `THREE.InstancedBufferGeometry` CPU expansion for mesh, point, and line geometry with common per-instance offset and color attributes, including dashed line expansion and invalid explicit instance counts failing clearly.
-- CPU skinning and morph target baking before native rendering.
+- CPU skinning and morph target baking before native rendering, with invalid morph target influence values failing clearly.
 - `MeshBasicMaterial`, `MeshDepthMaterial` with supported depth-packing modes and clear failures for unsupported depth-packing constants, `MeshDistanceMaterial`, `MeshLambertMaterial`, `MeshMatcapMaterial`, `MeshNormalMaterial`, `MeshPhongMaterial`, `MeshToonMaterial`, `ShadowMaterial`, `MeshStandardMaterial`, and a substantial `MeshPhysicalMaterial` subset.
 - Base color, opacity, premultiplied alpha, base/sprite/point/line/matcap/emissive/light/toon gradient/physical color map, supported background texture, and equirectangular/cube scene-environment and reflection-probe LDR IBL sRGB/linear color-space handling, output color-space controls, base color `flipY`, normal/bump maps, metallic/roughness/specular maps, AO/light maps with selected UV channels, Phong specular maps with selected UV channels, toon gradient maps, alpha/displacement maps, alpha test with invalid values failing clearly, common material scalar controls with invalid values failing clearly, alpha hash, transparency sorting, side/culling with clear failures for unsupported side constants, texture wrap modes, one-channel/two-channel/RGB/RGBA raw material/background texture payloads, and clear failures for malformed raw texture channel layouts.
 - Base color, supported background, sprite/point color and alpha, line, normal, bump, displacement, metallic/roughness, emissive, AO, light, specular, alpha, and physical-extension map texture UV transforms (`offset`, `repeat`, `rotation`, `center`, `flipY`, and explicit matrix), with direct explicit-matrix conformance for base/background, sprite/point color and alpha, line, common mesh material maps, and current physical-extension maps.
@@ -111,7 +111,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 |---|---:|---|
 | Persistent resource cache | High | Reuse GPU buffers, textures, pipelines, IBL maps, and bind groups across renders. |
 | Incremental scene updates | High | Avoid rebuilding every mesh/material/texture for animation frames. |
-| GPU skinning/morphing path | Medium | CPU baking is simple and correct enough for stills, but expensive for dense animated characters. |
+| GPU skinning/morphing path | Medium | CPU baking is simple and correct enough for stills, with invalid morph target influence values failing clearly, but expensive for dense animated characters. |
 | Large scene memory budget tests | Medium | Scale regression tests render many meshes, many unique raw and encoded textures, and the supported 64-light budget in CI; direct conformance covers clear failure for scenes with more than 64 visible non-ambient lights; and platform-specific scale budget notes are documented. Remaining work is larger memory ceilings. |
 | Parallel texture decode/precompute | Medium | IBL and image decode can dominate render latency. |
 

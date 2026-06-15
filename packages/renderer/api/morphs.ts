@@ -36,13 +36,14 @@ export function applyMorphTargets(
 
   if (!morphPositions || morphPositions.length === 0) return { positions, normals }
 
-  // Check if any influence is actually non-zero before allocating.
   const targetCount = Math.min(influences.length, morphPositions.length)
+  const weights: number[] = []
   let hasEffect = false
   for (let t = 0; t < targetCount; t++) {
-    if (influences[t] !== 0 && Number.isFinite(influences[t])) {
+    const weight = morphTargetInfluence(influences[t], `morphTargetInfluences[${t}]`)
+    weights.push(weight)
+    if (weight !== 0) {
       hasEffect = true
-      break
     }
   }
   if (!hasEffect) return { positions, normals }
@@ -54,8 +55,8 @@ export function applyMorphTargets(
   const morphedNormals = normals ? normals.slice() : null
 
   for (let t = 0; t < targetCount; t++) {
-    const weight = influences[t]
-    if (!Number.isFinite(weight) || weight === 0) continue
+    const weight = weights[t]
+    if (weight === 0) continue
 
     const morphPosAttr = morphPositions[t]
     if (!morphPosAttr) continue
@@ -114,4 +115,10 @@ export function applyMorphTargets(
   }
 
   return { positions: morphedPositions, normals: morphedNormals }
+}
+
+function morphTargetInfluence(value: unknown, label: string): number {
+  if (value == null) return 0
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
 }
