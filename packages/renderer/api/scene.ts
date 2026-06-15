@@ -65,6 +65,15 @@ interface DashedLineExpansion {
   colors?: number[]
 }
 
+interface ThickLineExpansion {
+  center: [number, number, number]
+  colors?: number[]
+  indices: number[]
+  positions: number[]
+  uvs?: number[]
+  uvs2?: number[]
+}
+
 interface ClippingContext {
   unionPlanes: readonly NativeClippingPlane[]
   intersectionPlanes: readonly NativeClippingPlane[]
@@ -118,7 +127,7 @@ function visitObject(
     if (object.isMesh === true && object.geometry) {
       appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
-      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, nextClippingContext, localClippingEnabled, materialContext)
+      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext)
     } else if (object.isPoints === true && object.geometry) {
       appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if (object.isSprite === true) {
@@ -897,6 +906,7 @@ function appendLineOrPoints(
   meshes: FlattenedMesh[],
   topology: 'lines' | 'points',
   groupOrder: number,
+  viewportHeight: number,
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   materialContext: MaterialExtractionContext,
@@ -929,16 +939,24 @@ function appendLineOrPoints(
     let outputUvs: number[] | undefined = topology === 'lines' ? uvs ?? undefined : undefined
     let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? secondaryUvs ?? undefined : undefined
     let outputColors: number[] | undefined
+    let thickCenter: [number, number, number] | undefined
     const color = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
     const textureInfo = extractTextureData(material)
     const drawStart = group.start
     const drawEnd = group.start + group.count
+    const lineWidth = finiteOrDefault(material?.linewidth, 1)
+    const thickLine = topology === 'lines' && lineWidth > 1
 
     if (topology === 'lines') {
       const source = indexAttr ?? rangeIndices(vertexCount)
       if (material?.isLineDashedMaterial === true) {
+        if (thickLine) {
+          throw new Error(
+            'LineDashedMaterial linewidth values other than 1 are not supported by @headless-three/renderer yet. Use the default dashed line width or expand thick dashed lines to mesh geometry before rendering.',
+          )
+        }
         const dashed = instancedGeometryCount > 1 || instancedPositionOffset
           ? dashedLineAttributesForInstances(
             positions,
@@ -982,16 +1000,40 @@ function appendLineOrPoints(
           outputSecondaryUvs = secondaryUvs ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount) : undefined
           indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
         }
+        if (thickLine) {
+          const transform = matrixElements(object.matrixWorld!, 'object.matrixWorld')
+          const thick = thickLineAttributes(
+            outputPositions,
+            outputUvs,
+            outputSecondaryUvs,
+            useVertexColors ? outputColors ?? expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount) : undefined,
+            indices,
+            transform,
+            camera,
+            viewportHeight,
+            lineWidth,
+          )
+          if (thick.positions.length < 12) continue
+          outputPositions = thick.positions
+          outputUvs = thick.uvs
+          outputSecondaryUvs = thick.uvs2
+          outputColors = thick.colors
+          indices = thick.indices
+          thickCenter = thick.center
+        }
       }
     } else if (indexAttr) {
       indices = indexAttr.slice(drawStart, drawEnd)
       if (indices.length === 0) continue
     }
 
-    if (useVertexColors && material?.isLineDashedMaterial !== true) {
+    if (useVertexColors && material?.isLineDashedMaterial !== true && !thickLine) {
       outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
     }
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
+    if (thickCenter && camera) {
+      sortInfo.sortZ = projectedWorldPointZ(thickCenter, camera)
+    }
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
 
     pushMesh(meshes, {
@@ -1012,13 +1054,14 @@ function appendLineOrPoints(
       textureTransform: textureInfo?.transform,
       textureColorSpace: textureInfo?.colorSpace,
       textureUsesUv2: textureInfo?.usesUv2,
-      transform: matrixElements(object.matrixWorld!, 'object.matrixWorld'),
+      transform: thickLine ? IDENTITY_4X4.slice() : matrixElements(object.matrixWorld!, 'object.matrixWorld'),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       alphaTest: material && Number.isFinite(material.alphaTest) && material.alphaTest! > 0 ? material.alphaTest : undefined,
       clipShadows: clipShadowsForMaterial(material, clippingContext),
       ...pbrProps,
+      ...(thickLine ? { side: 'double' } : {}),
       shadingModel: 'basic',
-      topology,
+      topology: thickLine ? 'triangles' : topology,
       ...clipping,
       ...sortInfo,
     })
@@ -1026,10 +1069,156 @@ function appendLineOrPoints(
 }
 
 function assertSupportedLineMaterial(material: ThreeMaterialLike | undefined): void {
-  if (!material || !Number.isFinite(material.linewidth) || material.linewidth === 1) return
-  throw new Error(
-    'Line material linewidth values other than 1 are not supported by @headless-three/renderer yet. Use the default 1-pixel line width or expand thick lines to mesh geometry before rendering.',
+  if (!material || !Number.isFinite(material.linewidth)) return
+  if (material.linewidth !== 1 && material.isLineDashedMaterial === true) {
+    throw new Error(
+      'LineDashedMaterial linewidth values other than 1 are not supported by @headless-three/renderer yet. Use the default dashed line width or expand thick dashed lines to mesh geometry before rendering.',
+    )
+  }
+}
+
+function thickLineAttributes(
+  positions: number[],
+  uvs: number[] | undefined,
+  uvs2: number[] | undefined,
+  colors: number[] | undefined,
+  lineIndices: number[],
+  transform: ArrayLike<number>,
+  camera: ThreeCameraLike | undefined,
+  viewportHeight: number,
+  lineWidth: number,
+): ThickLineExpansion {
+  const axes = cameraBillboardAxes(camera)
+  const outputPositions: number[] = []
+  const outputUvs: number[] | undefined = uvs ? [] : undefined
+  const outputUvs2: number[] | undefined = uvs2 ? [] : undefined
+  const outputColors: number[] | undefined = colors ? [] : undefined
+  const outputIndices: number[] = []
+
+  for (let i = 0; i + 1 < lineIndices.length; i += 2) {
+    const aIndex = lineIndices[i]
+    const bIndex = lineIndices[i + 1]
+    if (!validPositionIndex(positions, aIndex) || !validPositionIndex(positions, bIndex)) continue
+
+    const a = transformPoint(transform, [
+      positions[aIndex * 3],
+      positions[aIndex * 3 + 1],
+      positions[aIndex * 3 + 2],
+    ])
+    const b = transformPoint(transform, [
+      positions[bIndex * 3],
+      positions[bIndex * 3 + 1],
+      positions[bIndex * 3 + 2],
+    ])
+    const dx = b[0] - a[0]
+    const dy = b[1] - a[1]
+    const dz = b[2] - a[2]
+    if (Math.hypot(dx, dy, dz) <= 1e-8) continue
+
+    const screenDx = dx * axes.right[0] + dy * axes.right[1] + dz * axes.right[2]
+    const screenDy = dx * axes.up[0] + dy * axes.up[1] + dz * axes.up[2]
+    const side = normalizeVec3([
+      -screenDy * axes.right[0] + screenDx * axes.up[0],
+      -screenDy * axes.right[1] + screenDx * axes.up[1],
+      -screenDy * axes.right[2] + screenDx * axes.up[2],
+    ], axes.up)
+    const midpoint: [number, number, number] = [
+      (a[0] + b[0]) * 0.5,
+      (a[1] + b[1]) * 0.5,
+      (a[2] + b[2]) * 0.5,
+    ]
+    const halfWidth = linePixelWorldSize(lineWidth, midpoint, camera, viewportHeight) * 0.5
+    if (halfWidth <= 0) continue
+
+    const vertexBase = outputPositions.length / 3
+    pushThickLineVertex(outputPositions, a, side, -halfWidth)
+    pushThickLineVertex(outputPositions, a, side, halfWidth)
+    pushThickLineVertex(outputPositions, b, side, halfWidth)
+    pushThickLineVertex(outputPositions, b, side, -halfWidth)
+    outputIndices.push(vertexBase, vertexBase + 1, vertexBase + 2, vertexBase, vertexBase + 2, vertexBase + 3)
+
+    pushRepeatedVec2(outputUvs, uvs, aIndex)
+    pushRepeatedVec2(outputUvs, uvs, aIndex)
+    pushRepeatedVec2(outputUvs, uvs, bIndex)
+    pushRepeatedVec2(outputUvs, uvs, bIndex)
+    pushRepeatedVec2(outputUvs2, uvs2, aIndex)
+    pushRepeatedVec2(outputUvs2, uvs2, aIndex)
+    pushRepeatedVec2(outputUvs2, uvs2, bIndex)
+    pushRepeatedVec2(outputUvs2, uvs2, bIndex)
+    pushRepeatedColor(outputColors, colors, aIndex)
+    pushRepeatedColor(outputColors, colors, aIndex)
+    pushRepeatedColor(outputColors, colors, bIndex)
+    pushRepeatedColor(outputColors, colors, bIndex)
+  }
+
+  return {
+    center: thickLineCenter(outputPositions),
+    colors: outputColors,
+    indices: outputIndices,
+    positions: outputPositions,
+    uvs: outputUvs,
+    uvs2: outputUvs2,
+  }
+}
+
+function validPositionIndex(positions: number[], index: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index * 3 + 2 < positions.length
+}
+
+function pushThickLineVertex(
+  positions: number[],
+  point: [number, number, number],
+  side: [number, number, number],
+  offset: number,
+): void {
+  positions.push(
+    point[0] + side[0] * offset,
+    point[1] + side[1] * offset,
+    point[2] + side[2] * offset,
   )
+}
+
+function pushRepeatedVec2(target: number[] | undefined, source: number[] | undefined, index: number): void {
+  if (!target || !source || index * 2 + 1 >= source.length) return
+  target.push(source[index * 2], source[index * 2 + 1])
+}
+
+function pushRepeatedColor(target: number[] | undefined, source: number[] | undefined, index: number): void {
+  if (!target || !source || index * 4 + 3 >= source.length) return
+  target.push(source[index * 4], source[index * 4 + 1], source[index * 4 + 2], source[index * 4 + 3])
+}
+
+function linePixelWorldSize(
+  lineWidth: number,
+  worldPosition: [number, number, number],
+  camera: ThreeCameraLike | undefined,
+  viewportHeight: number,
+): number {
+  const projectionY = Math.abs(finiteOrDefault(camera?.projectionMatrix?.elements?.[5], 1))
+  if (projectionY <= 0) return 0
+
+  if (camera?.isPerspectiveCamera === true) {
+    const viewZ = viewSpaceZ(worldPosition, camera)
+    const depth = Number.isFinite(viewZ) ? Math.max(0.0001, Math.abs(viewZ)) : 1
+    return lineWidth * 2 * depth / Math.max(1, viewportHeight) / projectionY
+  }
+
+  return lineWidth * 2 / Math.max(1, viewportHeight) / projectionY
+}
+
+function thickLineCenter(positions: number[]): [number, number, number] {
+  if (positions.length < 3) return [0, 0, 0]
+  let x = 0
+  let y = 0
+  let z = 0
+  let count = 0
+  for (let i = 0; i + 2 < positions.length; i += 3) {
+    x += positions[i]
+    y += positions[i + 1]
+    z += positions[i + 2]
+    count += 1
+  }
+  return count > 0 ? [x / count, y / count, z / count] : [0, 0, 0]
 }
 
 function clippingState(
@@ -1130,6 +1319,23 @@ function projectedObjectZ(object: ThreeObject3DLike, camera: ThreeCameraLike, tr
   const x = world[0] * center[0] + world[4] * center[1] + world[8] * center[2] + world[12]
   const y = world[1] * center[0] + world[5] * center[1] + world[9] * center[2] + world[13]
   const z = world[2] * center[0] + world[6] * center[1] + world[10] * center[2] + world[14]
+  const vx = view[0] * x + view[4] * y + view[8] * z + view[12]
+  const vy = view[1] * x + view[5] * y + view[9] * z + view[13]
+  const vz = view[2] * x + view[6] * y + view[10] * z + view[14]
+  const vw = view[3] * x + view[7] * y + view[11] * z + view[15]
+  const clipZ = projection[2] * vx + projection[6] * vy + projection[10] * vz + projection[14] * vw
+  const clipW = projection[3] * vx + projection[7] * vy + projection[11] * vz + projection[15] * vw
+  return clipW === 0 ? clipZ : clipZ / clipW
+}
+
+function projectedWorldPointZ(worldPoint: [number, number, number], camera: ThreeCameraLike): number {
+  const view = camera.matrixWorldInverse?.elements
+  const projection = camera.projectionMatrix?.elements
+  if (!view || view.length < 16 || !projection || projection.length < 16) return 0
+
+  const x = worldPoint[0]
+  const y = worldPoint[1]
+  const z = worldPoint[2]
   const vx = view[0] * x + view[4] * y + view[8] * z + view[12]
   const vy = view[1] * x + view[5] * y + view[9] * z + view[13]
   const vz = view[2] * x + view[6] * y + view[10] * z + view[14]
