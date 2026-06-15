@@ -40,6 +40,7 @@ Already supported in the current implementation:
 - Object/camera layer filtering for renderable objects and lights, plus native draw-order keys for group order, `renderOrder`, material id, WebGL material variant, transmissive/transparent buckets, projected geometry bounding-sphere z, object/insertion ties, `sortObjects`, and custom opaque/transparent sort callbacks, with invalid layer masks, `renderOrder`, sort option, and reusable-renderer setter values failing clearly.
 - `THREE.LOD` auto-update selection for the active camera, with invalid auto-update flags, camera zoom, or level distance/hysteresis values failing clearly.
 - `THREE.Fog` and `THREE.FogExp2` in mesh, shadow, sprite, point, and line material paths, using view-space depth fog with `material.fog` opt-out and invalid fog color/parameter values failing clearly.
+- Packaged artifacts are built and install-verified in CI across Linux x64, Linux arm64, macOS x64, macOS arm64, and Windows x64.
 
 Distance to the project goal:
 
