@@ -3390,6 +3390,10 @@ test('invalid sort controls fail clearly', () => {
 
   const renderer = new Renderer()
   assert.throws(
+    () => { renderer.sortObjects = 'yes' },
+    /Renderer\.sortObjects must be a boolean/i,
+  )
+  assert.throws(
     () => renderer.setOpaqueSort('front'),
     /Renderer\.setOpaqueSort expects a function or null/i,
   )

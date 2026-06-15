@@ -86,12 +86,22 @@ export type {
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private opaqueSort: RenderSortFunction | null = null
+  private sortObjectsValue = true
   private transparentSort: RenderSortFunction | null = null
-
-  sortObjects = true
 
   constructor() {
     this.native = new native.NativeRenderer()
+  }
+
+  get sortObjects(): boolean {
+    return this.sortObjectsValue
+  }
+
+  set sortObjects(value: boolean) {
+    if (typeof value !== 'boolean') {
+      throw new TypeError(`Renderer.sortObjects must be a boolean; received ${String(value)}.`)
+    }
+    this.sortObjectsValue = value
   }
 
   setOpaqueSort(method: RenderSortFunction | null): void {
