@@ -1698,6 +1698,18 @@ function finiteCountOrDefault(value: unknown, label: string, fallback: number): 
   throw new TypeError(`${label} must be a finite number.`)
 }
 
+function integerCountOrDefault(value: unknown, label: string, fallback: number): number {
+  const number = finiteCountOrDefault(value, label, fallback)
+  if (number === Infinity) return number
+  if (!Number.isInteger(number)) {
+    throw new TypeError(`${label} must be an integer.`)
+  }
+  if (number < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+  return number
+}
+
 function unsignedSortKey(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : fallback
 }
@@ -1712,10 +1724,10 @@ function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number
     maxCount = Math.min(maxCount, attribute.count * meshPerAttribute(attribute, `geometry.attributes.${name}.meshPerAttribute`))
   }
 
-  const requested = finiteCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity)
+  const requested = integerCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity)
   const effectiveCount = Math.min(requested, maxCount)
   if (effectiveCount === Infinity) return 1
-  return clampInteger(Math.floor(effectiveCount), 0, Math.max(0, Math.floor(maxCount)))
+  return clampInteger(effectiveCount, 0, Math.max(0, Math.floor(maxCount)))
 }
 
 function isInstancedAttribute(attribute: ThreeBufferAttributeLike | undefined | null): attribute is ThreeBufferAttributeLike {
@@ -1725,8 +1737,14 @@ function isInstancedAttribute(attribute: ThreeBufferAttributeLike | undefined | 
 function meshPerAttribute(attribute: ThreeBufferAttributeLike, label = 'InstancedBufferAttribute.meshPerAttribute'): number {
   const value = attribute.meshPerAttribute
   if (value == null) return 1
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return Math.max(1, Math.floor(value))
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value <= 0) {
+      throw new TypeError(`${label} must be a positive finite number.`)
+    }
+    if (!Number.isInteger(value)) {
+      throw new TypeError(`${label} must be a positive integer.`)
+    }
+    return value
   }
   throw new TypeError(`${label} must be a positive finite number.`)
 }
@@ -2309,7 +2327,7 @@ function meshInstances(object: ThreeObject3DLike, baseTransform: number[]): Mesh
   if (!instanceMatrix || instanceMatrix.count == null) return []
 
   const count = clampInteger(
-    finiteCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrix.count),
+    integerCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrix.count),
     0,
     instanceMatrix.count,
   )

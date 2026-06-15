@@ -4587,6 +4587,18 @@ test('invalid instance counts fail clearly', () => {
     /InstancedMesh\.count must be a finite number/i,
   )
 
+  instancedMesh.count = -1
+  assert.throws(
+    () => renderRgba(meshScene, camera, { width: 64, height: 64 }),
+    /InstancedMesh\.count must be non-negative/i,
+  )
+
+  instancedMesh.count = 1.5
+  assert.throws(
+    () => renderRgba(meshScene, camera, { width: 64, height: 64 }),
+    /InstancedMesh\.count must be an integer/i,
+  )
+
   const base = new THREE.PlaneGeometry(0.85, 0.85)
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.index = base.index
@@ -4599,6 +4611,18 @@ test('invalid instance counts fail clearly', () => {
   assert.throws(
     () => renderRgba(geometryScene, camera, { width: 64, height: 64 }),
     /geometry\.instanceCount must be a finite number/i,
+  )
+
+  geometry.instanceCount = -1
+  assert.throws(
+    () => renderRgba(geometryScene, camera, { width: 64, height: 64 }),
+    /geometry\.instanceCount must be non-negative/i,
+  )
+
+  geometry.instanceCount = 1.5
+  assert.throws(
+    () => renderRgba(geometryScene, camera, { width: 64, height: 64 }),
+    /geometry\.instanceCount must be an integer/i,
   )
 
   const meshPerAttributeScene = new THREE.Scene()
@@ -4614,6 +4638,18 @@ test('invalid instance counts fail clearly', () => {
   assert.throws(
     () => renderRgba(meshPerAttributeScene, camera, { width: 64, height: 64 }),
     /geometry\.attributes\.instanceOffset\.meshPerAttribute must be a positive finite number/i,
+  )
+
+  instanceOffset.meshPerAttribute = 0
+  assert.throws(
+    () => renderRgba(meshPerAttributeScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.instanceOffset\.meshPerAttribute must be a positive finite number/i,
+  )
+
+  instanceOffset.meshPerAttribute = 1.5
+  assert.throws(
+    () => renderRgba(meshPerAttributeScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.instanceOffset\.meshPerAttribute must be a positive integer/i,
   )
 })
 
