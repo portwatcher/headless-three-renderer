@@ -25,6 +25,7 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
     lodAndGroupsCorpus(),
     pathologicalGeometryCorpus(),
@@ -793,6 +794,44 @@ function physicalIblShadowCorpus() {
     camera: makeCamera([2.2, 1.4, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [10, 10, 13],
+  }
+}
+
+function dashedLineMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.72, -0.25, 0,
+    -0.15, 0.35, 0,
+    0.35, -0.1, 0,
+    0.72, 0.42, 0,
+  ]), 3))
+  geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    0,
+    0.82,
+    1.49,
+    2.13,
+  ]), 1))
+
+  scene.add(new THREE.Line(
+    geometry,
+    new THREE.LineDashedMaterial({
+      color: 0xffee55,
+      dashSize: 0.16,
+      gapSize: 0.09,
+      scale: 1,
+    }),
+  ))
+
+  return {
+    name: 'line-dashed-material-pattern',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.001,
   }
 }
 
