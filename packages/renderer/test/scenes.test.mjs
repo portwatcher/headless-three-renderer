@@ -433,6 +433,12 @@ test('invalid camera clipping distances fail clearly', () => {
     /camera\.near must be a finite number/i,
   )
 
+  camera.near = 0
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    /camera\.near must be positive/i,
+  )
+
   camera.near = 0.01
   camera.far = 'deep'
   assert.throws(
@@ -440,6 +446,20 @@ test('invalid camera clipping distances fail clearly', () => {
     /camera\.far must be a finite number/i,
   )
 
+  camera.far = -1
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    /camera\.far must be positive/i,
+  )
+
+  camera.near = 10
+  camera.far = 1
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    /camera\.far must be greater than camera\.near/i,
+  )
+
+  camera.near = 0.01
   camera.far = 100
   camera.projectionMatrix.elements[0] = Number.NaN
   assert.throws(

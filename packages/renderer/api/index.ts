@@ -412,11 +412,12 @@ function toNativeInput(
     ...(colorMode ? fogToNative(scene.fog) : {}),
     ...(colorMode ? postProcessingToNative(options.postProcessing) : {}),
   }
+  const clipDistances = cameraClipDistances(camera)
   const nativeCamera: NativeCamera = {
     width: size.width,
     height: size.height,
-    near: optionalFiniteNumber(camera.near, 'camera.near'),
-    far: optionalFiniteNumber(camera.far, 'camera.far'),
+    near: clipDistances.near,
+    far: clipDistances.far,
     viewProjection: cameraViewProjection(camera),
     viewMatrix: cameraViewMatrix(camera),
     cameraPosition: cameraWorldPosition(camera),
@@ -1131,6 +1132,23 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function cameraClipDistances(camera: ThreeCameraLike): Pick<NativeCamera, 'near' | 'far'> {
+  const near = optionalFiniteNumber(camera.near, 'camera.near')
+  const far = optionalFiniteNumber(camera.far, 'camera.far')
+
+  if (near != null && near <= 0) {
+    throw new TypeError('camera.near must be positive.')
+  }
+  if (far != null && far <= 0) {
+    throw new TypeError('camera.far must be positive.')
+  }
+  if (near != null && far != null && far <= near) {
+    throw new TypeError('camera.far must be greater than camera.near.')
+  }
+
+  return { near, far }
 }
 
 function booleanOrNumber(value: unknown): number | undefined {
