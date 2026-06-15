@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
+import native from '../native.js'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
@@ -29,6 +30,19 @@ function makeTexture(index) {
     }
   }
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+function makeEncodedTexture(index) {
+  const raw = makeTexture(index)
+  const image = raw.image
+  const data = Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength)
+  const encoded = native.encodePng(data, image.width, image.height)
+  const texture = new THREE.Texture()
+  texture.image = encoded
+  texture.source.data = encoded
   texture.colorSpace = THREE.SRGBColorSpace
   texture.needsUpdate = true
   return texture
@@ -99,6 +113,33 @@ test('texture-heavy scene budget renders many unique maps', () => {
   assert.ok(ratio > 0.25, `texture-heavy scene should render many mapped pixels (${ratio})`)
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `texture-heavy scene should retain textured color (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('encoded texture budget renders many unique PNG buffer maps', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const geometry = new THREE.PlaneGeometry(0.2, 0.2)
+  for (let row = 0; row < 6; row += 1) {
+    for (let col = 0; col < 6; col += 1) {
+      const index = row * 6 + col
+      const material = new THREE.MeshBasicMaterial({ map: makeEncodedTexture(index) })
+      const mesh = new THREE.Mesh(geometry, material)
+      mesh.position.set((col - 2.5) * 0.25, (row - 2.5) * 0.25, 0)
+      scene.add(mesh)
+    }
+  }
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = new Renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.25, `encoded texture scene should render many mapped pixels (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `encoded texture scene should retain decoded color (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('more than 32 visible non-ambient lights fail clearly', () => {
