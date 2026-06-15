@@ -103,7 +103,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.Mesh` and `THREE.SkinnedMesh`
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`; invalid explicit instance counts fail clearly
 - `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes; invalid explicit instance counts or per-attribute repeat values fail clearly
-- `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
+- `THREE.BufferGeometry` positions, indices, normals, and UV coordinates, with invalid attribute values failing clearly
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar values fail clearly
 - geometry groups with material arrays
 - mesh world transforms, with invalid transform matrix values failing clearly

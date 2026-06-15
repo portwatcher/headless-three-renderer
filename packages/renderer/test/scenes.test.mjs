@@ -298,6 +298,24 @@ test('invalid transform matrix values fail clearly', () => {
   )
 })
 
+test('invalid geometry attribute values fail clearly', () => {
+  const camera = makeCamera()
+
+  const scene = new THREE.Scene()
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.75, -0.5, 0,
+    Number.NaN, -0.5, 0,
+    0, 0.75, 0,
+  ]), 3))
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    /geometry\.attributes\.position\[1\]\.x must be a finite number/i,
+  )
+})
+
 test('invalid output dimensions fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))

@@ -156,14 +156,14 @@ function appendMesh(
   const position = getAttribute(geometry, 'position')
   if (!position) return
 
-  let positions = readVec3Attribute(position)
+  let positions = readVec3Attribute(position, 'geometry.attributes.position')
   const uvAttribute = getAttribute(geometry, 'uv')
-  const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
+  const uvs = uvAttribute ? readVec2Attribute(uvAttribute, 'geometry.attributes.uv') : null
   const uvChannels = readUvChannels(geometry, uvs)
   const normalAttribute = getAttribute(geometry, 'normal')
-  let normals = normalAttribute ? readVec3Attribute(normalAttribute) : null
+  let normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
   const vertexColors = getAttribute(geometry, 'color')
-  const index = geometry.index ? readIndexAttribute(geometry.index) : null
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
@@ -667,9 +667,9 @@ function appendPoints(
   const position = getAttribute(geometry, 'position')
   if (!position) return
 
-  const positions = readVec3Attribute(position)
+  const positions = readVec3Attribute(position, 'geometry.attributes.position')
   const vertexColors = getAttribute(geometry, 'color')
-  const index = geometry.index ? readIndexAttribute(geometry.index) : null
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
@@ -934,12 +934,12 @@ function appendLineOrPoints(
   const position = getAttribute(geometry, 'position')
   if (!position) return
 
-  const positions = readVec3Attribute(position)
+  const positions = readVec3Attribute(position, 'geometry.attributes.position')
   const uvAttribute = getAttribute(geometry, 'uv')
-  const uvs = uvAttribute ? readVec2Attribute(uvAttribute) : null
+  const uvs = uvAttribute ? readVec2Attribute(uvAttribute, 'geometry.attributes.uv') : null
   const uvChannels = readUvChannels(geometry, uvs)
   const vertexColors = getAttribute(geometry, 'color')
-  const indexAttr = geometry.index ? readIndexAttribute(geometry.index) : null
+  const indexAttr = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
   const vertexCount = position.count
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
@@ -988,7 +988,7 @@ function appendLineOrPoints(
             positions,
             uvs,
             secondaryUvs,
-            useVertexColors ? readColorAttribute(vertexColors!, color) : undefined,
+            useVertexColors ? readColorAttribute(vertexColors!, color, 'geometry.attributes.color') : undefined,
             source,
             drawStart,
             drawEnd,
@@ -1582,7 +1582,7 @@ function expandColorAttributeForInstances(
   instanceCount: number,
 ): number[] {
   if (!isInstancedAttribute(attribute)) {
-    const colors = readColorAttribute(attribute, materialColor)
+    const colors = readColorAttribute(attribute, materialColor, 'geometry.attributes.color')
     if (instanceCount <= 1) return colors.slice(start * 4, (start + count) * 4)
     const out = new Array<number>(count * instanceCount * 4)
     let dst = 0
@@ -1676,7 +1676,7 @@ function readUvChannels(geometry: ThreeBufferGeometryLike, primaryUvs: number[] 
 
 function readOptionalUvAttribute(geometry: ThreeBufferGeometryLike, name: string): number[] | null {
   const attribute = getAttribute(geometry, name)
-  return attribute ? readVec2Attribute(attribute) : null
+  return attribute ? readVec2Attribute(attribute, `geometry.attributes.${name}`) : null
 }
 
 function secondaryUvsForMaterial(
@@ -1862,7 +1862,7 @@ function dashedLineAttributesForInstances(
     colors: vertexColors ? [] : undefined,
   }
   const baseColors = vertexColors && !isInstancedAttribute(vertexColors)
-    ? readColorAttribute(vertexColors, materialColor)
+    ? readColorAttribute(vertexColors, materialColor, 'geometry.attributes.color')
     : undefined
 
   for (let instance = 0; instance < instanceCount; instance += 1) {

@@ -23,7 +23,7 @@ Status keys:
 | Feature | Status | Notes |
 |---|---|---|
 | Scene graph root traversal | Supported | Accepts `THREE.Scene` or `THREE.Object3D` roots and honors `visible === false` on ancestors. |
-| `THREE.Mesh` | Supported | Indexed and non-indexed `BufferGeometry`, groups, material arrays, transforms, normals, UVs, and vertex colors; invalid transform matrix values fail clearly. |
+| `THREE.Mesh` | Supported | Indexed and non-indexed `BufferGeometry`, groups, material arrays, transforms, normals, UVs, and vertex colors; invalid geometry attribute and transform matrix values fail clearly. |
 | `THREE.SkinnedMesh` | Supported | CPU skinning from skeleton bones and inverse bind matrices; invalid bone, inverse bind, and mesh bind matrix values fail clearly. |
 | `THREE.InstancedMesh` | Supported | CPU-expanded per instance with `instanceMatrix` and `instanceColor`; this favors compatibility over native GPU instancing performance. |
 | Morph targets | Supported | CPU-baked relative and absolute position/normal morph targets. |

@@ -63,14 +63,14 @@ export function applyCpuSkinning(
   const skinnedNormals = normals ? new Array<number>(normals.length) : null
 
   for (let vi = 0; vi < vertexCount; vi++) {
-    const ji0 = Math.floor(attributeComponent(skinIndexAttr, vi, 0))
-    const ji1 = Math.floor(attributeComponent(skinIndexAttr, vi, 1))
-    const ji2 = Math.floor(attributeComponent(skinIndexAttr, vi, 2))
-    const ji3 = Math.floor(attributeComponent(skinIndexAttr, vi, 3))
-    const jw0 = attributeComponent(skinWeightAttr, vi, 0)
-    const jw1 = attributeComponent(skinWeightAttr, vi, 1)
-    const jw2 = attributeComponent(skinWeightAttr, vi, 2)
-    const jw3 = attributeComponent(skinWeightAttr, vi, 3)
+    const ji0 = Math.floor(attributeComponent(skinIndexAttr, vi, 0, 'geometry.attributes.skinIndex'))
+    const ji1 = Math.floor(attributeComponent(skinIndexAttr, vi, 1, 'geometry.attributes.skinIndex'))
+    const ji2 = Math.floor(attributeComponent(skinIndexAttr, vi, 2, 'geometry.attributes.skinIndex'))
+    const ji3 = Math.floor(attributeComponent(skinIndexAttr, vi, 3, 'geometry.attributes.skinIndex'))
+    const jw0 = attributeComponent(skinWeightAttr, vi, 0, 'geometry.attributes.skinWeight')
+    const jw1 = attributeComponent(skinWeightAttr, vi, 1, 'geometry.attributes.skinWeight')
+    const jw2 = attributeComponent(skinWeightAttr, vi, 2, 'geometry.attributes.skinWeight')
+    const jw3 = attributeComponent(skinWeightAttr, vi, 3, 'geometry.attributes.skinWeight')
 
     const skinMatrix = blendBoneMatrices(
       boneMatrices, boneCount,

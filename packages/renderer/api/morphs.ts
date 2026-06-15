@@ -65,9 +65,9 @@ export function applyMorphTargets(
     const count = Math.min(vertexCount, morphPosAttr.count ?? 0)
 
     for (let vi = 0; vi < count; vi++) {
-      const mx = attributeComponent(morphPosAttr, vi, 0)
-      const my = attributeComponent(morphPosAttr, vi, 1)
-      const mz = attributeComponent(morphPosAttr, vi, 2)
+      const mx = attributeComponent(morphPosAttr, vi, 0, `geometry.morphAttributes.position[${t}]`)
+      const my = attributeComponent(morphPosAttr, vi, 1, `geometry.morphAttributes.position[${t}]`)
+      const mz = attributeComponent(morphPosAttr, vi, 2, `geometry.morphAttributes.position[${t}]`)
 
       if (isRelative) {
         // Morph attributes store deltas
@@ -82,9 +82,9 @@ export function applyMorphTargets(
       }
 
       if (morphedNormals && morphNormAttr) {
-        const nx = attributeComponent(morphNormAttr, vi, 0)
-        const ny = attributeComponent(morphNormAttr, vi, 1)
-        const nz = attributeComponent(morphNormAttr, vi, 2)
+        const nx = attributeComponent(morphNormAttr, vi, 0, `geometry.morphAttributes.normal[${t}]`)
+        const ny = attributeComponent(morphNormAttr, vi, 1, `geometry.morphAttributes.normal[${t}]`)
+        const nz = attributeComponent(morphNormAttr, vi, 2, `geometry.morphAttributes.normal[${t}]`)
 
         if (isRelative) {
           morphedNormals[vi * 3] += weight * nx
