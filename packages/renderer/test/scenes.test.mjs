@@ -4849,9 +4849,19 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
     ['environment', (scene) => {
       scene.environment = invalidRawTexture(new Uint8Array([255, 0]))
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture: invalidRawTexture(new Uint8Array([255, 0])) },
+      }
+    }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering/i],
     ['FloatType environment', (scene) => {
       scene.environment = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['FloatType reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture: invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType) },
+      }
+    }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
@@ -4886,6 +4896,11 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
     ['environment', (scene) => {
       scene.environment = browserLikeTexture()
     }, /scene\.environment.*texture image object.*not readable.*environment map rendering/i],
+    ['reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture: browserLikeTexture() },
+      }
+    }, /reflectionProbe\.texture.*texture image object.*not readable.*environment map rendering/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
