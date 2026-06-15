@@ -90,7 +90,7 @@ struct Uniforms {
   shadow_params2: vec4<f32>,
   // x/y/z = cascade split distances, w = shadow layer count.
   shadow_params3: vec4<f32>,
-  // x = PCF radius multiplier, y = clip shadow caster fragments by clipping_planes.
+  // x = PCF radius multiplier, y = clip shadow caster fragments by clipping_planes, z = explicit shadow side (0=double/no-cull, 1=front, 2=back).
   shadow_params4: vec4<f32>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
@@ -266,7 +266,17 @@ fn vs_shadow5(input: VertexInput) -> ShadowVertexOutput {
 }
 
 @fragment
-fn fs_shadow(input: ShadowVertexOutput) {
+fn fs_shadow(input: ShadowVertexOutput, @builtin(front_facing) front_facing: bool) {
+  let shadow_side = uniforms.shadow_params4.z;
+  if shadow_side > 0.5 {
+    if shadow_side < 1.5 && !front_facing {
+      discard;
+    }
+    if shadow_side > 1.5 && front_facing {
+      discard;
+    }
+  }
+
   if uniforms.shadow_params4.y > 0.5 && is_clipped_by_planes(input.world_pos) {
     discard;
   }

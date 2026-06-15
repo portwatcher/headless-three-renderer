@@ -736,6 +736,8 @@ pub struct SceneMesh {
     pub stencil_z_pass: Option<u32>,
     /// Which faces to render: `"front"` (default), `"back"`, or `"double"`.
     pub side: Option<String>,
+    /// Optional shadow-pass face filter: `"front"`, `"back"`, or `"double"`. Unset preserves no-cull shadow casters.
+    pub shadow_side: Option<String>,
     /// Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
     /// or `"lambert"` (diffuse-only / MeshLambertMaterial).
     pub shading_model: Option<String>,

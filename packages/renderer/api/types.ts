@@ -239,6 +239,7 @@ export interface ThreeMaterialLike {
   stencilZPass?: number
   transparent?: boolean
   side?: number
+  shadowSide?: number | null
   flatShading?: boolean
   wireframe?: boolean
   fog?: boolean
@@ -871,6 +872,8 @@ export interface NativeSceneMesh {
   stencilZPass?: number
   transparent?: boolean
   side?: string
+  /** Optional shadow-pass face filter from material.shadowSide. Unset preserves the renderer's default no-cull caster behavior. */
+  shadowSide?: string
   shadingModel?: string
   useEnvironmentMap?: boolean
   environmentMapIntensity?: number
@@ -1222,6 +1225,7 @@ export interface PbrProperties {
   stencilZFail?: number
   stencilZPass?: number
   side?: string
+  shadowSide?: string
   shadingModel?: string
   customFragmentShader?: string
 }

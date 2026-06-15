@@ -8444,6 +8444,74 @@ test('rectangular directional shadow map sizes render shadows', () => {
   assert.ok(shadowedLum < unshadowedLum - 30, `rectangular shadow map should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
 })
 
+test('material shadowSide filters shadow caster faces', () => {
+  function renderShadowSide(shadowSide) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const casterMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      colorWrite: false,
+      depthWrite: false,
+    })
+    casterMaterial.shadowSide = shadowSide
+    const caster = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), casterMaterial)
+    caster.rotation.x = -Math.PI / 2
+    caster.position.y = 2
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 2)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(512, 512)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const front = renderShadowSide(THREE.FrontSide)
+  const back = renderShadowSide(THREE.BackSide)
+  const frontLum = front.r + front.g + front.b
+  const backLum = back.r + back.g + back.b
+  assert.ok(frontLum < backLum - 30, `front shadowSide should cast a darker shadow than back shadowSide (${frontLum} vs ${backLum})`)
+})
+
+test('unsupported material shadowSide values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.DirectionalLight(0xffffff, 1))
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  material.shadowSide = 999
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
+  mesh.castShadow = true
+  scene.add(mesh)
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /material\.shadowSide 999.*not supported/i,
+  )
+})
+
 test('non-square point-light shadow map sizes fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

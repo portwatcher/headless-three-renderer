@@ -782,6 +782,8 @@ export interface SceneMesh {
   stencilZPass?: number
   /** Which faces to render: `"front"` (default), `"back"`, or `"double"`. */
   side?: string
+  /** Optional shadow-pass face filter: `"front"`, `"back"`, or `"double"`. Unset preserves no-cull shadow casters. */
+  shadowSide?: string
   /**
    * Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
    * or `"lambert"` (diffuse-only / MeshLambertMaterial).

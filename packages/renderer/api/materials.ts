@@ -864,6 +864,10 @@ export function extractPbrProperties(
   } else if (material.side === FrontSide) {
     props.side = 'front'
   }
+  const shadowSide = materialShadowSide(material)
+  if (shadowSide) {
+    props.shadowSide = shadowSide
+  }
   if (material.flatShading === true) {
     props.flatShading = true
   }
@@ -946,6 +950,22 @@ function materialDepthFunc(material: ThreeMaterialLike): string | undefined {
     default:
       throw new Error(
         `material.depthFunc ${String(material.depthFunc)} is not supported by @headless-three/renderer. Use a Three.js depth comparison constant such as LessEqualDepth, GreaterDepth, or AlwaysDepth.`,
+      )
+  }
+}
+
+function materialShadowSide(material: ThreeMaterialLike): string | undefined {
+  if (material.shadowSide == null) return undefined
+  switch (material.shadowSide) {
+    case FrontSide:
+      return 'front'
+    case BackSide:
+      return 'back'
+    case DoubleSide:
+      return 'double'
+    default:
+      throw new Error(
+        `material.shadowSide ${String(material.shadowSide)} is not supported by @headless-three/renderer. Use FrontSide, BackSide, DoubleSide, null, or undefined.`,
       )
   }
 }

@@ -111,6 +111,7 @@ pub struct PreparedMesh {
     pub stencil_z_fail: StencilOperation,
     pub stencil_z_pass: StencilOperation,
     pub side: MeshSide,
+    pub shadow_side: MeshSide,
     pub shading_model: ShadingModel,
     pub use_environment_map: Option<bool>,
     pub environment_map_intensity: Option<f32>,
@@ -1263,6 +1264,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         "stencilZPass",
     )?;
     let side = MeshSide::from_str_opt(mesh.side.as_deref());
+    let shadow_side = parse_shadow_side(mesh.shadow_side.as_deref(), mesh_index)?;
     let requested_shading_model = ShadingModel::from_str_opt(mesh.shading_model.as_deref());
     // Lines and points are normally unlit. Depth/distance wireframe meshes are
     // emitted as lines but still use position-only material outputs.
@@ -1370,6 +1372,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         stencil_z_fail,
         stencil_z_pass,
         side,
+        shadow_side,
         shading_model,
         use_environment_map: mesh.use_environment_map,
         environment_map_intensity,
@@ -1615,6 +1618,16 @@ fn parse_depth_func(value: Option<&str>, mesh_index: usize) -> Result<StencilCom
         other => bail!(
             "scene.meshes[{mesh_index}].depthFunc has unsupported compare function `{other}`"
         ),
+    }
+}
+
+fn parse_shadow_side(value: Option<&str>, mesh_index: usize) -> Result<MeshSide> {
+    match value {
+        None => Ok(MeshSide::Double),
+        Some("front") => Ok(MeshSide::Front),
+        Some("back") => Ok(MeshSide::Back),
+        Some("double") => Ok(MeshSide::Double),
+        Some(other) => bail!("scene.meshes[{mesh_index}].shadowSide has unsupported side `{other}`"),
     }
 }
 
