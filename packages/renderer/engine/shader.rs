@@ -542,6 +542,11 @@ fn apply_fog(color: vec3<f32>, fog_distance: f32) -> vec3<f32> {
   return color;
 }
 
+fn fog_depth(world_pos: vec3<f32>) -> f32 {
+  let view_pos = uniforms.view * vec4<f32>(world_pos, 1.0);
+  return max(-view_pos.z, 0.0);
+}
+
 fn transform_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
   let map_uv = select(uv, uv2, uniforms.texture_transform1.w > 0.5);
   let uv1 = vec3<f32>(map_uv, 1.0);
@@ -911,7 +916,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     let emissive_basic = decode_emissive_map_sample(textureSample(t_emissive, s_emissive, transform_emissive_map_uv(uv, uv2))).rgb;
     unlit = unlit + uniforms.emissive.rgb * emissive_basic;
     let mapped_basic = apply_output_color_space(aces_filmic_tone_mapping(unlit));
-    let fogged_basic = apply_fog(mapped_basic, distance(input.world_pos, uniforms.camera_pos.xyz));
+    let fogged_basic = apply_fog(mapped_basic, fog_depth(input.world_pos));
     return output_color(fogged_basic, alpha);
   }
 
@@ -934,7 +939,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     }
     var matcap_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, matcap_uv)).rgb * matcap_surface_color;
     let mapped_matcap = apply_output_color_space(aces_filmic_tone_mapping(matcap_color));
-    let fogged_matcap = apply_fog(mapped_matcap, distance(input.world_pos, uniforms.camera_pos.xyz));
+    let fogged_matcap = apply_fog(mapped_matcap, fog_depth(input.world_pos));
     return output_color(fogged_matcap, alpha);
   }
 
@@ -997,7 +1002,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   if use_shadow_material {
     let shadow_alpha = alpha * (1.0 - sample_shadow(input.world_pos, N));
     let mapped_shadow = apply_output_color_space(aces_filmic_tone_mapping(albedo));
-    let fogged_shadow = apply_fog(mapped_shadow, distance(input.world_pos, uniforms.camera_pos.xyz));
+    let fogged_shadow = apply_fog(mapped_shadow, fog_depth(input.world_pos));
     return output_color(fogged_shadow, shadow_alpha);
   }
   let T = normalize(tbn[0]);
@@ -1318,7 +1323,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   // Tone mapping (ACES Filmic, matches three.js) and output color conversion.
   let mapped = aces_filmic_tone_mapping(lo);
   let output_mapped = apply_output_color_space(mapped);
-  let fogged = apply_fog(output_mapped, distance(input.world_pos, uniforms.camera_pos.xyz));
+  let fogged = apply_fog(output_mapped, fog_depth(input.world_pos));
 
   return output_color(fogged, alpha);
 }

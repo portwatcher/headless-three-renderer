@@ -5149,6 +5149,31 @@ test('Fog and FogExp2 affect material output', () => {
   )
 })
 
+test('Fog uses view-space depth rather than Euclidean camera distance', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.fog = new THREE.Fog(0x00ff00, 2.9, 3.1)
+
+  for (const x of [0, 2]) {
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.8, 0.8),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    plane.position.x = x
+    scene.add(plane)
+  }
+
+  const camera = new THREE.OrthographicCamera(-3, 3, 2, -2, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const center = meanRegion(rgba, 96, 96, 42, 42, 54, 54)
+  const offAxis = meanRegion(rgba, 96, 96, 74, 42, 86, 54)
+  assert.ok(Math.abs(center.g - offAxis.g) < 15, `same view-depth planes should receive similar linear fog (${center.g} vs ${offAxis.g})`)
+  assert.ok(Math.abs(center.r - offAxis.r) < 15, `same view-depth planes should retain similar red output (${center.r} vs ${offAxis.r})`)
+})
+
 test('Fog affects sprites, points, and lines with material fog opt-out', () => {
   function renderObject(object) {
     const scene = new THREE.Scene()
