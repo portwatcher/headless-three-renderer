@@ -283,24 +283,26 @@ function toNativeInput(
     ? optionBackgroundTexture ?? (hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background'))
     : null
   const hasBackgroundRotationOverride = options.backgroundRotation !== undefined
-  const backgroundRotation = hasBackgroundRotationOverride ? options.backgroundRotation : scene.backgroundRotation
+  const backgroundRotation = hasBackgroundOverride
+    ? options.backgroundRotation
+    : hasBackgroundRotationOverride ? options.backgroundRotation : scene.backgroundRotation
   const backgroundTextureRotation = colorMode
     ? backgroundRotationToNative(
       backgroundRotation,
       backgroundTexture,
-      hasBackgroundRotationOverride ? 'options.backgroundRotation' : 'scene.backgroundRotation',
+      hasBackgroundOverride || hasBackgroundRotationOverride ? 'options.backgroundRotation' : 'scene.backgroundRotation',
     )
     : undefined
   const backgroundTextureBlurriness = colorMode && backgroundTexture
     ? optionalFiniteNumber(
-      options.backgroundBlurriness ?? scene.backgroundBlurriness,
-      options.backgroundBlurriness !== undefined ? 'options.backgroundBlurriness' : 'scene.backgroundBlurriness',
+      hasBackgroundOverride ? options.backgroundBlurriness : options.backgroundBlurriness ?? scene.backgroundBlurriness,
+      hasBackgroundOverride || options.backgroundBlurriness !== undefined ? 'options.backgroundBlurriness' : 'scene.backgroundBlurriness',
     )
     : undefined
   const backgroundIntensity = colorMode
     ? optionalFiniteNumber(
-      options.backgroundIntensity ?? scene.backgroundIntensity,
-      options.backgroundIntensity !== undefined ? 'options.backgroundIntensity' : 'scene.backgroundIntensity',
+      hasBackgroundOverride ? options.backgroundIntensity : options.backgroundIntensity ?? scene.backgroundIntensity,
+      hasBackgroundOverride || options.backgroundIntensity !== undefined ? 'options.backgroundIntensity' : 'scene.backgroundIntensity',
     )
     : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')

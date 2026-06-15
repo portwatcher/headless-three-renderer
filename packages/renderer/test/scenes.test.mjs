@@ -12988,6 +12988,8 @@ test('CubeUV background texture mappings fail clearly', () => {
 test('render options accept texture backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
+  scene.backgroundIntensity = 0
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
   const camera = makeCamera()
 
   const mean = meanRgba(renderRgba(scene, camera, {
@@ -13001,6 +13003,8 @@ test('render options accept texture backgrounds', () => {
 test('render option color backgrounds override scene texture backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.EquirectangularReflectionMapping })
+  scene.backgroundIntensity = 0
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
   const camera = makeCamera()
 
   const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64, background: [1, 0, 0] }))
@@ -13014,6 +13018,8 @@ test('render option null background clears scene color backgrounds', () => {
   const camera = makeCamera()
 
   const sceneBackground = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  scene.backgroundIntensity = 'ignored'
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
   const cleared = meanRgba(renderRgba(scene, camera, { width: 64, height: 64, background: null }))
 
   assert.ok(sceneBackground.r > 200, `scene color background should render red (${sceneBackground.r})`)
