@@ -105,6 +105,8 @@ export class Renderer {
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+    validateThreeSceneRoot(scene)
+    validateTopLevelRenderCamera(camera)
     assertRenderOptionsLike(options, 'options')
     const renderOptions = this.resolveRenderOptions(options)
     if (isCubeCamera(camera)) {
@@ -149,6 +151,8 @@ export class Renderer {
     target: RenderTargetLike = {},
     options: RenderOptions = {},
   ): RenderTargetLike {
+    validateThreeSceneRoot(scene)
+    validateTopLevelRenderCamera(camera)
     assertRenderTargetLike(target, 'target')
     assertRenderOptionsLike(options, 'options')
     const targetOptions: RenderOptions = this.resolveRenderOptions({ ...options, target, format: options.format ?? 'rgba' })
@@ -202,6 +206,8 @@ export class Renderer {
 }
 
 export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+  validateThreeSceneRoot(scene)
+  validateTopLevelRenderCamera(camera)
   assertRenderOptionsLike(options, 'options')
   if (isCubeCamera(camera)) {
     const { buffer } = renderCubeCamera(scene, camera, options, native.renderNative)
@@ -231,6 +237,8 @@ export function renderToTarget(
   target: RenderTargetLike = {},
   options: RenderOptions = {},
 ): RenderTargetLike {
+  validateThreeSceneRoot(scene)
+  validateTopLevelRenderCamera(camera)
   assertRenderTargetLike(target, 'target')
   assertRenderOptionsLike(options, 'options')
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
@@ -1635,6 +1643,17 @@ function validateThreeSceneRoot(scene: unknown): asserts scene is ThreeSceneRoot
   const root = scene as any
   if (!root || (root.isScene !== true && root.isObject3D !== true)) {
     throw new TypeError('render(scene, camera) expects scene to be a THREE.Scene or THREE.Object3D root')
+  }
+}
+
+function validateTopLevelRenderCamera(camera: unknown): asserts camera is ThreeRenderCameraLike {
+  const cameraLike = camera as any
+  if (!cameraLike || typeof cameraLike !== 'object' || Array.isArray(cameraLike)) {
+    throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera, THREE.ArrayCamera, or THREE.CubeCamera')
+  }
+  if (isCubeCamera(cameraLike)) return
+  if (cameraLike.isCamera !== true) {
+    throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera, THREE.ArrayCamera, or THREE.CubeCamera')
   }
 }
 

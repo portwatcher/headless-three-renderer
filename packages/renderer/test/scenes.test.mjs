@@ -305,6 +305,36 @@ test('invalid render options containers fail clearly', () => {
   )
 })
 
+test('invalid render scene and camera containers fail clearly', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+
+  assert.throws(
+    () => render(null, camera, { width: 32, height: 32, format: 'rgba' }),
+    /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
+  )
+  assert.throws(
+    () => new Renderer().render([], camera, { width: 32, height: 32, format: 'rgba' }),
+    /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
+  )
+  assert.throws(
+    () => render(scene, null, { width: 32, height: 32, format: 'rgba' }),
+    /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
+  )
+  assert.throws(
+    () => new Renderer().render(scene, { cameras: [] }, { width: 32, height: 32, format: 'rgba' }),
+    /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
+  )
+  assert.throws(
+    () => renderToTarget(null, camera, {}, { width: 32, height: 32 }),
+    /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
+  )
+  assert.throws(
+    () => new Renderer().renderToTarget(scene, [], {}, { width: 32, height: 32 }),
+    /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
+  )
+})
+
 test('invalid transform matrix values fail clearly', () => {
   const camera = makeCamera()
 
