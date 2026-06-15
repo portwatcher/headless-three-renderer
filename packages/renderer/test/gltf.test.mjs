@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -61,34 +61,29 @@ test('committed glTF fixture loads through GLTFLoader and renders', async () => 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
   const gltf = await loadGltfFixture(TEXTURED_QUAD)
 
-  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
-  assert.ok(mesh, 'textured fixture should load a mesh')
-  assert.ok(mesh.material.map?.isTexture, 'textured fixture should load a base color texture')
-  assert.ok(Buffer.isBuffer(mesh.material.map.image), 'encoded image helper should expose the data URI PNG as a Buffer')
+  assertTexturedQuadLoadsEncodedMap(gltf, 'textured fixture')
+  assertTexturedQuadRendersTexture(gltf, 'textured quad')
+})
 
-  const camera = gltf.cameras[0]
-  assert.ok(camera, 'textured fixture should load a camera')
-  camera.aspect = 1
-  camera.updateProjectionMatrix()
+test('loadGltfFromFile resolves external glTF image files from the model directory', async () => {
+  const source = JSON.parse(await readFile(TEXTURED_QUAD, 'utf8'))
+  const imageUri = source.images[0].uri
+  const encodedImage = imageUri.slice(imageUri.indexOf(',') + 1)
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'headless-three-gltf-image-'))
+  try {
+    const textureDir = path.join(tmp, 'textures')
+    await mkdir(textureDir)
+    await writeFile(path.join(textureDir, 'quad.png'), Buffer.from(encodedImage, 'base64'))
+    source.images[0].uri = 'textures/quad.png'
+    const modelPath = path.join(tmp, 'external-image.gltf')
+    await writeFile(modelPath, JSON.stringify(source))
 
-  const scene = gltf.scene
-  scene.updateMatrixWorld(true)
-  camera.updateMatrixWorld(true)
-
-  const rgba = new Renderer().render(scene, camera, {
-    width: 96,
-    height: 96,
-    format: 'rgba',
-    background: [0, 0, 0],
-    outputColorSpace: THREE.LinearSRGBColorSpace,
-  })
-  assert.equal(rgba.length, 96 * 96 * 4)
-  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'textured quad should render visible pixels')
-
-  const left = meanRegion(rgba, 96, 96, 24, 36, 42, 60)
-  const right = meanRegion(rgba, 96, 96, 54, 36, 72, 60)
-  assert.ok(left.r > left.g + 80, `left half should sample the red data URI texel (${left.r} vs ${left.g})`)
-  assert.ok(right.g > right.r + 80, `right half should sample the green data URI texel (${right.g} vs ${right.r})`)
+    const gltf = await loadGltfFixture(modelPath)
+    assertTexturedQuadLoadsEncodedMap(gltf, 'external-image fixture')
+    assertTexturedQuadRendersTexture(gltf, 'external-image quad')
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
 })
 
 test('loadGltfFromFile resolves external glTF buffers from the model directory', async () => {
@@ -125,6 +120,39 @@ test('loadGltfFromFile resolves external glTF buffers from the model directory',
     await rm(tmp, { recursive: true, force: true })
   }
 })
+
+function assertTexturedQuadLoadsEncodedMap(gltf, label) {
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, `${label} should load a mesh`)
+  assert.ok(mesh.material.map?.isTexture, `${label} should load a base color texture`)
+  assert.ok(Buffer.isBuffer(mesh.material.map.image), 'encoded image helper should expose the PNG as a Buffer')
+}
+
+function assertTexturedQuadRendersTexture(gltf, label) {
+  const camera = gltf.cameras[0]
+  assert.ok(camera, `${label} should load a camera`)
+  camera.aspect = 1
+  camera.updateProjectionMatrix()
+
+  const scene = gltf.scene
+  scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(rgba.length, 96 * 96 * 4)
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, `${label} should render visible pixels`)
+
+  const left = meanRegion(rgba, 96, 96, 24, 36, 42, 60)
+  const right = meanRegion(rgba, 96, 96, 54, 36, 72, 60)
+  assert.ok(left.r > left.g + 80, `left half should sample the red texture texel (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 80, `right half should sample the green texture texel (${right.g} vs ${right.r})`)
+}
 
 async function loadGltfFixture(filePath, options) {
   return await loadGltfFromFile(filePath, options)
