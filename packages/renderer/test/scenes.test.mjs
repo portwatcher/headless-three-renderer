@@ -11003,6 +11003,9 @@ test('invalid shadow numeric values fail clearly', () => {
     ['radius', (light) => {
       light.shadow.radius = Number.NEGATIVE_INFINITY
     }, /light\.shadow\.radius must be a finite number/i],
+    ['blurSamples', (light) => {
+      light.shadow.blurSamples = 'many'
+    }, /light\.shadow\.blurSamples must be a finite number/i],
     ['camera.left', (light) => {
       light.shadow.camera.left = 'left'
     }, /light\.shadow\.camera\.left must be a finite number/i],
