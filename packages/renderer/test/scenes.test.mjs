@@ -3630,6 +3630,59 @@ test('Renderer.setTransparentSort overrides transparent depth sorting', () => {
   assert.ok(mean.b > mean.r + 160, `custom transparent sort should draw blue after red (${mean.b} vs ${mean.r})`)
 })
 
+test('opaque sort callbacks receive geometry group render items', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+    -1, -1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  geometry.addGroup(0, 6, 0)
+  geometry.addGroup(6, 6, 1)
+
+  const materials = [
+    new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false }),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, depthTest: false }),
+  ]
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, materials))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const seenGroups = new Set()
+  const seenMaterials = new Set()
+  const opaqueSort = (a, b) => {
+    assert.equal(a.geometry, geometry)
+    assert.equal(b.geometry, geometry)
+    assert.ok(a.group)
+    assert.ok(b.group)
+    seenGroups.add(a.group.materialIndex)
+    seenGroups.add(b.group.materialIndex)
+    seenMaterials.add(a.material)
+    seenMaterials.add(b.material)
+    return b.group.materialIndex - a.group.materialIndex
+  }
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, opaqueSort })
+  assert.deepEqual([...seenGroups].sort(), [0, 1])
+  assert.deepEqual([...seenMaterials].sort((a, b) => materials.indexOf(a) - materials.indexOf(b)), materials)
+  const mean = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 160, `custom group-aware opaque sort should draw red after blue (${mean.r} vs ${mean.b})`)
+})
+
 test('transparent sort callbacks receive geometry group render items', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
