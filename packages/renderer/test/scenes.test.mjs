@@ -6670,6 +6670,35 @@ test('invalid light numeric values fail clearly', () => {
   )
 })
 
+test('invalid light color values fail clearly', () => {
+  const directScene = new THREE.Scene()
+  const directional = new THREE.DirectionalLight(0xffffff, 1)
+  directional.color = { isColor: true, r: 1, g: 'green', b: 0 }
+  directScene.add(directional)
+  assert.throws(
+    () => extractLights(directScene),
+    /light\.color\.g must be a finite number/i,
+  )
+
+  const hemisphereScene = new THREE.Scene()
+  const hemisphere = new THREE.HemisphereLight(0xffffff, 0x222222, 1)
+  hemisphere.groundColor = { isColor: true, r: 0, g: 0, b: Number.NaN }
+  hemisphereScene.add(hemisphere)
+  assert.throws(
+    () => extractLights(hemisphereScene),
+    /HemisphereLight\.groundColor\.b must be a finite number/i,
+  )
+
+  const ambientScene = new THREE.Scene()
+  const ambient = new THREE.AmbientLight(0xffffff, 1)
+  ambient.color = { isColor: true, r: 1, g: 1, b: 'blue' }
+  ambientScene.add(ambient)
+  assert.throws(
+    () => extractAmbientLight(ambientScene),
+    /AmbientLight\.color\.b must be a finite number/i,
+  )
+})
+
 test('LOD selects object level from active camera distance', () => {
   const lod = new THREE.LOD()
   lod.addLevel(

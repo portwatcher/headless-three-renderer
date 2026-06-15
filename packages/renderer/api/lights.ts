@@ -1,5 +1,5 @@
 import type { ThreeCameraLike, ThreeObject3DLike, NativeSceneLight } from './types'
-import { colorLikeToArray } from './color'
+import { strictColorLikeToArray } from './color'
 import { objectLayersMatchCamera } from './layers'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
@@ -30,7 +30,7 @@ function visitLights(object: ThreeObject3DLike, camera: ThreeCameraLike | undefi
 }
 
 function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
-  const color = colorLikeToArray(light.color) ?? [1, 1, 1, 1]
+  const color = strictColorLikeToArray(light.color, 'light.color') ?? [1, 1, 1, 1]
   const intensity = finiteNumberOrDefault(light.intensity, 'light.intensity', 1)
 
   if (light.isDirectionalLight === true) {
@@ -151,7 +151,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   }
 
   if (light.isHemisphereLight === true) {
-    const groundColor = colorLikeToArray(light.groundColor) ?? [0.04, 0.02, 0.0, 1]
+    const groundColor = strictColorLikeToArray(light.groundColor, 'HemisphereLight.groundColor') ?? [0.04, 0.02, 0.0, 1]
     let direction = [0, 1, 0]
     if (light.matrixWorld) {
       const e = light.matrixWorld.elements
@@ -314,7 +314,7 @@ function assertSupportedLightCount(lights: NativeSceneLight[]): void {
 export function extractAmbientLight(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {
   let color: number[] | null = null
   visitForAmbient(scene, camera, (light) => {
-    const c = colorLikeToArray(light.color) ?? [1, 1, 1, 1]
+    const c = strictColorLikeToArray(light.color, 'AmbientLight.color') ?? [1, 1, 1, 1]
     if (!color) {
       color = [c[0], c[1], c[2]]
     } else {
