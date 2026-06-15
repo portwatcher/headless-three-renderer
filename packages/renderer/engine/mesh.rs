@@ -457,10 +457,17 @@ pub enum StencilOperation {
     Invert,
 }
 
+pub struct PreparedTextureMipLevel {
+    pub rgba: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
 pub struct PreparedTexture {
     pub rgba: Vec<u8>,
     pub width: u32,
     pub height: u32,
+    pub mipmaps: Vec<PreparedTextureMipLevel>,
     pub wrap_s: WrapMode,
     pub wrap_t: WrapMode,
     pub mag_filter: TextureFilter,
@@ -1787,11 +1794,47 @@ pub fn decode_texture_with_label(
     let w = width_hint.unwrap_or(0);
     let h = height_hint.unwrap_or(0);
 
-    if w > 0 && h > 0 && data.len() == (w as usize) * (h as usize) * 4 {
+    if w > 0 && h > 0 && data.len() >= (w as usize) * (h as usize) * 4 {
+        let base_len = (w as usize) * (h as usize) * 4;
+        let mut mipmaps = Vec::new();
+        let mut offset = base_len;
+        let mut mip_width = w;
+        let mut mip_height = h;
+        let mut level = 1u32;
+
+        while offset < data.len() {
+            mip_width = (mip_width / 2).max(1);
+            mip_height = (mip_height / 2).max(1);
+            let level_len = (mip_width as usize) * (mip_height as usize) * 4;
+            if data.len() - offset < level_len {
+                bail!(
+                    "{label}: explicit mipmap level {level} expected {mip_width}x{mip_height} RGBA8 bytes"
+                );
+            }
+            let level_end = offset + level_len;
+            mipmaps.push(PreparedTextureMipLevel {
+                rgba: data[offset..level_end].to_vec(),
+                width: mip_width,
+                height: mip_height,
+            });
+            offset = level_end;
+            if mip_width == 1 && mip_height == 1 {
+                if offset != data.len() {
+                    bail!("{label}: explicit mipmap data continues after the 1x1 level");
+                }
+                break;
+            }
+            level += 1;
+        }
+        if !mipmaps.is_empty() && (mip_width != 1 || mip_height != 1) {
+            bail!("{label}: explicit mipmap data must include the complete chain down to 1x1");
+        }
+
         return Ok(PreparedTexture {
-            rgba: data.to_vec(),
+            rgba: data[..base_len].to_vec(),
             width: w,
             height: h,
+            mipmaps,
             wrap_s: WrapMode::ClampToEdge,
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
@@ -1808,6 +1851,7 @@ pub fn decode_texture_with_label(
         width: rgba.width(),
         height: rgba.height(),
         rgba: rgba.into_raw(),
+        mipmaps: Vec::new(),
         wrap_s: WrapMode::ClampToEdge,
         wrap_t: WrapMode::ClampToEdge,
         mag_filter: TextureFilter::Linear,
@@ -2058,6 +2102,7 @@ fn packed_texture(
         rgba,
         width,
         height,
+        mipmaps: Vec::new(),
         wrap_s: sampler.wrap_s,
         wrap_t: sampler.wrap_t,
         mag_filter: sampler.mag_filter,

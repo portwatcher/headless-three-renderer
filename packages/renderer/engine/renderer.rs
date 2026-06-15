@@ -2080,7 +2080,7 @@ impl GpuRenderer {
             height: tex.height,
             depth_or_array_layers: 1,
         };
-        let mip_level_count = texture_mip_level_count(tex.width, tex.height, tex.mipmap_filter);
+        let mip_level_count = texture_upload_mip_level_count(tex);
         let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: tex_size,
@@ -2091,14 +2091,7 @@ impl GpuRenderer {
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        self.write_texture_mip_chain(
-            &gpu_texture,
-            0,
-            &tex.rgba,
-            tex.width,
-            tex.height,
-            mip_level_count,
-        );
+        self.write_prepared_texture_mip_chain(&gpu_texture, 0, tex, mip_level_count);
         gpu_texture
     }
 
@@ -2212,6 +2205,58 @@ impl GpuRenderer {
             previous = next;
             previous_width = next_width;
             previous_height = next_height;
+        }
+    }
+
+    fn write_prepared_texture_mip_chain(
+        &self,
+        gpu_texture: &wgpu::Texture,
+        array_layer: u32,
+        texture: &PreparedTexture,
+        mip_level_count: u32,
+    ) {
+        self.write_texture_mip(
+            gpu_texture,
+            0,
+            array_layer,
+            &texture.rgba,
+            texture.width,
+            texture.height,
+        );
+        if texture.mipmaps.is_empty() {
+            if mip_level_count <= 1 {
+                return;
+            }
+            let mut previous = texture.rgba.clone();
+            let mut previous_width = texture.width;
+            let mut previous_height = texture.height;
+            for mip_level in 1..mip_level_count {
+                let (next, next_width, next_height) =
+                    downsample_rgba_mip(&previous, previous_width, previous_height);
+                self.write_texture_mip(
+                    gpu_texture,
+                    mip_level,
+                    array_layer,
+                    &next,
+                    next_width,
+                    next_height,
+                );
+                previous = next;
+                previous_width = next_width;
+                previous_height = next_height;
+            }
+            return;
+        }
+
+        for (index, mip) in texture.mipmaps.iter().enumerate() {
+            self.write_texture_mip(
+                gpu_texture,
+                (index + 1) as u32,
+                array_layer,
+                &mip.rgba,
+                mip.width,
+                mip.height,
+            );
         }
     }
 
@@ -3191,6 +3236,14 @@ fn texture_mip_level_count(width: u32, height: u32, mipmap_filter: MipmapFilter)
         levels += 1;
     }
     levels
+}
+
+fn texture_upload_mip_level_count(texture: &PreparedTexture) -> u32 {
+    if texture.mipmaps.is_empty() {
+        texture_mip_level_count(texture.width, texture.height, texture.mipmap_filter)
+    } else {
+        1 + texture.mipmaps.len() as u32
+    }
 }
 
 fn downsample_rgba_mip(source: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {

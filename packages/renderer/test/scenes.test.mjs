@@ -5034,8 +5034,52 @@ test('one- and two-channel raw DataTexture maps expand for texture rendering', (
   assert.ok(rg.b < 40, `two-channel raw texture should leave blue empty (${rg.b})`)
 })
 
-test('explicit texture mipmaps fail clearly', () => {
-  const map = solidTexture(255, 255, 255)
+test('explicit raw texture mipmaps upload for material and background maps', () => {
+  function mipmappedCheckerTexture() {
+    const size = 16
+    const data = []
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        if ((x + y) % 2 === 0) data.push(255, 0, 0, 255)
+        else data.push(0, 255, 0, 255)
+      }
+    }
+    const map = rgbaTexture(data, size, size)
+    map.wrapS = THREE.RepeatWrapping
+    map.wrapT = THREE.RepeatWrapping
+    map.repeat.set(128, 128)
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestMipmapNearestFilter
+    map.generateMipmaps = false
+    map.mipmaps = [8, 4, 2, 1].map((levelSize) => ({
+      data: new Uint8Array(levelSize * levelSize * 4).fill(0).map((_, index) => (
+        index % 4 === 2 || index % 4 === 3 ? 255 : 0
+      )),
+      width: levelSize,
+      height: levelSize,
+    }))
+    return map
+  }
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+
+  const materialScene = new THREE.Scene()
+  materialScene.background = new THREE.Color(0, 0, 0)
+  materialScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: mipmappedCheckerTexture() })))
+
+  const backgroundScene = new THREE.Scene()
+  backgroundScene.background = mipmappedCheckerTexture()
+
+  for (const [name, scene] of [['material', materialScene], ['background', backgroundScene]]) {
+    const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }))
+    assert.ok(mean.b > 180, `${name} explicit mipmap levels should drive minified sampling (${mean.r}, ${mean.g}, ${mean.b})`)
+    assert.ok(mean.r < 80 && mean.g < 80, `${name} base checker colors should not dominate explicit mip sampling (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
+})
+
+test('malformed explicit texture mipmaps fail clearly', () => {
+  const map = rgbaTexture(new Uint8Array(4 * 4 * 4).fill(255), 4, 4)
   map.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
   map.minFilter = THREE.LinearMipmapLinearFilter
 
@@ -5049,7 +5093,29 @@ test('explicit texture mipmaps fail clearly', () => {
 
   assert.throws(
     () => renderRgba(scene, camera, { width: 64, height: 64 }),
-    /explicit texture mipmaps.*not uploaded/i,
+    /mipmaps\[0\].*2x2/i,
+  )
+})
+
+test('packed physical extension maps reject explicit texture mipmaps clearly', () => {
+  const clearcoatMap = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+  ], 2, 2)
+  clearcoatMap.minFilter = THREE.LinearMipmapLinearFilter
+  clearcoatMap.mipmaps = [{ data: new Uint8Array([255, 0, 0, 255]), width: 1, height: 1 }]
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 8),
+    new THREE.MeshPhysicalMaterial({ color: 0xffffff, clearcoat: 1, clearcoatMap }),
+  ))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /physical extension scalar maps.*explicit mipmaps.*clearcoatMap/i,
   )
 })
 
@@ -5069,7 +5135,6 @@ test('unsupported texture inputs fail clearly for background and environment slo
     ['compressed reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: compressedTexture } }
     }, /compressed texture.*pre-decode/i],
-    ['mipmapped background', (scene) => { scene.background = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
     ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
     ['mipmapped reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: mipmappedTexture } }

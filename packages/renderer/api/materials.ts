@@ -1214,8 +1214,8 @@ export function extractBackgroundTexture(
 ): TextureInfo | null {
   const map = textureLike(background)
   if (!map) return null
-  assertSupportedTextureInput(map, label)
   if (isCubeBackgroundTexture(map)) {
+    assertSupportedTextureInput(map, label)
     return extractCubeBackgroundTexture(map, label)
   }
   assertSupportedBackgroundTexture(map, label)
@@ -1440,19 +1440,19 @@ function filterModeToString(mode: number | undefined): string | undefined {
 
 function minFilterModeToString(texture: ThreeTextureLike | null | undefined): string | undefined {
   const mode = texture?.minFilter
-  const allowGeneratedMipmaps = texture?.generateMipmaps !== false
+  const allowMipmaps = texture?.generateMipmaps !== false || hasExplicitMipmaps(texture)
   if (mode === NearestFilter) return 'nearest'
   if (mode === LinearFilter) return 'linear'
-  if (mode === NearestMipmapNearestFilter) return allowGeneratedMipmaps ? 'nearest-mipmap-nearest' : 'nearest'
-  if (mode === NearestMipmapLinearFilter) return allowGeneratedMipmaps ? 'nearest-mipmap-linear' : 'nearest'
-  if (mode === LinearMipmapNearestFilter) return allowGeneratedMipmaps ? 'linear-mipmap-nearest' : 'linear'
-  if (mode === LinearMipmapLinearFilter) return allowGeneratedMipmaps ? 'linear-mipmap-linear' : 'linear'
+  if (mode === NearestMipmapNearestFilter) return allowMipmaps ? 'nearest-mipmap-nearest' : 'nearest'
+  if (mode === NearestMipmapLinearFilter) return allowMipmaps ? 'nearest-mipmap-linear' : 'nearest'
+  if (mode === LinearMipmapNearestFilter) return allowMipmaps ? 'linear-mipmap-nearest' : 'linear'
+  if (mode === LinearMipmapLinearFilter) return allowMipmaps ? 'linear-mipmap-linear' : 'linear'
   return undefined
 }
 
 function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'): TextureInfo | null {
   if (!map) return null
-  assertSupportedTextureInput(map, label)
+  assertSupportedTextureInput(map, label, { allowMipmaps: true })
 
   const image = (map as any).image ?? (map as any).source?.data
   if (!image) return null
@@ -1461,29 +1461,106 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   if (image.data && image.width > 0 && image.height > 0) {
     const rgba = toRgba8(image.data, image.width, image.height)
     if (rgba) {
-      return { data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength), width: image.width, height: image.height }
+      const data = textureBytesWithExplicitMipmaps(map, label, rgba, image.width, image.height)
+      return { data: Buffer.from(data.buffer, data.byteOffset, data.byteLength), width: image.width, height: image.height }
     }
     throw unsupportedRawTextureDataError(label, 'texture rendering')
   }
 
   // Encoded image (PNG/JPEG/WebP Buffer from file loaders)
   if (Buffer.isBuffer(image)) {
+    assertNoEncodedExplicitMipmaps(map, label)
     return { data: image, width: 0, height: 0 }
   }
   if (image instanceof Uint8Array && !((image as any).width > 0)) {
+    assertNoEncodedExplicitMipmaps(map, label)
     return { data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0 }
   }
 
   // ImageData (canvas-based polyfill): { data: Uint8ClampedArray, width, height }
   if (image.data instanceof Uint8ClampedArray && image.width > 0 && image.height > 0) {
+    const data = textureBytesWithExplicitMipmaps(map, label, image.data, image.width, image.height)
     return {
-      data: Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength),
+      data: Buffer.from(data.buffer, data.byteOffset, data.byteLength),
       width: image.width,
       height: image.height,
     }
   }
 
   throw unsupportedTextureImageError(label, 'texture rendering')
+}
+
+function hasExplicitMipmaps(texture: ThreeTextureLike | null | undefined): boolean {
+  return Array.isArray(texture?.mipmaps) && texture.mipmaps.length > 0
+}
+
+function assertNoEncodedExplicitMipmaps(map: ThreeTextureLike, label: string): void {
+  if (!hasExplicitMipmaps(map)) return
+  throw new Error(
+    `${label} provides explicit texture mipmaps with an encoded base image. Explicit mipmap upload requires raw DataTexture-style base image data with raw mipmap levels.`,
+  )
+}
+
+function textureBytesWithExplicitMipmaps(
+  map: ThreeTextureLike,
+  label: string,
+  baseRgba: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8Array | Uint8ClampedArray {
+  if (!hasExplicitMipmaps(map)) return baseRgba
+  if (width <= 1 && height <= 1) {
+    throw new Error(
+      `${label} provides explicit texture mipmaps for a ${width}x${height} base image, but no additional mip levels are valid after the 1x1 level.`,
+    )
+  }
+
+  const levels: Uint8Array[] = [
+    baseRgba instanceof Uint8Array
+      ? new Uint8Array(baseRgba.buffer, baseRgba.byteOffset, baseRgba.byteLength)
+      : new Uint8Array(baseRgba),
+  ]
+  let expectedWidth = width
+  let expectedHeight = height
+  const mipmaps = map.mipmaps!
+
+  for (let i = 0; i < mipmaps.length; i += 1) {
+    expectedWidth = Math.max(1, Math.floor(expectedWidth / 2))
+    expectedHeight = Math.max(1, Math.floor(expectedHeight / 2))
+
+    const mip = mipmaps[i]
+    if (!mip || !mip.data || mip.width !== expectedWidth || mip.height !== expectedHeight) {
+      throw new Error(
+        `${label}.mipmaps[${i}] must provide raw pixel data with size ${expectedWidth}x${expectedHeight} for explicit mipmap upload.`,
+      )
+    }
+    const rgba = toRgba8(mip.data, expectedWidth, expectedHeight)
+    if (!rgba) {
+      throw unsupportedRawTextureDataError(`${label}.mipmaps[${i}]`, 'texture rendering')
+    }
+    levels.push(rgba)
+
+    if (expectedWidth === 1 && expectedHeight === 1 && i < mipmaps.length - 1) {
+      throw new Error(
+        `${label} provides extra explicit mipmap levels after the 1x1 level.`,
+      )
+    }
+  }
+
+  if (expectedWidth !== 1 || expectedHeight !== 1) {
+    throw new Error(
+      `${label} explicit texture mipmaps must include the complete mip chain down to 1x1.`,
+    )
+  }
+
+  const byteLength = levels.reduce((total, level) => total + level.byteLength, 0)
+  const out = new Uint8Array(byteLength)
+  let offset = 0
+  for (const level of levels) {
+    out.set(level, offset)
+    offset += level.byteLength
+  }
+  return out
 }
 
 function unsupportedRawTextureDataError(label: string, usage: string): Error {
@@ -1519,7 +1596,7 @@ function rawTextureChannelCount(
 }
 
 function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string): void {
-  assertSupportedTextureInput(map, label)
+  assertSupportedTextureInput(map, label, { allowMipmaps: true })
   if (
     map.isCubeTexture === true ||
     map.mapping === CubeReflectionMapping ||
@@ -1550,7 +1627,11 @@ function assertSupportedEnvironmentTexture(
   }
 }
 
-function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void {
+function assertSupportedTextureInput(
+  map: ThreeTextureLike,
+  label: string,
+  options: { allowMipmaps?: boolean } = {},
+): void {
   if (
     map.isCompressedTexture === true ||
     map.isCompressedArrayTexture === true ||
@@ -1560,7 +1641,7 @@ function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void
       `${label} uses a compressed texture. KTX2, Basis, and THREE.CompressedTexture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
     )
   }
-  if (Array.isArray(map.mipmaps) && map.mipmaps.length > 0) {
+  if (!options.allowMipmaps && hasExplicitMipmaps(map)) {
     throw new Error(
       `${label} provides explicit texture mipmaps, which are not uploaded by @headless-three/renderer yet. Provide only the base image level or prefilter/downsample the texture before rendering.`,
     )
@@ -1568,6 +1649,23 @@ function assertSupportedTextureInput(map: ThreeTextureLike, label: string): void
 }
 
 function assertCompatiblePackedPhysicalMapSamplers(material: ThreeMaterialLike): void {
+  assertNoPackedPhysicalMapMipmaps('physical extension scalar maps', [
+    ['clearcoatMap', material.clearcoatMap],
+    ['clearcoatRoughnessMap', material.clearcoatRoughnessMap],
+    ['transmissionMap', material.transmissionMap],
+    ['thicknessMap', material.thicknessMap],
+    ['anisotropyMap', material.anisotropyMap],
+    ['iridescenceMap', material.iridescenceMap],
+    ['iridescenceThicknessMap', material.iridescenceThicknessMap],
+  ])
+  assertNoPackedPhysicalMapMipmaps('physical extension sheen maps', [
+    ['sheenColorMap', material.sheenColorMap],
+    ['sheenRoughnessMap', material.sheenRoughnessMap],
+  ])
+  assertNoPackedPhysicalMapMipmaps('physical extension specular maps', [
+    ['specularColorMap', material.specularColorMap],
+    ['specularIntensityMap', material.specularIntensityMap],
+  ])
   assertMatchingSamplerSettings('physical extension scalar maps', [
     ['clearcoatMap', material.clearcoatMap],
     ['clearcoatRoughnessMap', material.clearcoatRoughnessMap],
@@ -1585,6 +1683,15 @@ function assertCompatiblePackedPhysicalMapSamplers(material: ThreeMaterialLike):
     ['specularColorMap', material.specularColorMap],
     ['specularIntensityMap', material.specularIntensityMap],
   ])
+}
+
+function assertNoPackedPhysicalMapMipmaps(groupLabel: string, slots: Array<[string, ThreeTextureLike | null | undefined]>): void {
+  for (const [label, texture] of slots) {
+    if (!texture || !hasExplicitMipmaps(texture)) continue
+    throw new Error(
+      `${groupLabel} are packed into one native texture, and explicit mipmaps for ${label} are not supported by @headless-three/renderer yet. Remove texture.mipmaps from packed physical-extension maps or rely on generated mipmaps from the packed base level.`,
+    )
+  }
 }
 
 function assertMatchingSamplerSettings(groupLabel: string, slots: Array<[string, ThreeTextureLike | null | undefined]>): void {
