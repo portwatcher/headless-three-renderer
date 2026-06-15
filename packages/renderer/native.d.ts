@@ -407,6 +407,14 @@ export interface SceneMesh {
   anisotropyMapTransform?: Array<number>
   /** Whether anisotropy map sampling uses the secondary UV stream. */
   anisotropyMapUsesUv2?: boolean
+  /** MeshPhysicalMaterial iridescence factor (0..1). Defaults to 0. */
+  iridescence?: number
+  /** Iridescence film IOR. Defaults to 1.3. */
+  iridescenceIor?: number
+  /** Iridescence film thickness range minimum in nanometers. Defaults to 100. */
+  iridescenceThicknessMin?: number
+  /** Iridescence film thickness range maximum in nanometers. Defaults to 400. */
+  iridescenceThicknessMax?: number
   /** Physical transmission factor (0..1). Defaults to 0. */
   transmission?: number
   /** Optional transmission map. Red channel multiplies `transmission`. */

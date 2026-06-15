@@ -6134,28 +6134,56 @@ test('MeshPhysicalMaterial transmission volume attenuation honors color and dist
   assert.ok(redShort.r > redShort.b + 80, `red attenuationColor should tint the same volume red (${redShort.r} vs ${redShort.b})`)
 })
 
-test('MeshPhysicalMaterial iridescence inputs fail clearly', () => {
-  const cases = []
+test('MeshPhysicalMaterial scalar iridescence tints direct specular', () => {
+  function renderIridescence(iridescence) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      }),
+    ))
 
-  const iridescence = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-  iridescence.iridescence = 0.5
-  cases.push([iridescence, /iridescence.*not supported/i, 'iridescence'])
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const plain = meanRgba(renderIridescence(0))
+  const iridescent = meanRgba(renderIridescence(1))
+
+  assert.ok(
+    Math.abs(iridescent.r - iridescent.g) > 2 || Math.abs(iridescent.g - iridescent.b) > 2,
+    `iridescence should tint the highlight, got ${JSON.stringify(iridescent)}`,
+  )
+  assert.ok(
+    meanAbsDiff(renderIridescence(0), renderIridescence(1)) > 0.5,
+    'scalar iridescence should change physical material output',
+  )
+})
+
+test('MeshPhysicalMaterial iridescence maps fail clearly', () => {
+  const cases = []
 
   const iridescenceMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
   iridescenceMap.iridescenceMap = solidTexture(255, 255, 255)
-  cases.push([iridescenceMap, /iridescence.*not supported/i, 'iridescenceMap'])
+  cases.push([iridescenceMap, /iridescence maps.*not supported/i, 'iridescenceMap'])
 
   const iridescenceThicknessMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
   iridescenceThicknessMap.iridescenceThicknessMap = solidTexture(255, 255, 255)
-  cases.push([iridescenceThicknessMap, /iridescence.*not supported/i, 'iridescenceThicknessMap'])
-
-  const iridescenceIor = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-  iridescenceIor.iridescenceIOR = 1.5
-  cases.push([iridescenceIor, /iridescence.*not supported/i, 'iridescenceIOR'])
-
-  const iridescenceThicknessRange = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-  iridescenceThicknessRange.iridescenceThicknessRange = [50, 500]
-  cases.push([iridescenceThicknessRange, /iridescence.*not supported/i, 'iridescenceThicknessRange'])
+  cases.push([iridescenceThicknessMap, /iridescence maps.*not supported/i, 'iridescenceThicknessMap'])
 
   for (const [material, pattern, label] of cases) {
     const scene = new THREE.Scene()

@@ -33,9 +33,6 @@ const AddOperation = 2
 const FrontSide = 0
 const BackSide = 1
 const DoubleSide = 2
-const DefaultIridescenceIor = 1.3
-const DefaultIridescenceThicknessMin = 100
-const DefaultIridescenceThicknessMax = 400
 
 // Three.js depth comparison constants
 const NeverDepth = 0
@@ -486,6 +483,22 @@ export function extractPbrProperties(
     props.anisotropyMapAnisotropy = textureAnisotropy(material.anisotropyMap)
     props.anisotropyMapTransform = textureTransform(material.anisotropyMap)
     props.anisotropyMapUsesUv2 = textureUvChannel(material.anisotropyMap) > 0
+  }
+
+  if (Number.isFinite(material.iridescence)) {
+    props.iridescence = clamp01(material.iridescence!)
+  }
+  if (Number.isFinite(material.iridescenceIOR)) {
+    props.iridescenceIor = Math.max(1, Math.min(2.333, material.iridescenceIOR!))
+  }
+  const iridescenceThicknessRange = material.iridescenceThicknessRange
+  if (iridescenceThicknessRange && iridescenceThicknessRange.length >= 2) {
+    const min = iridescenceThicknessRange[0]
+    const max = iridescenceThicknessRange[1]
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      props.iridescenceThicknessMin = Math.max(0, min)
+      props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
+    }
   }
 
   if (Number.isFinite(material.transmission)) {
@@ -1091,34 +1104,11 @@ function assertSupportedMaterialState(
       'material.envMap is only supported for MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
     )
   }
-  if (
-    (Number.isFinite(material.iridescence) && material.iridescence! > 0) ||
-    material.iridescenceMap != null ||
-    material.iridescenceThicknessMap != null ||
-    nonDefaultIridescenceIor(material.iridescenceIOR) ||
-    nonDefaultIridescenceThicknessRange(material.iridescenceThicknessRange)
-  ) {
+  if (material.iridescenceMap != null || material.iridescenceThicknessMap != null) {
     throw new Error(
-      'MeshPhysicalMaterial iridescence is not supported by @headless-three/renderer yet. Disable iridescence or bake the effect into textures before rendering.',
+      'MeshPhysicalMaterial iridescence maps are not supported by @headless-three/renderer yet. Scalar iridescence, iridescenceIOR, and iridescenceThicknessRange are supported; bake iridescence maps into material values before rendering.',
     )
   }
-}
-
-function nonDefaultIridescenceIor(value: unknown): boolean {
-  if (value == null) return false
-  return typeof value !== 'number' ||
-    !Number.isFinite(value) ||
-    Math.abs(value - DefaultIridescenceIor) > 1e-12
-}
-
-function nonDefaultIridescenceThicknessRange(value: ArrayLike<number> | undefined): boolean {
-  if (value == null) return false
-  const min = value[0]
-  const max = value[1]
-  if (typeof min !== 'number' || typeof max !== 'number') return true
-  if (!Number.isFinite(min) || !Number.isFinite(max)) return true
-  return Math.abs(min - DefaultIridescenceThicknessMin) > 1e-12 ||
-    Math.abs(max - DefaultIridescenceThicknessMax) > 1e-12
 }
 
 function assertSupportedMaterialClass(

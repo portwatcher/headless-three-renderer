@@ -67,6 +67,10 @@ pub struct PreparedMesh {
     pub sheen_roughness: f32,
     pub anisotropy: f32,
     pub anisotropy_rotation: f32,
+    pub iridescence: f32,
+    pub iridescence_ior: f32,
+    pub iridescence_thickness_min: f32,
+    pub iridescence_thickness_max: f32,
     pub transmission: f32,
     pub dispersion: f32,
     pub ior: f32,
@@ -1170,6 +1174,21 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.anisotropy_rotation.unwrap_or(0.0),
         "mesh anisotropyRotation",
     )?;
+    let iridescence = clamp01(mesh.iridescence.unwrap_or(0.0)) as f32;
+    let iridescence_ior =
+        finite_f32(mesh.iridescence_ior.unwrap_or(1.3), "mesh iridescenceIor")?.clamp(1.0, 2.333);
+    let iridescence_thickness_min = mesh
+        .iridescence_thickness_min
+        .map(|value| finite_f32(value, "mesh iridescenceThicknessMin"))
+        .transpose()?
+        .unwrap_or(100.0)
+        .max(0.0);
+    let iridescence_thickness_max = mesh
+        .iridescence_thickness_max
+        .map(|value| finite_f32(value, "mesh iridescenceThicknessMax"))
+        .transpose()?
+        .unwrap_or(400.0)
+        .max(iridescence_thickness_min);
     let transmission = clamp01(mesh.transmission.unwrap_or(0.0)) as f32;
     let dispersion = finite_f32(mesh.dispersion.unwrap_or(0.0), "mesh dispersion")?.max(0.0);
     let ior = mesh.ior.unwrap_or(1.5).clamp(1.0, 2.333) as f32;
@@ -1366,6 +1385,10 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         sheen_roughness,
         anisotropy,
         anisotropy_rotation,
+        iridescence,
+        iridescence_ior,
+        iridescence_thickness_min,
+        iridescence_thickness_max,
         transmission,
         dispersion,
         ior,

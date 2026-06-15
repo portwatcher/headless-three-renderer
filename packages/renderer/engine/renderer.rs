@@ -93,6 +93,8 @@ pub struct Uniforms {
     pub attenuation_color: [f32; 4],
     /// xyz = MeshPhysicalMaterial specular color factor, w = specular intensity.
     pub physical_specular: [f32; 4],
+    /// x = iridescence, y = iridescence IOR, z/w = iridescence thickness range in nanometers.
+    pub iridescence_params: [f32; 4],
     pub lights: [GpuLight; MAX_LIGHTS],
 }
 
@@ -2613,6 +2615,12 @@ impl GpuRenderer {
                 mesh.physical_specular_color[1],
                 mesh.physical_specular_color[2],
                 mesh.physical_specular_intensity,
+            ],
+            iridescence_params: [
+                mesh.iridescence,
+                mesh.iridescence_ior,
+                mesh.iridescence_thickness_min,
+                mesh.iridescence_thickness_max,
             ],
             lights,
         };

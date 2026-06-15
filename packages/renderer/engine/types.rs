@@ -373,6 +373,14 @@ pub struct SceneMesh {
     pub anisotropy_map_transform: Option<Vec<f64>>,
     /// Whether anisotropy map sampling uses the secondary UV stream.
     pub anisotropy_map_uses_uv2: Option<bool>,
+    /// MeshPhysicalMaterial iridescence factor (0..1). Defaults to 0.
+    pub iridescence: Option<f64>,
+    /// Iridescence film IOR. Defaults to 1.3.
+    pub iridescence_ior: Option<f64>,
+    /// Iridescence film thickness range minimum in nanometers. Defaults to 100.
+    pub iridescence_thickness_min: Option<f64>,
+    /// Iridescence film thickness range maximum in nanometers. Defaults to 400.
+    pub iridescence_thickness_max: Option<f64>,
     /// Physical transmission factor (0..1). Defaults to 0.
     pub transmission: Option<f64>,
     /// Optional transmission map. Red channel multiplies `transmission`.

@@ -669,6 +669,10 @@ export interface NativeSceneMesh {
   anisotropyMapAnisotropy?: number
   anisotropyMapTransform?: number[]
   anisotropyMapUsesUv2?: boolean
+  iridescence?: number
+  iridescenceIor?: number
+  iridescenceThicknessMin?: number
+  iridescenceThicknessMax?: number
   transmission?: number
   transmissionMap?: Buffer
   transmissionMapWidth?: number
@@ -1020,6 +1024,10 @@ export interface PbrProperties {
   anisotropyMapAnisotropy?: number
   anisotropyMapTransform?: number[]
   anisotropyMapUsesUv2?: boolean
+  iridescence?: number
+  iridescenceIor?: number
+  iridescenceThicknessMin?: number
+  iridescenceThicknessMax?: number
   transmission?: number
   transmissionMap?: Buffer
   transmissionMapWidth?: number

@@ -104,6 +104,8 @@ struct Uniforms {
   attenuation_color: vec4<f32>,
   // xyz = MeshPhysicalMaterial specular color factor, w = specular intensity.
   physical_specular: vec4<f32>,
+  // x = iridescence, y = iridescence IOR, z/w = iridescence thickness range in nanometers.
+  iridescence_params: vec4<f32>,
   lights: array<GpuLight, 64>,
 };
 
@@ -493,6 +495,15 @@ fn volume_attenuation(distance: f32, attenuation_color: vec3<f32>, attenuation_d
 
 fn apply_ior_to_roughness(roughness: f32, ior: f32) -> f32 {
   return roughness * clamp(ior * 2.0 - 2.0, 0.0, 1.0);
+}
+
+fn iridescence_fresnel_color(n_dot_v: f32, ior: f32, thickness_min: f32, thickness_max: f32) -> vec3<f32> {
+  let film_thickness = clamp((thickness_min + thickness_max) * 0.5, 0.0, 1200.0);
+  let view_phase = pow(1.0 - clamp(n_dot_v, 0.0, 1.0), 1.5) * 1.35;
+  let ior_phase = clamp(ior - 1.0, 0.0, 1.333) * 0.6;
+  let phase = film_thickness * 0.006 + view_phase + ior_phase;
+  let shifted = phase + vec3<f32>(0.00, 0.33, 0.67);
+  return 0.5 + 0.5 * cos(shifted * 6.2831853);
 }
 
 fn sample_transmission_scene_color(scene_uv: vec2<f32>, roughness: f32, ior: f32) -> vec3<f32> {
@@ -1050,7 +1061,14 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let physical_specular_intensity = clamp(uniforms.physical_specular.w * physical_specular_intensity_sample, 0.0, 1.0);
   let dielectric_f0 = min(vec3<f32>(dielectric_f0_scalar) * physical_specular_color, vec3<f32>(1.0)) * physical_specular_intensity;
   let specular_f90 = mix(physical_specular_intensity, 1.0, metallic);
-  let f0 = mix(dielectric_f0, albedo, metallic);
+  let iridescence_strength = clamp(uniforms.iridescence_params.x, 0.0, 1.0) * (1.0 - metallic);
+  let iridescence_f0 = iridescence_fresnel_color(
+    n_dot_v,
+    clamp(uniforms.iridescence_params.y, 1.0, 2.333),
+    uniforms.iridescence_params.z,
+    uniforms.iridescence_params.w,
+  ) * physical_specular_intensity;
+  let f0 = mix(mix(dielectric_f0, iridescence_f0, iridescence_strength), albedo, metallic);
   let phong_specular_color = clamp(uniforms.physical_params2.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
   let phong_shininess = max(uniforms.physical_params2.w, 0.0001);
   var phong_specular_strength = 1.0;
@@ -1438,6 +1456,7 @@ struct Uniforms {
   physical_params4: vec4<f32>,
   attenuation_color: vec4<f32>,
   physical_specular: vec4<f32>,
+  iridescence_params: vec4<f32>,
   lights: array<GpuLight, 64>,
 };
 
