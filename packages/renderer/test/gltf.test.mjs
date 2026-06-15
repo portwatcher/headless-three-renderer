@@ -19,6 +19,7 @@ const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const SIMPLE_TRIANGLE = path.join(FIXTURE_DIR, 'simple-triangle.gltf')
 const TEXTURED_QUAD = path.join(FIXTURE_DIR, 'textured-quad.gltf')
 const VERTEX_COLOR_QUAD = path.join(FIXTURE_DIR, 'vertex-color-quad.gltf')
+const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -96,6 +97,39 @@ test('committed vertex-color glTF fixture renders COLOR_0 attributes', async () 
   const right = meanRegion(rgba, 96, 96, 54, 36, 72, 60)
   assert.ok(left.r > left.g + 60, `left half should be dominated by COLOR_0 red (${left.r} vs ${left.g})`)
   assert.ok(right.g > right.r + 60, `right half should be dominated by COLOR_0 green (${right.g} vs ${right.r})`)
+})
+
+test('committed morph-target glTF fixture applies POSITION targets', async () => {
+  const gltf = await loadGltfFixture(MORPHED_TRIANGLE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'morph fixture should load a mesh')
+  assert.equal(mesh.geometry.morphAttributes.position?.length, 1)
+  assert.equal(mesh.morphTargetInfluences?.length, 1)
+
+  const camera = gltf.cameras[0]
+  assert.ok(camera, 'morph fixture should load a camera')
+  camera.aspect = 1
+  camera.updateProjectionMatrix()
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  function renderBounds(influence) {
+    mesh.morphTargetInfluences[0] = influence
+    const rgba = new Renderer().render(gltf.scene, camera, {
+      width: 96,
+      height: 96,
+      format: 'rgba',
+      background: [0, 0, 0],
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+    return nonBackgroundBounds(rgba, 96, 96, [0, 0, 0], 3)
+  }
+
+  const flat = renderBounds(0)
+  const morphed = renderBounds(1)
+  assert.ok(flat.height > 10, `flat triangle should render visible bounds (${flat.height})`)
+  assert.ok(morphed.minY < flat.minY - 12, `morph target should move the triangle top upward (${morphed.minY} vs ${flat.minY})`)
+  assert.ok(morphed.height > flat.height + 10, `morph target should expand rendered height (${morphed.height} vs ${flat.height})`)
 })
 
 test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
@@ -257,4 +291,34 @@ function meanRegion(rgba, width, _height, x0, y0, x1, y1) {
     }
   }
   return { r: r / count, g: g / count, b: b / count, a: a / count }
+}
+
+function nonBackgroundBounds(rgba, width, height, bg, tolerance = 2) {
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4
+      if (
+        Math.abs(rgba[i] - bg[0]) > tolerance ||
+        Math.abs(rgba[i + 1] - bg[1]) > tolerance ||
+        Math.abs(rgba[i + 2] - bg[2]) > tolerance
+      ) {
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+      }
+    }
+  }
+  return {
+    minX: maxX >= minX ? minX : 0,
+    minY: maxY >= minY ? minY : 0,
+    maxX,
+    maxY,
+    width: maxX >= minX ? maxX - minX + 1 : 0,
+    height: maxY >= minY ? maxY - minY + 1 : 0,
+  }
 }

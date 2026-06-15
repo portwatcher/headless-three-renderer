@@ -1,0 +1,138 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "@headless-three/renderer fixture"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "MorphedTriangleScene",
+      "nodes": [0, 1]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "MorphedTriangle",
+      "mesh": 0
+    },
+    {
+      "name": "Camera",
+      "camera": 0,
+      "translation": [0, 0, 3]
+    }
+  ],
+  "cameras": [
+    {
+      "name": "RenderCamera",
+      "type": "perspective",
+      "perspective": {
+        "aspectRatio": 1,
+        "yfov": 0.7853981633974483,
+        "znear": 0.01,
+        "zfar": 100
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "MorphedTriangleMesh",
+      "weights": [1],
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "targets": [
+            {
+              "POSITION": 2
+            }
+          ],
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "MorphUnlit",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.2, 0.85, 1, 1],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      },
+      "extensions": {
+        "KHR_materials_unlit": {}
+      }
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 114,
+      "uri": "data:application/octet-stream;base64,mpkZv2Zm5r4AAAAAmpkZP2Zm5r4AAAAAAAAAAAAAgD4AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGZmJj8AAAAAAAABAAIA"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 36,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 36,
+      "byteLength": 36,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 72,
+      "byteLength": 36,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 108,
+      "byteLength": 6,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [-0.6, -0.45, 0],
+      "max": [0.6, 0.25, 0]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [0, 0, 1],
+      "max": [0, 0, 1]
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [0, 0, 0],
+      "max": [0, 0.65, 0]
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 3,
+      "type": "SCALAR",
+      "min": [0],
+      "max": [2]
+    }
+  ],
+  "extensionsUsed": ["KHR_materials_unlit"]
+}
