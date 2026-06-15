@@ -20,6 +20,7 @@ const SIMPLE_TRIANGLE = path.join(FIXTURE_DIR, 'simple-triangle.gltf')
 const TEXTURED_QUAD = path.join(FIXTURE_DIR, 'textured-quad.gltf')
 const VERTEX_COLOR_QUAD = path.join(FIXTURE_DIR, 'vertex-color-quad.gltf')
 const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
+const SKINNED_QUAD = path.join(FIXTURE_DIR, 'skinned-quad.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -130,6 +131,40 @@ test('committed morph-target glTF fixture applies POSITION targets', async () =>
   assert.ok(flat.height > 10, `flat triangle should render visible bounds (${flat.height})`)
   assert.ok(morphed.minY < flat.minY - 12, `morph target should move the triangle top upward (${morphed.minY} vs ${flat.minY})`)
   assert.ok(morphed.height > flat.height + 10, `morph target should expand rendered height (${morphed.height} vs ${flat.height})`)
+})
+
+test('committed skinned glTF fixture applies JOINTS_0 and WEIGHTS_0 attributes', async () => {
+  const gltf = await loadGltfFixture(SKINNED_QUAD)
+  const mesh = findFirst(gltf.scene, (object) => object.isSkinnedMesh === true)
+  assert.ok(mesh, 'skinned fixture should load a SkinnedMesh')
+  assert.equal(mesh.geometry.getAttribute('skinIndex')?.count, 4)
+  assert.equal(mesh.geometry.getAttribute('skinWeight')?.count, 4)
+  assert.equal(mesh.skeleton.bones.length, 1)
+
+  const camera = gltf.cameras[0]
+  assert.ok(camera, 'skinned fixture should load a camera')
+  camera.aspect = 1
+  camera.updateProjectionMatrix()
+  camera.updateMatrixWorld(true)
+
+  function renderBounds(jointY) {
+    mesh.skeleton.bones[0].position.y = jointY
+    gltf.scene.updateMatrixWorld(true)
+    const rgba = new Renderer().render(gltf.scene, camera, {
+      width: 96,
+      height: 96,
+      format: 'rgba',
+      background: [0, 0, 0],
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+    return nonBackgroundBounds(rgba, 96, 96, [0, 0, 0], 3)
+  }
+
+  const base = renderBounds(0)
+  const moved = renderBounds(0.55)
+  assert.ok(base.height > 20, `base skinned quad should render visible bounds (${base.height})`)
+  assert.ok(moved.minY < base.minY - 12, `joint translation should move the skinned quad upward (${moved.minY} vs ${base.minY})`)
+  assert.ok(Math.abs(moved.height - base.height) <= 4, `single-joint translation should preserve quad height (${moved.height} vs ${base.height})`)
 })
 
 test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
