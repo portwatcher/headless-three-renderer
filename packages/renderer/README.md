@@ -146,7 +146,7 @@ The public API accepts only Three.js-like objects:
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`, with clear failures for unsupported side constants
-- `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths
+- `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths; invalid fog parameter values fail clearly
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
 - material render state: `depthTest`, `depthFunc`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes, `CustomBlending` equations/factors, and clear failures for unsupported render-state constants

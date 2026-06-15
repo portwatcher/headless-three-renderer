@@ -39,7 +39,7 @@ Already supported in the current implementation:
 - Line material arrays with geometry groups, plus `LineDashedMaterial` dash/gap/scale patterns and custom `lineDistance` attributes for common line, line segment, line loop, and instanced line cases.
 - Object/camera layer filtering for renderable objects and lights, plus native draw-order keys for group order, `renderOrder`, material id, projected geometry bounding-sphere z, and object/insertion ties.
 - `THREE.LOD` auto-update selection for the active camera.
-- `THREE.Fog` and `THREE.FogExp2` in mesh, shadow, sprite, point, and line material paths, using view-space depth fog with `material.fog` opt-out.
+- `THREE.Fog` and `THREE.FogExp2` in mesh, shadow, sprite, point, and line material paths, using view-space depth fog with `material.fog` opt-out and invalid fog parameter values failing clearly.
 
 Distance to the project goal:
 

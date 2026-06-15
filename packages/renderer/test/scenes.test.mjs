@@ -6162,6 +6162,26 @@ test('Fog uses view-space depth rather than Euclidean camera distance', () => {
   assert.ok(Math.abs(center.r - offAxis.r) < 15, `same view-depth planes should retain similar red output (${center.r} vs ${offAxis.r})`)
 })
 
+test('invalid fog parameter values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0xff0000 })))
+  const camera = makeCamera()
+
+  scene.fog = new THREE.Fog(0x00ff00, 0, 1)
+  scene.fog.near = Number.NaN
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.near must be a finite number/i,
+  )
+
+  scene.fog = new THREE.FogExp2(0x0000ff, 1)
+  scene.fog.density = 'dense'
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.density must be a finite number/i,
+  )
+})
+
 test('Fog affects sprites, points, and lines with material fog opt-out', () => {
   function renderObject(object) {
     const scene = new THREE.Scene()

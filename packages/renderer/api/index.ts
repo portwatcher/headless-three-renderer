@@ -966,15 +966,15 @@ function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene>
     return {
       fogType: 'exp2',
       fogColor: color ?? undefined,
-      fogDensity: finiteOrUndefined(fog.density),
+      fogDensity: optionalFiniteNumber(fog.density, 'scene.fog.density'),
     }
   }
   if (fog.isFog) {
     return {
       fogType: 'linear',
       fogColor: color ?? undefined,
-      fogNear: finiteOrUndefined(fog.near),
-      fogFar: finiteOrUndefined(fog.far),
+      fogNear: optionalFiniteNumber(fog.near, 'scene.fog.near'),
+      fogFar: optionalFiniteNumber(fog.far, 'scene.fog.far'),
     }
   }
   return {}
@@ -1025,6 +1025,12 @@ function pixelRectComponents(rect: RenderPixelRectLike): number[] {
 
 function finiteOrUndefined(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function optionalFiniteNumber(value: unknown, label: string): number | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
 }
 
 function booleanOrNumber(value: unknown): number | undefined {
