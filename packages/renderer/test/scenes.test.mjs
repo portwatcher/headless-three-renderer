@@ -6,7 +6,7 @@ import lightsApi from '../dist/lights.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
 const { Renderer, renderToTarget } = pkg
-const { extractLights } = lightsApi
+const { extractLights, extractAmbientIntensity, extractLightProbe } = lightsApi
 
 const SIZE = 128
 const BG = [26, 26, 26] // 0.1 * 255
@@ -6094,6 +6094,79 @@ test('RectAreaLight approximates finite one-sided area lighting', () => {
 
   assert.ok(smallForward > backward + 10, `forward RectAreaLight should illuminate its front side (${smallForward} vs ${backward})`)
   assert.ok(largeForward > smallForward + 10, `larger RectAreaLight should contribute more radiance (${largeForward} vs ${smallForward})`)
+})
+
+test('invalid light numeric values fail clearly', () => {
+  const directCases = [
+    ['directional intensity', () => {
+      const light = new THREE.DirectionalLight(0xffffff, 1)
+      light.intensity = 'bright'
+      return light
+    }, /light\.intensity must be a finite number/i],
+    ['point distance', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.distance = 'far'
+      return light
+    }, /PointLight\.distance must be a finite number/i],
+    ['point decay', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.decay = Number.POSITIVE_INFINITY
+      return light
+    }, /PointLight\.decay must be a finite number/i],
+    ['spot distance', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.distance = Number.NaN
+      return light
+    }, /SpotLight\.distance must be a finite number/i],
+    ['spot angle', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.angle = 'wide'
+      return light
+    }, /SpotLight\.angle must be a finite number/i],
+    ['spot penumbra', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.penumbra = Number.NEGATIVE_INFINITY
+      return light
+    }, /SpotLight\.penumbra must be a finite number/i],
+    ['rect width', () => {
+      const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
+      light.width = 'wide'
+      return light
+    }, /RectAreaLight\.width must be a finite number/i],
+    ['rect height', () => {
+      const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
+      light.height = Number.NaN
+      return light
+    }, /RectAreaLight\.height must be a finite number/i],
+  ]
+
+  for (const [name, makeLight, pattern] of directCases) {
+    const scene = new THREE.Scene()
+    scene.add(makeLight())
+    assert.throws(
+      () => extractLights(scene),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+
+  const ambientScene = new THREE.Scene()
+  const ambient = new THREE.AmbientLight(0xffffff, 1)
+  ambient.intensity = 'bright'
+  ambientScene.add(ambient)
+  assert.throws(
+    () => extractAmbientIntensity(ambientScene),
+    /AmbientLight\.intensity must be a finite number/i,
+  )
+
+  const probeScene = new THREE.Scene()
+  const probe = new THREE.LightProbe(undefined, 1)
+  probe.intensity = Number.NaN
+  probeScene.add(probe)
+  assert.throws(
+    () => extractLightProbe(probeScene),
+    /LightProbe\.intensity must be a finite number/i,
+  )
 })
 
 test('LOD selects object level from active camera distance', () => {

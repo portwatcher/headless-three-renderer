@@ -31,7 +31,7 @@ function visitLights(object: ThreeObject3DLike, camera: ThreeCameraLike | undefi
 
 function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   const color = colorLikeToArray(light.color) ?? [1, 1, 1, 1]
-  const intensity = Number.isFinite(light.intensity) ? light.intensity! : 1
+  const intensity = finiteNumberOrDefault(light.intensity, 'light.intensity', 1)
 
   if (light.isDirectionalLight === true) {
     const pos = light.matrixWorld
@@ -76,8 +76,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       color: [color[0], color[1], color[2]],
       intensity,
       position: pos,
-      distance: Number.isFinite(light.distance) ? light.distance! : 0,
-      decay: Number.isFinite(light.decay) ? light.decay! : 2,
+      distance: finiteNumberOrDefault(light.distance, 'PointLight.distance', 0),
+      decay: finiteNumberOrDefault(light.decay, 'PointLight.decay', 2),
     }
     if (light.castShadow === true) {
       out.castShadow = true
@@ -112,10 +112,10 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       intensity,
       position: pos,
       direction,
-      distance: Number.isFinite(light.distance) ? light.distance! : 0,
-      decay: Number.isFinite(light.decay) ? light.decay! : 2,
-      angle: Number.isFinite(light.angle) ? light.angle! : Math.PI / 3,
-      penumbra: Number.isFinite(light.penumbra) ? light.penumbra! : 0,
+      distance: finiteNumberOrDefault(light.distance, 'SpotLight.distance', 0),
+      decay: finiteNumberOrDefault(light.decay, 'SpotLight.decay', 2),
+      angle: finiteNumberOrDefault(light.angle, 'SpotLight.angle', Math.PI / 3),
+      penumbra: finiteNumberOrDefault(light.penumbra, 'SpotLight.penumbra', 0),
     }
     if (light.castShadow === true) {
       out.castShadow = true
@@ -145,8 +145,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       intensity,
       position: pos,
       direction,
-      width: Number.isFinite(light.width) ? light.width! : 10,
-      height: Number.isFinite(light.height) ? light.height! : 10,
+      width: finiteNumberOrDefault(light.width, 'RectAreaLight.width', 10),
+      height: finiteNumberOrDefault(light.height, 'RectAreaLight.height', 10),
     }
   }
 
@@ -250,6 +250,12 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function finiteNumberOrDefault(value: unknown, label: string, fallback: number): number {
+  if (value == null) return fallback
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
 function assertSupportedShadowLightCount(lights: NativeSceneLight[]): void {
   let shadowCasters = 0
   for (const light of lights) {
@@ -288,7 +294,7 @@ export function extractAmbientLight(scene: ThreeObject3DLike, camera?: ThreeCame
 export function extractAmbientIntensity(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number | undefined {
   let intensity = 0
   visitForAmbient(scene, camera, (light) => {
-    intensity += Number.isFinite(light.intensity) ? light.intensity! : 1
+    intensity += finiteNumberOrDefault(light.intensity, 'AmbientLight.intensity', 1)
   })
   return intensity > 0 ? intensity : undefined
 }
@@ -301,7 +307,7 @@ export function extractLightProbe(scene: ThreeObject3DLike, camera?: ThreeCamera
     const source = light.sh?.coefficients
     if (!Array.isArray(source) || source.length < 9) return
 
-    const intensity = Number.isFinite(light.intensity) ? light.intensity! : 1
+    const intensity = finiteNumberOrDefault(light.intensity, 'LightProbe.intensity', 1)
     for (let i = 0; i < 9; i += 1) {
       const coefficient = coefficientToRgb(source[i])
       if (!coefficient) continue
