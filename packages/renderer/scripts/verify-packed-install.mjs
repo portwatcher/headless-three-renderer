@@ -153,6 +153,7 @@ function run(command, args, cwd) {
     stdio: 'inherit',
     env: {
       ...process.env,
+      npm_config_cache: process.env.npm_config_cache ?? path.join(tmp, 'npm-cache'),
       npm_config_ignore_scripts: 'false',
     },
   })
