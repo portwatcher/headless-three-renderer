@@ -3880,6 +3880,62 @@ test('PointsMaterial casts directional shadows from expanded billboards', () => 
   assert.ok(shadowedLum < unshadowedLum - 15, `point billboard shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
 })
 
+test('SpriteMaterial and PointsMaterial cast spot-light shadows from expanded billboards', () => {
+  function renderSpotBillboardShadow(kind, castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+      sprite.position.set(0, 4, 0)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = castShadow
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 4, 0]), 3))
+      const points = new THREE.Points(geometry, new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 48,
+        sizeAttenuation: false,
+      }))
+      points.castShadow = castShadow
+      scene.add(points)
+    }
+
+    const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
+    light.position.set(0, 7, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 20
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const unshadowed = renderSpotBillboardShadow(kind, false)
+    const shadowed = renderSpotBillboardShadow(kind, true)
+    const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+    const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+    assert.ok(shadowedLum < unshadowedLum - 10, `${kind} spot-light shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
+  }
+})
+
 test('Sprite customDepthMaterial alphaMap controls directional shadow casters', () => {
   function renderSpriteCustomDepthShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
