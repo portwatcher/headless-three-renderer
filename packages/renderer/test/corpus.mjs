@@ -11,6 +11,7 @@ export function createSceneCorpus() {
     viewportScissorCorpus(),
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
+    meshDepthMaterialCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
     lightProbeCorpus(),
@@ -366,6 +367,28 @@ function materialEnvMapCorpus() {
     camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [10, 10, 13],
+    minNonBackgroundRatio: 0.02,
+  }
+}
+
+function meshDepthMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking })
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 24, 16),
+    material,
+  ))
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 4)
+  camera.position.set(0.7, 0.25, 3.0)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'mesh-depth-material-basic',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
   }
 }
