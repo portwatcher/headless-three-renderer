@@ -6858,6 +6858,20 @@ test('invalid LOD level values fail clearly', () => {
       label,
     )
   }
+
+  const invalidZoomCamera = camera.clone()
+  invalidZoomCamera.zoom = Number.NaN
+  assert.throws(
+    () => renderRgba(makeLodScene(() => {}), invalidZoomCamera, { width: 64, height: 64 }),
+    /camera\.zoom must be a finite number/i,
+  )
+
+  const zeroZoomCamera = camera.clone()
+  zeroZoomCamera.zoom = 0
+  assert.throws(
+    () => renderRgba(makeLodScene(() => {}), zeroZoomCamera, { width: 64, height: 64 }),
+    /camera\.zoom must be positive/i,
+  )
 })
 
 test('Fog and FogExp2 affect material output', () => {

@@ -38,7 +38,7 @@ Already supported in the current implementation:
 - `THREE.Sprite`/`SpriteMaterial` CPU billboard expansion with color, opacity, texture maps, scene fog, center, scale, rotation, size attenuation, layers, render ordering, and directional/spot/point shadow casting, with invalid billboard scalar values failing clearly; `receiveShadow` fails clearly.
 - Line material arrays with geometry groups, plus `LineDashedMaterial` dash/gap/scale patterns and custom `lineDistance` attributes for common line, line segment, line loop, and instanced line cases, with invalid line scalar values failing clearly.
 - Object/camera layer filtering for renderable objects and lights, plus native draw-order keys for group order, `renderOrder`, material id, projected geometry bounding-sphere z, and object/insertion ties, with invalid `renderOrder` values failing clearly.
-- `THREE.LOD` auto-update selection for the active camera, with invalid level distance/hysteresis values failing clearly.
+- `THREE.LOD` auto-update selection for the active camera, with invalid camera zoom or level distance/hysteresis values failing clearly.
 - `THREE.Fog` and `THREE.FogExp2` in mesh, shadow, sprite, point, and line material paths, using view-space depth fog with `material.fog` opt-out and invalid fog color/parameter values failing clearly.
 
 Distance to the project goal:

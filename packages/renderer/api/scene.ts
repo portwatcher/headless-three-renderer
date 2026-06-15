@@ -1472,6 +1472,17 @@ function finiteMaterialOrObjectNumber(value: unknown, label: string, fallback: n
   throw new TypeError(`${label} must be a finite number.`)
 }
 
+function cameraZoomOrDefault(value: unknown): number {
+  if (value == null) return 1
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError('camera.zoom must be a finite number.')
+  }
+  if (value <= 0) {
+    throw new TypeError('camera.zoom must be positive.')
+  }
+  return value
+}
+
 function finiteCountOrDefault(value: unknown, label: string, fallback: number): number {
   if (value == null) return fallback
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -1743,6 +1754,7 @@ function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | un
 
   const levels = object.levels
   const normalizedLevels = normalizeLodLevels(levels)
+  const cameraZoom = cameraZoomOrDefault(camera.zoom)
 
   if (typeof object.update === 'function') {
     object.update(camera)
@@ -1751,7 +1763,7 @@ function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | un
 
   if (normalizedLevels.length <= 1) return
 
-  const distance = distanceBetweenMatrices(camera.matrixWorld, object.matrixWorld) / finiteOrDefault(camera.zoom, 1)
+  const distance = distanceBetweenMatrices(camera.matrixWorld, object.matrixWorld) / cameraZoom
   normalizedLevels[0].object.visible = true
 
   let i = 1
