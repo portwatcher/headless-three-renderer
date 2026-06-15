@@ -8303,6 +8303,8 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
+    [{ texture: { format: THREE.RedFormat } }, /target color texture format .*not supported.*RGBAFormat/i, 'color texture format'],
+    [{ texture: { type: THREE.FloatType } }, /target color texture type .*not supported.*UnsignedByteType/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'depth-stencil format with scalar type'],

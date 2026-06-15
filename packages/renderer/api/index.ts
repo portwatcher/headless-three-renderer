@@ -490,6 +490,7 @@ const UnsignedIntType = 1014
 const FloatType = 1015
 const HalfFloatType = 1016
 const UnsignedInt248Type = 1020
+const RGBAFormat = 1023
 const DepthFormat = 1026
 const DepthStencilFormat = 1027
 
@@ -1216,6 +1217,7 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
   }
   assertSupportedSampleCount(target.samples, 'target.samples')
   assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
+  assertSupportedRenderTargetColorTexture(renderTargetColorTexture(target))
   assertSupportedDepthTextureType(target.depthTexture)
   assertSupportedDepthTextureFormat(target.depthTexture)
 }
@@ -1240,6 +1242,22 @@ function assertSupportedOutputFormat(value: unknown, label: string): void {
   throw new Error(
     `${label} ${String(value)} is not supported by @headless-three/renderer. Use "png" or "rgba".`,
   )
+}
+
+function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {
+  if (!texture) return
+  const format = texture.format
+  if (format != null && format !== RGBAFormat) {
+    throw new Error(
+      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use RGBAFormat or omit format for RGBA8 readback.`,
+    )
+  }
+  const type = texture.type
+  if (type != null && type !== UnsignedByteType) {
+    throw new Error(
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType or omit type for RGBA8 readback.`,
+    )
+  }
 }
 
 function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike | undefined): void {
@@ -1306,9 +1324,7 @@ function writeRenderTarget(
   image.width = width
   image.height = height
 
-  const texture = Array.isArray(target.texture)
-    ? target.texture[0]
-    : target.texture ?? target.textures?.[0]
+  const texture = renderTargetColorTexture(target)
   if (texture) {
     writeRenderTargetTexture(texture, data, width, height)
   }
@@ -1326,6 +1342,12 @@ function writeRenderTarget(
   }
 
   return target
+}
+
+function renderTargetColorTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {
+  return Array.isArray(target.texture)
+    ? target.texture[0]
+    : target.texture ?? target.textures?.[0]
 }
 
 function writeRenderTargetTexture(
