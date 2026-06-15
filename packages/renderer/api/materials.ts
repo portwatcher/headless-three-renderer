@@ -101,6 +101,8 @@ const UnsignedShortType = 1012
 const UnsignedIntType = 1014
 const HalfFloatType = 1016
 const FloatType = 1015
+const UnsignedShort4444Type = 1017
+const UnsignedShort5551Type = 1018
 const LinearEncoding = 3000
 const sRGBEncoding = 3001
 
@@ -2133,6 +2135,14 @@ function toRgba8(
     if (!(data instanceof Uint32Array)) return null
     return normalizedUnsignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0xffffffff)
   }
+  if (textureType === UnsignedShort4444Type) {
+    if (!(data instanceof Uint16Array)) return null
+    return packedUnsignedShort4444ToRgba8(data, pixels)
+  }
+  if (textureType === UnsignedShort5551Type) {
+    if (!(data instanceof Uint16Array)) return null
+    return packedUnsignedShort5551ToRgba8(data, pixels)
+  }
 
   if (data instanceof Uint8Array || data instanceof Uint8ClampedArray) {
     if (data.length === pixels * 4) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -2344,6 +2354,32 @@ function normalizedUnsignedIntegerDataToRgba8(
 
 function normalizedUnsignedIntegerToByte(value: number, maxValue: number): number {
   return Math.max(0, Math.min(255, Math.round((value / maxValue) * 255)))
+}
+
+function packedUnsignedShort4444ToRgba8(data: Uint16Array, pixels: number): Uint8Array | null {
+  if (data.length !== pixels) return null
+  const out = new Uint8Array(pixels * 4)
+  for (let i = 0; i < pixels; i++) {
+    const value = data[i]
+    out[i * 4] = ((value >> 12) & 0xf) * 17
+    out[i * 4 + 1] = ((value >> 8) & 0xf) * 17
+    out[i * 4 + 2] = ((value >> 4) & 0xf) * 17
+    out[i * 4 + 3] = (value & 0xf) * 17
+  }
+  return out
+}
+
+function packedUnsignedShort5551ToRgba8(data: Uint16Array, pixels: number): Uint8Array | null {
+  if (data.length !== pixels) return null
+  const out = new Uint8Array(pixels * 4)
+  for (let i = 0; i < pixels; i++) {
+    const value = data[i]
+    out[i * 4] = normalizedUnsignedIntegerToByte((value >> 11) & 0x1f, 0x1f)
+    out[i * 4 + 1] = normalizedUnsignedIntegerToByte((value >> 6) & 0x1f, 0x1f)
+    out[i * 4 + 2] = normalizedUnsignedIntegerToByte((value >> 1) & 0x1f, 0x1f)
+    out[i * 4 + 3] = (value & 0x1) === 1 ? 255 : 0
+  }
+  return out
 }
 
 function halfFloatDataToRgba8(

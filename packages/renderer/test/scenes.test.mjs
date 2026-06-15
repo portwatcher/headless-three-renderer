@@ -6509,6 +6509,56 @@ test('normalized unsigned integer raw DataTexture maps decode for material and b
   }
 })
 
+test('packed unsigned short raw DataTexture maps unpack RGBA channels', () => {
+  const cases = [
+    ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, 0x842f, 'red-dominant'],
+    ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, 0x823f, 'blue-dominant'],
+  ]
+
+  function packedTexture(type, value) {
+    const texture = new THREE.DataTexture(new Uint16Array([value]), 1, 1, THREE.RGBAFormat, type)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderTexture(kind, type, value) {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    if (kind === 'material') {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: packedTexture(type, value) })))
+    } else {
+      scene.background = packedTexture(type, value)
+    }
+    return meanRegion(
+      renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+  }
+
+  for (const [name, type, value, expectation] of cases) {
+    for (const kind of ['material', 'background']) {
+      const mean = renderTexture(kind, type, value)
+      if (expectation === 'red-dominant') {
+        assert.ok(mean.r > 100, `${kind} ${name} red channel should unpack strongly (${mean.r})`)
+        assert.ok(mean.r > mean.g + 20, `${kind} ${name} red should exceed green (${mean.r} vs ${mean.g})`)
+        assert.ok(mean.g > mean.b + 15, `${kind} ${name} green should exceed blue (${mean.g} vs ${mean.b})`)
+      } else {
+        assert.ok(mean.b > 180, `${kind} ${name} blue channel should unpack strongly (${mean.b})`)
+        assert.ok(mean.b > mean.r + 30, `${kind} ${name} blue should exceed red (${mean.b} vs ${mean.r})`)
+        assert.ok(mean.r > mean.g + 20, `${kind} ${name} red should exceed green (${mean.r} vs ${mean.g})`)
+      }
+    }
+  }
+})
+
 test('explicit raw texture mipmaps upload for material and background maps', () => {
   function mipmappedCheckerTexture() {
     const size = 16
