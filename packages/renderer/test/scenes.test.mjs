@@ -2995,6 +2995,69 @@ test('material stencil state masks later draws', () => {
   assert.ok(right.b < 10, `stencil fill should be rejected outside the mask (${right.b})`)
 })
 
+function assertMaterialRenderStateFails(material, pattern) {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    pattern,
+  )
+}
+
+test('unsupported material blending values fail clearly', () => {
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  material.blending = 999
+
+  assertMaterialRenderStateFails(
+    material,
+    /material\.blending 999.*not supported/i,
+  )
+})
+
+test('unsupported custom blending constants fail clearly', () => {
+  for (const field of ['blendEquation', 'blendEquationAlpha']) {
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      blending: THREE.CustomBlending,
+    })
+    material[field] = 999
+
+    assertMaterialRenderStateFails(
+      material,
+      new RegExp(`material\\.${field} 999.*not supported`, 'i'),
+    )
+  }
+
+  for (const field of ['blendSrc', 'blendDst', 'blendSrcAlpha', 'blendDstAlpha']) {
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      blending: THREE.CustomBlending,
+    })
+    material[field] = 999
+
+    assertMaterialRenderStateFails(
+      material,
+      new RegExp(`material\\.${field} 999.*not supported`, 'i'),
+    )
+  }
+})
+
+test('unsupported material stencil constants fail clearly', () => {
+  for (const field of ['stencilFunc', 'stencilFail', 'stencilZFail', 'stencilZPass']) {
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      stencilWrite: true,
+    })
+    material[field] = 999
+
+    assertMaterialRenderStateFails(
+      material,
+      new RegExp(`material\\.${field} 999.*not supported`, 'i'),
+    )
+  }
+})
+
 test('NoBlending disables blending even for transparent materials', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

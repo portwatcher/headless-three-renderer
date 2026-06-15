@@ -52,10 +52,41 @@ const SubtractiveBlending = 3
 const MultiplyBlending = 4
 const CustomBlending = 5
 const AddEquation = 100
+const SubtractEquation = 101
+const ReverseSubtractEquation = 102
+const MinEquation = 103
+const MaxEquation = 104
+const ZeroFactor = 200
+const OneFactor = 201
+const SrcColorFactor = 202
+const OneMinusSrcColorFactor = 203
 const SrcAlphaFactor = 204
 const OneMinusSrcAlphaFactor = 205
+const DstAlphaFactor = 206
+const OneMinusDstAlphaFactor = 207
+const DstColorFactor = 208
+const OneMinusDstColorFactor = 209
+const SrcAlphaSaturateFactor = 210
+const ConstantColorFactor = 211
+const OneMinusConstantColorFactor = 212
+const ConstantAlphaFactor = 213
+const OneMinusConstantAlphaFactor = 214
+const NeverStencilFunc = 512
+const LessStencilFunc = 513
+const EqualStencilFunc = 514
+const LessEqualStencilFunc = 515
+const GreaterStencilFunc = 516
+const NotEqualStencilFunc = 517
+const GreaterEqualStencilFunc = 518
 const AlwaysStencilFunc = 519
+const ZeroStencilOp = 0
 const KeepStencilOp = 7680
+const ReplaceStencilOp = 7681
+const IncrementStencilOp = 7682
+const DecrementStencilOp = 7683
+const IncrementWrapStencilOp = 34055
+const DecrementWrapStencilOp = 34056
+const InvertStencilOp = 5386
 
 // Three.js depth-packing constants
 const BasicDepthPacking = 3200
@@ -829,17 +860,17 @@ export function extractPbrProperties(
   if (blending) {
     props.blending = blending
     if (blending === 'custom') {
-      props.blendEquation = finiteIntegerOrDefault(material.blendEquation, AddEquation)
-      props.blendSrc = finiteIntegerOrDefault(material.blendSrc, SrcAlphaFactor)
-      props.blendDst = finiteIntegerOrDefault(material.blendDst, OneMinusSrcAlphaFactor)
+      props.blendEquation = materialBlendEquationOrDefault(material.blendEquation, 'material.blendEquation', AddEquation)
+      props.blendSrc = materialBlendFactorOrDefault(material.blendSrc, 'material.blendSrc', SrcAlphaFactor)
+      props.blendDst = materialBlendFactorOrDefault(material.blendDst, 'material.blendDst', OneMinusSrcAlphaFactor)
       if (Number.isFinite(material.blendEquationAlpha)) {
-        props.blendEquationAlpha = material.blendEquationAlpha!
+        props.blendEquationAlpha = materialBlendEquation(material.blendEquationAlpha, 'material.blendEquationAlpha')
       }
       if (Number.isFinite(material.blendSrcAlpha)) {
-        props.blendSrcAlpha = material.blendSrcAlpha!
+        props.blendSrcAlpha = materialBlendFactor(material.blendSrcAlpha, 'material.blendSrcAlpha')
       }
       if (Number.isFinite(material.blendDstAlpha)) {
-        props.blendDstAlpha = material.blendDstAlpha!
+        props.blendDstAlpha = materialBlendFactor(material.blendDstAlpha, 'material.blendDstAlpha')
       }
       const blendColor = colorLikeToArray(material.blendColor)
       if (blendColor) {
@@ -879,7 +910,7 @@ export function extractPbrProperties(
     props.stencilWriteMask = finiteIntegerOrDefault(material.stencilWriteMask, 0xff)
   }
   if (Number.isFinite(material.stencilFunc)) {
-    props.stencilFunc = finiteIntegerOrDefault(material.stencilFunc, AlwaysStencilFunc)
+    props.stencilFunc = materialStencilFunc(material.stencilFunc, 'material.stencilFunc')
   }
   if (Number.isFinite(material.stencilRef)) {
     props.stencilRef = finiteIntegerOrDefault(material.stencilRef, 0)
@@ -888,13 +919,13 @@ export function extractPbrProperties(
     props.stencilFuncMask = finiteIntegerOrDefault(material.stencilFuncMask, 0xff)
   }
   if (Number.isFinite(material.stencilFail)) {
-    props.stencilFail = finiteIntegerOrDefault(material.stencilFail, KeepStencilOp)
+    props.stencilFail = materialStencilOperation(material.stencilFail, 'material.stencilFail')
   }
   if (Number.isFinite(material.stencilZFail)) {
-    props.stencilZFail = finiteIntegerOrDefault(material.stencilZFail, KeepStencilOp)
+    props.stencilZFail = materialStencilOperation(material.stencilZFail, 'material.stencilZFail')
   }
   if (Number.isFinite(material.stencilZPass)) {
-    props.stencilZPass = finiteIntegerOrDefault(material.stencilZPass, KeepStencilOp)
+    props.stencilZPass = materialStencilOperation(material.stencilZPass, 'material.stencilZPass')
   }
   if (material.side === BackSide) {
     props.side = 'back'
@@ -963,8 +994,63 @@ function materialBlending(material: ThreeMaterialLike): string | undefined {
     case CustomBlending:
       return 'custom'
     default:
+      if (material.blending != null) {
+        throw new Error(
+          `material.blending ${String(material.blending)} is not supported by @headless-three/renderer. Use a Three.js blending constant such as NormalBlending, AdditiveBlending, or CustomBlending.`,
+        )
+      }
       return undefined
   }
+}
+
+function materialBlendEquationOrDefault(value: unknown, label: string, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return materialBlendEquation(value, label)
+}
+
+function materialBlendEquation(value: unknown, label: string): number {
+  if (
+    value === AddEquation ||
+    value === SubtractEquation ||
+    value === ReverseSubtractEquation ||
+    value === MinEquation ||
+    value === MaxEquation
+  ) {
+    return value
+  }
+  throw new Error(
+    `${label} ${String(value)} is not supported by @headless-three/renderer. Use a Three.js blend equation constant such as AddEquation, SubtractEquation, ReverseSubtractEquation, MinEquation, or MaxEquation.`,
+  )
+}
+
+function materialBlendFactorOrDefault(value: unknown, label: string, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return materialBlendFactor(value, label)
+}
+
+function materialBlendFactor(value: unknown, label: string): number {
+  if (
+    value === ZeroFactor ||
+    value === OneFactor ||
+    value === SrcColorFactor ||
+    value === OneMinusSrcColorFactor ||
+    value === SrcAlphaFactor ||
+    value === OneMinusSrcAlphaFactor ||
+    value === DstAlphaFactor ||
+    value === OneMinusDstAlphaFactor ||
+    value === DstColorFactor ||
+    value === OneMinusDstColorFactor ||
+    value === SrcAlphaSaturateFactor ||
+    value === ConstantColorFactor ||
+    value === OneMinusConstantColorFactor ||
+    value === ConstantAlphaFactor ||
+    value === OneMinusConstantAlphaFactor
+  ) {
+    return value
+  }
+  throw new Error(
+    `${label} ${String(value)} is not supported by @headless-three/renderer. Use a Three.js blend factor constant such as SrcAlphaFactor, OneMinusSrcAlphaFactor, OneFactor, or ZeroFactor.`,
+  )
 }
 
 function materialDepthFunc(material: ThreeMaterialLike): string | undefined {
@@ -991,6 +1077,42 @@ function materialDepthFunc(material: ThreeMaterialLike): string | undefined {
         `material.depthFunc ${String(material.depthFunc)} is not supported by @headless-three/renderer. Use a Three.js depth comparison constant such as LessEqualDepth, GreaterDepth, or AlwaysDepth.`,
       )
   }
+}
+
+function materialStencilFunc(value: unknown, label: string): number {
+  if (
+    value === NeverStencilFunc ||
+    value === LessStencilFunc ||
+    value === EqualStencilFunc ||
+    value === LessEqualStencilFunc ||
+    value === GreaterStencilFunc ||
+    value === NotEqualStencilFunc ||
+    value === GreaterEqualStencilFunc ||
+    value === AlwaysStencilFunc
+  ) {
+    return value
+  }
+  throw new Error(
+    `${label} ${String(value)} is not supported by @headless-three/renderer. Use a Three.js stencil function constant such as AlwaysStencilFunc, EqualStencilFunc, or NotEqualStencilFunc.`,
+  )
+}
+
+function materialStencilOperation(value: unknown, label: string): number {
+  if (
+    value === ZeroStencilOp ||
+    value === KeepStencilOp ||
+    value === ReplaceStencilOp ||
+    value === IncrementStencilOp ||
+    value === DecrementStencilOp ||
+    value === IncrementWrapStencilOp ||
+    value === DecrementWrapStencilOp ||
+    value === InvertStencilOp
+  ) {
+    return value
+  }
+  throw new Error(
+    `${label} ${String(value)} is not supported by @headless-three/renderer. Use a Three.js stencil operation constant such as KeepStencilOp, ReplaceStencilOp, or InvertStencilOp.`,
+  )
 }
 
 export function materialShadowSide(material: ThreeMaterialLike | undefined): string | undefined {
