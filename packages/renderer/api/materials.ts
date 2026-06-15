@@ -33,6 +33,9 @@ const AddOperation = 2
 const FrontSide = 0
 const BackSide = 1
 const DoubleSide = 2
+const DefaultIridescenceIor = 1.3
+const DefaultIridescenceThicknessMin = 100
+const DefaultIridescenceThicknessMax = 400
 
 // Three.js blending constants
 const NoBlending = 0
@@ -1031,12 +1034,31 @@ function assertSupportedMaterialState(
   if (
     (Number.isFinite(material.iridescence) && material.iridescence! > 0) ||
     material.iridescenceMap != null ||
-    material.iridescenceThicknessMap != null
+    material.iridescenceThicknessMap != null ||
+    nonDefaultIridescenceIor(material.iridescenceIOR) ||
+    nonDefaultIridescenceThicknessRange(material.iridescenceThicknessRange)
   ) {
     throw new Error(
       'MeshPhysicalMaterial iridescence is not supported by @headless-three/renderer yet. Disable iridescence or bake the effect into textures before rendering.',
     )
   }
+}
+
+function nonDefaultIridescenceIor(value: unknown): boolean {
+  if (value == null) return false
+  return typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    Math.abs(value - DefaultIridescenceIor) > 1e-12
+}
+
+function nonDefaultIridescenceThicknessRange(value: ArrayLike<number> | undefined): boolean {
+  if (value == null) return false
+  const min = value[0]
+  const max = value[1]
+  if (typeof min !== 'number' || typeof max !== 'number') return true
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return true
+  return Math.abs(min - DefaultIridescenceThicknessMin) > 1e-12 ||
+    Math.abs(max - DefaultIridescenceThicknessMax) > 1e-12
 }
 
 function assertSupportedMaterialClass(

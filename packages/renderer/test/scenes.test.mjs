@@ -5856,6 +5856,14 @@ test('MeshPhysicalMaterial iridescence inputs fail clearly', () => {
   iridescenceThicknessMap.iridescenceThicknessMap = solidTexture(255, 255, 255)
   cases.push([iridescenceThicknessMap, /iridescence.*not supported/i, 'iridescenceThicknessMap'])
 
+  const iridescenceIor = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+  iridescenceIor.iridescenceIOR = 1.5
+  cases.push([iridescenceIor, /iridescence.*not supported/i, 'iridescenceIOR'])
+
+  const iridescenceThicknessRange = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+  iridescenceThicknessRange.iridescenceThicknessRange = [50, 500]
+  cases.push([iridescenceThicknessRange, /iridescence.*not supported/i, 'iridescenceThicknessRange'])
+
   for (const [material, pattern, label] of cases) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
