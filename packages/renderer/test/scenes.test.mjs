@@ -9630,6 +9630,31 @@ test('LineBasicMaterial alphaMap samples the selected secondary UV channel', () 
   assert.ok(primary < secondary * 0.3, `line alphaMap channel=0 should sample the transparent primary UV texel (${primary} vs ${secondary})`)
 })
 
+test('LineBasicMaterial mixed non-primary texture channels fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.channel = 1
+  const alphaMap = solidTexture(255, 255, 255)
+  alphaMap.channel = 2
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(1, 0, 0),
+  ])
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.LineBasicMaterial({ color: 0xffffff, map, alphaTest: 0.5 })
+  material.alphaMap = alphaMap
+  scene.add(new THREE.Line(
+    geometry,
+    material,
+  ))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /multiple non-primary texture\.channel values.*1.*2.*one secondary UV attribute/i,
+  )
+})
+
 test('LineBasicMaterial map RGB multiplies line color from UVs', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
