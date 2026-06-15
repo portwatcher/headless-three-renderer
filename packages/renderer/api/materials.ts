@@ -297,7 +297,7 @@ function extractEnvironmentMapFromTexture(
     }
   }
 
-  return null
+  throw unsupportedTextureImageError(label, 'environment map rendering')
 }
 
 function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: number } | null {
@@ -1373,12 +1373,18 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
     }
   }
 
-  return null
+  throw unsupportedTextureImageError(label, 'texture rendering')
 }
 
 function unsupportedRawTextureDataError(label: string, usage: string): Error {
   return new Error(
     `${label} raw texture data must contain RGB or RGBA numeric pixel data for ${usage}; one-channel, two-channel, and mismatched data lengths are not supported yet.`,
+  )
+}
+
+function unsupportedTextureImageError(label: string, usage: string): Error {
+  return new Error(
+    `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, or raw RGB/RGBA numeric pixel data as { data, width, height } before rendering.`,
   )
 }
 

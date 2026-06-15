@@ -4786,6 +4786,40 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
   }
 })
 
+test('browser-like texture image objects fail clearly in Node slots', () => {
+  function browserLikeTexture() {
+    const texture = new THREE.Texture({ width: 1, height: 1, complete: true })
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const cases = [
+    ['material map', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: browserLikeTexture() }),
+      ))
+    }, /texture image object.*not readable.*texture rendering/i],
+    ['background', (scene) => {
+      scene.background = browserLikeTexture()
+    }, /background.*texture image object.*not readable.*texture rendering/i],
+    ['environment', (scene) => {
+      scene.environment = browserLikeTexture()
+    }, /scene\.environment.*texture image object.*not readable.*environment map rendering/i],
+  ]
+
+  for (const [name, setup, pattern] of cases) {
+    const scene = new THREE.Scene()
+    setup(scene)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('base color maps decode sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)

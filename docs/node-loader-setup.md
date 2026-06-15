@@ -112,10 +112,10 @@ forms:
 
 - `texture.image = Buffer | Uint8Array` for encoded PNG/JPEG/WebP bytes.
 - `texture.source.data = Buffer | Uint8Array` for encoded PNG/JPEG/WebP bytes.
-- `texture.image = { data, width, height }` for raw RGBA8 data.
+- `texture.image = { data, width, height }` for raw RGB/RGBA data.
 
 Compressed KTX2/Basis textures are not decoded by the renderer yet. Decode them
-to RGBA data or convert them to PNG/JPEG/WebP before rendering.
+to RGB/RGBA data or convert them to PNG/JPEG/WebP before rendering.
 
 ## Optional Polyfills
 
@@ -129,4 +129,6 @@ Only install polyfills that your loader path actually uses:
   Three.js `TextureLoader`/`ImageLoader`.
 
 If a polyfilled image loader returns browser image objects instead of encoded
-bytes or raw RGBA data, normalize those textures before calling `render()`.
+bytes or raw RGB/RGBA data, normalize those textures before calling `render()`.
+The renderer fails clearly for browser `Image`/`ImageBitmap`/canvas-like
+texture objects because their pixels are not readable in headless Node.
