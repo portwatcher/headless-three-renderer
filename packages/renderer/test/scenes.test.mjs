@@ -1649,6 +1649,24 @@ test('unsupported material envMap inputs fail clearly', () => {
     )
   }
 
+  {
+    const cubeUvEnvMap = Object.assign(solidTexture(255, 255, 255), {
+      mapping: THREE.CubeUVReflectionMapping,
+    })
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, envMap: cubeUvEnvMap }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /material\.envMap.*refraction or PMREM\/CubeUV environment mapping.*not supported/i,
+      'material envMap CubeUV mapping',
+    )
+  }
+
   const firstEnvMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
   })
