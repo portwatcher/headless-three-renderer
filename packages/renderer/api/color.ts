@@ -13,24 +13,7 @@ export function colorLikeToArray(value: unknown): Color4 | null {
   return null
 }
 
-export function normalizeColorArray(values: number[], label?: string): Color4 {
-  if (values.length !== 3 && values.length !== 4) {
-    throw new TypeError(label ? `${label} must be [r, g, b] or [r, g, b, a]` : 'Color arrays must be [r, g, b] or [r, g, b, a]')
-  }
-  return [
-    clamp01(assertFiniteColorComponent(values[0], colorComponentLabel(label, 0, 'r'))),
-    clamp01(assertFiniteColorComponent(values[1], colorComponentLabel(label, 1, 'g'))),
-    clamp01(assertFiniteColorComponent(values[2], colorComponentLabel(label, 2, 'b'))),
-    clamp01(values.length === 4 ? assertFiniteColorComponent(values[3], colorComponentLabel(label, 3, 'a')) : 1),
-  ]
-}
-
-export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions): Color4 {
-  const color = backgroundColorToArray(options.background, 'options.background') ?? backgroundColorToArray(scene.background, 'scene.background')
-  return color ?? [0.04, 0.045, 0.05, 1]
-}
-
-function backgroundColorToArray(value: unknown, label: string): Color4 | null {
+export function strictColorLikeToArray(value: unknown, label: string): Color4 | null {
   if (!value) return null
   if (Array.isArray(value)) return normalizeColorArray(value, label)
   if (typeof value !== 'object') return null
@@ -44,6 +27,23 @@ function backgroundColorToArray(value: unknown, label: string): Color4 | null {
     clamp01(assertFiniteColorComponent(color.b, `${label}.b`)),
     clamp01(color.a === undefined ? 1 : assertFiniteColorComponent(color.a, `${label}.a`)),
   ]
+}
+
+export function normalizeColorArray(values: number[], label?: string): Color4 {
+  if (values.length !== 3 && values.length !== 4) {
+    throw new TypeError(label ? `${label} must be [r, g, b] or [r, g, b, a]` : 'Color arrays must be [r, g, b] or [r, g, b, a]')
+  }
+  return [
+    clamp01(assertFiniteColorComponent(values[0], colorComponentLabel(label, 0, 'r'))),
+    clamp01(assertFiniteColorComponent(values[1], colorComponentLabel(label, 1, 'g'))),
+    clamp01(assertFiniteColorComponent(values[2], colorComponentLabel(label, 2, 'b'))),
+    clamp01(values.length === 4 ? assertFiniteColorComponent(values[3], colorComponentLabel(label, 3, 'a')) : 1),
+  ]
+}
+
+export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions): Color4 {
+  const color = strictColorLikeToArray(options.background, 'options.background') ?? strictColorLikeToArray(scene.background, 'scene.background')
+  return color ?? [0.04, 0.045, 0.05, 1]
 }
 
 function isColorShaped(value: ColorLikeWithAlpha): boolean {

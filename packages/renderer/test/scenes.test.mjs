@@ -6813,6 +6813,13 @@ test('invalid fog parameter values fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
     /scene\.fog\.density must be a finite number/i,
   )
+
+  scene.fog = new THREE.Fog(0x00ff00, 0, 1)
+  scene.fog.color = { isColor: true, r: 0, g: Number.POSITIVE_INFINITY, b: 0 }
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.color\.g must be a finite number/i,
+  )
 })
 
 test('Fog affects sprites, points, and lines with material fog opt-out', () => {

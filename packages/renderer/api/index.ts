@@ -22,7 +22,7 @@ import type {
 const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
-import { colorLikeToArray, resolveBackground } from './color'
+import { resolveBackground, strictColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
@@ -973,7 +973,7 @@ function formatWgslFloat(value: number): string {
 
 function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene> {
   if (!fog) return {}
-  const color = colorLikeToArray(fog.color)
+  const color = strictColorLikeToArray(fog.color, 'scene.fog.color')
   if (fog.isFogExp2) {
     return {
       fogType: 'exp2',
