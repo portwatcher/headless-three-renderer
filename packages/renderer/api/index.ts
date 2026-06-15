@@ -597,6 +597,10 @@ type PixelRect = {
   width: number
   height: number
 }
+type InternalRenderOptions = RenderOptions & {
+  __headlessThreeViewportLabel?: string
+  __headlessThreeScissorLabel?: string
+}
 
 const WEBGL_COORDINATE_SYSTEM = 2000
 const CUBE_FACE_COUNT = 6
@@ -630,7 +634,7 @@ function renderCubeCamera(
   const { width, height } = cubeMipmapSize(targetWidth, targetHeight, activeMipmapLevel)
   const outputFormat = options.format ?? (options.target ? 'rgba' : 'png')
   const subCameras = cubeSubCameras(camera)
-  const faceOptions: RenderOptions = {
+  const faceOptions: InternalRenderOptions = {
     ...options,
     target,
     width,
@@ -638,6 +642,8 @@ function renderCubeCamera(
     format: 'rgba',
     viewport: cubeMipmapViewport(options, target, activeMipmapLevel),
     scissor: cubeMipmapScissor(options, target, activeMipmapLevel),
+    __headlessThreeViewportLabel: cubeMipmapViewportLabel(options),
+    __headlessThreeScissorLabel: cubeMipmapScissorLabel(options, target),
   }
   const faces: Buffer[] = []
   const depthFaces: NonNullable<RenderTargetImageLike['data']>[] = []
@@ -743,6 +749,11 @@ function cubeMipmapViewport(
   return cubeMipmapRect(target.viewport, activeMipmapLevel)
 }
 
+function cubeMipmapViewportLabel(options: RenderOptions): string | undefined {
+  if (options.viewport !== undefined) return 'options.viewport'
+  return 'target.viewport'
+}
+
 function cubeMipmapScissor(
   options: RenderOptions,
   target: RenderTargetLike,
@@ -750,6 +761,11 @@ function cubeMipmapScissor(
 ): RenderPixelRectLike | null | undefined {
   if (options.scissor !== undefined) return options.scissor
   return target.scissorTest === true ? cubeMipmapRect(target.scissor, activeMipmapLevel) : undefined
+}
+
+function cubeMipmapScissorLabel(options: RenderOptions, target: RenderTargetLike): string | undefined {
+  if (options.scissor !== undefined) return 'options.scissor'
+  return target.scissorTest === true ? 'target.scissor' : undefined
 }
 
 function cubeMipmapRect(rect: RenderPixelRectLike | null | undefined, activeMipmapLevel: number): RenderPixelRectLike | null | undefined {
@@ -1109,10 +1125,14 @@ function effectiveScissor(options: RenderOptions): RenderPixelRectLike | null | 
 }
 
 function effectiveViewportLabel(options: RenderOptions): string {
+  const internalLabel = (options as InternalRenderOptions).__headlessThreeViewportLabel
+  if (internalLabel) return internalLabel
   return options.viewport !== undefined ? 'options.viewport' : 'target.viewport'
 }
 
 function effectiveScissorLabel(options: RenderOptions): string {
+  const internalLabel = (options as InternalRenderOptions).__headlessThreeScissorLabel
+  if (internalLabel) return internalLabel
   return options.scissor !== undefined ? 'options.scissor' : 'target.scissor'
 }
 

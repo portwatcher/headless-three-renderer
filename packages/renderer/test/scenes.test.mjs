@@ -14620,6 +14620,14 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   cubeTarget.viewport = { x: 0, y: 0, width: '32', height: 32 }
   assert.throws(
     () => renderToTarget(scene, cubeCamera, cubeTarget),
-    /options\.viewport must contain finite x, y, width, and height values/i,
+    /target\.viewport must contain finite x, y, width, and height values/i,
+  )
+
+  cubeTarget.viewport = undefined
+  cubeTarget.scissorTest = true
+  cubeTarget.scissor = { x: 0, y: 0, width: 64, height: 32 }
+  assert.throws(
+    () => renderToTarget(scene, cubeCamera, cubeTarget),
+    /target\.scissor must fit inside the render target/i,
   )
 })
