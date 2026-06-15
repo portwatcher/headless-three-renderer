@@ -12,6 +12,7 @@ export function createSceneCorpus() {
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
     meshDepthMaterialCorpus(),
+    meshMatcapMaterialCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
     lightProbeCorpus(),
@@ -389,6 +390,38 @@ function meshDepthMaterialCorpus() {
     camera,
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
+    minNonBackgroundRatio: 0.02,
+  }
+}
+
+function meshMatcapMaterialCorpus() {
+  const matcap = new THREE.DataTexture(new Uint8Array([
+    40, 70, 130, 255,
+    245, 210, 140, 255,
+    90, 170, 210, 255,
+    255, 255, 240, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  matcap.colorSpace = THREE.SRGBColorSpace
+  matcap.magFilter = THREE.LinearFilter
+  matcap.minFilter = THREE.LinearFilter
+  matcap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.025, 0.03)
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 24, 16),
+    new THREE.MeshMatcapMaterial({
+      color: 0xffffff,
+      matcap,
+    }),
+  ))
+
+  return {
+    name: 'mesh-matcap-material-map',
+    scene,
+    camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 6, 8],
     minNonBackgroundRatio: 0.02,
   }
 }
