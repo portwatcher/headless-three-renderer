@@ -9859,6 +9859,17 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   )
 
   const targetCases = [
+    [{ texture: 'bad' }, /target\.texture must be a texture-like object/i, 'color texture container'],
+    [{ texture: [] }, /target\.texture must contain one texture-like object/i, 'empty texture array'],
+    [{ texture: ['bad'] }, /target\.texture\[0\] must be a texture-like object/i, 'texture array element'],
+    [{ textures: 'bad' }, /target\.textures must be an array of texture-like objects/i, 'textures container'],
+    [{ textures: [] }, /target\.textures must contain one texture-like object/i, 'empty textures array'],
+    [{ textures: ['bad'] }, /target\.textures\[0\] must be a texture-like object/i, 'textures array element'],
+    [{ depthTexture: 'bad' }, /target\.depthTexture must be a texture-like object/i, 'depth texture container'],
+    [{ texture: { image: 'bad' } }, /target\.texture\.image must be an image-like object/i, 'texture image container'],
+    [{ texture: { mipmaps: ['bad'] } }, /target\.texture\.mipmaps\[0\] must be an image-like object/i, 'texture mipmap container'],
+    [{ texture: { source: 'bad' } }, /target\.texture\.source must be a source-like object/i, 'texture source container'],
+    [{ texture: { source: { data: 'bad' } } }, /target\.texture\.source\.data must be an image-like object/i, 'texture source data container'],
     [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'texture array'],
     [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
     [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],

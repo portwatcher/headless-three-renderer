@@ -1362,6 +1362,9 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
       'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
     )
   }
+  assertRenderTargetTextureSlot(target.texture, 'target.texture')
+  assertRenderTargetTexturesSlot(target.textures, 'target.textures')
+  if (target.depthTexture != null) assertRenderTargetTextureLike(target.depthTexture, 'target.depthTexture')
   assertSupportedSampleCount(target.samples, 'target.samples')
   assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
   assertSupportedRenderTargetColorTexture(renderTargetColorTexture(target))
@@ -1403,6 +1406,78 @@ function assertSupportedOutputColorSpace(value: unknown): void {
   throw new Error(
     `options.outputColorSpace ${String(value)} is not supported by @headless-three/renderer. Use THREE.SRGBColorSpace or THREE.LinearSRGBColorSpace.`,
   )
+}
+
+function assertRenderTargetTextureSlot(value: unknown, label: string): void {
+  if (value == null) return
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      throw new TypeError(`${label} must contain one texture-like object when provided as an array.`)
+    }
+    if (value.length === 1) {
+      assertRenderTargetTextureLike(value[0], `${label}[0]`)
+    }
+    return
+  }
+  assertRenderTargetTextureLike(value, label)
+}
+
+function assertRenderTargetTexturesSlot(value: unknown, label: string): void {
+  if (value == null) return
+  if (!Array.isArray(value)) {
+    throw new TypeError(`${label} must be an array of texture-like objects.`)
+  }
+  if (value.length === 0) {
+    throw new TypeError(`${label} must contain one texture-like object when provided.`)
+  }
+  if (value.length === 1) {
+    assertRenderTargetTextureLike(value[0], `${label}[0]`)
+  }
+}
+
+function assertRenderTargetTextureLike(value: unknown, label: string): asserts value is RenderTargetTextureLike {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a texture-like object.`)
+  }
+  const texture = value as RenderTargetTextureLike
+  assertRenderTargetImageSlot(texture.image, `${label}.image`)
+  assertRenderTargetMipmaps(texture.mipmaps, `${label}.mipmaps`)
+  assertRenderTargetSource(texture.source, `${label}.source`)
+}
+
+function assertRenderTargetSource(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a source-like object.`)
+  }
+  assertRenderTargetImageSlot((value as { data?: unknown }).data, `${label}.data`)
+}
+
+function assertRenderTargetMipmaps(value: unknown, label: string): void {
+  if (value == null) return
+  if (!Array.isArray(value)) {
+    throw new TypeError(`${label} must be an array of image-like objects.`)
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    assertRenderTargetImageLike(value[index], `${label}[${index}]`)
+  }
+}
+
+function assertRenderTargetImageSlot(value: unknown, label: string): void {
+  if (value == null) return
+  if (Array.isArray(value)) {
+    value.forEach((image, index) => {
+      assertRenderTargetImageLike(image, `${label}[${index}]`)
+    })
+    return
+  }
+  assertRenderTargetImageLike(value, label)
+}
+
+function assertRenderTargetImageLike(value: unknown, label: string): asserts value is RenderTargetImageLike {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an image-like object.`)
+  }
 }
 
 function validatePostProcessingOptions(value: unknown): void {
