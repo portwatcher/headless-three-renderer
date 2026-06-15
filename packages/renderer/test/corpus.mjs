@@ -12,6 +12,7 @@ export function createSceneCorpus() {
     materialEnvMapCorpus(),
     globalClippingPlaneCorpus(),
     lightProbeCorpus(),
+    linearFogCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -118,6 +119,35 @@ function lightProbeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [8, 8, 10],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function linearFogCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.03)
+  scene.fog = new THREE.Fog(0x3366ff, 1.2, 3.2)
+
+  const fogged = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.82, 1.45),
+    new THREE.MeshBasicMaterial({ color: 0xff4422 }),
+  )
+  fogged.position.set(-0.48, 0, 0)
+  scene.add(fogged)
+
+  const unfogged = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.82, 1.45),
+    new THREE.MeshBasicMaterial({ color: 0xff4422, fog: false }),
+  )
+  unfogged.position.set(0.48, 0, 0)
+  scene.add(unfogged)
+
+  return {
+    name: 'linear-fog-material-opt-out',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 5, 8],
+    minNonBackgroundRatio: 0.08,
   }
 }
 
