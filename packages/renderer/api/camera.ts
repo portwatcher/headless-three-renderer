@@ -1,35 +1,49 @@
 import type { ThreeCameraLike, RenderOptions, Mat4 } from './types'
-import { OPENGL_TO_WGPU_CLIP, multiplyMatrices, matrixElements, numberOrUndefined, isFinitePositive } from './math'
+import { OPENGL_TO_WGPU_CLIP, multiplyMatrices, matrixElements, isFinitePositive } from './math'
 
 const DEFAULT_WIDTH = 512
 const DEFAULT_HEIGHT = 512
 
 export function resolveSize(camera: ThreeCameraLike, options: RenderOptions): { width: number; height: number } {
-  let width = numberOrUndefined(options.width) ?? numberOrUndefined(options.target?.width)
-  let height = numberOrUndefined(options.height) ?? numberOrUndefined(options.target?.height)
+  let width = optionalDimension(options.width, 'options.width') ?? optionalDimension(options.target?.width, 'target.width')
+  let height = optionalDimension(options.height, 'options.height') ?? optionalDimension(options.target?.height, 'target.height')
+  let widthLabel = options.width != null ? 'options.width' : options.target?.width != null ? 'target.width' : 'output width'
+  let heightLabel = options.height != null ? 'options.height' : options.target?.height != null ? 'target.height' : 'output height'
 
   if (width == null && height == null) {
-    width = numberOrUndefined(camera.userData?.width) ?? DEFAULT_WIDTH
-    height = numberOrUndefined(camera.userData?.height)
+    width = optionalDimension(camera.userData?.width, 'camera.userData.width') ?? DEFAULT_WIDTH
+    height = optionalDimension(camera.userData?.height, 'camera.userData.height')
+    widthLabel = camera.userData?.width != null ? 'camera.userData.width' : 'output width'
+    heightLabel = camera.userData?.height != null ? 'camera.userData.height' : 'output height'
   }
   if (height == null && width != null && isFinitePositive(camera.aspect)) {
     height = Math.round(width / camera.aspect)
+    heightLabel = 'camera.aspect-derived height'
   }
   if (width == null && height != null && isFinitePositive(camera.aspect)) {
     width = Math.round(height * camera.aspect!)
+    widthLabel = 'camera.aspect-derived width'
   }
 
   width ??= DEFAULT_WIDTH
   height ??= DEFAULT_HEIGHT
 
   if (!Number.isInteger(width) || width <= 0) {
-    throw new TypeError('render options width must be a positive integer')
+    throw new TypeError(`${widthLabel} must be a positive integer.`)
   }
   if (!Number.isInteger(height) || height <= 0) {
-    throw new TypeError('render options height must be a positive integer')
+    throw new TypeError(`${heightLabel} must be a positive integer.`)
   }
 
   return { width, height }
+}
+
+function optionalDimension(value: unknown, label: string): number | undefined {
+  if (value == null) return undefined
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  return value
 }
 
 export function cameraViewProjection(camera: ThreeCameraLike): Mat4 {

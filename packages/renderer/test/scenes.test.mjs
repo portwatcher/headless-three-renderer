@@ -282,6 +282,32 @@ test('unsupported output format values fail clearly', () => {
   )
 })
 
+test('invalid output dimensions fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  const camera = makeCamera()
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: '64', height: 32 }),
+    /options\.width must be a finite number/i,
+  )
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 0 }),
+    /options\.height must be a positive integer/i,
+  )
+  assert.throws(
+    () => renderToTarget(scene, camera, { width: Number.NaN, height: 32 }),
+    /target\.width must be a finite number/i,
+  )
+
+  const userDataCamera = makeCamera()
+  userDataCamera.userData.width = 32.5
+  assert.throws(
+    () => new Renderer().render(scene, userDataCamera, { format: 'rgba' }),
+    /camera\.userData\.width must be a positive integer/i,
+  )
+})
+
 function makeLayeredArrayCamera(width = 64, height = 64) {
   const leftCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   leftCamera.position.set(0, 0, 3)

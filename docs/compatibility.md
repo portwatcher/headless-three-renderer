@@ -12,7 +12,7 @@ Status keys:
 
 | Feature | Status | Notes |
 |---|---|---|
-| `render(scene, camera, options)` | Supported | Accepts a `THREE.Scene` or `THREE.Object3D` root and returns PNG by default or raw RGBA when `options.format` is `'rgba'`; unsupported output formats fail clearly. |
+| `render(scene, camera, options)` | Supported | Accepts a `THREE.Scene` or `THREE.Object3D` root and returns PNG by default or raw RGBA when `options.format` is `'rgba'`; unsupported output formats and invalid explicit dimensions fail clearly. |
 | `Renderer` reusable instance | Supported | Reuses the native renderer object across calls. |
 | `renderToTarget()` / `options.target` | Supported | Populates target-like `{ width, height, data, texture.image.data }` fields with RGBA8 for a single color output, including one-element `target.texture` arrays and `target.textures[0]`. Target `depthTexture` objects receive normalized depth readback, including scissor clipping and alpha-tested cutouts; `THREE.FloatType` depth textures receive scalar `Float32Array` data, `HalfFloatType` receives `Uint16Array` half-float data, `UnsignedByteType`/`UnsignedShortType`/`UnsignedIntType` depth textures receive scalar unsigned typed arrays, `UnsignedInt248Type` receives `Uint32Array` data with normalized depth24 in the high bits and zero stencil bytes, and plain depth target objects receive RGBA8 bytes. 4x MSAA resolves into target readback buffers; multiple color attachments, unsupported sample counts, unsupported color target texture format/type requests, and unsupported depth texture type/format pairings fail clearly. |
 | Post-processing options | Supported | Exposure, contrast, saturation, vignette, grayscale, and invert; invalid effect values fail clearly. |
