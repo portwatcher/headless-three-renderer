@@ -9649,6 +9649,17 @@ test('invalid environment and background rotation values fail clearly', () => {
     /scene\.backgroundRotation\[3\] must be one of XYZ, YXZ, ZXY, ZYX, YZX, or XZY/i,
   )
 
+  const optionBackgroundScene = new THREE.Scene()
+  optionBackgroundScene.background = splitEnvironmentTexture()
+  assert.throws(
+    () => renderRgba(optionBackgroundScene, camera, {
+      width: 32,
+      height: 32,
+      backgroundRotation: { x: 'left', y: 0, z: 0 },
+    }),
+    /options\.backgroundRotation\.x must be a finite number/i,
+  )
+
   const environmentScene = new THREE.Scene()
   environmentScene.background = new THREE.Color(0, 0, 0)
   environmentScene.environment = splitEnvironmentTexture()
@@ -9660,6 +9671,22 @@ test('invalid environment and background rotation values fail clearly', () => {
   assert.throws(
     () => renderRgba(environmentScene, camera, { width: 32, height: 32 }),
     /scene\.environmentRotation\[1\] must be a finite number/i,
+  )
+
+  const optionEnvironmentScene = new THREE.Scene()
+  optionEnvironmentScene.background = new THREE.Color(0, 0, 0)
+  optionEnvironmentScene.environment = splitEnvironmentTexture()
+  optionEnvironmentScene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+  ))
+  assert.throws(
+    () => renderRgba(optionEnvironmentScene, camera, {
+      width: 32,
+      height: 32,
+      environmentRotation: [0, Number.NaN, 0],
+    }),
+    /options\.environmentRotation\[1\] must be a finite number/i,
   )
 })
 
@@ -9753,6 +9780,37 @@ test('scene environmentRotation rotates equirectangular IBL', () => {
   const rotated = renderWithRotation(-Math.PI / 2)
   assert.ok(unrotated.r > unrotated.g + 15, `unrotated reflection should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
   assert.ok(rotated.g > rotated.r + 15, `rotated reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+})
+
+test('options.environmentRotation overrides scene environmentRotation', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.environment = splitEnvironmentTexture()
+  scene.environmentIntensity = 4
+  scene.environmentRotation = new THREE.Euler(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const sceneRotation = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 24, 24, 40, 40)
+  const optionRotation = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    environmentRotation: new THREE.Euler(0, -Math.PI / 2, 0),
+  }), 64, 64, 24, 24, 40, 40)
+
+  assert.ok(sceneRotation.r > sceneRotation.g + 15, `scene rotation should sample red environment half (${sceneRotation.r} vs ${sceneRotation.g})`)
+  assert.ok(optionRotation.g > optionRotation.r + 15, `options.environmentRotation should override to green half (${optionRotation.g} vs ${optionRotation.r})`)
 })
 
 test('scene environmentRotation rotates cube IBL', () => {
@@ -12656,6 +12714,44 @@ test('equirect background textures honor scene backgroundRotation', () => {
   const rotated = renderWithRotation(Math.PI)
   assert.ok(unrotated.r > unrotated.g + 80, `unrotated -Z view should sample red (${unrotated.r} vs ${unrotated.g})`)
   assert.ok(rotated.g > rotated.r + 80, `rotated -Z view should sample green (${rotated.g} vs ${rotated.r})`)
+})
+
+test('options.backgroundRotation overrides scene backgroundRotation', () => {
+  const background = rgbaTexture([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ], 8, 1)
+  background.mapping = THREE.EquirectangularReflectionMapping
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = background
+  scene.backgroundRotation = new THREE.Euler(0, 0, 0)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 0)
+  camera.lookAt(new THREE.Vector3(0, 0, -1))
+
+  const sceneRotation = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 28, 28, 36, 36)
+  const optionRotation = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    backgroundRotation: new THREE.Euler(0, Math.PI, 0),
+  }), 64, 64, 28, 28, 36, 36)
+
+  assert.ok(sceneRotation.r > sceneRotation.g + 80, `scene backgroundRotation should keep red -Z view (${sceneRotation.r} vs ${sceneRotation.g})`)
+  assert.ok(optionRotation.g > optionRotation.r + 80, `options.backgroundRotation should override to green -Z view (${optionRotation.g} vs ${optionRotation.r})`)
 })
 
 test('cube DataTexture backgrounds sample from camera direction', () => {

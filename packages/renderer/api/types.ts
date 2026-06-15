@@ -451,6 +451,8 @@ export interface RenderOptions {
   background?: number[] | ThreeColorLike | ThreeTextureLike
   backgroundIntensity?: number
   backgroundBlurriness?: number
+  backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null
+  environmentRotation?: ThreeEulerLike | ArrayLike<number> | null
   viewport?: RenderPixelRectLike | null
   scissor?: RenderPixelRectLike | null
   clippingPlanes?: ThreePlaneLike[] | null

@@ -263,8 +263,13 @@ function toNativeInput(
   const size = resolveSize(camera, options)
   const environment = colorMode ? resolveEnvironmentMap(scene) : { envMap: null }
   const envMap = environment.envMap
-  const environmentRotation = environment.rotation ?? scene.environmentRotation
-  const environmentRotationLabel = environment.rotation ? 'material.envMapRotation' : 'scene.environmentRotation'
+  const hasEnvironmentRotationOverride = options.environmentRotation !== undefined
+  const environmentRotation = environment.rotation ?? (
+    hasEnvironmentRotationOverride ? options.environmentRotation : scene.environmentRotation
+  )
+  const environmentRotationLabel = environment.rotation
+    ? 'material.envMapRotation'
+    : hasEnvironmentRotationOverride ? 'options.environmentRotation' : 'scene.environmentRotation'
   const environmentMapRotation = colorMode
     ? environmentRotationToNative(environmentRotation, envMap, environmentRotationLabel)
     : undefined
@@ -275,8 +280,14 @@ function toNativeInput(
   const backgroundTexture = colorMode
     ? optionBackgroundTexture ?? (hasBackgroundOverride ? null : extractBackgroundTexture(scene.background, 'scene.background'))
     : null
+  const hasBackgroundRotationOverride = options.backgroundRotation !== undefined
+  const backgroundRotation = hasBackgroundRotationOverride ? options.backgroundRotation : scene.backgroundRotation
   const backgroundTextureRotation = colorMode
-    ? backgroundRotationToNative(scene.backgroundRotation, backgroundTexture)
+    ? backgroundRotationToNative(
+      backgroundRotation,
+      backgroundTexture,
+      hasBackgroundRotationOverride ? 'options.backgroundRotation' : 'scene.backgroundRotation',
+    )
     : undefined
   const backgroundTextureBlurriness = colorMode && backgroundTexture
     ? optionalFiniteNumber(
@@ -1090,12 +1101,13 @@ type EulerComponents = { x: number; y: number; z: number; order: EulerOrder }
 function backgroundRotationToNative(
   rotation: ThreeSceneRootLike['backgroundRotation'],
   backgroundTexture: { mapping?: string } | null,
+  label = 'scene.backgroundRotation',
 ): number[] | undefined {
-  const euler = optionalEulerComponents(rotation, 'scene.backgroundRotation')
+  const euler = optionalEulerComponents(rotation, label)
   if (!euler || !hasNonZeroEulerRotation(euler)) return undefined
   if (backgroundTexture?.mapping !== 'equirectangular') {
     throw new Error(
-      'scene.backgroundRotation is only supported for equirectangular or cube texture backgrounds by @headless-three/renderer. Leave backgroundRotation at its default for color/2D backgrounds or pre-rotate the background texture before rendering.',
+      `${label} is only supported for equirectangular or cube texture backgrounds by @headless-three/renderer. Leave backgroundRotation at its default for color/2D backgrounds or pre-rotate the background texture before rendering.`,
     )
   }
   const { x, y, z, order } = euler

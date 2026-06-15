@@ -90,6 +90,8 @@ The public API accepts only Three.js-like objects:
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`; invalid explicit color values fail clearly.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds; invalid values fail clearly.
 - `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds; invalid values fail clearly.
+- `options.backgroundRotation`: overrides `scene.backgroundRotation` for supported equirectangular and cube texture backgrounds; invalid or unsupported rotations fail clearly.
+- `options.environmentRotation`: overrides `scene.environmentRotation` for supported scene environments; invalid values fail clearly.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws; invalid rectangles fail clearly.
 - `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws; invalid rectangles fail clearly.
 - `options.clippingPlanes`: global world-space clipping planes for the render.
@@ -111,7 +113,7 @@ The public API accepts only Three.js-like objects:
 - mesh world transforms, with invalid transform matrix values failing clearly
 - `THREE.LOD` camera-distance/zoom level selection, with invalid camera zoom or level distance/hysteresis values failing clearly
 - vertex colors
-- scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; invalid background color/control/rotation values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
+- scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `scene.backgroundRotation`/`options.backgroundRotation`, and equirectangular/cube `scene.environmentRotation`/`options.environmentRotation`; invalid background color/control/rotation values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
 - render-option viewport/scissor rectangles and render-target viewport/scissor fields in output pixel coordinates
 - perspective, orthographic, and custom projection matrices
 
