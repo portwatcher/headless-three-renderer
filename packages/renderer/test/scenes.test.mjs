@@ -7920,26 +7920,66 @@ test('invalid light numeric values fail clearly', () => {
       light.distance = 'far'
       return light
     }, /PointLight\.distance must be a finite number/i],
+    ['point distance negative', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.distance = -1
+      return light
+    }, /PointLight\.distance must be non-negative/i],
     ['point decay', () => {
       const light = new THREE.PointLight(0xffffff, 1)
       light.decay = Number.POSITIVE_INFINITY
       return light
     }, /PointLight\.decay must be a finite number/i],
+    ['point decay negative', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.decay = -0.5
+      return light
+    }, /PointLight\.decay must be non-negative/i],
     ['spot distance', () => {
       const light = new THREE.SpotLight(0xffffff, 1)
       light.distance = Number.NaN
       return light
     }, /SpotLight\.distance must be a finite number/i],
+    ['spot distance negative', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.distance = -1
+      return light
+    }, /SpotLight\.distance must be non-negative/i],
+    ['spot decay negative', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.decay = -0.5
+      return light
+    }, /SpotLight\.decay must be non-negative/i],
     ['spot angle', () => {
       const light = new THREE.SpotLight(0xffffff, 1)
       light.angle = 'wide'
       return light
     }, /SpotLight\.angle must be a finite number/i],
+    ['spot angle negative', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.angle = -0.1
+      return light
+    }, /SpotLight\.angle must be between 0 and Math\.PI \/ 2/i],
+    ['spot angle too wide', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.angle = Math.PI
+      return light
+    }, /SpotLight\.angle must be between 0 and Math\.PI \/ 2/i],
     ['spot penumbra', () => {
       const light = new THREE.SpotLight(0xffffff, 1)
       light.penumbra = Number.NEGATIVE_INFINITY
       return light
     }, /SpotLight\.penumbra must be a finite number/i],
+    ['spot penumbra negative', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.penumbra = -0.1
+      return light
+    }, /SpotLight\.penumbra must be between 0 and 1/i],
+    ['spot penumbra above one', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.penumbra = 1.5
+      return light
+    }, /SpotLight\.penumbra must be between 0 and 1/i],
     ['rect width', () => {
       const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
       light.width = 'wide'

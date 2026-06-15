@@ -70,8 +70,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       color: [color[0], color[1], color[2]],
       intensity,
       position: pos,
-      distance: finiteNumberOrDefault(light.distance, 'PointLight.distance', 0),
-      decay: finiteNumberOrDefault(light.decay, 'PointLight.decay', 2),
+      distance: nonNegativeFiniteNumberOrDefault(light.distance, 'PointLight.distance', 0),
+      decay: nonNegativeFiniteNumberOrDefault(light.decay, 'PointLight.decay', 2),
     }
     if (optionalBoolean(light.castShadow, 'light.castShadow') === true) {
       out.castShadow = true
@@ -100,10 +100,10 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       intensity,
       position: pos,
       direction,
-      distance: finiteNumberOrDefault(light.distance, 'SpotLight.distance', 0),
-      decay: finiteNumberOrDefault(light.decay, 'SpotLight.decay', 2),
-      angle: finiteNumberOrDefault(light.angle, 'SpotLight.angle', Math.PI / 3),
-      penumbra: finiteNumberOrDefault(light.penumbra, 'SpotLight.penumbra', 0),
+      distance: nonNegativeFiniteNumberOrDefault(light.distance, 'SpotLight.distance', 0),
+      decay: nonNegativeFiniteNumberOrDefault(light.decay, 'SpotLight.decay', 2),
+      angle: spotAngleOrDefault(light.angle),
+      penumbra: normalizedFiniteNumberOrDefault(light.penumbra, 'SpotLight.penumbra', 0),
     }
     if (optionalBoolean(light.castShadow, 'light.castShadow') === true) {
       out.castShadow = true
@@ -364,6 +364,30 @@ function finiteNumberOrDefault(value: unknown, label: string, fallback: number):
   if (value == null) return fallback
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function nonNegativeFiniteNumberOrDefault(value: unknown, label: string, fallback: number): number {
+  const number = finiteNumberOrDefault(value, label, fallback)
+  if (number < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+  return number
+}
+
+function normalizedFiniteNumberOrDefault(value: unknown, label: string, fallback: number): number {
+  const number = finiteNumberOrDefault(value, label, fallback)
+  if (number < 0 || number > 1) {
+    throw new TypeError(`${label} must be between 0 and 1.`)
+  }
+  return number
+}
+
+function spotAngleOrDefault(value: unknown): number {
+  const angle = finiteNumberOrDefault(value, 'SpotLight.angle', Math.PI / 3)
+  if (angle < 0 || angle > Math.PI / 2) {
+    throw new TypeError('SpotLight.angle must be between 0 and Math.PI / 2.')
+  }
+  return angle
 }
 
 function optionalFiniteNumber(value: unknown, label: string): number | undefined {
