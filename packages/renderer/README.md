@@ -69,6 +69,8 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 It also exports Node loader helpers:
 
 - `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed.
+- `loadVrmFromFile(filePath, options)`: loads local VRM files with `@pixiv/three-vrm`'s `VRMLoaderPlugin` registered. The Pixiv package remains an optional dependency in your project.
+- `loadVrmAnimationFromFile(filePath, options)`: loads local VRMA files with `@pixiv/three-vrm-animation`'s `VRMAnimationLoaderPlugin` registered. The animation package remains optional.
 - `createNodeGltfLoader(rootDir, options)`: creates a configured `GLTFLoader` bundle for advanced flows, including plugin registration through `options.configureLoader`.
 - `createEncodedImageTextureLoader(rootDir)` / `EncodedImageTextureLoader`: a `LoadingManager` image handler for local PNG/JPEG/WebP files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs that exposes encoded buffers directly to renderer-supported texture slots.
 - `installLocalFileFetch()`: a small `file://` fetch bridge for Three.js `FileLoader` when loading local external glTF buffers.
@@ -205,22 +207,20 @@ Call `mixer.update(dt)` and `scene.updateMatrixWorld(true)` before `render()` to
 import * as THREE from 'three'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { loadGltfFromFile, render } from '@headless-three/renderer'
-
-const configureVrmLoader = (loader) => {
-  loader.register((parser) => new VRMLoaderPlugin(parser))
-  loader.register((parser) => new VRMAnimationLoaderPlugin(parser))
-}
+import { loadVrmAnimationFromFile, loadVrmFromFile, render } from '@headless-three/renderer'
 
 // Load VRM model
-const modelGltf = await loadGltfFromFile('./avatar.vrm', { configureLoader: configureVrmLoader })
+const modelGltf = await loadVrmFromFile('./avatar.vrm', { VRMLoaderPlugin })
 const vrm = modelGltf.userData.vrm
 VRMUtils.removeUnnecessaryVertices(vrm.scene)
 VRMUtils.removeUnnecessaryJoints(vrm.scene)
 vrm.scene.rotation.y = Math.PI
 
 // Load VRMA animation
-const animGltf = await loadGltfFromFile('./dance.vrma', { configureLoader: configureVrmLoader })
+const animGltf = await loadVrmAnimationFromFile('./dance.vrma', {
+  VRMLoaderPlugin,
+  VRMAnimationLoaderPlugin,
+})
 const vrmAnimation = animGltf.userData.vrmAnimations[0]
 const clip = createVRMAnimationClip(vrmAnimation, vrm)
 

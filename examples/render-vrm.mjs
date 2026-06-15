@@ -2,7 +2,8 @@
 import fs from 'node:fs/promises'
 import * as THREE from 'three'
 import {
-  loadGltfFromFile,
+  loadVrmAnimationFromFile,
+  loadVrmFromFile,
   render,
 } from '../packages/renderer/dist/index.js'
 
@@ -22,14 +23,9 @@ const animationTime = Number.isFinite(Number(process.env.TIME)) ? Number(process
 
 try {
   const packages = await importVrmPackages(Boolean(animationPath))
-  const configureLoader = (loader) => {
-    loader.register((parser) => new packages.VRMLoaderPlugin(parser))
-    if (packages.VRMAnimationLoaderPlugin) {
-      loader.register((parser) => new packages.VRMAnimationLoaderPlugin(parser))
-    }
-  }
-
-  const modelGltf = await loadGltfFromFile(modelPath, { configureLoader })
+  const modelGltf = await loadVrmFromFile(modelPath, {
+    VRMLoaderPlugin: packages.VRMLoaderPlugin,
+  })
   const vrm = modelGltf.userData?.vrm
   if (!vrm?.scene) {
     throw new Error(`No VRM model was found in ${modelPath}. Confirm that the file is a VRM asset and @pixiv/three-vrm can parse it.`)
@@ -40,7 +36,10 @@ try {
   vrm.scene.rotation.y = Math.PI
 
   if (animationPath) {
-    const animationGltf = await loadGltfFromFile(animationPath, { configureLoader })
+    const animationGltf = await loadVrmAnimationFromFile(animationPath, {
+      VRMLoaderPlugin: packages.VRMLoaderPlugin,
+      VRMAnimationLoaderPlugin: packages.VRMAnimationLoaderPlugin,
+    })
     const vrmAnimation = animationGltf.userData?.vrmAnimations?.[0]
     if (!vrmAnimation) {
       throw new Error(`No VRMA animation was found in ${animationPath}. Confirm that the file is a VRM Animation asset.`)

@@ -34,16 +34,21 @@ export {
   createNodeGltfLoader,
   installLocalFileFetch,
   loadGltfFromFile,
+  loadVrmAnimationFromFile,
+  loadVrmFromFile,
   resolveLocalAssetPath,
 } from './loaders'
 
 export type {
   ConfigureGltfLoader,
   LoadGltfFromFileOptions,
+  LoadVrmAnimationFromFileOptions,
+  LoadVrmFromFileOptions,
   NodeGltfLoaderBundle,
   NodeGltfLoaderOptions,
   ThreeGltfLoaderLike,
   ThreeLoadingManagerLike,
+  VrmLoaderPluginConstructor,
 } from './loaders'
 
 export type {

@@ -30,8 +30,8 @@ const imageBuffer = render(gltf.scene, camera, { width: 1024, height: 1024 })
 await fs.writeFile('render.png', imageBuffer)
 ```
 
-If you need loader plugins, register them through the configuration hook before
-the file is parsed:
+If you need custom loader plugins, register them through the configuration hook
+before the file is parsed:
 
 ```js
 import { loadGltfFromFile } from '@headless-three/renderer'
@@ -43,6 +43,21 @@ const gltf = await loadGltfFromFile('./avatar.vrm', {
   },
 })
 ```
+
+For VRM avatars, `loadVrmFromFile()` installs `@pixiv/three-vrm`'s
+`VRMLoaderPlugin` for you. Pass the plugin constructor explicitly when you
+already imported the Pixiv package and want to avoid an extra dynamic import:
+
+```js
+import { VRMLoaderPlugin } from '@pixiv/three-vrm'
+import { loadVrmFromFile } from '@headless-three/renderer'
+
+const gltf = await loadVrmFromFile('./avatar.vrm', { VRMLoaderPlugin })
+const vrm = gltf.userData.vrm
+```
+
+For VRMA clips, use `loadVrmAnimationFromFile()` with
+`@pixiv/three-vrm-animation` installed.
 
 For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
 configured `{ loader, manager, encodedImages }` bundle so callers can add more

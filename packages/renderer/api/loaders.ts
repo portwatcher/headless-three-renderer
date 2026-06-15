@@ -25,6 +25,7 @@ type GltfLoaderCtor = new (manager?: ThreeLoadingManagerLike) => ThreeGltfLoader
 type GltfLoaderModule = {
   GLTFLoader: GltfLoaderCtor
 }
+export type VrmLoaderPluginConstructor = new (parser: unknown) => unknown
 type TextureLoadCallback = (texture: TextureLike) => void
 type TextureErrorCallback = (error: unknown) => void
 
@@ -40,6 +41,15 @@ export type NodeGltfLoaderOptions = {
 export type LoadGltfFromFileOptions = NodeGltfLoaderOptions & {
   baseUrl?: string
   rootDir?: string
+}
+
+export type LoadVrmFromFileOptions = LoadGltfFromFileOptions & {
+  VRMLoaderPlugin?: VrmLoaderPluginConstructor
+}
+
+export type LoadVrmAnimationFromFileOptions = LoadGltfFromFileOptions & {
+  VRMAnimationLoaderPlugin?: VrmLoaderPluginConstructor
+  VRMLoaderPlugin?: VrmLoaderPluginConstructor
 }
 
 export type NodeGltfLoaderBundle = {
@@ -134,6 +144,50 @@ export async function loadGltfFromFile<T = unknown>(
 
   return await new Promise<T>((resolve, reject) => {
     loader.parse(arrayBufferView(bytes), baseUrl, (gltf) => resolve(gltf as T), reject)
+  })
+}
+
+export async function loadVrmFromFile<T = unknown>(
+  filePath: string,
+  options: LoadVrmFromFileOptions = {},
+): Promise<T> {
+  const {
+    VRMLoaderPlugin,
+    configureLoader,
+    ...gltfOptions
+  } = options
+  const VrmPlugin = VRMLoaderPlugin ?? await importVrmLoaderPlugin()
+
+  return await loadGltfFromFile<T>(filePath, {
+    ...gltfOptions,
+    configureLoader: async (loader) => {
+      registerLoaderPlugin(loader, (parser) => new VrmPlugin(parser), 'VRMLoaderPlugin')
+      await configureLoader?.(loader)
+    },
+  })
+}
+
+export async function loadVrmAnimationFromFile<T = unknown>(
+  filePath: string,
+  options: LoadVrmAnimationFromFileOptions = {},
+): Promise<T> {
+  const {
+    VRMAnimationLoaderPlugin,
+    VRMLoaderPlugin,
+    configureLoader,
+    ...gltfOptions
+  } = options
+  const AnimationPlugin = VRMAnimationLoaderPlugin ?? await importVrmAnimationLoaderPlugin()
+
+  return await loadGltfFromFile<T>(filePath, {
+    ...gltfOptions,
+    configureLoader: async (loader) => {
+      if (VRMLoaderPlugin) {
+        registerLoaderPlugin(loader, (parser) => new VRMLoaderPlugin(parser), 'VRMLoaderPlugin')
+      }
+      registerLoaderPlugin(loader, (parser) => new AnimationPlugin(parser), 'VRMAnimationLoaderPlugin')
+      await configureLoader?.(loader)
+    },
   })
 }
 
@@ -239,10 +293,49 @@ function arrayBufferView(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
 }
 
-const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+function registerLoaderPlugin(
+  loader: ThreeGltfLoaderLike,
+  callback: (parser: unknown) => unknown,
+  label: string,
+): void {
+  if (typeof loader.register !== 'function') {
+    throw new Error(`GLTFLoader.register is required to install ${label}.`)
+  }
+  loader.register(callback)
+}
+
+const dynamicImport = new Function('specifier', 'return import(specifier)') as <T = unknown>(
   specifier: string,
-) => Promise<GltfLoaderModule>
+) => Promise<T>
 
 function importGltfLoader(): Promise<GltfLoaderModule> {
-  return dynamicImport('three/examples/jsm/loaders/GLTFLoader.js')
+  return dynamicImport<GltfLoaderModule>('three/examples/jsm/loaders/GLTFLoader.js')
+}
+
+async function importVrmLoaderPlugin(): Promise<VrmLoaderPluginConstructor> {
+  let module: any
+  try {
+    module = await dynamicImport('@pixiv/three-vrm')
+  } catch {
+    throw new Error('Missing optional dependency @pixiv/three-vrm. Install it in your project or pass VRMLoaderPlugin to loadVrmFromFile().')
+  }
+
+  if (typeof module.VRMLoaderPlugin !== 'function') {
+    throw new Error('@pixiv/three-vrm did not export VRMLoaderPlugin.')
+  }
+  return module.VRMLoaderPlugin as VrmLoaderPluginConstructor
+}
+
+async function importVrmAnimationLoaderPlugin(): Promise<VrmLoaderPluginConstructor> {
+  let module: any
+  try {
+    module = await dynamicImport('@pixiv/three-vrm-animation')
+  } catch {
+    throw new Error('Missing optional dependency @pixiv/three-vrm-animation. Install it in your project or pass VRMAnimationLoaderPlugin to loadVrmAnimationFromFile().')
+  }
+
+  if (typeof module.VRMAnimationLoaderPlugin !== 'function') {
+    throw new Error('@pixiv/three-vrm-animation did not export VRMAnimationLoaderPlugin.')
+  }
+  return module.VRMAnimationLoaderPlugin as VrmLoaderPluginConstructor
 }

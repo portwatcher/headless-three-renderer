@@ -11,6 +11,8 @@ import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 const {
   Renderer,
   loadGltfFromFile,
+  loadVrmAnimationFromFile,
+  loadVrmFromFile,
 } = pkg
 
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url))
@@ -63,6 +65,47 @@ test('committed textured glTF fixture loads data URI image and renders texture',
 
   assertTexturedQuadLoadsEncodedMap(gltf, 'textured fixture')
   assertTexturedQuadRendersTexture(gltf, 'textured quad')
+})
+
+test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
+  let vrmPluginParser = null
+  let animationPluginParser = null
+  let modelPluginParser = null
+
+  class FakeVRMLoaderPlugin {
+    constructor(parser) {
+      this.name = 'FakeVRMLoaderPlugin'
+      vrmPluginParser = parser
+    }
+  }
+
+  class FakeModelLoaderPlugin {
+    constructor(parser) {
+      this.name = 'FakeModelLoaderPlugin'
+      modelPluginParser = parser
+    }
+  }
+
+  class FakeVRMAnimationLoaderPlugin {
+    constructor(parser) {
+      this.name = 'FakeVRMAnimationLoaderPlugin'
+      animationPluginParser = parser
+    }
+  }
+
+  const vrmGltf = await loadVrmFromFile(SIMPLE_TRIANGLE, {
+    VRMLoaderPlugin: FakeVRMLoaderPlugin,
+  })
+  assert.ok(findFirst(vrmGltf.scene, (object) => object.isMesh === true), 'VRM helper should still parse glTF scenes')
+  assert.ok(vrmPluginParser, 'VRM helper should install the supplied VRMLoaderPlugin')
+
+  const animationGltf = await loadVrmAnimationFromFile(SIMPLE_TRIANGLE, {
+    VRMLoaderPlugin: FakeModelLoaderPlugin,
+    VRMAnimationLoaderPlugin: FakeVRMAnimationLoaderPlugin,
+  })
+  assert.ok(findFirst(animationGltf.scene, (object) => object.isMesh === true), 'VRMA helper should still parse glTF scenes')
+  assert.ok(modelPluginParser, 'VRMA helper should install the supplied VRMLoaderPlugin when provided')
+  assert.ok(animationPluginParser, 'VRMA helper should install the supplied VRMAnimationLoaderPlugin')
 })
 
 test('loadGltfFromFile resolves external glTF image files from the model directory', async () => {
