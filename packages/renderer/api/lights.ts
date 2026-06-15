@@ -197,17 +197,51 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
     const right = optionalFiniteNumber(cam.right, 'light.shadow.camera.right')
     const top = optionalFiniteNumber(cam.top, 'light.shadow.camera.top')
     const bottom = optionalFiniteNumber(cam.bottom, 'light.shadow.camera.bottom')
-    const near = optionalFiniteNumber(cam.near, 'light.shadow.camera.near')
-    const far = optionalFiniteNumber(cam.far, 'light.shadow.camera.far')
+    const clipDistances = shadowCameraClipDistances(cam, out)
     if (left !== undefined) out.shadowCameraLeft = left
     if (right !== undefined) out.shadowCameraRight = right
     if (top !== undefined) out.shadowCameraTop = top
     if (bottom !== undefined) out.shadowCameraBottom = bottom
-    if (near !== undefined) out.shadowCameraNear = near
-    if (far !== undefined) out.shadowCameraFar = far
+    if (clipDistances.shadowCameraNear !== undefined) out.shadowCameraNear = clipDistances.shadowCameraNear
+    if (clipDistances.shadowCameraFar !== undefined) out.shadowCameraFar = clipDistances.shadowCameraFar
   }
 
   applyShadowCascadeOptions(out, light)
+}
+
+function shadowCameraClipDistances(
+  camera: NonNullable<NonNullable<ThreeObject3DLike['shadow']>['camera']>,
+  light: NativeSceneLight,
+): Pick<NativeSceneLight, 'shadowCameraNear' | 'shadowCameraFar'> {
+  const near = optionalFiniteNumber(camera.near, 'light.shadow.camera.near')
+  const far = optionalFiniteNumber(camera.far, 'light.shadow.camera.far')
+
+  if (near !== undefined && near < 0) {
+    throw new TypeError('light.shadow.camera.near must be non-negative.')
+  }
+  if (near === 0 && (light.lightType === 'point' || light.lightType === 'spot')) {
+    throw new TypeError('light.shadow.camera.near must be positive for point and spot shadows.')
+  }
+  if (far !== undefined && far <= 0) {
+    throw new TypeError('light.shadow.camera.far must be positive.')
+  }
+
+  const effectiveNear = near ?? 0.5
+  const effectiveFar = far ?? defaultShadowCameraFar(light)
+  if (effectiveFar <= effectiveNear) {
+    if (far !== undefined) {
+      throw new TypeError('light.shadow.camera.far must be greater than light.shadow.camera.near.')
+    }
+    throw new TypeError('light.shadow.camera.near must be less than the effective light.shadow.camera.far.')
+  }
+
+  return { shadowCameraNear: near, shadowCameraFar: far }
+}
+
+function defaultShadowCameraFar(light: NativeSceneLight): number {
+  return light.lightType === 'point' && light.distance !== undefined && light.distance > 0
+    ? light.distance
+    : 500
 }
 
 function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3DLike): { width: number; height: number } {

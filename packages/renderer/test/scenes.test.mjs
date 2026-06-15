@@ -11924,6 +11924,20 @@ test('invalid shadow numeric values fail clearly', () => {
     ['camera.far', (light) => {
       light.shadow.camera.far = 'far'
     }, /light\.shadow\.camera\.far must be a finite number/i],
+    ['camera.near negative', (light) => {
+      light.shadow.camera.near = -0.1
+    }, /light\.shadow\.camera\.near must be non-negative/i],
+    ['camera.far zero', (light) => {
+      light.shadow.camera.far = 0
+    }, /light\.shadow\.camera\.far must be positive/i],
+    ['camera.far before near', (light) => {
+      light.shadow.camera.near = 10
+      light.shadow.camera.far = 1
+    }, /light\.shadow\.camera\.far must be greater than light\.shadow\.camera\.near/i],
+    ['camera.near beyond default far', (light) => {
+      light.shadow.camera.near = 600
+      delete light.shadow.camera.far
+    }, /light\.shadow\.camera\.near must be less than the effective light\.shadow\.camera\.far/i],
   ]
 
   for (const [name, mutate, pattern] of cases) {
@@ -11938,6 +11952,31 @@ test('invalid shadow numeric values fail clearly', () => {
       `${name} should fail clearly`,
     )
   }
+
+  for (const [name, makeLight] of [
+    ['point near zero', () => new THREE.PointLight(0xffffff, 1)],
+    ['spot near zero', () => new THREE.SpotLight(0xffffff, 1)],
+  ]) {
+    const scene = new THREE.Scene()
+    const light = makeLight()
+    light.castShadow = true
+    light.shadow.camera.near = 0
+    scene.add(light)
+    assert.throws(
+      () => extractLights(scene),
+      /light\.shadow\.camera\.near must be positive for point and spot shadows/i,
+      `${name} should fail clearly`,
+    )
+  }
+
+  const directionalScene = new THREE.Scene()
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1)
+  directionalLight.castShadow = true
+  directionalLight.shadow.camera.near = 0
+  directionalLight.shadow.camera.far = 24
+  directionalScene.add(directionalLight)
+  const [nativeDirectionalLight] = extractLights(directionalScene) ?? []
+  assert.equal(nativeDirectionalLight.shadowCameraNear, 0)
 })
 
 test('shadow radius values render PCF shadows', () => {
