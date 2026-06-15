@@ -436,7 +436,9 @@ export type ThreeRenderCameraLike = ThreeCameraLike | ThreeCubeCameraLike
 export interface RenderSortItem {
   id: number
   object?: ThreeObject3DLike
+  geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike
+  group?: GeometryGroup
   groupOrder: number
   renderOrder: number
   z: number

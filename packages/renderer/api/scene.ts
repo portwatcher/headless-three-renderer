@@ -251,7 +251,7 @@ function appendMesh(
 
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
-        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform)
+        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group)
         pushMesh(meshes, {
           positions: expandedPositions,
           indices: expandedIndices,
@@ -309,7 +309,7 @@ function appendMesh(
         : undefined
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
-        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform)
+        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group)
         pushMesh(meshes, {
           positions: expandedGroupPositions,
           indices: expandedGroupIndices,
@@ -428,7 +428,7 @@ function appendShadowOnlyMeshGroup(
 
     for (const instance of instances) {
       const color = instanceColor(baseColor, instance)
-      const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform)
+      const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, object.geometry, group)
       pushMesh(meshes, {
         positions: expandedPositions,
         indices: expandedIndices,
@@ -490,7 +490,7 @@ function appendShadowOnlyMeshGroup(
 
   for (const instance of instances) {
     const color = instanceColor(baseColor, instance)
-    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform)
+    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, object.geometry, group)
     pushMesh(meshes, {
       positions: expandedGroupPositions,
       indices: expandedGroupIndices,
@@ -774,7 +774,7 @@ function appendPoints(
     if (outputPositions.length === 0) continue
 
     const textureInfo = extractTextureData(material)
-    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
+    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
     const pbrProps = extractPbrProperties(material, materialContext)
     pbrProps.alphaMapUsesUv2 = false
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
@@ -1116,7 +1116,7 @@ function appendLineOrPoints(
     if (useVertexColors && material?.isLineDashedMaterial !== true && !thickLine) {
       outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
     }
-    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
+    const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
     if (thickCenter && camera) {
       sortInfo.keys.sortZ = projectedWorldPointZ(thickCenter, camera)
       sortInfo.item.z = sortInfo.keys.sortZ
@@ -1374,6 +1374,8 @@ function sortInfoForObject(
   sortIndex: number,
   groupOrder: number,
   transform?: number[],
+  geometry?: ThreeBufferGeometryLike,
+  group?: GeometryGroup,
 ): MeshSortInfo {
   const renderOrder = finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
   const z = camera ? projectedObjectZ(object, camera, transform) : 0
@@ -1392,7 +1394,9 @@ function sortInfoForObject(
     item: {
       id,
       object,
+      geometry,
       material,
+      group,
       groupOrder,
       renderOrder,
       z,

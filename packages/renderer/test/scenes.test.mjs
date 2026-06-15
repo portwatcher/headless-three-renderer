@@ -3408,6 +3408,53 @@ test('Renderer.setTransparentSort overrides transparent depth sorting', () => {
   assert.ok(mean.b > mean.r + 160, `custom transparent sort should draw blue after red (${mean.b} vs ${mean.r})`)
 })
 
+test('transparent sort callbacks receive geometry group render items', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+    -1, -1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  geometry.addGroup(0, 6, 0)
+  geometry.addGroup(6, 6, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, [
+    new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.55, transparent: true, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, opacity: 0.55, transparent: true, depthWrite: false }),
+  ]))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const seenGroups = new Set()
+  const transparentSort = (a, b) => {
+    assert.equal(a.geometry, geometry)
+    assert.equal(b.geometry, geometry)
+    assert.ok(a.group)
+    assert.ok(b.group)
+    seenGroups.add(a.group.materialIndex)
+    seenGroups.add(b.group.materialIndex)
+    return b.group.materialIndex - a.group.materialIndex
+  }
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, transparentSort })
+  assert.deepEqual([...seenGroups].sort(), [0, 1])
+  const mean = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 10, `custom group-aware transparent sort should draw red after blue (${mean.r} vs ${mean.b})`)
+})
+
 test('sortObjects=false preserves traversal order within transparent bucket', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
