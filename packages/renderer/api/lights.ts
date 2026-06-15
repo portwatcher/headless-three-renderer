@@ -131,8 +131,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       intensity,
       position: pos,
       direction,
-      width: finiteNumberOrDefault(light.width, 'RectAreaLight.width', 10),
-      height: finiteNumberOrDefault(light.height, 'RectAreaLight.height', 10),
+      width: positiveFiniteNumberOrDefault(light.width, 'RectAreaLight.width', 10),
+      height: positiveFiniteNumberOrDefault(light.height, 'RectAreaLight.height', 10),
     }
   }
 
@@ -370,6 +370,14 @@ function nonNegativeFiniteNumberOrDefault(value: unknown, label: string, fallbac
   const number = finiteNumberOrDefault(value, label, fallback)
   if (number < 0) {
     throw new TypeError(`${label} must be non-negative.`)
+  }
+  return number
+}
+
+function positiveFiniteNumberOrDefault(value: unknown, label: string, fallback: number): number {
+  const number = finiteNumberOrDefault(value, label, fallback)
+  if (number <= 0) {
+    throw new TypeError(`${label} must be positive.`)
   }
   return number
 }

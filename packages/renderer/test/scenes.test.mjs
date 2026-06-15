@@ -7985,11 +7985,21 @@ test('invalid light numeric values fail clearly', () => {
       light.width = 'wide'
       return light
     }, /RectAreaLight\.width must be a finite number/i],
+    ['rect width zero', () => {
+      const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
+      light.width = 0
+      return light
+    }, /RectAreaLight\.width must be positive/i],
     ['rect height', () => {
       const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
       light.height = Number.NaN
       return light
     }, /RectAreaLight\.height must be a finite number/i],
+    ['rect height negative', () => {
+      const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
+      light.height = -1
+      return light
+    }, /RectAreaLight\.height must be positive/i],
     ['rect transform matrix', () => {
       const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
       light.matrixWorld.elements[8] = Number.NEGATIVE_INFINITY
