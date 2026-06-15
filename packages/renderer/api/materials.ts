@@ -954,8 +954,8 @@ function materialDepthFunc(material: ThreeMaterialLike): string | undefined {
   }
 }
 
-function materialShadowSide(material: ThreeMaterialLike): string | undefined {
-  if (material.shadowSide == null) return undefined
+export function materialShadowSide(material: ThreeMaterialLike | undefined): string | undefined {
+  if (!material || material.shadowSide == null) return undefined
   switch (material.shadowSide) {
     case FrontSide:
       return 'front'

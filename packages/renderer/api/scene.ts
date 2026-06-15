@@ -22,6 +22,7 @@ import {
   materialColor,
   extractPbrProperties,
   extractTextureData,
+  materialShadowSide,
   textureUvChannel,
   type MaterialExtractionContext,
 } from './materials'
@@ -335,6 +336,7 @@ function appendMesh(
         clippingContext,
         localClippingEnabled,
         customShadowMaterial,
+        material,
         materialContext,
         positions,
         normals,
@@ -360,6 +362,7 @@ function appendShadowOnlyMeshGroup(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   material: ThreeMaterialLike,
+  sourceMaterial: ThreeMaterialLike | undefined,
   materialContext: MaterialExtractionContext,
   positions: number[],
   normals: number[] | null,
@@ -374,7 +377,7 @@ function appendShadowOnlyMeshGroup(
 ): void {
   const baseColor = materialColor(material)
   const useVertexColors = vertexColors && material.vertexColors !== false
-  const pbrProps = extractPbrProperties(material, materialContext)
+  const pbrProps = shadowPbrProperties(material, sourceMaterial, materialContext)
   const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
   const textureInfo = extractTextureData(material)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
@@ -638,6 +641,7 @@ function appendSprite(
       clippingContext,
       localClippingEnabled,
       customShadowMaterial,
+      material,
       materialContext,
       positions,
       [0, 1, 2, 0, 2, 3],
@@ -781,6 +785,7 @@ function appendPoints(
         clippingContext,
         localClippingEnabled,
         customShadowMaterial,
+        material,
         materialContext,
         outputPositions,
         outputIndices,
@@ -798,6 +803,7 @@ function appendShadowOnlyBillboardMesh(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   material: ThreeMaterialLike,
+  sourceMaterial: ThreeMaterialLike | undefined,
   materialContext: MaterialExtractionContext,
   positions: number[],
   indices: number[],
@@ -831,9 +837,22 @@ function appendShadowOnlyBillboardMesh(
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
     ...sortInfo,
-    ...extractPbrProperties(material, materialContext),
+    ...shadowPbrProperties(material, sourceMaterial, materialContext),
     ...hiddenMainPass,
   })
+}
+
+function shadowPbrProperties(
+  material: ThreeMaterialLike,
+  sourceMaterial: ThreeMaterialLike | undefined,
+  materialContext: MaterialExtractionContext,
+): ReturnType<typeof extractPbrProperties> {
+  const props = extractPbrProperties(material, materialContext)
+  const sourceShadowSide = materialShadowSide(sourceMaterial)
+  if (sourceShadowSide) {
+    props.shadowSide = sourceShadowSide
+  }
+  return props
 }
 
 function assertUnsupportedSpriteShadows(object: ThreeObject3DLike): void {
