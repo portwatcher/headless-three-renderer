@@ -11435,3 +11435,26 @@ test('render options scissor clips draws to an output rectangle', () => {
   assert.ok(outsideLeft.b > outsideLeft.g + 80, `left of scissor should retain blue background (${outsideLeft.b} vs ${outsideLeft.g})`)
   assert.ok(outsideTop.b > outsideTop.g + 80, `above scissor should retain blue background (${outsideTop.b} vs ${outsideTop.g})`)
 })
+
+test('invalid viewport and scissor rectangles fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  const camera = makeCamera()
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, viewport: [0, 0, 0, 16] }),
+    /options\.viewport width and height must be greater than 0/i,
+  )
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, scissor: { x: 0, y: 0, width: 64, height: 16 } }),
+    /options\.scissor must fit inside the render target/i,
+  )
+  assert.throws(
+    () => renderToTarget(scene, camera, { viewport: { x: 0, y: 0, width: Number.NaN, height: 16 } }, { width: 32, height: 32 }),
+    /target\.viewport must contain finite x, y, width, and height values/i,
+  )
+  assert.throws(
+    () => renderToTarget(scene, camera, { scissorTest: true, scissor: [0, 0, 16, 0] }, { width: 32, height: 32 }),
+    /target\.scissor width and height must be greater than 0/i,
+  )
+})

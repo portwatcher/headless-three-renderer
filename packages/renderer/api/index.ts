@@ -267,8 +267,18 @@ function toNativeInput(
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)
-  const viewport = effectiveViewport(options)
-  const scissor = effectiveScissor(options)
+  const viewport = normalizeOptionalPixelRect(
+    effectiveViewport(options),
+    size.width,
+    size.height,
+    effectiveViewportLabel(options),
+  )
+  const scissor = normalizeOptionalPixelRect(
+    effectiveScissor(options),
+    size.width,
+    size.height,
+    effectiveScissorLabel(options),
+  )
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
@@ -848,6 +858,16 @@ function normalizePixelRect(rect: RenderPixelRectLike, targetWidth: number, targ
   return { x, y, width, height }
 }
 
+function normalizeOptionalPixelRect(
+  rect: RenderPixelRectLike | null | undefined,
+  targetWidth: number,
+  targetHeight: number,
+  label: string,
+): PixelRect | undefined {
+  if (rect == null) return undefined
+  return normalizePixelRect(rect, targetWidth, targetHeight, label)
+}
+
 function copyPixelRect(source: Buffer, destination: Buffer, imageWidth: number, rect: PixelRect): void {
   const rowBytes = rect.width * 4
   for (let row = 0; row < rect.height; row += 1) {
@@ -984,6 +1004,14 @@ function effectiveViewport(options: RenderOptions): RenderPixelRectLike | null |
 function effectiveScissor(options: RenderOptions): RenderPixelRectLike | null | undefined {
   if (options.scissor !== undefined) return options.scissor
   return options.target?.scissorTest === true ? options.target.scissor : undefined
+}
+
+function effectiveViewportLabel(options: RenderOptions): string {
+  return options.viewport !== undefined ? 'options.viewport' : 'target.viewport'
+}
+
+function effectiveScissorLabel(options: RenderOptions): string {
+  return options.scissor !== undefined ? 'options.scissor' : 'target.scissor'
 }
 
 function pixelRectComponents(rect: RenderPixelRectLike): number[] {

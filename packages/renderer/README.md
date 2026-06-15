@@ -88,8 +88,8 @@ The public API accepts only Three.js-like objects:
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds.
 - `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds.
-- `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws.
-- `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws.
+- `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws; invalid rectangles fail clearly.
+- `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws; invalid rectangles fail clearly.
 - `options.clippingPlanes`: global world-space clipping planes for the render.
 - `options.localClippingEnabled`: `false` disables material-local clipping planes while preserving `options.clippingPlanes`; defaults to `true`.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes; unsupported values fail clearly.
