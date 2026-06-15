@@ -12,6 +12,7 @@ export function createSceneCorpus() {
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
     meshDepthMaterialCorpus(),
+    meshNormalMaterialCorpus(),
     meshMatcapMaterialCorpus(),
     meshToonMaterialCorpus(),
     globalClippingPlaneCorpus(),
@@ -393,6 +394,26 @@ function meshDepthMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function meshNormalMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.015, 0.015, 0.02)
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 0.95, 0.95),
+    new THREE.MeshNormalMaterial({ flatShading: true }),
+  )
+  mesh.rotation.set(0.25, -0.55, 0.18)
+  scene.add(mesh)
+
+  return {
+    name: 'mesh-normal-material-flat',
+    scene,
+    camera: makeCamera([1.1, 0.7, 3.0], [0, 0, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [4, 4, 5],
+    minNonBackgroundRatio: 0.04,
   }
 }
 
