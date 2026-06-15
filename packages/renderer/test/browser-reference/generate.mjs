@@ -66,10 +66,12 @@ function renderFixture(fixture) {
   renderer.outputColorSpace = outputColorSpace(fixture.options.outputColorSpace)
 
   let restoreRendererOptions = () => {}
+  let restoreSceneOptions = () => {}
   let restoreRenderMode = () => {}
   let dataUrl
   try {
     restoreRendererOptions = applyFixtureRendererOptions(fixture)
+    restoreSceneOptions = applyFixtureSceneOptions(fixture)
     restoreRenderMode = applyFixtureRenderMode(fixture)
     fixture.scene.updateMatrixWorld(true)
     fixture.camera.updateMatrixWorld(true)
@@ -77,6 +79,7 @@ function renderFixture(fixture) {
     dataUrl = renderer.domElement.toDataURL('image/png')
   } finally {
     restoreRenderMode()
+    restoreSceneOptions()
     restoreRendererOptions()
   }
 
@@ -156,6 +159,22 @@ function applyFixtureRendererOptions(fixture) {
     renderer.setTransparentSort(null)
     renderer.clippingPlanes = previousClippingPlanes
     renderer.localClippingEnabled = previousLocalClippingEnabled
+  }
+}
+
+function applyFixtureSceneOptions(fixture) {
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'background') !== true) {
+    return () => {}
+  }
+  if (fixture.scene?.isScene !== true) {
+    throw new Error('Browser reference background options require a THREE.Scene fixture.')
+  }
+
+  const previousBackground = fixture.scene.background
+  fixture.scene.background = fixture.options.background
+
+  return () => {
+    fixture.scene.background = previousBackground
   }
 }
 

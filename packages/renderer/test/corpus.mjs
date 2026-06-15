@@ -5,6 +5,7 @@ export const CORPUS_RENDER_SIZE = 96
 export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
+    backgroundOverrideCorpus(),
     equirectangularBackgroundCorpus(),
     arrayCameraViewportCorpus(),
     viewportScissorCorpus(),
@@ -96,6 +97,29 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function backgroundOverrideCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.7, 0.05, 0.05)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x33cc88 }),
+  ))
+
+  return {
+    name: 'option-background-override-color',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      background: new THREE.Color(0, 0, 0),
+    },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.06,
   }
 }
 
