@@ -2802,6 +2802,80 @@ test('Sprite center shifts billboard anchoring around object position', () => {
   assert.ok(upperRight.minY > centered.minY + 10, `center=(1,1) should anchor the sprite below its origin (${upperRight.minY} vs ${centered.minY})`)
 })
 
+test('invalid billboard and line scalar values fail clearly', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function spriteScene(mutator) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+    mutator(sprite, sprite.material)
+    const scene = new THREE.Scene()
+    scene.add(sprite)
+    return scene
+  }
+
+  function pointsScene(mutator) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+    const material = new THREE.PointsMaterial({ color: 0xffffff })
+    mutator(material)
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Points(geometry, material))
+    return scene
+  }
+
+  function lineScene(material) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.5, 0, 0),
+      new THREE.Vector3(0.5, 0, 0),
+    ])
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Line(geometry, material))
+    return scene
+  }
+
+  const cases = [
+    ['sprite center', () => spriteScene((sprite) => {
+      sprite.center.x = 'left'
+    }), /Sprite\.center\.x must be a finite number/i],
+    ['sprite rotation', () => spriteScene((_sprite, material) => {
+      material.rotation = Number.NaN
+    }), /material\.rotation must be a finite number/i],
+    ['point size', () => pointsScene((material) => {
+      material.size = 'large'
+    }), /material\.size must be a finite number/i],
+    ['line width', () => {
+      const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+      material.linewidth = Number.POSITIVE_INFINITY
+      return lineScene(material)
+    }, /material\.linewidth must be a finite number/i],
+    ['dash size', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      material.dashSize = 'long'
+      return lineScene(material)
+    }, /material\.dashSize must be a finite number/i],
+    ['dash gap', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      material.gapSize = Number.NaN
+      return lineScene(material)
+    }, /material\.gapSize must be a finite number/i],
+    ['dash scale', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      material.scale = 'fast'
+      return lineScene(material)
+    }, /material\.scale must be a finite number/i],
+  ]
+
+  for (const [label, makeScene, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(), camera, { width: 64, height: 64 }),
+      pattern,
+      label,
+    )
+  }
+})
+
 test('Sprite receiveShadow fails clearly', () => {
   const receiveScene = new THREE.Scene()
   const receiver = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))

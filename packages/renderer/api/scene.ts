@@ -558,8 +558,8 @@ function appendSprite(
 
   const matrix = matrixElements(object.matrixWorld!, 'sprite.matrixWorld')
   const center = [
-    finiteOrDefault(object.center?.x, 0.5),
-    finiteOrDefault(object.center?.y, 0.5),
+    finiteMaterialOrObjectNumber(object.center?.x, 'Sprite.center.x', 0.5),
+    finiteMaterialOrObjectNumber(object.center?.y, 'Sprite.center.y', 0.5),
   ]
   const worldPosition = [matrix[12], matrix[13], matrix[14]]
   let scaleX = columnLength3(matrix, 0)
@@ -576,7 +576,7 @@ function appendSprite(
   if (scaleX <= 0 || scaleY <= 0) return
 
   const axes = cameraBillboardAxes(camera)
-  const rotation = finiteOrDefault(material?.rotation, 0)
+  const rotation = finiteMaterialOrObjectNumber(material?.rotation, 'material.rotation', 0)
   const cos = Math.cos(rotation)
   const sin = Math.sin(rotation)
   const corners = [
@@ -690,7 +690,7 @@ function appendPoints(
     const outputUvs: number[] = []
     const outputColors: number[] | undefined = useVertexColors ? [] : undefined
     const outputIndices: number[] = []
-    const pointSize = Math.max(0, finiteOrDefault(material?.size, 1))
+    const pointSize = Math.max(0, finiteMaterialOrObjectNumber(material?.size, 'material.size', 1))
     if (pointSize <= 0) continue
 
     for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
@@ -962,7 +962,7 @@ function appendLineOrPoints(
     const textureInfo = extractTextureData(material)
     const drawStart = group.start
     const drawEnd = group.start + group.count
-    const lineWidth = finiteOrDefault(material?.linewidth, 1)
+    const lineWidth = finiteMaterialOrObjectNumber(material?.linewidth, 'material.linewidth', 1)
     const thickLine = topology === 'lines' && lineWidth > 1
 
     if (topology === 'lines') {
@@ -1466,6 +1466,12 @@ function finiteOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+function finiteMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {
+  if (value == null) return fallback
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
 function finiteCountOrDefault(value: unknown, label: string, fallback: number): number {
   if (value == null) return fallback
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -1785,9 +1791,9 @@ function dashedLineAttributes(
   lineDistance: ThreeBufferAttributeLike | undefined,
   material: { dashSize?: number; gapSize?: number; scale?: number },
 ): DashedLineExpansion {
-  const dashSize = Math.max(0, finiteOrDefault(material.dashSize, 3))
-  const gapSize = Math.max(0, finiteOrDefault(material.gapSize, 1))
-  const scale = finiteOrDefault(material.scale, 1)
+  const dashSize = Math.max(0, finiteMaterialOrObjectNumber(material.dashSize, 'material.dashSize', 3))
+  const gapSize = Math.max(0, finiteMaterialOrObjectNumber(material.gapSize, 'material.gapSize', 1))
+  const scale = finiteMaterialOrObjectNumber(material.scale, 'material.scale', 1)
   if (dashSize <= 0) return { positions: [] }
 
   const segments = lineSegmentsWithDistances(positions, source, start, end, object, lineDistance)
