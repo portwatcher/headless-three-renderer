@@ -101,12 +101,17 @@ const RGDepthPacking = 3203
 
 // Three.js texture type constants
 const UnsignedByteType = 1009
+const ByteType = 1010
+const ShortType = 1011
 const UnsignedShortType = 1012
+const IntType = 1013
 const UnsignedIntType = 1014
 const HalfFloatType = 1016
 const FloatType = 1015
 const UnsignedShort4444Type = 1017
 const UnsignedShort5551Type = 1018
+const UnsignedInt248Type = 1020
+const UnsignedInt5999Type = 35902
 const LinearEncoding = 3000
 const sRGBEncoding = 3001
 
@@ -280,6 +285,7 @@ function extractEnvironmentMapFromTexture(
   // DataTexture: { data, width, height }
   if (image.data && image.width > 0 && image.height > 0) {
     const texType = (envTex as any).type ?? UnsignedByteType
+    assertSupportedRawTextureType(texType, label, 'environment map rendering')
     const rawData = image.data as ArrayBufferView & { buffer: ArrayBuffer; byteOffset: number; byteLength: number }
 
     if (texType === HalfFloatType) {
@@ -332,7 +338,7 @@ function extractEnvironmentMapFromTexture(
     }
 
     // UnsignedByteType / default: convert to RGBA8
-    const rgba = toRgba8(rawData as any, image.width, image.height, { narrowChannels: false })
+    const rgba = toRgba8(rawData as any, image.width, image.height, { narrowChannels: false, type: texType })
     if (rgba) {
       return {
         data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength),
@@ -1772,6 +1778,7 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
 
   // DataTexture style: { data: TypedArray, width, height }
   if (image.data && image.width > 0 && image.height > 0) {
+    assertSupportedRawTextureType((map as any).type, label, 'texture rendering')
     const rgba = toRgba8(image.data, image.width, image.height, { type: map.type })
     if (rgba) {
       const data = textureBytesWithExplicitMipmaps(map, label, rgba, image.width, image.height)
@@ -1892,6 +1899,41 @@ function unsupportedTextureImageError(label: string, usage: string): Error {
   return new Error(
     `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, or raw one-channel, two-channel, RGB, or RGBA numeric pixel data as { data, width, height } before rendering.`,
   )
+}
+
+function assertSupportedRawTextureType(type: unknown, label: string, usage: string): void {
+  if (
+    type == null ||
+    type === UnsignedByteType ||
+    type === UnsignedShortType ||
+    type === UnsignedIntType ||
+    type === HalfFloatType ||
+    type === FloatType ||
+    type === UnsignedShort4444Type ||
+    type === UnsignedShort5551Type
+  ) {
+    return
+  }
+  throw new Error(
+    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, UnsignedShortType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, or UnsignedShort5551Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
+  )
+}
+
+function textureTypeName(type: unknown): string {
+  switch (type) {
+    case ByteType:
+      return 'ByteType'
+    case ShortType:
+      return 'ShortType'
+    case IntType:
+      return 'IntType'
+    case UnsignedInt248Type:
+      return 'UnsignedInt248Type'
+    case UnsignedInt5999Type:
+      return 'UnsignedInt5999Type'
+    default:
+      return String(type)
+  }
 }
 
 function rawTextureChannelCount(

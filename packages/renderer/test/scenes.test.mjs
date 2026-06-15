@@ -6985,6 +6985,44 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
   }
 })
 
+test('unsupported raw DataTexture type constants fail clearly', () => {
+  function rawTexture(data, type) {
+    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, type)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const cases = [
+    ['material ByteType', (scene) => {
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: rawTexture(new Int8Array([-128, 0, 64, 127]), THREE.ByteType) }),
+      ))
+    }, /texture raw texture type ByteType.*not supported/i],
+    ['background ShortType', (scene) => {
+      scene.background = rawTexture(new Int16Array([-32768, 0, 16384, 32767]), THREE.ShortType)
+    }, /background raw texture type ShortType.*not supported/i],
+    ['environment IntType', (scene) => {
+      scene.environment = rawTexture(new Int32Array([-2147483648, 0, 1073741824, 2147483647]), THREE.IntType)
+    }, /scene\.environment raw texture type IntType.*not supported/i],
+    ['reflection probe packed depth type', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture: rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type) },
+      }
+    }, /reflectionProbe\.texture raw texture type UnsignedInt248Type.*not supported/i],
+  ]
+
+  for (const [name, setup, pattern] of cases) {
+    const scene = new THREE.Scene()
+    setup(scene)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('browser-like texture image objects fail clearly in Node slots', () => {
   function browserLikeTexture() {
     const texture = new THREE.Texture({ width: 1, height: 1, complete: true })
