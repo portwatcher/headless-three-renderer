@@ -9449,6 +9449,34 @@ test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
   assert.ok(visible.r > 80, `opaque alphaMap region should write visible mesh depth (${visible.r})`)
 })
 
+test('renderToTarget depthTexture honors transparent default depthWrite', () => {
+  function renderTransparentDepth(depthWrite) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      opacity: 0.5,
+      transparent: true,
+    })
+    if (depthWrite !== undefined) material.depthWrite = depthWrite
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const depthTexture = {}
+    renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+    return meanRegion(depthTexture.image.data, 64, 64, 24, 24, 40, 40)
+  }
+
+  const defaultDepth = renderTransparentDepth(undefined)
+  const disabledDepth = renderTransparentDepth(false)
+
+  assert.ok(defaultDepth.r > disabledDepth.r + 0.5, `transparent default depthWrite should populate target depth (${defaultDepth.r} vs ${disabledDepth.r})`)
+  assert.ok(disabledDepth.r < 0.5, `transparent depthWrite=false should leave target depth clear (${disabledDepth.r})`)
+})
+
 test('MSAA sampleCount 4 resolves antialiased color output and render targets', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

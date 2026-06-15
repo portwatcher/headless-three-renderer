@@ -998,16 +998,7 @@ function depthReadbackMesh(mesh: NativeSceneMesh): NativeSceneMesh {
 function meshWritesDepth(mesh: NativeSceneMesh): boolean {
   if (mesh.depthTest === false) return false
   if (typeof mesh.depthWrite === 'boolean') return mesh.depthWrite
-  return !meshDefaultsTransparent(mesh)
-}
-
-function meshDefaultsTransparent(mesh: NativeSceneMesh): boolean {
-  if (mesh.alphaHash === true) return false
-  return mesh.transparent === true || materialAlpha(mesh) < 0.999 || finitePositive(mesh.transmission)
-}
-
-function finitePositive(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0.0001
+  return true
 }
 
 function formatWgslFloat(value: number): string {
