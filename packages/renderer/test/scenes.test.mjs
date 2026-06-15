@@ -6220,6 +6220,42 @@ test('unsupported texture inputs fail clearly for background and environment slo
   }
 })
 
+test('malformed environment and reflection probe texture values fail clearly', () => {
+  const cases = [
+    ['string scene environment', (scene) => {
+      scene.environment = 'bright'
+    }, /scene\.environment must be a Three\.js texture or null/i],
+    ['empty scene environment', (scene) => {
+      scene.environment = {}
+    }, /scene\.environment must be a Three\.js texture or null/i],
+    ['array scene environment', (scene) => {
+      scene.environment = []
+    }, /scene\.environment must be a Three\.js texture or null/i],
+    ['image-less scene environment texture', (scene) => {
+      scene.environment = new THREE.Texture()
+    }, /scene\.environment.*texture image object.*not readable.*environment map rendering/i],
+    ['string reflection probe texture', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: 'bright' } }
+    }, /reflectionProbe\.texture must be a Three\.js texture or null/i],
+    ['empty reflection probe object', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: {} }
+    }, /reflectionProbe must be a Three\.js texture or null/i],
+    ['malformed reflection probe map', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbes: [{ map: {} }] }
+    }, /reflectionProbe\.map must be a Three\.js texture or null/i],
+  ]
+
+  for (const [name, setup, pattern] of cases) {
+    const scene = new THREE.Scene()
+    setup(scene)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('unsupported raw DataTexture channel layouts fail clearly', () => {
   function invalidRawTexture(data, type = THREE.UnsignedByteType) {
     const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, type)
@@ -9811,6 +9847,47 @@ test('options.environmentIntensity overrides scene and reflection-probe intensit
   assert.ok(
     optionProbeIntensity > probeIntensity + 35,
     `options.environmentIntensity should brighten reflection-probe IBL (${optionProbeIntensity} vs ${probeIntensity})`,
+  )
+})
+
+test('scene.environment intensity takes precedence over reflection-probe intensity', () => {
+  function sampledRed(scene) {
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40).r
+  }
+
+  function makeScene(withProbe) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 0.15
+    if (withProbe) {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: {
+          texture: makeEnvironmentTexture(),
+          intensity: 4,
+        },
+      }
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.15 }),
+    ))
+    return scene
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const sceneOnly = sampledRed(makeScene(false))
+  const withProbe = sampledRed(makeScene(true))
+  assert.ok(
+    Math.abs(sceneOnly - withProbe) <= 3,
+    `scene.environment should ignore reflection-probe intensity when both are present (${sceneOnly} vs ${withProbe})`,
   )
 })
 

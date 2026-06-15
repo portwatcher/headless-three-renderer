@@ -135,19 +135,21 @@ type TextureImageInput = {
  * Normalizes 3-channel inputs to RGBA before handing bytes to the native IBL path.
  */
 export function extractEnvironmentMap(scene: ThreeSceneRootLike, intensityOverride?: number): EnvironmentMapInfo | null {
-  const probe = extractReflectionProbe(scene)
-  const envTex = scene.environment ?? probe?.texture
-  if (!envTex) return null
-  const label = scene.environment ? 'scene.environment' : 'reflectionProbe.texture'
-  let intensity: number
-  if (intensityOverride !== undefined) {
-    intensity = intensityOverride
-  } else if (probe?.intensity !== undefined) {
-    intensity = optionalFiniteNumber(probe.intensity, 'reflectionProbe.intensity') ?? 1.0
-  } else {
-    intensity = optionalFiniteNumber((scene as any).environmentIntensity, 'scene.environmentIntensity') ?? 1.0
+  if (scene.environment != null) {
+    const envTex = requiredEnvironmentTexture(scene.environment, 'scene.environment')
+    const intensity = intensityOverride !== undefined
+      ? intensityOverride
+      : optionalFiniteNumber((scene as any).environmentIntensity, 'scene.environmentIntensity') ?? 1.0
+    return extractEnvironmentMapFromTexture(envTex, 'scene.environment', intensity)
   }
-  return extractEnvironmentMapFromTexture(envTex, label, intensity)
+
+  const probe = extractReflectionProbe(scene)
+  if (!probe) return null
+
+  const intensity = intensityOverride !== undefined
+    ? intensityOverride
+    : optionalFiniteNumber(probe.intensity, 'reflectionProbe.intensity') ?? 1.0
+  return extractEnvironmentMapFromTexture(probe.texture, probe.label, intensity)
 }
 
 export function resolveEnvironmentMap(scene: ThreeSceneRootLike, intensityOverride?: number): EnvironmentMapResolution {
@@ -263,7 +265,7 @@ function extractEnvironmentMapFromTexture(
   }
 
   const image = (envTex as any).image ?? (envTex as any).source?.data
-  if (!image) return null
+  if (!image) throw unsupportedTextureImageError(label, 'environment map rendering')
 
   // DataTexture: { data, width, height }
   if (image.data && image.width > 0 && image.height > 0) {
@@ -350,15 +352,42 @@ function extractEnvironmentMapFromTexture(
   throw unsupportedTextureImageError(label, 'environment map rendering')
 }
 
-function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: unknown } | null {
+function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: unknown; label: string } | null {
   const hints = scene.userData?.headlessThreeRenderer ?? scene.userData?.headlessRenderer ?? {}
   const probes = hints.reflectionProbes ?? hints.probes
   const probe = hints.reflectionProbe ?? (Array.isArray(probes) ? probes[0] : undefined)
-  const candidate = probe?.texture ?? probe?.map ?? probe
-  if (!candidate) return null
+  if (probe == null) return null
+
+  const directTexture = textureLike(probe)
+  if (directTexture) {
+    return {
+      texture: directTexture,
+      intensity: undefined,
+      label: 'reflectionProbe',
+    }
+  }
+
+  const probeObject = probe as { texture?: unknown; map?: unknown; intensity?: unknown }
+  if (probeObject.texture != null) {
+    return {
+      texture: requiredEnvironmentTexture(probeObject.texture, 'reflectionProbe.texture'),
+      intensity: probeObject.intensity,
+      label: 'reflectionProbe.texture',
+    }
+  }
+  if (probeObject.map != null) {
+    return {
+      texture: requiredEnvironmentTexture(probeObject.map, 'reflectionProbe.map'),
+      intensity: probeObject.intensity,
+      label: 'reflectionProbe.map',
+    }
+  }
+
+  const texture = requiredEnvironmentTexture(probe, 'reflectionProbe')
   return {
-    texture: candidate as ThreeTextureLike,
-    intensity: probe?.intensity,
+    texture,
+    intensity: probeObject.intensity,
+    label: 'reflectionProbe',
   }
 }
 
@@ -1634,6 +1663,14 @@ function textureLike(value: unknown): ThreeTextureLike | null {
     return candidate
   }
   return null
+}
+
+function requiredEnvironmentTexture(value: unknown, label: string): ThreeTextureLike {
+  const texture = textureLike(value)
+  if (texture) return texture
+  throw new TypeError(
+    `${label} must be a Three.js texture or null for environment map rendering.`,
+  )
 }
 
 function wrapModeToString(mode: unknown): string | undefined {
