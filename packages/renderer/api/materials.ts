@@ -25,6 +25,10 @@ const EquirectangularReflectionMapping = 303
 const EquirectangularRefractionMapping = 304
 const CubeUVReflectionMapping = 306
 
+// Three.js normal map type constants
+const TangentSpaceNormalMap = 0
+const ObjectSpaceNormalMap = 1
+
 // Three.js environment combine constants
 const MultiplyOperation = 0
 const MixOperation = 1
@@ -731,6 +735,7 @@ export function extractPbrProperties(
     props.normalMapAnisotropy = textureAnisotropy(material.normalMap, 'material.normalMap')
     props.normalMapTransform = textureTransform(material.normalMap, 'material.normalMap')
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
+    props.normalMapType = materialNormalMapType(material)
   }
   if (material.normalScale) {
     props.normalScale = [
@@ -1235,6 +1240,20 @@ function materialDepthPacking(material: ThreeMaterialLike): number | undefined {
     default:
       throw new Error(
         `material.depthPacking ${String(material.depthPacking)} is not supported by @headless-three/renderer. Use BasicDepthPacking, RGBADepthPacking, RGBDepthPacking, or RGDepthPacking.`,
+      )
+  }
+}
+
+function materialNormalMapType(material: ThreeMaterialLike): 'tangent' | 'object' {
+  if (material.normalMapType == null) return 'tangent'
+  switch (material.normalMapType) {
+    case TangentSpaceNormalMap:
+      return 'tangent'
+    case ObjectSpaceNormalMap:
+      return 'object'
+    default:
+      throw new Error(
+        `material.normalMapType ${String(material.normalMapType)} is not supported by @headless-three/renderer. Use TangentSpaceNormalMap or ObjectSpaceNormalMap.`,
       )
   }
 }

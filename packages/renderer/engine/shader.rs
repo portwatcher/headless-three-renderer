@@ -34,7 +34,7 @@ struct Uniforms {
   light_probe: array<vec4<f32>, 9>,
   // x = has LightProbe, y = has toon gradient map, z = depth packing, w = has matcap color map.
   light_probe_params: vec4<f32>,
-  // x/y = normalScale or bumpScale, z = normal mode (0=none, 1=normalMap, 2=bumpMap), w = has_ibl
+  // x/y = normalScale or bumpScale, z = normal mode (0=none, 1=tangent normalMap, 2=bumpMap, 3=object normalMap), w = has_ibl
   normal_map_params: vec4<f32>,
   // x = env_intensity, y = shading_model (0=standard PBR, 1=basic/unlit, 2=lambert, 3=normal, 4=matcap, 5=phong, 6=depth, 7=toon, 8=distance, 9=shadow), z = camera near, w = camera far
   ibl_params: vec4<f32>,
@@ -907,6 +907,14 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     tbn = tangent_basis(N, tbn[0], input.tangent_w);
   } else if normal_mode == 2u {
     N = perturb_normal_from_bump(input.world_pos, N, transform_normal_map_uv(uv, uv2));
+    tbn = tangent_basis(N, tbn[0], input.tangent_w);
+  } else if normal_mode == 3u {
+    let normal_sample = textureSample(t_normal, s_normal, transform_normal_map_uv(uv, uv2)).rgb;
+    var object_normal = normal_sample * 2.0 - vec3<f32>(1.0);
+    if !front_facing {
+      object_normal = -object_normal;
+    }
+    N = normalize((uniforms.normal_matrix * vec4<f32>(object_normal, 0.0)).xyz);
     tbn = tangent_basis(N, tbn[0], input.tangent_w);
   }
 

@@ -38,7 +38,7 @@ pub struct Uniforms {
     pub light_probe: [[f32; 4]; 9],
     /// x = has LightProbe, y = has toon gradient map, z = depth packing, w = has matcap color map.
     pub light_probe_params: [f32; 4],
-    // x/y = normalScale or bumpScale, z = normal mode (0=none, 1=normalMap, 2=bumpMap), w = has_ibl
+    // x/y = normalScale or bumpScale, z = normal mode (0=none, 1=tangent normalMap, 2=bumpMap, 3=object normalMap), w = has_ibl
     pub normal_map_params: [f32; 4],
     /// x = env_intensity, y = shading_model, z = camera near, w = camera far
     pub ibl_params: [f32; 4],
@@ -2494,7 +2494,7 @@ impl GpuRenderer {
                     0.0
                 },
                 if mesh.normal_map.is_some() {
-                    1.0
+                    mesh.normal_map_type.normal_mode()
                 } else if mesh.bump_map.is_some() {
                     2.0
                 } else {

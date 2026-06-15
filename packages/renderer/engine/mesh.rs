@@ -43,6 +43,7 @@ pub struct PreparedMesh {
     pub transform: Mat4,
     pub texture: Option<PreparedTexture>,
     pub normal_map: Option<PreparedTexture>,
+    pub normal_map_type: NormalMapType,
     pub normal_scale: [f32; 2],
     pub bump_map: Option<PreparedTexture>,
     pub bump_scale: f32,
@@ -343,6 +344,32 @@ impl DepthPacking {
             Self::Rgba => 1,
             Self::Rgb => 2,
             Self::Rg => 3,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum NormalMapType {
+    #[default]
+    Tangent,
+    Object,
+}
+
+impl NormalMapType {
+    pub fn from_str_opt(value: Option<&str>, mesh_index: usize) -> Result<Self> {
+        match value {
+            None | Some("tangent") => Ok(Self::Tangent),
+            Some("object") => Ok(Self::Object),
+            Some(other) => bail!(
+                "mesh {mesh_index} normalMapType must be \"tangent\" or \"object\", got {other:?}"
+            ),
+        }
+    }
+
+    pub fn normal_mode(self) -> f32 {
+        match self {
+            Self::Tangent => 1.0,
+            Self::Object => 3.0,
         }
     }
 }
@@ -834,6 +861,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         _ => None,
     };
 
+    let normal_map_type = NormalMapType::from_str_opt(mesh.normal_map_type.as_deref(), mesh_index)?;
     let normal_scale = match mesh.normal_scale.as_deref() {
         Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
         _ => [1.0, 1.0],
@@ -1417,6 +1445,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         transform: parse_transform(mesh.transform.as_deref(), mesh_index)?,
         texture,
         normal_map,
+        normal_map_type,
         normal_scale,
         bump_map,
         bump_scale,

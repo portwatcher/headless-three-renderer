@@ -547,6 +547,8 @@ pub struct SceneMesh {
     pub normal_map_transform: Option<Vec<f64>>,
     /// Whether normal map sampling uses the secondary UV stream.
     pub normal_map_uses_uv2: Option<bool>,
+    /// Normal map space: "tangent" (default) or "object".
+    pub normal_map_type: Option<String>,
     /// Normal map scale `[x, y]`. Defaults to `[1, 1]`.
     pub normal_scale: Option<Vec<f64>>,
     /// Optional bump map image data. Red channel is used as height.

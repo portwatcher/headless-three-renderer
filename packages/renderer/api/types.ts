@@ -202,6 +202,7 @@ export interface ThreeMaterialLike {
   emissiveIntensity?: number
   emissiveMap?: ThreeTextureLike | null
   normalMap?: ThreeTextureLike | null
+  normalMapType?: number
   normalScale?: { x: number; y: number }
   bumpMap?: ThreeTextureLike | null
   bumpScale?: number
@@ -781,6 +782,7 @@ export interface NativeSceneMesh {
   normalMapAnisotropy?: number
   normalMapTransform?: number[]
   normalMapUsesUv2?: boolean
+  normalMapType?: 'tangent' | 'object'
   normalScale?: number[]
   bumpMap?: Buffer
   bumpMapWidth?: number
@@ -1172,6 +1174,7 @@ export interface PbrProperties {
   normalMapAnisotropy?: number
   normalMapTransform?: number[]
   normalMapUsesUv2?: boolean
+  normalMapType?: 'tangent' | 'object'
   normalScale?: number[]
   bumpMap?: Buffer
   bumpMapWidth?: number

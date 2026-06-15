@@ -581,6 +581,8 @@ export interface SceneMesh {
   normalMapTransform?: Array<number>
   /** Whether normal map sampling uses the secondary UV stream. */
   normalMapUsesUv2?: boolean
+  /** Normal map space: "tangent" (default) or "object". */
+  normalMapType?: string
   /** Normal map scale `[x, y]`. Defaults to `[1, 1]`. */
   normalScale?: Array<number>
   /** Optional bump map image data. Red channel is used as height. */

@@ -970,6 +970,73 @@ test('MeshNormalMaterial normalMap perturbs output normals', () => {
   assert.ok(unperturbed.b > tangentRight.b + 40, `normalMap should reduce the front-facing blue normal channel (${unperturbed.b} vs ${tangentRight.b})`)
 })
 
+test('MeshNormalMaterial supports object-space normal maps', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    -1, 1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0, 0,
+    0, 1,
+    1, 0,
+    0, 1,
+    1, 1,
+    1, 0,
+  ]), 2))
+
+  function renderNormalType(normalMapType) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshNormalMaterial({
+        normalMap: solidTexture(255, 128, 128),
+        normalMapType,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const tangentSpace = renderNormalType(THREE.TangentSpaceNormalMap)
+  const objectSpace = renderNormalType(THREE.ObjectSpaceNormalMap)
+  assert.ok(tangentSpace.g > tangentSpace.r + 35, `swapped UV tangent normal should point toward green (${tangentSpace.g} vs ${tangentSpace.r})`)
+  assert.ok(objectSpace.r > objectSpace.g + 35, `object-space normal should point toward red (${objectSpace.r} vs ${objectSpace.g})`)
+})
+
+test('unsupported normalMapType values fail clearly', () => {
+  const scene = new THREE.Scene()
+  const material = new THREE.MeshNormalMaterial({ normalMap: solidTexture(128, 128, 255) })
+  material.normalMapType = 999
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /material\.normalMapType 999.*not supported/i,
+  )
+})
+
 test('MeshNormalMaterial bumpMap perturbs output normals', () => {
   function renderBumpMaterial(bumpScale) {
     const bumpMap = rgbaTexture([
