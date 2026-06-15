@@ -9073,6 +9073,38 @@ test('directional shadow cascade hints over four valid cascades fail clearly', (
   )
 })
 
+test('invalid directional shadow cascade hints fail clearly', () => {
+  const validCascade = (index = 0) => ({
+    left: -2 - index,
+    right: 2 + index,
+    top: 2 + index,
+    bottom: -2 - index,
+    near: 0.1,
+    far: 12 + index,
+    split: 2 + index,
+  })
+  const cases = [
+    ['non-object cascade', [validCascade(), null], /shadowCascades\[1\] must be an object/i],
+    ['missing far bound', [{ ...validCascade(), far: undefined }, validCascade(1)], /shadowCascades\[0\]\.far must be a finite number/i],
+    ['invalid split', [{ ...validCascade(), split: 'near' }, validCascade(1)], /shadowCascades\[0\]\.split must be a finite number/i],
+    ['invalid distance alias', [{ ...validCascade(), split: undefined, distance: Number.NaN }, validCascade(1)], /shadowCascades\[0\]\.distance must be a finite number/i],
+  ]
+
+  for (const [name, shadowCascades, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const light = new THREE.DirectionalLight(0xffffff, 1)
+    light.castShadow = true
+    light.userData.headlessThreeRenderer = { shadowCascades }
+    scene.add(light)
+
+    assert.throws(
+      () => extractLights(scene),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('multiple shadow-casting lights fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

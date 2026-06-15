@@ -238,25 +238,27 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
   const splits: number[] = []
   const bounds: number[] = []
 
-  for (const cascade of cascades) {
-    if (!cascade || typeof cascade !== 'object') continue
-    const left = numberOrNull(cascade.left)
-    const right = numberOrNull(cascade.right)
-    const top = numberOrNull(cascade.top)
-    const bottom = numberOrNull(cascade.bottom)
-    const near = numberOrNull(cascade.near)
-    const far = numberOrNull(cascade.far)
-    if (left == null || right == null || top == null || bottom == null || near == null || far == null) {
-      continue
+  for (let i = 0; i < cascades.length; i += 1) {
+    const rawCascade = cascades[i]
+    if (!rawCascade || typeof rawCascade !== 'object') {
+      throw new TypeError(`shadowCascades[${i}] must be an object with finite left, right, top, bottom, near, and far values.`)
     }
+    const cascade = rawCascade as Record<string, unknown>
+    const label = `shadowCascades[${i}]`
+    const left = requiredFiniteNumber(cascade.left, `${label}.left`)
+    const right = requiredFiniteNumber(cascade.right, `${label}.right`)
+    const top = requiredFiniteNumber(cascade.top, `${label}.top`)
+    const bottom = requiredFiniteNumber(cascade.bottom, `${label}.bottom`)
+    const near = requiredFiniteNumber(cascade.near, `${label}.near`)
+    const far = requiredFiniteNumber(cascade.far, `${label}.far`)
     if (bounds.length / 6 >= MAX_SHADOW_CASCADES) {
       throw new Error(
         `Directional shadow cascade hints support at most ${MAX_SHADOW_CASCADES} valid cascades in @headless-three/renderer. Reduce light.userData.headlessThreeRenderer.shadowCascades or render separate shadow passes.`,
       )
     }
     bounds.push(left, right, top, bottom, near, far)
-    const split = numberOrNull(cascade.split ?? cascade.distance ?? cascade.farDistance)
-    if (split != null) splits.push(split)
+    const split = shadowCascadeSplit(cascade, label)
+    if (split !== undefined) splits.push(split)
   }
 
   const count = bounds.length / 6
@@ -266,8 +268,10 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
   }
 }
 
-function numberOrNull(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+function shadowCascadeSplit(cascade: Record<string, unknown>, label: string): number | undefined {
+  if (cascade.split != null) return optionalFiniteNumber(cascade.split, `${label}.split`)
+  if (cascade.distance != null) return optionalFiniteNumber(cascade.distance, `${label}.distance`)
+  return optionalFiniteNumber(cascade.farDistance, `${label}.farDistance`)
 }
 
 function finiteNumberOrDefault(value: unknown, label: string, fallback: number): number {
@@ -278,6 +282,11 @@ function finiteNumberOrDefault(value: unknown, label: string, fallback: number):
 
 function optionalFiniteNumber(value: unknown, label: string): number | undefined {
   if (value == null) return undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
+function requiredFiniteNumber(value: unknown, label: string): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
 }
