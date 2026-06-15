@@ -55,7 +55,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       position: pos,
       direction,
     }
-    if (light.castShadow === true) {
+    if (optionalBoolean(light.castShadow, 'light.castShadow') === true) {
       out.castShadow = true
       applyShadowOptions(out, light)
     }
@@ -72,7 +72,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       distance: finiteNumberOrDefault(light.distance, 'PointLight.distance', 0),
       decay: finiteNumberOrDefault(light.decay, 'PointLight.decay', 2),
     }
-    if (light.castShadow === true) {
+    if (optionalBoolean(light.castShadow, 'light.castShadow') === true) {
       out.castShadow = true
       applyShadowOptions(out, light)
     }
@@ -104,7 +104,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
       angle: finiteNumberOrDefault(light.angle, 'SpotLight.angle', Math.PI / 3),
       penumbra: finiteNumberOrDefault(light.penumbra, 'SpotLight.penumbra', 0),
     }
-    if (light.castShadow === true) {
+    if (optionalBoolean(light.castShadow, 'light.castShadow') === true) {
       out.castShadow = true
       applyShadowOptions(out, light)
     }
@@ -300,6 +300,12 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
 }
 
 function optionalPositiveFiniteNumber(value: unknown, label: string): number | undefined {

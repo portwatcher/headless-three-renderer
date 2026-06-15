@@ -204,20 +204,22 @@ function appendMesh(
     : matrixElements(object.matrixWorld!, 'mesh.matrixWorld')
   const instances = meshInstances(object, meshTransform)
   if (instances.length === 0) return
+  const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
+  const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
 
   for (const group of groups) {
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
 
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
-    const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
+    const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
     const baseColor = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
     const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
     const textureInfo = extractTextureData(material)
-    const castShadow = object.castShadow === true && !usesCustomShadowMaterial ? true : undefined
-    const receiveShadow = object.receiveShadow === true ? true : undefined
+    const castShadow = objectCastsShadow && !usesCustomShadowMaterial ? true : undefined
+    const receiveShadow = objectReceivesShadow ? true : undefined
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const wireframe = isDepthDistanceWireframeMaterial(material)
 
@@ -566,7 +568,9 @@ function appendSprite(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
 ): void {
-  assertUnsupportedSpriteShadows(object)
+  const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
+  const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
+  assertUnsupportedSpriteShadows(objectReceivesShadow)
 
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
@@ -619,7 +623,7 @@ function appendSprite(
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
   const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
-  const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
+  const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
 
   pushMesh(meshes, {
     positions,
@@ -639,7 +643,7 @@ function appendSprite(
     textureUsesUv2: textureInfo?.usesUv2,
     transform: IDENTITY_4X4.slice(),
     transparent: material?.transparent !== false,
-    castShadow: object.castShadow === true && !usesCustomShadowMaterial ? true : undefined,
+    castShadow: objectCastsShadow && !usesCustomShadowMaterial ? true : undefined,
     receiveShadow: undefined,
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
@@ -676,7 +680,9 @@ function appendPoints(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
 ): void {
-  assertUnsupportedPointShadows(object)
+  const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
+  const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
+  assertUnsupportedPointShadows(objectReceivesShadow)
 
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -760,7 +766,7 @@ function appendPoints(
     const pbrProps = extractPbrProperties(material, materialContext)
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
-    const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
+    const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
 
     pushMesh(meshes, {
       positions: outputPositions,
@@ -782,7 +788,7 @@ function appendPoints(
       transform: IDENTITY_4X4.slice(),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       topology: 'triangles',
-      castShadow: object.castShadow === true && !usesCustomShadowMaterial ? true : undefined,
+      castShadow: objectCastsShadow && !usesCustomShadowMaterial ? true : undefined,
       receiveShadow: false,
       clipShadows: clipShadowsForMaterial(material, clippingContext),
       ...clipping,
@@ -870,14 +876,25 @@ function shadowPbrProperties(
   return props
 }
 
-function assertUnsupportedSpriteShadows(object: ThreeObject3DLike): void {
-  if (object.receiveShadow === true) {
+function validateObjectShadowFlags(object: ThreeObject3DLike): void {
+  optionalObjectBoolean(object.castShadow, 'object.castShadow')
+  optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
+}
+
+function optionalObjectBoolean(value: unknown, label: string): boolean | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
+}
+
+function assertUnsupportedSpriteShadows(receiveShadow: boolean): void {
+  if (receiveShadow) {
     throw new Error('THREE.Sprite receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the sprite to mesh geometry before receiving shadows.')
   }
 }
 
-function assertUnsupportedPointShadows(object: ThreeObject3DLike): void {
-  if (object.receiveShadow === true) {
+function assertUnsupportedPointShadows(receiveShadow: boolean): void {
+  if (receiveShadow) {
     throw new Error('THREE.Points receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the points to mesh geometry before receiving shadows.')
   }
 }
@@ -945,6 +962,7 @@ function appendLineOrPoints(
   localClippingEnabled: boolean,
   materialContext: MaterialExtractionContext,
 ): void {
+  validateObjectShadowFlags(object)
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
   if (!position) return

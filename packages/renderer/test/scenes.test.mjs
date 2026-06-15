@@ -10906,6 +10906,77 @@ test('non-square point-light shadow map sizes fail clearly', () => {
   )
 })
 
+test('invalid object and light shadow flag values fail clearly', () => {
+  const camera = makeCamera()
+  const objectCases = [
+    ['mesh castShadow', () => {
+      const scene = new THREE.Scene()
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+      mesh.castShadow = 'yes'
+      scene.add(mesh)
+      return scene
+    }, /object\.castShadow must be a boolean/i],
+    ['mesh receiveShadow', () => {
+      const scene = new THREE.Scene()
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+      mesh.receiveShadow = 1
+      scene.add(mesh)
+      return scene
+    }, /object\.receiveShadow must be a boolean/i],
+    ['sprite castShadow', () => {
+      const scene = new THREE.Scene()
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial())
+      sprite.castShadow = 'yes'
+      scene.add(sprite)
+      return scene
+    }, /object\.castShadow must be a boolean/i],
+    ['sprite receiveShadow', () => {
+      const scene = new THREE.Scene()
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial())
+      sprite.receiveShadow = 'yes'
+      scene.add(sprite)
+      return scene
+    }, /object\.receiveShadow must be a boolean/i],
+    ['points castShadow', () => {
+      const scene = new THREE.Scene()
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      const points = new THREE.Points(geometry, new THREE.PointsMaterial())
+      points.castShadow = 1
+      scene.add(points)
+      return scene
+    }, /object\.castShadow must be a boolean/i],
+    ['line receiveShadow', () => {
+      const scene = new THREE.Scene()
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-1, 0, 0),
+        new THREE.Vector3(1, 0, 0),
+      ])
+      const line = new THREE.Line(geometry, new THREE.LineBasicMaterial())
+      line.receiveShadow = 'yes'
+      scene.add(line)
+      return scene
+    }, /object\.receiveShadow must be a boolean/i],
+  ]
+
+  for (const [name, makeScene, pattern] of objectCases) {
+    assert.throws(
+      () => renderRgba(makeScene(), camera, { width: 32, height: 32 }),
+      pattern,
+      name,
+    )
+  }
+
+  const lightScene = new THREE.Scene()
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.castShadow = 'yes'
+  lightScene.add(light)
+  assert.throws(
+    () => extractLights(lightScene),
+    /light\.castShadow must be a boolean/i,
+  )
+})
+
 test('invalid shadow numeric values fail clearly', () => {
   const cases = [
     ['shadow container', (light) => {
