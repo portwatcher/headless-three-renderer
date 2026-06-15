@@ -9235,27 +9235,37 @@ test('LineBasicMaterial linewidth expands to thick camera-facing quads', () => {
   assert.ok(thickPixels > thinPixels * 3, `wide linewidth should increase covered pixels (${thinPixels} -> ${thickPixels})`)
 })
 
-test('LineDashedMaterial with non-default linewidth fails clearly', () => {
-  const geom = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-1, 0, 0),
-    new THREE.Vector3(1, 0, 0),
-  ])
-  const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
-    color: 0xffffff,
-    linewidth: 2,
-    dashSize: 0.2,
-    gapSize: 0.1,
-  }))
-  line.computeLineDistances()
+test('LineDashedMaterial linewidth expands dash segments to thick camera-facing quads', () => {
+  function renderLine(linewidth) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.9, 0, 0),
+      new THREE.Vector3(0.9, 0, 0),
+    ])
+    const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      linewidth,
+      dashSize: 0.25,
+      gapSize: 0.2,
+      scale: 1,
+    }))
+    line.computeLineDistances()
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(line)
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
 
-  assert.throws(
-    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /LineDashedMaterial linewidth.*not supported/i,
-  )
+    const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+    camera.position.set(0, 0, 2)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  const white = (r, g, b) => r > 180 && g > 180 && b > 180
+  const thinPixels = countRegionPixels(renderLine(1), 96, 96, 10, 32, 86, 64, white)
+  const thickPixels = countRegionPixels(renderLine(10), 96, 96, 10, 32, 86, 64, white)
+
+  assert.ok(thinPixels > 0, `default dashed linewidth should render visible dash pixels (${thinPixels})`)
+  assert.ok(thickPixels > thinPixels * 3, `wide dashed linewidth should increase covered pixels (${thinPixels} -> ${thickPixels})`)
 })
 
 test('LineDashedMaterial map alpha samples reconstructed dash UVs', () => {

@@ -929,9 +929,6 @@ function appendLineOrPoints(
   for (const group of groups) {
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
-    if (topology === 'lines') {
-      assertSupportedLineMaterial(material)
-    }
 
     const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
     let indices: number[] | null = null
@@ -952,11 +949,6 @@ function appendLineOrPoints(
     if (topology === 'lines') {
       const source = indexAttr ?? rangeIndices(vertexCount)
       if (material?.isLineDashedMaterial === true) {
-        if (thickLine) {
-          throw new Error(
-            'LineDashedMaterial linewidth values other than 1 are not supported by @headless-three/renderer yet. Use the default dashed line width or expand thick dashed lines to mesh geometry before rendering.',
-          )
-        }
         const dashed = instancedGeometryCount > 1 || instancedPositionOffset
           ? dashedLineAttributesForInstances(
             positions,
@@ -990,7 +982,30 @@ function appendLineOrPoints(
         outputUvs = dashed.uvs
         outputSecondaryUvs = dashed.uvs2
         outputColors = dashed.colors
-        indices = null
+        indices = rangeIndices(dashed.positions.length / 3)
+        if (thickLine) {
+          const transform = matrixElements(object.matrixWorld!, 'object.matrixWorld')
+          const thick = thickLineAttributes(
+            outputPositions,
+            outputUvs,
+            outputSecondaryUvs,
+            outputColors,
+            indices,
+            transform,
+            camera,
+            viewportHeight,
+            lineWidth,
+          )
+          if (thick.positions.length < 12) continue
+          outputPositions = thick.positions
+          outputUvs = thick.uvs
+          outputSecondaryUvs = thick.uvs2
+          outputColors = thick.colors
+          indices = thick.indices
+          thickCenter = thick.center
+        } else {
+          indices = null
+        }
       } else {
         indices = expandLineIndices(source, drawStart, drawEnd, object)
         if (indices.length < 2) continue
@@ -1065,15 +1080,6 @@ function appendLineOrPoints(
       ...clipping,
       ...sortInfo,
     })
-  }
-}
-
-function assertSupportedLineMaterial(material: ThreeMaterialLike | undefined): void {
-  if (!material || !Number.isFinite(material.linewidth)) return
-  if (material.linewidth !== 1 && material.isLineDashedMaterial === true) {
-    throw new Error(
-      'LineDashedMaterial linewidth values other than 1 are not supported by @headless-three/renderer yet. Use the default dashed line width or expand thick dashed lines to mesh geometry before rendering.',
-    )
   }
 }
 
