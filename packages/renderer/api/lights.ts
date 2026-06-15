@@ -177,6 +177,7 @@ function matrixElementsOrUndefined(
 
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
   const shadow = light.shadow
+  assertShadowContainerLike(shadow)
   const mapSize = shadowMapSizeOrDefault(shadow?.mapSize, light)
   out.shadowMapSize = Math.max(mapSize.width, mapSize.height)
   out.shadowMapWidth = mapSize.width
@@ -189,7 +190,8 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   if (radius !== undefined) out.shadowRadius = radius
 
   const cam = shadow?.camera
-  if (cam) {
+  if (cam != null) {
+    assertPlainObject(cam, 'light.shadow.camera')
     const left = optionalFiniteNumber(cam.left, 'light.shadow.camera.left')
     const right = optionalFiniteNumber(cam.right, 'light.shadow.camera.right')
     const top = optionalFiniteNumber(cam.top, 'light.shadow.camera.top')
@@ -208,6 +210,9 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
 }
 
 function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3DLike): { width: number; height: number } {
+  if (mapSize != null) {
+    assertPlainObject(mapSize, 'light.shadow.mapSize')
+  }
   const width = shadowMapSizeComponent(mapSize, 'x', 'width')
   const height = shadowMapSizeComponent(mapSize, 'y', 'height')
   const resolvedWidth = Math.max(32, Math.floor(width ?? height ?? 512))
@@ -218,6 +223,16 @@ function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3D
     )
   }
   return { width: resolvedWidth, height: resolvedHeight }
+}
+
+function assertShadowContainerLike(shadow: unknown): void {
+  if (shadow == null) return
+  assertPlainObject(shadow, 'light.shadow')
+}
+
+function assertPlainObject(value: unknown, label: string): void {
+  if (typeof value === 'object' && !Array.isArray(value)) return
+  throw new TypeError(`${label} must be an object.`)
 }
 
 function shadowMapSizeComponent(

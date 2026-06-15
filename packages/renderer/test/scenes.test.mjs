@@ -10864,6 +10864,12 @@ test('non-square point-light shadow map sizes fail clearly', () => {
 
 test('invalid shadow numeric values fail clearly', () => {
   const cases = [
+    ['shadow container', (light) => {
+      light.shadow = 'shadow'
+    }, /light\.shadow must be an object/i],
+    ['mapSize container', (light) => {
+      light.shadow.mapSize = [512, 512]
+    }, /light\.shadow\.mapSize must be an object/i],
     ['mapSize.x', (light) => {
       light.shadow.mapSize.x = 'wide'
     }, /light\.shadow\.mapSize\.x must be a finite number/i],
@@ -10885,6 +10891,9 @@ test('invalid shadow numeric values fail clearly', () => {
     ['camera.left', (light) => {
       light.shadow.camera.left = 'left'
     }, /light\.shadow\.camera\.left must be a finite number/i],
+    ['camera container', (light) => {
+      light.shadow.camera = 'camera'
+    }, /light\.shadow\.camera must be an object/i],
     ['camera.near', (light) => {
       light.shadow.camera.near = Number.NaN
     }, /light\.shadow\.camera\.near must be a finite number/i],
