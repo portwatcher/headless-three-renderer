@@ -13457,6 +13457,10 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
     () => renderToTarget(scene, camera, { scissorTest: true, scissor: [0, 0, 16, 0] }, { width: 32, height: 32 }),
     /target\.scissor width and height must be greater than 0/i,
   )
+  assert.throws(
+    () => renderToTarget(scene, camera, { scissorTest: 'yes', scissor: [0, 0, 16, 16] }, { width: 32, height: 32 }),
+    /target\.scissorTest must be a boolean/i,
+  )
 
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)

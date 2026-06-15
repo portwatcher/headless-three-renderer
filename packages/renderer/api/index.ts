@@ -1344,6 +1344,9 @@ function assertSortFunctionOrNull(value: unknown, label: string): asserts value 
 }
 
 function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void {
+  if (target.scissorTest != null && typeof target.scissorTest !== 'boolean') {
+    throw new TypeError('target.scissorTest must be a boolean.')
+  }
   if (target.isWebGLMultipleRenderTargets === true) {
     throw new Error(
       'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
