@@ -3935,6 +3935,70 @@ test('invalid morph target influence values fail clearly', () => {
   }
 })
 
+test('invalid skinning matrix values fail clearly', () => {
+  function sceneWithSkinning(mutator) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -0.75, -0.5, 0,
+      0.75, -0.5, 0,
+      0, 0.75, 0,
+    ]), 3))
+    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+    ]), 3))
+    geometry.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array([
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+    ]), 4))
+    geometry.setAttribute('skinWeight', new THREE.BufferAttribute(new Float32Array([
+      1, 0, 0, 0,
+      1, 0, 0, 0,
+      1, 0, 0, 0,
+    ]), 4))
+
+    const mesh = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff }))
+    const bone = new THREE.Bone()
+    const skeleton = new THREE.Skeleton([bone])
+    mesh.add(bone)
+    const scene = new THREE.Scene()
+    scene.add(mesh)
+    mesh.bind(skeleton)
+    mutator({ mesh, bone, skeleton })
+    scene.updateMatrixWorld = () => {}
+    return scene
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['bone world matrix', ({ bone }) => {
+      bone.matrixWorld.elements[13] = Number.NaN
+    }, /skeleton\.bones\[0\]\.matrixWorld\.elements\[13\] must be a finite number/i],
+    ['bone inverse matrix', ({ skeleton }) => {
+      skeleton.boneInverses[0].elements[0] = Number.NaN
+    }, /skeleton\.boneInverses\[0\]\.elements\[0\] must be a finite number/i],
+    ['bind matrix', ({ mesh }) => {
+      mesh.bindMatrix.elements[5] = Number.POSITIVE_INFINITY
+    }, /mesh\.bindMatrix\.elements\[5\] must be a finite number/i],
+    ['bind inverse matrix', ({ mesh }) => {
+      mesh.bindMatrixInverse.elements[10] = Number.NEGATIVE_INFINITY
+    }, /mesh\.bindMatrixInverse\.elements\[10\] must be a finite number/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(sceneWithSkinning(mutate), camera, { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('aoMap samples the selected UV channel', () => {
   function renderWithChannel(channel) {
     const aoMap = rgbaTexture([

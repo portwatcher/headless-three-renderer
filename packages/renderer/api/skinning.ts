@@ -1,5 +1,5 @@
 import type { ThreeObject3DLike, Mat4 } from './types'
-import { IDENTITY_4X4, multiplyMatrices, invertMatrix4, blendBoneMatrices } from './math'
+import { IDENTITY_4X4, multiplyMatrices, invertMatrix4, blendBoneMatrices, matrixElements } from './math'
 import { getAttribute, attributeComponent } from './attributes'
 
 /**
@@ -39,20 +39,23 @@ export function applyCpuSkinning(
   const boneCount = bones.length
   const boneMatrices = new Array<Mat4>(boneCount)
   for (let i = 0; i < boneCount; i++) {
-    const boneWorld = bones[i]?.matrixWorld?.elements
-    const boneInv = boneInverses[i]?.elements
+    const boneWorld = bones[i]?.matrixWorld
+    const boneInv = boneInverses[i]
     if (!boneWorld || !boneInv) {
       boneMatrices[i] = IDENTITY_4X4
       continue
     }
-    boneMatrices[i] = multiplyMatrices(Array.from(boneWorld), Array.from(boneInv))
+    boneMatrices[i] = multiplyMatrices(
+      matrixElements(boneWorld, `skeleton.bones[${i}].matrixWorld`),
+      matrixElements(boneInv, `skeleton.boneInverses[${i}]`),
+    )
   }
 
-  const bindMatrix = mesh.bindMatrix?.elements
-    ? Array.from(mesh.bindMatrix.elements)
+  const bindMatrix = mesh.bindMatrix
+    ? matrixElements(mesh.bindMatrix, 'mesh.bindMatrix')
     : IDENTITY_4X4
-  const bindMatrixInverse = mesh.bindMatrixInverse?.elements
-    ? Array.from(mesh.bindMatrixInverse.elements)
+  const bindMatrixInverse = mesh.bindMatrixInverse
+    ? matrixElements(mesh.bindMatrixInverse, 'mesh.bindMatrixInverse')
     : invertMatrix4(bindMatrix)
 
   const vertexCount = positions.length / 3
