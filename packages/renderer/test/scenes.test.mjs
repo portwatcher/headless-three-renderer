@@ -9598,6 +9598,31 @@ test('background textures honor horizontal wrap modes', () => {
   assert.ok(repeated.r > repeated.g + 80, `repeated offset should wrap back to the red texel (${repeated.r} vs ${repeated.g})`)
 })
 
+test('background textures honor vertical wrap modes', () => {
+  function renderWrap(wrapT) {
+    const background = rgbaTexture([
+      255, 0, 0, 255,
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 2)
+    background.magFilter = THREE.NearestFilter
+    background.minFilter = THREE.NearestFilter
+    background.offset.set(0, 0.5)
+    if (wrapT != null) background.wrapT = wrapT
+
+    const scene = new THREE.Scene()
+    scene.background = background
+    return meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWrap(undefined)
+  const repeated = renderWrap(THREE.RepeatWrapping)
+  assert.ok(clamped.g > clamped.r + 80, `clamped vertical offset should hold the green edge texel (${clamped.g} vs ${clamped.r})`)
+  assert.ok(repeated.r > clamped.r + 80, `repeated vertical offset should wrap red texels back into view (${repeated.r} vs ${clamped.r})`)
+  assert.ok(repeated.g < clamped.g - 80, `repeated vertical offset should no longer be fully clamped green (${repeated.g} vs ${clamped.g})`)
+})
+
 test('background texture anisotropy renders with native sampler settings', () => {
   const background = solidTexture(32, 180, 64)
   background.anisotropy = 4
