@@ -109,7 +109,7 @@ export function matrixElements(matrix: ThreeMatrix4Like, label: string): Mat4 {
   if (!elements || elements.length !== 16) {
     throw new TypeError(`${label} must be a THREE.Matrix4`)
   }
-  return Array.from(elements, (value) => assertFinite(value, label))
+  return Array.from(elements, (value, index) => assertFinite(value, `${label}.elements[${index}]`))
 }
 
 export function clampInteger(value: number, min: number, max: number): number {
@@ -127,7 +127,7 @@ export function isFinitePositive(value: unknown): value is number {
 
 export function assertFinite(value: number, label: string): number {
   if (!Number.isFinite(value)) {
-    throw new TypeError(`${label} must be finite`)
+    throw new TypeError(`${label} must be a finite number.`)
   }
   return value
 }

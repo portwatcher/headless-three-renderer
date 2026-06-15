@@ -83,7 +83,7 @@ See the versioned [compatibility matrix](https://github.com/portwatcher/headless
 The public API accepts only Three.js-like objects:
 
 - `scene`: a `THREE.Scene` or `THREE.Object3D` root.
-- `camera`: a `THREE.Camera`, including perspective and orthographic cameras. Invalid aspect-derived dimensions and clipping distances fail clearly. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; exact WebGL face semantics remain limited.
+- `camera`: a `THREE.Camera`, including perspective and orthographic cameras. Invalid aspect-derived dimensions, clipping distances, and matrix values fail clearly. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; exact WebGL face semantics remain limited.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`; invalid explicit dimensions fail clearly.
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`; invalid explicit color values fail clearly.
 - `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds; invalid values fail clearly.
@@ -106,7 +106,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar values fail clearly
 - geometry groups with material arrays
-- mesh world transforms
+- mesh world transforms, with invalid transform matrix values failing clearly
 - `THREE.LOD` camera-distance/zoom level selection, with invalid camera zoom or level distance/hysteresis values failing clearly
 - vertex colors
 - scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; invalid background color/control/rotation values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly

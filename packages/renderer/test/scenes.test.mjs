@@ -282,6 +282,22 @@ test('unsupported output format values fail clearly', () => {
   )
 })
 
+test('invalid transform matrix values fail clearly', () => {
+  const camera = makeCamera()
+
+  const scene = new THREE.Scene()
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff }))
+  mesh.matrixAutoUpdate = false
+  mesh.matrixWorldAutoUpdate = false
+  mesh.matrixWorld.elements[12] = Number.NaN
+  scene.add(mesh)
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    /mesh\.matrixWorld\.elements\[12\] must be a finite number/i,
+  )
+})
+
 test('invalid output dimensions fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
@@ -338,6 +354,13 @@ test('invalid camera clipping distances fail clearly', () => {
   assert.throws(
     () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.far must be a finite number/i,
+  )
+
+  camera.far = 100
+  camera.projectionMatrix.elements[0] = Number.NaN
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    /camera\.projectionMatrix\.elements\[0\] must be a finite number/i,
   )
 })
 
