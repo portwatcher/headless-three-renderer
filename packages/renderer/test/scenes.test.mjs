@@ -9191,6 +9191,39 @@ test('invalid environment intensity values fail clearly', () => {
   )
 })
 
+test('invalid environment and background rotation values fail clearly', () => {
+  const camera = makeCamera()
+
+  const backgroundScene = new THREE.Scene()
+  backgroundScene.background = splitEnvironmentTexture()
+  backgroundScene.backgroundRotation = { x: 'left', y: 0, z: 0 }
+  assert.throws(
+    () => renderRgba(backgroundScene, camera, { width: 32, height: 32 }),
+    /scene\.backgroundRotation\.x must be a finite number/i,
+  )
+
+  const backgroundOrderScene = new THREE.Scene()
+  backgroundOrderScene.background = splitEnvironmentTexture()
+  backgroundOrderScene.backgroundRotation = [0, 0, 0, 'BAD']
+  assert.throws(
+    () => renderRgba(backgroundOrderScene, camera, { width: 32, height: 32 }),
+    /scene\.backgroundRotation\[3\] must be one of XYZ, YXZ, ZXY, ZYX, YZX, or XZY/i,
+  )
+
+  const environmentScene = new THREE.Scene()
+  environmentScene.background = new THREE.Color(0, 0, 0)
+  environmentScene.environment = splitEnvironmentTexture()
+  environmentScene.environmentRotation = [0, Number.NaN, 0]
+  environmentScene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+  ))
+  assert.throws(
+    () => renderRgba(environmentScene, camera, { width: 32, height: 32 }),
+    /scene\.environmentRotation\[1\] must be a finite number/i,
+  )
+})
+
 test('cube scene environments feed physical IBL', () => {
   function makeScene(environment) {
     const scene = new THREE.Scene()

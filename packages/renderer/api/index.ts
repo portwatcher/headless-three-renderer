@@ -1051,18 +1051,20 @@ function booleanOrNumber(value: unknown): number | undefined {
 }
 
 type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY'
+type EulerComponents = { x: number; y: number; z: number; order: EulerOrder }
 
 function backgroundRotationToNative(
   rotation: ThreeSceneRootLike['backgroundRotation'],
   backgroundTexture: { mapping?: string } | null,
 ): number[] | undefined {
-  if (!hasNonZeroRotation(rotation)) return undefined
+  const euler = optionalEulerComponents(rotation, 'scene.backgroundRotation')
+  if (!euler || !hasNonZeroEulerRotation(euler)) return undefined
   if (backgroundTexture?.mapping !== 'equirectangular') {
     throw new Error(
       'scene.backgroundRotation is only supported for equirectangular or cube texture backgrounds by @headless-three/renderer. Leave backgroundRotation at its default for color/2D backgrounds or pre-rotate the background texture before rendering.',
     )
   }
-  const { x, y, z, order } = eulerComponents(rotation, 'scene.backgroundRotation')
+  const { x, y, z, order } = euler
   // Three.js negates background Euler angles before producing the rotation matrix
   // to account for the background shader's left-handed frame.
   return eulerRotationMatrix3Columns(-x, -y, -z, order)
@@ -1073,14 +1075,20 @@ function environmentRotationToNative(
   envMap: { data?: Buffer } | null,
   label = 'scene.environmentRotation',
 ): number[] | undefined {
-  if (!hasNonZeroRotation(rotation) || !envMap) return undefined
-  const { x, y, z, order } = eulerComponents(rotation, label)
+  if (!envMap) return undefined
+  const euler = optionalEulerComponents(rotation, label)
+  if (!euler || !hasNonZeroEulerRotation(euler)) return undefined
+  const { x, y, z, order } = euler
   return eulerRotationMatrix3Columns(-x, -y, -z, order)
 }
 
-function eulerComponents(value: ThreeEulerLike | ArrayLike<number> | null | undefined, label: string): { x: number; y: number; z: number; order: EulerOrder } {
-  const rotation = value as (ThreeEulerLike & { length?: number }) | null | undefined
-  if (!rotation) return { x: 0, y: 0, z: 0, order: 'XYZ' }
+function optionalEulerComponents(value: ThreeEulerLike | ArrayLike<number> | null | undefined, label: string): EulerComponents | null {
+  if (!value) return null
+  return eulerComponents(value, label)
+}
+
+function eulerComponents(value: ThreeEulerLike | ArrayLike<number>, label: string): EulerComponents {
+  const rotation = value as ThreeEulerLike & { length?: number }
   if (typeof rotation.length === 'number') {
     const values = value as ArrayLike<number | string | undefined>
     return {
@@ -1217,25 +1225,8 @@ function eulerRotationMatrix3Columns(x: number, y: number, z: number, order: Eul
   return te
 }
 
-function hasNonZeroRotation(value: unknown): boolean {
-  if (!value) return false
-  const rotation = value as { x?: unknown; y?: unknown; z?: unknown; length?: unknown }
-  if (
-    nonZeroFinite(rotation.x) ||
-    nonZeroFinite(rotation.y) ||
-    nonZeroFinite(rotation.z)
-  ) {
-    return true
-  }
-  if (typeof rotation.length === 'number') {
-    const values = value as ArrayLike<unknown>
-    return nonZeroFinite(values[0]) || nonZeroFinite(values[1]) || nonZeroFinite(values[2])
-  }
-  return false
-}
-
-function nonZeroFinite(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) > 1e-12
+function hasNonZeroEulerRotation(rotation: EulerComponents): boolean {
+  return Math.abs(rotation.x) > 1e-12 || Math.abs(rotation.y) > 1e-12 || Math.abs(rotation.z) > 1e-12
 }
 
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
