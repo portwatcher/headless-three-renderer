@@ -7,6 +7,7 @@ export function createSceneCorpus() {
     transparentLayerCorpus(),
     equirectangularBackgroundCorpus(),
     arrayCameraViewportCorpus(),
+    viewportScissorCorpus(),
     customSortGroupCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
@@ -87,6 +88,29 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function viewportScissorCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.12)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffcc22 }),
+  ))
+
+  return {
+    name: 'viewport-scissor-rectangle',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      viewport: { x: 24, y: 16, width: 48, height: 56 },
+      scissor: { x: 36, y: 28, width: 24, height: 24 },
+    },
+    background: [0, 0, 31],
   }
 }
 

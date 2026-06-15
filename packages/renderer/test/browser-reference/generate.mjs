@@ -62,8 +62,7 @@ function renderFixture(fixture) {
   }
 
   renderer.setSize(width, height, false)
-  renderer.setViewport(0, 0, width, height)
-  renderer.setScissorTest(false)
+  applyFixtureRenderRectangles(fixture, width, height)
   renderer.outputColorSpace = outputColorSpace(fixture.options.outputColorSpace)
 
   const restoreRendererOptions = applyFixtureRendererOptions(fixture)
@@ -93,6 +92,47 @@ function renderFixture(fixture) {
   element.append(image, title, link)
 
   return { element, link }
+}
+
+function applyFixtureRenderRectangles(fixture, width, height) {
+  const viewport = rectangleFromOption(fixture.options.viewport) ?? { x: 0, y: 0, width, height }
+  renderer.setViewport(
+    viewport.x,
+    height - viewport.y - viewport.height,
+    viewport.width,
+    viewport.height,
+  )
+
+  const scissor = rectangleFromOption(fixture.options.scissor)
+  if (scissor) {
+    renderer.setScissor(
+      scissor.x,
+      height - scissor.y - scissor.height,
+      scissor.width,
+      scissor.height,
+    )
+    renderer.setScissorTest(true)
+  } else {
+    renderer.setScissorTest(false)
+  }
+}
+
+function rectangleFromOption(rectangle) {
+  if (!rectangle) return null
+  if (Array.isArray(rectangle)) {
+    return {
+      x: rectangle[0],
+      y: rectangle[1],
+      width: rectangle[2],
+      height: rectangle[3],
+    }
+  }
+  return {
+    x: rectangle.x,
+    y: rectangle.y,
+    width: rectangle.width ?? rectangle.z,
+    height: rectangle.height ?? rectangle.w,
+  }
 }
 
 function applyFixtureRendererOptions(fixture) {
