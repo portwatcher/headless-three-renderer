@@ -1272,6 +1272,9 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertFiniteNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
   assertFiniteNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
   assertFiniteNumberOption(options.environmentIntensity, 'options.environmentIntensity')
+  if (options.localClippingEnabled != null && typeof options.localClippingEnabled !== 'boolean') {
+    throw new TypeError('options.localClippingEnabled must be a boolean.')
+  }
   validateSortControls(options)
   validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')

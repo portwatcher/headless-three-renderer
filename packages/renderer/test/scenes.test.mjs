@@ -4601,6 +4601,13 @@ test('clippingPlanes over the native plane budget fail clearly', () => {
   for (const [label, makeRender, pattern] of cases) {
     assert.throws(makeRender(), pattern, label)
   }
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64, localClippingEnabled: 'no' }),
+    /options\.localClippingEnabled must be a boolean/i,
+  )
 })
 
 test('invalid clippingPlane values fail clearly', () => {
