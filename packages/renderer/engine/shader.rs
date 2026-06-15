@@ -62,8 +62,7 @@ struct Uniforms {
   // map_transform_rows[5].w = emissive map uses secondary UV stream.
   // map_transform_rows[8].w = light map is sRGB.
   map_transform_rows: array<vec4<f32>, 12>,
-  // Row pairs for clearcoat, clearcoat roughness, clearcoat normal, sheen color,
-  // sheen roughness, anisotropy, transmission, and thickness map transforms.
+  // Row pairs for current physical-extension map transforms.
   // physical_map_transform_rows[1].w = clearcoat map uses secondary UV stream.
   // physical_map_transform_rows[3].w = clearcoat roughness map uses secondary UV stream.
   // physical_map_transform_rows[5].w = clearcoat normal map uses secondary UV stream.
@@ -74,7 +73,9 @@ struct Uniforms {
   // physical_map_transform_rows[15].w = thickness map uses secondary UV stream.
   // physical_map_transform_rows[17].w = specular color map uses secondary UV stream.
   // physical_map_transform_rows[19].w = specular intensity map uses secondary UV stream.
-  physical_map_transform_rows: array<vec4<f32>, 20>,
+  // physical_map_transform_rows[21].w = iridescence map uses secondary UV stream.
+  // physical_map_transform_rows[23].w = iridescence thickness map uses secondary UV stream.
+  physical_map_transform_rows: array<vec4<f32>, 24>,
   // World-space clipping planes [normal.xyz, constant].
   clipping_planes: array<vec4<f32>, 8>,
   // x = union plane count, y = total plane count, z = alpha hash enabled, w = premultiplied alpha.
@@ -173,7 +174,6 @@ var s_physical_sheen_map: sampler;
 var s_physical_specular_map: sampler;
 @group(6) @binding(15)
 var s_clearcoat_normal_map: sampler;
-
 @group(7) @binding(0)
 var t_shadow: texture_depth_2d_array;
 @group(7) @binding(1)
@@ -678,6 +678,16 @@ fn transform_specular_intensity_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f3
   return transform_physical_slot_uv(specular_uv, 18u);
 }
 
+fn transform_iridescence_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let iridescence_uv = select(uv, uv2, uniforms.physical_map_transform_rows[21u].w > 0.5);
+  return transform_physical_slot_uv(iridescence_uv, 20u);
+}
+
+fn transform_iridescence_thickness_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let thickness_uv = select(uv, uv2, uniforms.physical_map_transform_rows[23u].w > 0.5);
+  return transform_physical_slot_uv(thickness_uv, 22u);
+}
+
 fn srgb_to_linear_channel(value: f32) -> f32 {
   if value <= 0.04045 {
     return value / 12.92;
@@ -1009,6 +1019,8 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let physical_anisotropy_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_anisotropy_map_uv(uv, uv2), 1);
   let physical_specular_color_sample = textureSample(t_physical_specular, s_physical_specular_map, transform_specular_color_map_uv(uv, uv2)).rgb;
   let physical_specular_intensity_sample = textureSample(t_physical_specular, s_physical_specular_map, transform_specular_intensity_map_uv(uv, uv2)).a;
+  let iridescence_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_iridescence_map_uv(uv, uv2), 2).r;
+  let iridescence_thickness_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_iridescence_thickness_map_uv(uv, uv2), 2).g;
   let clearcoat = clamp(uniforms.physical_params1.x * clearcoat_sample, 0.0, 1.0);
   let clearcoat_roughness = max(uniforms.physical_params1.y * clearcoat_roughness_sample, 0.0525);
   let transmission = clamp(uniforms.physical_params1.z * transmission_sample, 0.0, 1.0);
@@ -1061,12 +1073,13 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let physical_specular_intensity = clamp(uniforms.physical_specular.w * physical_specular_intensity_sample, 0.0, 1.0);
   let dielectric_f0 = min(vec3<f32>(dielectric_f0_scalar) * physical_specular_color, vec3<f32>(1.0)) * physical_specular_intensity;
   let specular_f90 = mix(physical_specular_intensity, 1.0, metallic);
-  let iridescence_strength = clamp(uniforms.iridescence_params.x, 0.0, 1.0) * (1.0 - metallic);
+  let iridescence_strength = clamp(uniforms.iridescence_params.x * iridescence_sample, 0.0, 1.0) * (1.0 - metallic);
+  let iridescence_thickness = mix(uniforms.iridescence_params.z, uniforms.iridescence_params.w, iridescence_thickness_sample);
   let iridescence_f0 = iridescence_fresnel_color(
     n_dot_v,
     clamp(uniforms.iridescence_params.y, 1.0, 2.333),
-    uniforms.iridescence_params.z,
-    uniforms.iridescence_params.w,
+    iridescence_thickness,
+    iridescence_thickness,
   ) * physical_specular_intensity;
   let f0 = mix(mix(dielectric_f0, iridescence_f0, iridescence_strength), albedo, metallic);
   let phong_specular_color = clamp(uniforms.physical_params2.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
@@ -1439,7 +1452,7 @@ struct Uniforms {
   alpha_map_transform1: vec4<f32>,
   alpha_map_transform2: vec4<f32>,
   map_transform_rows: array<vec4<f32>, 12>,
-  physical_map_transform_rows: array<vec4<f32>, 20>,
+  physical_map_transform_rows: array<vec4<f32>, 24>,
   clipping_planes: array<vec4<f32>, 8>,
   // x = union plane count, y = total plane count, z = alpha hash enabled, w = premultiplied alpha.
   clipping_params: vec4<f32>,

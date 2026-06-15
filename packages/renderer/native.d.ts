@@ -409,12 +409,52 @@ export interface SceneMesh {
   anisotropyMapUsesUv2?: boolean
   /** MeshPhysicalMaterial iridescence factor (0..1). Defaults to 0. */
   iridescence?: number
+  /** Optional iridescence factor map. Red channel multiplies `iridescence`. */
+  iridescenceMap?: Buffer
+  /** Iridescence factor map width (required when map is raw RGBA8 bytes). */
+  iridescenceMapWidth?: number
+  /** Iridescence factor map height (required when map is raw RGBA8 bytes). */
+  iridescenceMapHeight?: number
+  /** Iridescence factor map horizontal wrap mode. */
+  iridescenceMapWrapS?: string
+  /** Iridescence factor map vertical wrap mode. */
+  iridescenceMapWrapT?: string
+  /** Iridescence factor map magnification filter. */
+  iridescenceMapMagFilter?: string
+  /** Iridescence factor map minification filter. */
+  iridescenceMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  iridescenceMapAnisotropy?: number
+  /** Iridescence factor map UV transform `[a, c, tx, b, d, ty]`. */
+  iridescenceMapTransform?: Array<number>
+  /** Whether iridescence factor map sampling uses the secondary UV stream. */
+  iridescenceMapUsesUv2?: boolean
   /** Iridescence film IOR. Defaults to 1.3. */
   iridescenceIor?: number
   /** Iridescence film thickness range minimum in nanometers. Defaults to 100. */
   iridescenceThicknessMin?: number
   /** Iridescence film thickness range maximum in nanometers. Defaults to 400. */
   iridescenceThicknessMax?: number
+  /** Optional iridescence thickness map. Green channel interpolates the configured thickness range. */
+  iridescenceThicknessMap?: Buffer
+  /** Iridescence thickness map width (required when map is raw RGBA8 bytes). */
+  iridescenceThicknessMapWidth?: number
+  /** Iridescence thickness map height (required when map is raw RGBA8 bytes). */
+  iridescenceThicknessMapHeight?: number
+  /** Iridescence thickness map horizontal wrap mode. */
+  iridescenceThicknessMapWrapS?: string
+  /** Iridescence thickness map vertical wrap mode. */
+  iridescenceThicknessMapWrapT?: string
+  /** Iridescence thickness map magnification filter. */
+  iridescenceThicknessMapMagFilter?: string
+  /** Iridescence thickness map minification filter. */
+  iridescenceThicknessMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  iridescenceThicknessMapAnisotropy?: number
+  /** Iridescence thickness map UV transform `[a, c, tx, b, d, ty]`. */
+  iridescenceThicknessMapTransform?: Array<number>
+  /** Whether iridescence thickness map sampling uses the secondary UV stream. */
+  iridescenceThicknessMapUsesUv2?: boolean
   /** Physical transmission factor (0..1). Defaults to 0. */
   transmission?: number
   /** Optional transmission map. Red channel multiplies `transmission`. */

@@ -670,9 +670,29 @@ export interface NativeSceneMesh {
   anisotropyMapTransform?: number[]
   anisotropyMapUsesUv2?: boolean
   iridescence?: number
+  iridescenceMap?: Buffer
+  iridescenceMapWidth?: number
+  iridescenceMapHeight?: number
+  iridescenceMapWrapS?: string
+  iridescenceMapWrapT?: string
+  iridescenceMapMagFilter?: string
+  iridescenceMapMinFilter?: string
+  iridescenceMapAnisotropy?: number
+  iridescenceMapTransform?: number[]
+  iridescenceMapUsesUv2?: boolean
   iridescenceIor?: number
   iridescenceThicknessMin?: number
   iridescenceThicknessMax?: number
+  iridescenceThicknessMap?: Buffer
+  iridescenceThicknessMapWidth?: number
+  iridescenceThicknessMapHeight?: number
+  iridescenceThicknessMapWrapS?: string
+  iridescenceThicknessMapWrapT?: string
+  iridescenceThicknessMapMagFilter?: string
+  iridescenceThicknessMapMinFilter?: string
+  iridescenceThicknessMapAnisotropy?: number
+  iridescenceThicknessMapTransform?: number[]
+  iridescenceThicknessMapUsesUv2?: boolean
   transmission?: number
   transmissionMap?: Buffer
   transmissionMapWidth?: number
@@ -1025,9 +1045,29 @@ export interface PbrProperties {
   anisotropyMapTransform?: number[]
   anisotropyMapUsesUv2?: boolean
   iridescence?: number
+  iridescenceMap?: Buffer
+  iridescenceMapWidth?: number
+  iridescenceMapHeight?: number
+  iridescenceMapWrapS?: string
+  iridescenceMapWrapT?: string
+  iridescenceMapMagFilter?: string
+  iridescenceMapMinFilter?: string
+  iridescenceMapAnisotropy?: number
+  iridescenceMapTransform?: number[]
+  iridescenceMapUsesUv2?: boolean
   iridescenceIor?: number
   iridescenceThicknessMin?: number
   iridescenceThicknessMax?: number
+  iridescenceThicknessMap?: Buffer
+  iridescenceThicknessMapWidth?: number
+  iridescenceThicknessMapHeight?: number
+  iridescenceThicknessMapWrapS?: string
+  iridescenceThicknessMapWrapT?: string
+  iridescenceThicknessMapMagFilter?: string
+  iridescenceThicknessMapMinFilter?: string
+  iridescenceThicknessMapAnisotropy?: number
+  iridescenceThicknessMapTransform?: number[]
+  iridescenceThicknessMapUsesUv2?: boolean
   transmission?: number
   transmissionMap?: Buffer
   transmissionMapWidth?: number

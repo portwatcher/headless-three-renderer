@@ -488,6 +488,19 @@ export function extractPbrProperties(
   if (Number.isFinite(material.iridescence)) {
     props.iridescence = clamp01(material.iridescence!)
   }
+  const iridescenceMapInfo = extractTextureFromSlot(material.iridescenceMap)
+  if (iridescenceMapInfo) {
+    props.iridescenceMap = iridescenceMapInfo.data
+    props.iridescenceMapWidth = iridescenceMapInfo.width
+    props.iridescenceMapHeight = iridescenceMapInfo.height
+    props.iridescenceMapWrapS = wrapModeToString(material.iridescenceMap?.wrapS)
+    props.iridescenceMapWrapT = wrapModeToString(material.iridescenceMap?.wrapT)
+    props.iridescenceMapMagFilter = filterModeToString(material.iridescenceMap?.magFilter)
+    props.iridescenceMapMinFilter = minFilterModeToString(material.iridescenceMap)
+    props.iridescenceMapAnisotropy = textureAnisotropy(material.iridescenceMap)
+    props.iridescenceMapTransform = textureTransform(material.iridescenceMap)
+    props.iridescenceMapUsesUv2 = textureUvChannel(material.iridescenceMap) > 0
+  }
   if (Number.isFinite(material.iridescenceIOR)) {
     props.iridescenceIor = Math.max(1, Math.min(2.333, material.iridescenceIOR!))
   }
@@ -499,6 +512,19 @@ export function extractPbrProperties(
       props.iridescenceThicknessMin = Math.max(0, min)
       props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
     }
+  }
+  const iridescenceThicknessMapInfo = extractTextureFromSlot(material.iridescenceThicknessMap)
+  if (iridescenceThicknessMapInfo) {
+    props.iridescenceThicknessMap = iridescenceThicknessMapInfo.data
+    props.iridescenceThicknessMapWidth = iridescenceThicknessMapInfo.width
+    props.iridescenceThicknessMapHeight = iridescenceThicknessMapInfo.height
+    props.iridescenceThicknessMapWrapS = wrapModeToString(material.iridescenceThicknessMap?.wrapS)
+    props.iridescenceThicknessMapWrapT = wrapModeToString(material.iridescenceThicknessMap?.wrapT)
+    props.iridescenceThicknessMapMagFilter = filterModeToString(material.iridescenceThicknessMap?.magFilter)
+    props.iridescenceThicknessMapMinFilter = minFilterModeToString(material.iridescenceThicknessMap)
+    props.iridescenceThicknessMapAnisotropy = textureAnisotropy(material.iridescenceThicknessMap)
+    props.iridescenceThicknessMapTransform = textureTransform(material.iridescenceThicknessMap)
+    props.iridescenceThicknessMapUsesUv2 = textureUvChannel(material.iridescenceThicknessMap) > 0
   }
 
   if (Number.isFinite(material.transmission)) {
@@ -1104,11 +1130,6 @@ function assertSupportedMaterialState(
       'material.envMap is only supported for MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
     )
   }
-  if (material.iridescenceMap != null || material.iridescenceThicknessMap != null) {
-    throw new Error(
-      'MeshPhysicalMaterial iridescence maps are not supported by @headless-three/renderer yet. Scalar iridescence, iridescenceIOR, and iridescenceThicknessRange are supported; bake iridescence maps into material values before rendering.',
-    )
-  }
 }
 
 function assertSupportedMaterialClass(
@@ -1553,6 +1574,8 @@ function assertCompatiblePackedPhysicalMapSamplers(material: ThreeMaterialLike):
     ['transmissionMap', material.transmissionMap],
     ['thicknessMap', material.thicknessMap],
     ['anisotropyMap', material.anisotropyMap],
+    ['iridescenceMap', material.iridescenceMap],
+    ['iridescenceThicknessMap', material.iridescenceThicknessMap],
   ])
   assertMatchingSamplerSettings('physical extension sheen maps', [
     ['sheenColorMap', material.sheenColorMap],

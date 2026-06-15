@@ -6174,28 +6174,84 @@ test('MeshPhysicalMaterial scalar iridescence tints direct specular', () => {
   )
 })
 
-test('MeshPhysicalMaterial iridescence maps fail clearly', () => {
-  const cases = []
+test('MeshPhysicalMaterial iridescenceMap modulates scalar iridescence', () => {
+  function renderIridescenceMap(matrixOffsetX) {
+    const iridescenceMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], 2, 1)
+    setTextureMatrixOffset(iridescenceMap, matrixOffsetX)
 
-  const iridescenceMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-  iridescenceMap.iridescenceMap = solidTexture(255, 255, 255)
-  cases.push([iridescenceMap, /iridescence maps.*not supported/i, 'iridescenceMap'])
-
-  const iridescenceThicknessMap = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
-  iridescenceThicknessMap.iridescenceThicknessMap = solidTexture(255, 255, 255)
-  cases.push([iridescenceThicknessMap, /iridescence maps.*not supported/i, 'iridescenceThicknessMap'])
-
-  for (const [material, pattern, label] of cases) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), material))
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceMap,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      }),
+    ))
 
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      pattern,
-      label,
-    )
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
   }
+
+  assert.ok(
+    meanAbsDiff(renderIridescenceMap(0), renderIridescenceMap(0.5)) > 10,
+    'explicit iridescenceMap matrix should select the texel that enables iridescence',
+  )
+})
+
+test('MeshPhysicalMaterial iridescenceThicknessMap selects film thickness range', () => {
+  function renderThicknessMap(matrixOffsetX) {
+    const iridescenceThicknessMap = rgbaTexture([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 1)
+    setTextureMatrixOffset(iridescenceThicknessMap, matrixOffsetX)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [120, 760],
+        iridescenceThicknessMap,
+      }),
+    ))
+
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  assert.ok(
+    meanAbsDiff(renderThicknessMap(0), renderThicknessMap(0.5)) > 5,
+    'explicit iridescenceThicknessMap matrix should select a different film thickness',
+  )
 })
 
 test('physical extension maps apply texture UV transforms', () => {

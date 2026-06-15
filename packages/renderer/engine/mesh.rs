@@ -159,6 +159,10 @@ pub struct PreparedMesh {
     pub sheen_roughness_map_uses_uv2: bool,
     pub anisotropy_map_transform: [f32; 6],
     pub anisotropy_map_uses_uv2: bool,
+    pub iridescence_map_transform: [f32; 6],
+    pub iridescence_map_uses_uv2: bool,
+    pub iridescence_thickness_map_transform: [f32; 6],
+    pub iridescence_thickness_map_uses_uv2: bool,
     pub transmission_map_transform: [f32; 6],
     pub transmission_map_uses_uv2: bool,
     pub thickness_map_transform: [f32; 6],
@@ -186,6 +190,8 @@ pub struct PreparedPhysicalMaps {
     pub anisotropy_map: PreparedTexture,
     /// RGBA: specular color RGB, specular intensity multiplier in A.
     pub specular_map: PreparedTexture,
+    /// RG: iridescence multiplier in R, thickness range factor in G.
+    pub iridescence_map: PreparedTexture,
     pub physical_layers_sampler: TextureSamplerSettings,
     pub sheen_sampler: TextureSamplerSettings,
     pub specular_sampler: TextureSamplerSettings,
@@ -781,6 +787,12 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         parse_texture_transform(mesh.sheen_roughness_map_transform.as_deref(), mesh_index)?;
     let anisotropy_map_transform =
         parse_texture_transform(mesh.anisotropy_map_transform.as_deref(), mesh_index)?;
+    let iridescence_map_transform =
+        parse_texture_transform(mesh.iridescence_map_transform.as_deref(), mesh_index)?;
+    let iridescence_thickness_map_transform = parse_texture_transform(
+        mesh.iridescence_thickness_map_transform.as_deref(),
+        mesh_index,
+    )?;
     let transmission_map_transform =
         parse_texture_transform(mesh.transmission_map_transform.as_deref(), mesh_index)?;
     let thickness_map_transform =
@@ -1091,6 +1103,28 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh.anisotropy_map_min_filter.as_deref(),
         mesh.anisotropy_map_anisotropy,
     )?;
+    let iridescence_map = decode_optional_texture_with_sampling(
+        mesh.iridescence_map.as_deref(),
+        mesh.iridescence_map_width,
+        mesh.iridescence_map_height,
+        mesh_index,
+        mesh.iridescence_map_wrap_s.as_deref(),
+        mesh.iridescence_map_wrap_t.as_deref(),
+        mesh.iridescence_map_mag_filter.as_deref(),
+        mesh.iridescence_map_min_filter.as_deref(),
+        mesh.iridescence_map_anisotropy,
+    )?;
+    let iridescence_thickness_map = decode_optional_texture_with_sampling(
+        mesh.iridescence_thickness_map.as_deref(),
+        mesh.iridescence_thickness_map_width,
+        mesh.iridescence_thickness_map_height,
+        mesh_index,
+        mesh.iridescence_thickness_map_wrap_s.as_deref(),
+        mesh.iridescence_thickness_map_wrap_t.as_deref(),
+        mesh.iridescence_thickness_map_mag_filter.as_deref(),
+        mesh.iridescence_thickness_map_min_filter.as_deref(),
+        mesh.iridescence_thickness_map_anisotropy,
+    )?;
     let transmission_map = decode_optional_texture_with_sampling(
         mesh.transmission_map.as_deref(),
         mesh.transmission_map_width,
@@ -1141,6 +1175,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         sheen_color: sheen_color_map.as_ref(),
         sheen_roughness: sheen_roughness_map.as_ref(),
         anisotropy: anisotropy_map.as_ref(),
+        iridescence: iridescence_map.as_ref(),
+        iridescence_thickness: iridescence_thickness_map.as_ref(),
         transmission: transmission_map.as_ref(),
         thickness: thickness_map.as_ref(),
         specular_color: specular_color_map.as_ref(),
@@ -1484,6 +1520,12 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         sheen_roughness_map_uses_uv2: mesh.sheen_roughness_map_uses_uv2.unwrap_or(false),
         anisotropy_map_transform,
         anisotropy_map_uses_uv2: mesh.anisotropy_map_uses_uv2.unwrap_or(false),
+        iridescence_map_transform,
+        iridescence_map_uses_uv2: mesh.iridescence_map_uses_uv2.unwrap_or(false),
+        iridescence_thickness_map_transform,
+        iridescence_thickness_map_uses_uv2: mesh
+            .iridescence_thickness_map_uses_uv2
+            .unwrap_or(false),
         transmission_map_transform,
         transmission_map_uses_uv2: mesh.transmission_map_uses_uv2.unwrap_or(false),
         thickness_map_transform,
@@ -1832,6 +1874,8 @@ struct PhysicalMapInputs<'a> {
     sheen_color: Option<&'a PreparedTexture>,
     sheen_roughness: Option<&'a PreparedTexture>,
     anisotropy: Option<&'a PreparedTexture>,
+    iridescence: Option<&'a PreparedTexture>,
+    iridescence_thickness: Option<&'a PreparedTexture>,
     transmission: Option<&'a PreparedTexture>,
     thickness: Option<&'a PreparedTexture>,
     specular_color: Option<&'a PreparedTexture>,
@@ -1847,6 +1891,8 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
         inputs.sheen_color,
         inputs.sheen_roughness,
         inputs.anisotropy,
+        inputs.iridescence,
+        inputs.iridescence_thickness,
         inputs.transmission,
         inputs.thickness,
         inputs.specular_color,
@@ -1872,6 +1918,7 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
     let mut scalar = vec![255u8; pixel_count * 4];
     let mut sheen = vec![255u8; pixel_count * 4];
     let mut specular = vec![255u8; pixel_count * 4];
+    let mut iridescence = vec![255u8; pixel_count * 4];
     // Default anisotropy map is direction +X, full strength.
     let mut anisotropy = vec![0u8; pixel_count * 4];
     for px in 0..pixel_count {
@@ -1933,6 +1980,12 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
                 anisotropy[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
                 anisotropy[out + 2] = sample_texture_channel(map, x, y, width, height, 2);
             }
+            if let Some(map) = inputs.iridescence {
+                iridescence[out] = sample_texture_channel(map, x, y, width, height, 0);
+            }
+            if let Some(map) = inputs.iridescence_thickness {
+                iridescence[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
+            }
             if let Some(map) = inputs.specular_color {
                 specular[out] = sample_texture_color_channel(
                     map,
@@ -1974,6 +2027,8 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
         inputs.transmission,
         inputs.thickness,
         inputs.anisotropy,
+        inputs.iridescence,
+        inputs.iridescence_thickness,
     ]);
     let sheen_sampler =
         TextureSamplerSettings::first_from_textures(&[inputs.sheen_color, inputs.sheen_roughness]);
@@ -1981,12 +2036,12 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
         inputs.specular_color,
         inputs.specular_intensity,
     ]);
-
     Some(PreparedPhysicalMaps {
         scalar_map: packed_texture(scalar, width, height, physical_layers_sampler),
         sheen_map: packed_texture(sheen, width, height, sheen_sampler),
         anisotropy_map: packed_texture(anisotropy, width, height, physical_layers_sampler),
         specular_map: packed_texture(specular, width, height, specular_sampler),
+        iridescence_map: packed_texture(iridescence, width, height, physical_layers_sampler),
         physical_layers_sampler,
         sheen_sampler,
         specular_sampler,

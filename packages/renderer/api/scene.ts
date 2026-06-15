@@ -1661,6 +1661,8 @@ function secondaryUvsForMaterial(
     sheenColorMap?: { channel?: number } | null
     sheenRoughnessMap?: { channel?: number } | null
     anisotropyMap?: { channel?: number } | null
+    iridescenceMap?: { channel?: number } | null
+    iridescenceThicknessMap?: { channel?: number } | null
     displacementMap?: { channel?: number } | null
     normalMap?: { channel?: number } | null
     bumpMap?: { channel?: number } | null
@@ -1684,6 +1686,8 @@ function secondaryUvsForMaterial(
     material?.sheenColorMap,
     material?.sheenRoughnessMap,
     material?.anisotropyMap,
+    material?.iridescenceMap,
+    material?.iridescenceThicknessMap,
     material?.normalMap,
     material?.bumpMap,
     material?.transmissionMap,

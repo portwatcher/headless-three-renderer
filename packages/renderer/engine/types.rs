@@ -375,12 +375,52 @@ pub struct SceneMesh {
     pub anisotropy_map_uses_uv2: Option<bool>,
     /// MeshPhysicalMaterial iridescence factor (0..1). Defaults to 0.
     pub iridescence: Option<f64>,
+    /// Optional iridescence factor map. Red channel multiplies `iridescence`.
+    pub iridescence_map: Option<Buffer>,
+    /// Iridescence factor map width (required when map is raw RGBA8 bytes).
+    pub iridescence_map_width: Option<u32>,
+    /// Iridescence factor map height (required when map is raw RGBA8 bytes).
+    pub iridescence_map_height: Option<u32>,
+    /// Iridescence factor map horizontal wrap mode.
+    pub iridescence_map_wrap_s: Option<String>,
+    /// Iridescence factor map vertical wrap mode.
+    pub iridescence_map_wrap_t: Option<String>,
+    /// Iridescence factor map magnification filter.
+    pub iridescence_map_mag_filter: Option<String>,
+    /// Iridescence factor map minification filter.
+    pub iridescence_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub iridescence_map_anisotropy: Option<f64>,
+    /// Iridescence factor map UV transform `[a, c, tx, b, d, ty]`.
+    pub iridescence_map_transform: Option<Vec<f64>>,
+    /// Whether iridescence factor map sampling uses the secondary UV stream.
+    pub iridescence_map_uses_uv2: Option<bool>,
     /// Iridescence film IOR. Defaults to 1.3.
     pub iridescence_ior: Option<f64>,
     /// Iridescence film thickness range minimum in nanometers. Defaults to 100.
     pub iridescence_thickness_min: Option<f64>,
     /// Iridescence film thickness range maximum in nanometers. Defaults to 400.
     pub iridescence_thickness_max: Option<f64>,
+    /// Optional iridescence thickness map. Green channel interpolates the configured thickness range.
+    pub iridescence_thickness_map: Option<Buffer>,
+    /// Iridescence thickness map width (required when map is raw RGBA8 bytes).
+    pub iridescence_thickness_map_width: Option<u32>,
+    /// Iridescence thickness map height (required when map is raw RGBA8 bytes).
+    pub iridescence_thickness_map_height: Option<u32>,
+    /// Iridescence thickness map horizontal wrap mode.
+    pub iridescence_thickness_map_wrap_s: Option<String>,
+    /// Iridescence thickness map vertical wrap mode.
+    pub iridescence_thickness_map_wrap_t: Option<String>,
+    /// Iridescence thickness map magnification filter.
+    pub iridescence_thickness_map_mag_filter: Option<String>,
+    /// Iridescence thickness map minification filter.
+    pub iridescence_thickness_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub iridescence_thickness_map_anisotropy: Option<f64>,
+    /// Iridescence thickness map UV transform `[a, c, tx, b, d, ty]`.
+    pub iridescence_thickness_map_transform: Option<Vec<f64>>,
+    /// Whether iridescence thickness map sampling uses the secondary UV stream.
+    pub iridescence_thickness_map_uses_uv2: Option<bool>,
     /// Physical transmission factor (0..1). Defaults to 0.
     pub transmission: Option<f64>,
     /// Optional transmission map. Red channel multiplies `transmission`.

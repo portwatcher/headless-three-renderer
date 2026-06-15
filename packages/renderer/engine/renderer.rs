@@ -61,9 +61,8 @@ pub struct Uniforms {
     /// Row pairs for normal, metallic-roughness, emissive, AO, light, and specular map transforms.
     /// Emissive/light-map row 0 w lanes flag sRGB decode; row 1 w lanes retain UV selection.
     pub map_transform_rows: [[f32; 4]; 12],
-    /// Row pairs for clearcoat, clearcoat roughness, clearcoat normal, sheen color,
-    /// sheen roughness, anisotropy, transmission, and thickness map transforms.
-    pub physical_map_transform_rows: [[f32; 4]; 20],
+    /// Row pairs for current physical-extension map transforms.
+    pub physical_map_transform_rows: [[f32; 4]; 24],
     /// World-space clipping planes `[nx, ny, nz, constant]`.
     pub clipping_planes: [[f32; 4]; MAX_CLIPPING_PLANES],
     /// x = union plane count, y = total plane count, z = alpha hash enabled, w = premultiplied alpha.
@@ -847,13 +846,14 @@ impl GpuRenderer {
             create_default_ibl_bind_group(&device, &queue, &ibl_layout, &sampler);
 
         // Default physical layers: layer 0 is neutral scalar/specular data, layer 1 is
-        // the default +X anisotropy direction with full strength.
+        // the default +X anisotropy direction with full strength, and layer 2 is
+        // neutral iridescence factor/thickness data.
         let default_physical_layers_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("headless-three-renderer default physical layers map"),
             size: wgpu::Extent3d {
                 width: 1,
                 height: 1,
-                depth_or_array_layers: 2,
+                depth_or_array_layers: 3,
             },
             mip_level_count: 1,
             sample_count: 1,
@@ -889,6 +889,25 @@ impl GpuRenderer {
                 aspect: wgpu::TextureAspect::All,
             },
             &[255u8, 128, 255, 255],
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &default_physical_layers_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d { x: 0, y: 0, z: 2 },
+                aspect: wgpu::TextureAspect::All,
+            },
+            &[255u8, 255, 255, 255],
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(4),
@@ -2088,11 +2107,12 @@ impl GpuRenderer {
         label: &'static str,
         scalar: &PreparedTexture,
         anisotropy: Option<&PreparedTexture>,
+        iridescence: Option<&PreparedTexture>,
     ) -> wgpu::Texture {
         let tex_size = wgpu::Extent3d {
             width: scalar.width,
             height: scalar.height,
-            depth_or_array_layers: 2,
+            depth_or_array_layers: 3,
         };
         let mip_level_count =
             texture_mip_level_count(scalar.width, scalar.height, scalar.mipmap_filter);
@@ -2132,6 +2152,28 @@ impl GpuRenderer {
             &gpu_texture,
             1,
             anisotropy_rgba,
+            scalar.width,
+            scalar.height,
+            mip_level_count,
+        );
+
+        let mut default_iridescence = Vec::new();
+        let iridescence_rgba = match iridescence {
+            Some(tex) if tex.width == scalar.width && tex.height == scalar.height => {
+                tex.rgba.as_slice()
+            }
+            _ => {
+                default_iridescence.reserve_exact((scalar.width * scalar.height * 4) as usize);
+                for _ in 0..(scalar.width * scalar.height) {
+                    default_iridescence.extend_from_slice(&[255u8, 255, 255, 255]);
+                }
+                default_iridescence.as_slice()
+            }
+        };
+        self.write_texture_mip_chain(
+            &gpu_texture,
+            2,
+            iridescence_rgba,
             scalar.width,
             scalar.height,
             mip_level_count,
@@ -2805,10 +2847,12 @@ impl GpuRenderer {
                         "headless-three-renderer physical layers map",
                         &maps.scalar_map,
                         Some(&maps.anisotropy_map),
+                        Some(&maps.iridescence_map),
                     )),
                     (None, Some(tex)) => Some(self.upload_physical_layers_texture(
                         "headless-three-renderer specular and physical layers map",
                         tex,
+                        None,
                         None,
                     )),
                     (None, None) => None,
@@ -3659,7 +3703,7 @@ fn map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 12] {
     rows
 }
 
-fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 20] {
+fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 24] {
     let transforms = [
         mesh.clearcoat_map_transform,
         mesh.clearcoat_roughness_map_transform,
@@ -3675,8 +3719,10 @@ fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 20] {
         mesh.thickness_map_transform,
         mesh.specular_color_map_transform,
         mesh.specular_intensity_map_transform,
+        mesh.iridescence_map_transform,
+        mesh.iridescence_thickness_map_transform,
     ];
-    let mut rows = [[0.0; 4]; 20];
+    let mut rows = [[0.0; 4]; 24];
     for (index, transform) in transforms.iter().enumerate() {
         let row = index * 2;
         rows[row] = [transform[0], transform[1], transform[2], 0.0];
@@ -3732,6 +3778,16 @@ fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 20] {
         0.0
     };
     rows[19][3] = if mesh.specular_intensity_map_uses_uv2 {
+        1.0
+    } else {
+        0.0
+    };
+    rows[21][3] = if mesh.iridescence_map_uses_uv2 {
+        1.0
+    } else {
+        0.0
+    };
+    rows[23][3] = if mesh.iridescence_thickness_map_uses_uv2 {
         1.0
     } else {
         0.0
