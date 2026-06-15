@@ -84,6 +84,7 @@ export interface ThreeTextureLike {
   wrapT?: number
   magFilter?: number
   minFilter?: number
+  type?: number
   generateMipmaps?: boolean
   mipmaps?: Array<{
     data?: ArrayLike<number>

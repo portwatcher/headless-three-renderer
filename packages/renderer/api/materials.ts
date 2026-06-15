@@ -1548,7 +1548,7 @@ function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { d
     )
   }
 
-  const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`))
+  const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`, map.type))
   const faceWidth = faceTextures[0].width
   const faceHeight = faceTextures[0].height
   if (faceWidth !== faceHeight) {
@@ -1594,7 +1594,7 @@ function cubeFaceImages(map: ThreeTextureLike): TextureImageInput[] | null {
   return null
 }
 
-function imageToRgbaTexture(image: TextureImageInput, label: string): { rgba: Uint8Array; width: number; height: number } {
+function imageToRgbaTexture(image: TextureImageInput, label: string, textureType?: number): { rgba: Uint8Array; width: number; height: number } {
   if (Buffer.isBuffer(image) || image instanceof Uint8Array) {
     const buffer = Buffer.isBuffer(image)
       ? image
@@ -1614,7 +1614,7 @@ function imageToRgbaTexture(image: TextureImageInput, label: string): { rgba: Ui
   if (!image || !image.data || !(image.width! > 0) || !(image.height! > 0)) {
     throw new Error(`${label} must provide raw face data, width, and height for cube background rendering.`)
   }
-  const rgba = toRgba8(image.data, image.width!, image.height!)
+  const rgba = toRgba8(image.data, image.width!, image.height!, { type: textureType })
   if (!rgba) {
     throw new Error(`${label} must contain RGB or RGBA numeric pixel data for cube background rendering.`)
   }
@@ -1744,7 +1744,7 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
 
   // DataTexture style: { data: TypedArray, width, height }
   if (image.data && image.width > 0 && image.height > 0) {
-    const rgba = toRgba8(image.data, image.width, image.height)
+    const rgba = toRgba8(image.data, image.width, image.height, { type: map.type })
     if (rgba) {
       const data = textureBytesWithExplicitMipmaps(map, label, rgba, image.width, image.height)
       return { data: Buffer.from(data.buffer, data.byteOffset, data.byteLength), width: image.width, height: image.height }
@@ -1819,7 +1819,7 @@ function textureBytesWithExplicitMipmaps(
         `${label}.mipmaps[${i}] must provide raw pixel data with size ${expectedWidth}x${expectedHeight} for explicit mipmap upload.`,
       )
     }
-    const rgba = toRgba8(mip.data, expectedWidth, expectedHeight)
+    const rgba = toRgba8(mip.data, expectedWidth, expectedHeight, { type: map.type })
     if (!rgba) {
       throw unsupportedRawTextureDataError(`${label}.mipmaps[${i}]`, 'texture rendering')
     }
@@ -2113,10 +2113,16 @@ function toRgba8(
   data: ArrayLike<number>,
   width: number,
   height: number,
-  options: { narrowChannels?: boolean } = {},
+  options: { narrowChannels?: boolean; type?: number } = {},
 ): Uint8Array | null {
   const pixels = width * height
   const allowNarrowChannels = options.narrowChannels !== false
+  const textureType = options.type ?? UnsignedByteType
+
+  if (textureType === HalfFloatType) {
+    if (!(data instanceof Uint16Array)) return null
+    return halfFloatDataToRgba8(data, pixels, allowNarrowChannels)
+  }
 
   if (data instanceof Uint8Array || data instanceof Uint8ClampedArray) {
     if (data.length === pixels * 4) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -2277,4 +2283,66 @@ function toRgba8(
   }
 
   return null
+}
+
+function halfFloatDataToRgba8(
+  data: Uint16Array,
+  pixels: number,
+  allowNarrowChannels: boolean,
+): Uint8Array | null {
+  if (data.length === pixels * 4) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels * 4; i++) {
+      out[i] = halfFloatToByte(data[i])
+    }
+    return out
+  }
+  if (data.length === pixels * 3) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = halfFloatToByte(data[i * 3])
+      out[i * 4 + 1] = halfFloatToByte(data[i * 3 + 1])
+      out[i * 4 + 2] = halfFloatToByte(data[i * 3 + 2])
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels * 2) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = halfFloatToByte(data[i * 2])
+      out[i * 4 + 1] = halfFloatToByte(data[i * 2 + 1])
+      out[i * 4 + 2] = 0
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      const value = halfFloatToByte(data[i])
+      out[i * 4] = value
+      out[i * 4 + 1] = value
+      out[i * 4 + 2] = value
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  return null
+}
+
+function halfFloatToByte(bits: number): number {
+  const sign = bits & 0x8000 ? -1 : 1
+  const exponent = (bits >> 10) & 0x1f
+  const mantissa = bits & 0x03ff
+  let value: number
+  if (exponent === 0) {
+    value = sign * (mantissa / 0x400) * (2 ** -14)
+  } else if (exponent === 0x1f) {
+    value = mantissa === 0 ? sign * Infinity : Number.NaN
+  } else {
+    value = sign * (1 + mantissa / 0x400) * (2 ** (exponent - 15))
+  }
+  if (!Number.isFinite(value)) return value > 0 ? 255 : 0
+  return Math.max(0, Math.min(255, Math.round(value * 255)))
 }

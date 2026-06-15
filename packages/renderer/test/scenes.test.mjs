@@ -6414,6 +6414,49 @@ test('one- and two-channel raw DataTexture maps expand for texture rendering', (
   assert.ok(rg.b < 40, `two-channel raw texture should leave blue empty (${rg.b})`)
 })
 
+test('HalfFloatType raw DataTexture maps decode for material and background textures', () => {
+  function halfRgbaTexture() {
+    const texture = new THREE.DataTexture(
+      new Uint16Array([0x3800, 0x3400, 0x3c00, 0x3c00]),
+      1,
+      1,
+      THREE.RGBAFormat,
+      THREE.HalfFloatType,
+    )
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderTexture(kind) {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    if (kind === 'material') {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: halfRgbaTexture() })))
+    } else {
+      scene.background = halfRgbaTexture()
+    }
+    return meanRegion(
+      renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+  }
+
+  for (const kind of ['material', 'background']) {
+    const mean = renderTexture(kind)
+    assert.ok(mean.r > 105 && mean.r < 150, `${kind} half-float red should decode near 0.5 (${mean.r})`)
+    assert.ok(mean.g > 45 && mean.g < 100, `${kind} half-float green should decode near 0.25 (${mean.g})`)
+    assert.ok(mean.b > 180, `${kind} half-float blue should decode near 1.0 (${mean.b})`)
+  }
+})
+
 test('explicit raw texture mipmaps upload for material and background maps', () => {
   function mipmappedCheckerTexture() {
     const size = 16
@@ -6456,6 +6499,46 @@ test('explicit raw texture mipmaps upload for material and background maps', () 
     assert.ok(mean.b > 180, `${name} explicit mipmap levels should drive minified sampling (${mean.r}, ${mean.g}, ${mean.b})`)
     assert.ok(mean.r < 80 && mean.g < 80, `${name} base checker colors should not dominate explicit mip sampling (${mean.r}, ${mean.g}, ${mean.b})`)
   }
+})
+
+test('HalfFloatType explicit raw texture mipmaps decode before upload', () => {
+  const size = 16
+  const data = new Uint16Array(size * size * 4)
+  for (let i = 0; i < size * size; i += 1) {
+    data[i * 4] = 0x3c00
+    data[i * 4 + 1] = 0x0000
+    data[i * 4 + 2] = 0x0000
+    data[i * 4 + 3] = 0x3c00
+  }
+  const map = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.HalfFloatType)
+  map.wrapS = THREE.RepeatWrapping
+  map.wrapT = THREE.RepeatWrapping
+  map.repeat.set(128, 128)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestMipmapNearestFilter
+  map.generateMipmaps = false
+  map.mipmaps = [8, 4, 2, 1].map((levelSize) => {
+    const level = new Uint16Array(levelSize * levelSize * 4)
+    for (let i = 0; i < levelSize * levelSize; i += 1) {
+      level[i * 4] = 0x0000
+      level[i * 4 + 1] = 0x0000
+      level[i * 4 + 2] = 0x3800
+      level[i * 4 + 3] = 0x3c00
+    }
+    return { data: level, width: levelSize, height: levelSize }
+  })
+  map.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }))
+  assert.ok(mean.b > 100 && mean.b < 160, `half-float explicit mipmap blue should decode near 0.5 (${mean.b})`)
+  assert.ok(mean.r < 60 && mean.g < 60, `half-float base red should not dominate explicit mip sampling (${mean.r}, ${mean.g})`)
 })
 
 test('malformed explicit texture mipmaps fail clearly', () => {
