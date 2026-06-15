@@ -117,7 +117,7 @@ The public API accepts only Three.js-like objects:
 
 - material base color and opacity
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw one-channel, two-channel, RGB, or RGBA numeric DataTexture inputs, with `texture.channel` UV selection and sRGB color-space decode
-- base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
+- base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`; unsupported texture color-space/encoding values fail clearly
 - base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots
 - `texture.channel` supports channels 0-3 on supported map slots; channels 1-3 route one selected non-primary UV attribute through the native secondary UV stream, and mixed non-primary channels in one material draw fail clearly
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`

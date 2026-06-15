@@ -99,6 +99,7 @@ const RGDepthPacking = 3203
 const UnsignedByteType = 1009
 const HalfFloatType = 1016
 const FloatType = 1015
+const LinearEncoding = 3000
 const sRGBEncoding = 3001
 
 const DefaultOnBeforeCompileSource = 'onBeforeCompile( /* shaderobject, renderer */ ) {}'
@@ -1926,7 +1927,7 @@ function composeTextureTransformWithFlipY(transform: number[], flipY: boolean): 
 
 function textureColorSpace(map: ThreeTextureLike | null | undefined): string | undefined {
   if (!map) return undefined
-  if (map.colorSpace === 'srgb' || map.encoding === sRGBEncoding) return 'srgb'
+  if (map.colorSpace === 'srgb') return 'srgb'
   if (
     map.colorSpace === 'srgb-linear' ||
     map.colorSpace === 'linear-srgb' ||
@@ -1934,6 +1935,17 @@ function textureColorSpace(map: ThreeTextureLike | null | undefined): string | u
     map.colorSpace === 'linear'
   ) {
     return 'linear'
+  }
+  if (map.colorSpace != null && map.colorSpace !== '') {
+    throw new Error(
+      `texture.colorSpace ${String(map.colorSpace)} is not supported by @headless-three/renderer. Use THREE.SRGBColorSpace, THREE.LinearSRGBColorSpace, or THREE.NoColorSpace.`,
+    )
+  }
+  if (map.encoding === sRGBEncoding) return 'srgb'
+  if (map.encoding != null && map.encoding !== LinearEncoding) {
+    throw new Error(
+      `texture.encoding ${String(map.encoding)} is not supported by @headless-three/renderer. Use sRGBEncoding, LinearEncoding, or texture.colorSpace with THREE.SRGBColorSpace/THREE.LinearSRGBColorSpace.`,
+    )
   }
   return undefined
 }
