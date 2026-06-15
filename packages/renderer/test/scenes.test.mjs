@@ -619,6 +619,33 @@ test('renderMode mask preserves alphaMap cutouts', () => {
   assert.ok(rightMean.r > 250 && rightMean.g > 250 && rightMean.b > 250, `alphaMap green=255 should keep mask pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
+test('invalid material alphaTest values fail clearly', () => {
+  const cases = [
+    ['mesh', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      material.alphaTest = 'cutout'
+      return new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material)
+    }],
+    ['line', () => {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, 0, 0, 0.5, 0, 0]), 3))
+      const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+      material.alphaTest = Number.NaN
+      return new THREE.Line(geometry, material)
+    }],
+  ]
+
+  for (const [name, object] of cases) {
+    const scene = new THREE.Scene()
+    scene.add(object())
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /material\.alphaTest must be a finite number/i,
+      `${name} alphaTest should fail clearly`,
+    )
+  }
+})
+
 test('different materials produce visibly different outputs', async () => {
   const camera = makeCamera()
 

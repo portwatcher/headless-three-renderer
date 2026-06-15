@@ -841,8 +841,9 @@ export function extractPbrProperties(
     props.alphaMapUsesUv2 = textureUvChannel(material.alphaMap) > 0
   }
 
-  if (Number.isFinite(material.alphaTest) && material.alphaTest! > 0) {
-    props.alphaTest = clamp01(material.alphaTest!)
+  const alphaTest = optionalFiniteNumber(material.alphaTest, 'material.alphaTest')
+  if (alphaTest !== undefined && alphaTest > 0) {
+    props.alphaTest = clamp01(alphaTest)
   }
   if (material.alphaHash === true) {
     props.alphaHash = true
