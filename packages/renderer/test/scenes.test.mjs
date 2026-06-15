@@ -4425,6 +4425,54 @@ test('customDistanceMaterial displacement shifts point-light shadow casters', ()
   assert.ok(diff > 5, `customDistanceMaterial displacement should move the point-light caster shadow, diff=${diff.toFixed(3)}`)
 })
 
+test('custom shadow material wireframe inputs fail clearly', () => {
+  function makeScene(customShadowMaterial, light) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.castShadow = true
+    if (customShadowMaterial.isMeshDistanceMaterial) {
+      caster.customDistanceMaterial = customShadowMaterial
+    } else {
+      caster.customDepthMaterial = customShadowMaterial
+    }
+    scene.add(caster)
+    scene.add(light)
+    if (light.target) scene.add(light.target)
+    return scene
+  }
+
+  const directional = new THREE.DirectionalLight(0xffffff, 1)
+  directional.castShadow = true
+  directional.position.set(2, 4, 3)
+  directional.target.position.set(0, 0, 0)
+  assert.throws(
+    () => renderRgba(
+      makeScene(new THREE.MeshDepthMaterial({ wireframe: true }), directional),
+      makeCamera(),
+      { width: 64, height: 64 },
+    ),
+    /customDepthMaterial wireframe shadow casters.*not supported/i,
+  )
+
+  const point = new THREE.PointLight(0xffffff, 1)
+  point.castShadow = true
+  point.position.set(2, 4, 3)
+  const distanceWireframe = new THREE.MeshDistanceMaterial()
+  distanceWireframe.wireframe = true
+  assert.throws(
+    () => renderRgba(
+      makeScene(distanceWireframe, point),
+      makeCamera(),
+      { width: 64, height: 64 },
+    ),
+    /customDistanceMaterial wireframe shadow casters.*not supported/i,
+  )
+})
+
 test('base color map applies texture UV transforms', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
