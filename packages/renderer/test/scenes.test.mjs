@@ -702,6 +702,42 @@ test('invalid material scalar values fail clearly', () => {
   }
 })
 
+test('invalid material color values fail clearly', () => {
+  const cases = [
+    ['base color', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      material.color = { isColor: true, r: 1, g: 'green', b: 0 }
+      return material
+    }, /material\.color\.g must be a finite number/i],
+    ['emissive', () => {
+      const material = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xff0000 })
+      material.emissive = { isColor: true, r: 1, g: 0, b: Number.NaN }
+      return material
+    }, /material\.emissive\.b must be a finite number/i],
+    ['physical specularColor', () => {
+      const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+      material.specularColor = { isColor: true, r: 1, g: Number.POSITIVE_INFINITY, b: 1 }
+      return material
+    }, /material\.specularColor\.g must be a finite number/i],
+    ['blendColor', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      material.blending = THREE.CustomBlending
+      material.blendColor = { isColor: true, r: 'red', g: 0, b: 0 }
+      return material
+    }, /material\.blendColor\.r must be a finite number/i],
+  ]
+
+  for (const [name, material, pattern] of cases) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material()))
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('different materials produce visibly different outputs', async () => {
   const camera = makeCamera()
 
