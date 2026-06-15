@@ -11,6 +11,7 @@ export function createSceneCorpus() {
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
     globalClippingPlaneCorpus(),
+    lightProbeCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -90,6 +91,33 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function lightProbeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.03, 0.03, 0.04)
+
+  const probe = new THREE.LightProbe()
+  probe.sh.coefficients[0].set(0.7, 0.45, 0.25)
+  probe.sh.coefficients[1].set(0.15, 0.05, 0.0)
+  probe.intensity = 1.4
+  scene.add(probe)
+
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 24, 16),
+    new THREE.MeshLambertMaterial({ color: 0xffffff }),
+  )
+  mesh.rotation.y = -0.25
+  scene.add(mesh)
+
+  return {
+    name: 'light-probe-diffuse',
+    scene,
+    camera: makeCamera([0.8, 0.4, 3.0], [0, 0, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [8, 8, 10],
+    minNonBackgroundRatio: 0.02,
   }
 }
 
