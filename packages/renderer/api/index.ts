@@ -621,6 +621,7 @@ function renderCubeCamera(
   if (!target) {
     throw new Error('THREE.CubeCamera rendering requires a WebGLCubeRenderTarget via camera.renderTarget or options.target.')
   }
+  assertRenderTargetLike(target, options.target !== undefined ? 'options.target' : 'THREE.CubeCamera renderTarget')
   validateUnsupportedRenderTargetOptions(target)
 
   const { width: targetWidth, height: targetHeight } = resolveCubeTargetSize(target, options)

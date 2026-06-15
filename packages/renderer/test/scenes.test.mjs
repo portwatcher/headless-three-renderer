@@ -645,6 +645,22 @@ test('CubeCamera captured target textures can be reused as cube inputs', () => {
   assert.ok(diff > 1, `captured cube environment should affect metallic IBL, diff=${diff.toFixed(3)}`)
 })
 
+test('CubeCamera malformed render targets fail clearly', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(32))
+
+  cubeCamera.renderTarget = 'bad'
+  assert.throws(
+    () => renderRgba(scene, cubeCamera, { width: 32, height: 32 }),
+    /THREE\.CubeCamera renderTarget must be a target-like object/i,
+  )
+
+  assert.throws(
+    () => render(scene, cubeCamera, { width: 32, height: 32, target: 'bad' }),
+    /options\.target must be a target-like object/i,
+  )
+})
+
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)
