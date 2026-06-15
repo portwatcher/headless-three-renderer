@@ -1954,6 +1954,16 @@ function assertSupportedTextureInput(
       `${label} uses a compressed texture. KTX2, Basis, and THREE.CompressedTexture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
     )
   }
+  if (
+    (map as any).isDataArrayTexture === true ||
+    (map as any).isData3DTexture === true ||
+    (map as any).isArrayTexture === true ||
+    (map as any).is3DTexture === true
+  ) {
+    throw new Error(
+      `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer yet. Provide a 2D texture image for this slot or render each layer separately.`,
+    )
+  }
   if (!options.allowMipmaps && hasExplicitMipmaps(map)) {
     throw new Error(
       `${label} provides explicit texture mipmaps, which are not uploaded by @headless-three/renderer yet. Provide only the base image level or prefilter/downsample the texture before rendering.`,

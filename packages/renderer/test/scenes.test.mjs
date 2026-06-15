@@ -6860,6 +6860,48 @@ test('unsupported texture inputs fail clearly for background and environment slo
   }
 })
 
+test('unsupported array and 3D texture inputs fail clearly', () => {
+  function dataArrayTexture() {
+    const texture = new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function data3dTexture() {
+    const texture = new THREE.Data3DTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const cases = [
+    ['material DataArrayTexture', (scene) => {
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: dataArrayTexture() }),
+      ))
+    }, /texture uses an array or 3D texture/i],
+    ['background DataArrayTexture', (scene) => {
+      scene.background = dataArrayTexture()
+    }, /background uses an array or 3D texture/i],
+    ['environment Data3DTexture', (scene) => {
+      scene.environment = data3dTexture()
+    }, /scene\.environment uses an array or 3D texture/i],
+    ['reflection probe Data3DTexture', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: data3dTexture() } }
+    }, /reflectionProbe\.texture uses an array or 3D texture/i],
+  ]
+
+  for (const [name, setup, pattern] of cases) {
+    const scene = new THREE.Scene()
+    setup(scene)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('malformed environment and reflection probe texture values fail clearly', () => {
   const cases = [
     ['string scene environment', (scene) => {
