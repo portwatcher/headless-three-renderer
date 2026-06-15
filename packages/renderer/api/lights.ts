@@ -180,26 +180,35 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   out.shadowMapSize = Math.max(mapSize.width, mapSize.height)
   out.shadowMapWidth = mapSize.width
   out.shadowMapHeight = mapSize.height
-  if (Number.isFinite(shadow?.bias)) out.shadowBias = shadow!.bias!
-  if (Number.isFinite(shadow?.normalBias)) out.shadowNormalBias = shadow!.normalBias!
-  if (Number.isFinite(shadow?.radius)) out.shadowRadius = shadow!.radius!
+  const bias = optionalFiniteNumber(shadow?.bias, 'light.shadow.bias')
+  const normalBias = optionalFiniteNumber(shadow?.normalBias, 'light.shadow.normalBias')
+  const radius = optionalFiniteNumber(shadow?.radius, 'light.shadow.radius')
+  if (bias !== undefined) out.shadowBias = bias
+  if (normalBias !== undefined) out.shadowNormalBias = normalBias
+  if (radius !== undefined) out.shadowRadius = radius
 
   const cam = shadow?.camera
   if (cam) {
-    if (Number.isFinite(cam.left)) out.shadowCameraLeft = cam.left!
-    if (Number.isFinite(cam.right)) out.shadowCameraRight = cam.right!
-    if (Number.isFinite(cam.top)) out.shadowCameraTop = cam.top!
-    if (Number.isFinite(cam.bottom)) out.shadowCameraBottom = cam.bottom!
-    if (Number.isFinite(cam.near)) out.shadowCameraNear = cam.near!
-    if (Number.isFinite(cam.far)) out.shadowCameraFar = cam.far!
+    const left = optionalFiniteNumber(cam.left, 'light.shadow.camera.left')
+    const right = optionalFiniteNumber(cam.right, 'light.shadow.camera.right')
+    const top = optionalFiniteNumber(cam.top, 'light.shadow.camera.top')
+    const bottom = optionalFiniteNumber(cam.bottom, 'light.shadow.camera.bottom')
+    const near = optionalFiniteNumber(cam.near, 'light.shadow.camera.near')
+    const far = optionalFiniteNumber(cam.far, 'light.shadow.camera.far')
+    if (left !== undefined) out.shadowCameraLeft = left
+    if (right !== undefined) out.shadowCameraRight = right
+    if (top !== undefined) out.shadowCameraTop = top
+    if (bottom !== undefined) out.shadowCameraBottom = bottom
+    if (near !== undefined) out.shadowCameraNear = near
+    if (far !== undefined) out.shadowCameraFar = far
   }
 
   applyShadowCascadeOptions(out, light)
 }
 
 function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3DLike): { width: number; height: number } {
-  const width = numberOrNull(mapSize?.x ?? mapSize?.width)
-  const height = numberOrNull(mapSize?.y ?? mapSize?.height)
+  const width = shadowMapSizeComponent(mapSize, 'x', 'width')
+  const height = shadowMapSizeComponent(mapSize, 'y', 'height')
   const resolvedWidth = Math.max(32, Math.floor(width ?? height ?? 512))
   const resolvedHeight = Math.max(32, Math.floor(height ?? width ?? 512))
   if (light.isPointLight === true && resolvedWidth !== resolvedHeight) {
@@ -208,6 +217,17 @@ function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3D
     )
   }
   return { width: resolvedWidth, height: resolvedHeight }
+}
+
+function shadowMapSizeComponent(
+  mapSize: ShadowMapSizeLike,
+  vectorKey: 'x' | 'y',
+  dimensionKey: 'width' | 'height',
+): number | undefined {
+  if (!mapSize) return undefined
+  const vectorValue = mapSize[vectorKey]
+  if (vectorValue != null) return optionalFiniteNumber(vectorValue, `light.shadow.mapSize.${vectorKey}`)
+  return optionalFiniteNumber(mapSize[dimensionKey], `light.shadow.mapSize.${dimensionKey}`)
 }
 
 function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
@@ -252,6 +272,12 @@ function numberOrNull(value: unknown): number | null {
 
 function finiteNumberOrDefault(value: unknown, label: string, fallback: number): number {
   if (value == null) return fallback
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalFiniteNumber(value: unknown, label: string): number | undefined {
+  if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
 }

@@ -9399,6 +9399,48 @@ test('non-square point-light shadow map sizes fail clearly', () => {
   )
 })
 
+test('invalid shadow numeric values fail clearly', () => {
+  const cases = [
+    ['mapSize.x', (light) => {
+      light.shadow.mapSize.x = 'wide'
+    }, /light\.shadow\.mapSize\.x must be a finite number/i],
+    ['mapSize.y', (light) => {
+      light.shadow.mapSize.y = Number.NaN
+    }, /light\.shadow\.mapSize\.y must be a finite number/i],
+    ['bias', (light) => {
+      light.shadow.bias = 'biased'
+    }, /light\.shadow\.bias must be a finite number/i],
+    ['normalBias', (light) => {
+      light.shadow.normalBias = Number.POSITIVE_INFINITY
+    }, /light\.shadow\.normalBias must be a finite number/i],
+    ['radius', (light) => {
+      light.shadow.radius = Number.NEGATIVE_INFINITY
+    }, /light\.shadow\.radius must be a finite number/i],
+    ['camera.left', (light) => {
+      light.shadow.camera.left = 'left'
+    }, /light\.shadow\.camera\.left must be a finite number/i],
+    ['camera.near', (light) => {
+      light.shadow.camera.near = Number.NaN
+    }, /light\.shadow\.camera\.near must be a finite number/i],
+    ['camera.far', (light) => {
+      light.shadow.camera.far = 'far'
+    }, /light\.shadow\.camera\.far must be a finite number/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const light = new THREE.DirectionalLight(0xffffff, 1)
+    light.castShadow = true
+    mutate(light)
+    scene.add(light)
+    assert.throws(
+      () => extractLights(scene),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('shadow radius values render PCF shadows', () => {
   function renderRadiusShadow(castShadow) {
     const scene = new THREE.Scene()
