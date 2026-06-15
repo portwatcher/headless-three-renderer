@@ -369,7 +369,7 @@ export function materialForGroup(
 
 export function materialColor(material: ThreeMaterialLike | undefined): Color4 {
   const color = strictColorLikeToArray(material?.color, 'material.color') ?? [1, 1, 1, 1] as Color4
-  color[3] = clamp01(material?.opacity ?? color[3] ?? 1)
+  color[3] = clamp01(optionalFiniteNumber(material?.opacity, 'material.opacity') ?? color[3] ?? 1)
   return color
 }
 

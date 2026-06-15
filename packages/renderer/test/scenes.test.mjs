@@ -659,6 +659,11 @@ test('invalid material scalar values fail clearly', () => {
       material.emissiveIntensity = Number.POSITIVE_INFINITY
       return material
     }, /material\.emissiveIntensity must be a finite number/i],
+    ['opacity', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true })
+      material.opacity = 'clear'
+      return material
+    }, /material\.opacity must be a finite number/i],
     ['bumpScale', () => {
       const material = new THREE.MeshNormalMaterial({ bumpMap: texture })
       material.bumpScale = 'strong'
