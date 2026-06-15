@@ -7704,6 +7704,12 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleTextureArrayTarget.width, 32)
   assert.equal(singleTextureArrayTarget.height, 16)
   assert.equal(singleTextureArrayTarget.texture[0].image.data, singleTextureArrayTarget.data)
+
+  const texturesTarget = { textures: [{}] }
+  renderToTarget(scene, makeCamera(), texturesTarget, { width: 16, height: 8 })
+  assert.equal(texturesTarget.width, 16)
+  assert.equal(texturesTarget.height, 8)
+  assert.equal(texturesTarget.textures[0].image.data, texturesTarget.data)
 })
 
 test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
