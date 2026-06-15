@@ -8160,9 +8160,18 @@ test('invalid LOD level values fail clearly', () => {
     ['distance', (lod) => {
       lod.levels[1].distance = 'far'
     }, /LOD\.levels\[1\]\.distance must be a finite number/i],
+    ['distance negative', (lod) => {
+      lod.levels[1].distance = -1
+    }, /LOD\.levels\[1\]\.distance must be non-negative/i],
     ['hysteresis', (lod) => {
       lod.levels[1].hysteresis = Number.POSITIVE_INFINITY
     }, /LOD\.levels\[1\]\.hysteresis must be a finite number/i],
+    ['hysteresis negative', (lod) => {
+      lod.levels[1].hysteresis = -0.1
+    }, /LOD\.levels\[1\]\.hysteresis must be between 0 and 1/i],
+    ['hysteresis above one', (lod) => {
+      lod.levels[1].hysteresis = 1.5
+    }, /LOD\.levels\[1\]\.hysteresis must be between 0 and 1/i],
   ]
 
   for (const [label, mutate, pattern] of cases) {

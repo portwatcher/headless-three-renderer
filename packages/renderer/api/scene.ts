@@ -1658,6 +1658,22 @@ function finiteMaterialOrObjectNumber(value: unknown, label: string, fallback: n
   throw new TypeError(`${label} must be a finite number.`)
 }
 
+function nonNegativeMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {
+  const number = finiteMaterialOrObjectNumber(value, label, fallback)
+  if (number < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+  return number
+}
+
+function normalizedMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {
+  const number = finiteMaterialOrObjectNumber(value, label, fallback)
+  if (number < 0 || number > 1) {
+    throw new TypeError(`${label} must be between 0 and 1.`)
+  }
+  return number
+}
+
 function cameraZoomOrDefault(value: unknown): number {
   if (value == null) return 1
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -1979,8 +1995,8 @@ function normalizeLodLevels(levels: unknown): Array<{ object: ThreeObject3DLike;
   if (!Array.isArray(levels)) return []
   return levels.map((level, index) => ({
     object: (level as { object?: ThreeObject3DLike }).object!,
-    distance: finiteMaterialOrObjectNumber((level as { distance?: unknown }).distance, `LOD.levels[${index}].distance`, 0),
-    hysteresis: finiteMaterialOrObjectNumber((level as { hysteresis?: unknown }).hysteresis, `LOD.levels[${index}].hysteresis`, 0),
+    distance: nonNegativeMaterialOrObjectNumber((level as { distance?: unknown }).distance, `LOD.levels[${index}].distance`, 0),
+    hysteresis: normalizedMaterialOrObjectNumber((level as { hysteresis?: unknown }).hysteresis, `LOD.levels[${index}].hysteresis`, 0),
   }))
 }
 
