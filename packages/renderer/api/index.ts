@@ -1067,15 +1067,16 @@ function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene>
     return {
       fogType: 'exp2',
       fogColor: color ?? undefined,
-      fogDensity: optionalFiniteNumber(fog.density, 'scene.fog.density'),
+      fogDensity: optionalNonNegativeFiniteNumber(fog.density, 'scene.fog.density'),
     }
   }
   if (fog.isFog) {
+    const clipDistances = fogClipDistances(fog)
     return {
       fogType: 'linear',
       fogColor: color ?? undefined,
-      fogNear: optionalFiniteNumber(fog.near, 'scene.fog.near'),
-      fogFar: optionalFiniteNumber(fog.far, 'scene.fog.far'),
+      fogNear: clipDistances.fogNear,
+      fogFar: clipDistances.fogFar,
     }
   }
   return {}
@@ -1132,6 +1133,31 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalNonNegativeFiniteNumber(value: unknown, label: string): number | undefined {
+  const number = optionalFiniteNumber(value, label)
+  if (number === undefined) return undefined
+  if (number < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+  return number
+}
+
+function fogClipDistances(fog: NonNullable<ThreeSceneRootLike['fog']>): Pick<NativeRenderScene, 'fogNear' | 'fogFar'> {
+  const near = optionalFiniteNumber(fog.near, 'scene.fog.near')
+  const far = optionalFiniteNumber(fog.far, 'scene.fog.far')
+  const effectiveNear = near ?? 1
+  const effectiveFar = far ?? 1000
+
+  if (effectiveFar <= effectiveNear) {
+    if (far !== undefined) {
+      throw new TypeError('scene.fog.far must be greater than scene.fog.near.')
+    }
+    throw new TypeError('scene.fog.near must be less than the effective scene.fog.far.')
+  }
+
+  return { fogNear: near, fogFar: far }
 }
 
 function cameraClipDistances(camera: ThreeCameraLike): Pick<NativeCamera, 'near' | 'far'> {

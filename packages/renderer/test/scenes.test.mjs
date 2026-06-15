@@ -8271,6 +8271,26 @@ test('invalid fog parameter values fail clearly', () => {
     /scene\.fog\.density must be a finite number/i,
   )
 
+  scene.fog = new THREE.FogExp2(0x0000ff, 1)
+  scene.fog.density = -0.1
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.density must be non-negative/i,
+  )
+
+  scene.fog = new THREE.Fog(0x00ff00, 10, 1)
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.far must be greater than scene\.fog\.near/i,
+  )
+
+  scene.fog = new THREE.Fog(0x00ff00, 1001, 2000)
+  delete scene.fog.far
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.near must be less than the effective scene\.fog\.far/i,
+  )
+
   scene.fog = new THREE.Fog(0x00ff00, 0, 1)
   scene.fog.color = { isColor: true, r: 0, g: Number.POSITIVE_INFINITY, b: 0 }
   assert.throws(
