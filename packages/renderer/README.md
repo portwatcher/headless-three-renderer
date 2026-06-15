@@ -101,7 +101,7 @@ The public API accepts only Three.js-like objects:
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes; unsupported values fail clearly.
 - `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and texture background output conversion; unsupported values fail clearly.
 - `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, or `'object-id'` for flat RGB object IDs; invalid values fail clearly.
-- `options.target`: a target-like object populated with raw RGBA8 readback data for a single color output, including `target.texture`, `target.textures[0]`, or one-element `target.texture` arrays.
+- `options.target`: a non-array target-like object populated with raw RGBA8 readback data for a single color output, including `target.texture`, `target.textures[0]`, or one-element `target.texture` arrays.
 - `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`); malformed containers and invalid effect values fail clearly.
 
 ### Geometry & Scene

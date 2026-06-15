@@ -1304,7 +1304,7 @@ function assertRenderOptionsLike(value: unknown, label: string): asserts value i
 }
 
 function assertRenderTargetLike(value: unknown, label: string): asserts value is RenderTargetLike {
-  if (value == null || typeof value !== 'object') {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a target-like object.`)
   }
 }

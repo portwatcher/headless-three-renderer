@@ -9585,7 +9585,15 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     /target must be a target-like object/i,
   )
   assert.throws(
+    () => renderToTarget(scene, camera, [], { width: 32, height: 32 }),
+    /target must be a target-like object/i,
+  )
+  assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, target: 'bad' }),
+    /options\.target must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, target: [] }),
     /options\.target must be a target-like object/i,
   )
 
