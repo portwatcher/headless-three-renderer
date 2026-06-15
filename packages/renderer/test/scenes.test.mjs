@@ -10048,24 +10048,31 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(target.height, 32)
   assert.equal(target.data.length, 64 * 32 * 4)
   assert.equal(target.texture.image.data, target.data)
+  assert.equal(target.texture.source.data, target.texture.image)
+  assert.equal(target.texture.source.data.data, target.data)
+  assert.equal(target.texture.source.data.width, 64)
+  assert.equal(target.texture.source.data.height, 32)
 
   const singleTextureArrayTarget = { texture: [{}] }
   renderToTarget(scene, makeCamera(), singleTextureArrayTarget, { width: 32, height: 16 })
   assert.equal(singleTextureArrayTarget.width, 32)
   assert.equal(singleTextureArrayTarget.height, 16)
   assert.equal(singleTextureArrayTarget.texture[0].image.data, singleTextureArrayTarget.data)
+  assert.equal(singleTextureArrayTarget.texture[0].source.data, singleTextureArrayTarget.texture[0].image)
 
   const texturesTarget = { textures: [{}] }
   renderToTarget(scene, makeCamera(), texturesTarget, { width: 16, height: 8 })
   assert.equal(texturesTarget.width, 16)
   assert.equal(texturesTarget.height, 8)
   assert.equal(texturesTarget.textures[0].image.data, texturesTarget.data)
+  assert.equal(texturesTarget.textures[0].source.data, texturesTarget.textures[0].image)
 
   const singleAttachmentMrtTarget = { isWebGLMultipleRenderTargets: true, textures: [{}] }
   renderToTarget(scene, makeCamera(), singleAttachmentMrtTarget, { width: 8, height: 4 })
   assert.equal(singleAttachmentMrtTarget.width, 8)
   assert.equal(singleAttachmentMrtTarget.height, 4)
   assert.equal(singleAttachmentMrtTarget.textures[0].image.data, singleAttachmentMrtTarget.data)
+  assert.equal(singleAttachmentMrtTarget.textures[0].source.data, singleAttachmentMrtTarget.textures[0].image)
 })
 
 test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
@@ -10310,6 +10317,10 @@ test('renderToTarget depthTexture honors scissor clipping', () => {
     height: 64,
     scissor: { x: 16, y: 16, width: 32, height: 32 },
   })
+  assert.equal(depthTexture.source.data, depthTexture.image)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.source.data.width, 64)
+  assert.equal(depthTexture.source.data.height, 64)
 
   const inside = meanRegion(depthTexture.image.data, 64, 64, 24, 24, 40, 40)
   const outsideLeft = meanRegion(depthTexture.image.data, 64, 64, 4, 24, 12, 40)

@@ -1686,6 +1686,7 @@ function writeRenderTargetTexture(
   width: number,
   height: number,
 ): void {
+  const imageWasArray = Array.isArray(texture.image)
   const textureImage = Array.isArray(texture.image)
     ? texture.image[0] ?? (texture.image[0] = {})
     : texture.image ?? (texture.image = {})
@@ -1693,14 +1694,14 @@ function writeRenderTargetTexture(
   textureImage.width = width
   textureImage.height = height
 
-  if (texture.source?.data) {
-    const sourceData = Array.isArray(texture.source.data)
-      ? texture.source.data[0] ?? (texture.source.data[0] = {})
-      : texture.source.data
-    sourceData.data = data
-    sourceData.width = width
-    sourceData.height = height
-  }
+  const source = texture.source ?? (texture.source = {})
+  source.data ??= imageWasArray ? texture.image as RenderTargetImageLike[] : textureImage
+  const sourceData = Array.isArray(source.data)
+    ? source.data[0] ?? (source.data[0] = {})
+    : source.data
+  sourceData.data = data
+  sourceData.width = width
+  sourceData.height = height
 }
 
 function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNullable<RenderTargetImageLike['data']> {
