@@ -486,6 +486,7 @@ const CUBE_FACE_COUNT = 6
 const UnsignedShortType = 1012
 const UnsignedIntType = 1014
 const FloatType = 1015
+const HalfFloatType = 1016
 
 function renderCubeCamera(
   scene: ThreeSceneRootLike,
@@ -1233,9 +1234,9 @@ function assertSupportedSampleCount(value: unknown, label: string): void {
 function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike | undefined): void {
   const type = depthTexture?.type
   if (type == null) return
-  if (type === UnsignedShortType || type === UnsignedIntType || type === FloatType) return
+  if (type === UnsignedShortType || type === UnsignedIntType || type === FloatType || type === HalfFloatType) return
   throw new Error(
-    `target.depthTexture.type ${String(type)} is not supported by @headless-three/renderer yet. Use FloatType, UnsignedShortType, UnsignedIntType, or omit type for RGBA8 normalized depth readback.`,
+    `target.depthTexture.type ${String(type)} is not supported by @headless-three/renderer yet. Use FloatType, HalfFloatType, UnsignedShortType, UnsignedIntType, or omit type for RGBA8 normalized depth readback.`,
   )
 }
 
@@ -1332,7 +1333,33 @@ function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): 
     }
     return depth
   }
+  if (texture.type === HalfFloatType) {
+    const depth = new Uint16Array(rgbaDepth.length / 4)
+    for (let i = 0, p = 0; i < rgbaDepth.length; i += 4, p += 1) {
+      depth[p] = normalizedFloatToHalf(rgbaDepth[i] / 255)
+    }
+    return depth
+  }
   return rgbaDepth
+}
+
+function normalizedFloatToHalf(value: number): number {
+  const clamped = Math.min(1, Math.max(0, value))
+  if (clamped === 0) return 0
+  if (clamped === 1) return 0x3c00
+
+  const exponent = Math.floor(Math.log2(clamped))
+  if (exponent < -14) {
+    return Math.round(clamped * 0x1000000)
+  }
+
+  let mantissa = Math.round((clamped / (2 ** exponent) - 1) * 0x400)
+  let biasedExponent = exponent + 15
+  if (mantissa === 0x400) {
+    mantissa = 0
+    biasedExponent += 1
+  }
+  return (biasedExponent << 10) | mantissa
 }
 
 function cloneTargetData(data: NonNullable<RenderTargetImageLike['data']>): NonNullable<RenderTargetImageLike['data']> {

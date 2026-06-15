@@ -63,6 +63,15 @@ function setTextureMatrixOffset(texture, x, y = 0) {
   )
 }
 
+function halfFloatToNumber(bits) {
+  const sign = bits & 0x8000 ? -1 : 1
+  const exponent = (bits >> 10) & 0x1f
+  const mantissa = bits & 0x03ff
+  if (exponent === 0) return sign * (mantissa / 0x400) * (2 ** -14)
+  if (exponent === 0x1f) return mantissa ? Number.NaN : sign * Infinity
+  return sign * (1 + mantissa / 0x400) * (2 ** (exponent - 15))
+}
+
 function splitEnvironmentTexture() {
   const data = []
   for (let y = 0; y < 2; y++) {
@@ -7469,6 +7478,42 @@ test('renderToTarget populates FloatType depthTexture with normalized scalar dep
   assert.ok(leftDepth <= 1 && rightDepth >= 0, `float depth values should be normalized (${leftDepth}, ${rightDepth})`)
 })
 
+test('renderToTarget populates HalfFloatType depthTexture with normalized scalar depth', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const near = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  near.position.set(-0.7, 0, 1)
+
+  const far = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  far.position.set(0.7, 0, -3)
+  scene.add(near, far)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = { type: THREE.HalfFloatType, source: { data: {} } }
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+
+  assert.ok(depthTexture.image.data instanceof Uint16Array, 'HalfFloatType depthTexture should receive Uint16Array half-float data')
+  assert.equal(depthTexture.image.data.length, 64 * 64)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.source.data.width, 64)
+  assert.equal(depthTexture.source.data.height, 64)
+
+  const leftDepth = halfFloatToNumber(Math.round(meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)))
+  const rightDepth = halfFloatToNumber(Math.round(meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)))
+  assert.ok(leftDepth > rightDepth + 0.3, `near half-float depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+  assert.ok(leftDepth <= 1 && rightDepth >= 0, `half-float depth values should be normalized (${leftDepth}, ${rightDepth})`)
+})
+
 test('renderToTarget populates THREE.DepthTexture with unsigned scalar depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -7655,7 +7700,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
-    [{ depthTexture: { type: THREE.HalfFloatType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
+    [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
   ]
 
   for (const [target, pattern, label] of targetCases) {
