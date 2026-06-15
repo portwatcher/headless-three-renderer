@@ -9859,6 +9859,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   )
 
   const targetCases = [
+    [{ image: 'bad' }, /target\.image must be an image-like object/i, 'target image container'],
     [{ texture: 'bad' }, /target\.texture must be a texture-like object/i, 'color texture container'],
     [{ texture: [] }, /target\.texture must contain one texture-like object/i, 'empty texture array'],
     [{ texture: ['bad'] }, /target\.texture\[0\] must be a texture-like object/i, 'texture array element'],

@@ -1362,6 +1362,7 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
       'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
     )
   }
+  if (target.image != null) assertRenderTargetImageLike(target.image, 'target.image')
   assertRenderTargetTextureSlot(target.texture, 'target.texture')
   assertRenderTargetTexturesSlot(target.textures, 'target.textures')
   if (target.depthTexture != null) assertRenderTargetTextureLike(target.depthTexture, 'target.depthTexture')
