@@ -4772,8 +4772,14 @@ test('unsupported texture inputs fail clearly for background and environment slo
   const cases = [
     ['compressed background', (scene) => { scene.background = compressedTexture }, /compressed texture.*pre-decode/i],
     ['compressed environment', (scene) => { scene.environment = compressedTexture }, /compressed texture.*pre-decode/i],
+    ['compressed reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: compressedTexture } }
+    }, /compressed texture.*pre-decode/i],
     ['mipmapped background', (scene) => { scene.background = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
     ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
+    ['mipmapped reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: mipmappedTexture } }
+    }, /explicit texture mipmaps.*not uploaded/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
