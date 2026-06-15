@@ -127,21 +127,21 @@ The public API accepts only Three.js-like objects:
 - physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, iridescence factor/thickness, specular color/intensity, transmission, and thickness; all current physical-extension maps include primary/secondary `texture.channel` UV selection, texture transforms including explicit matrices, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
 - custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
-- normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
+- normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings; invalid scalar values fail clearly
 - `MeshNormalMaterial` and `MeshMatcapMaterial` normal-map output
 - `material.flatShading` per-face normals for triangle meshes without normal maps
 - `MeshMatcapMaterial.map` color maps with primary/secondary `texture.channel` UV selection and transforms
-- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, and texture transforms
+- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, and texture transforms; invalid scale/bias values fail clearly
 - `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode and wrap/filter sampler settings; direct conformance also covers toon base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing, with clear failures for unsupported depth-packing constants
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, plus alpha-map cutouts and CPU-baked displacement
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
 - `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
-- emissive color, intensity, and emissive map, with primary/secondary `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings
-- light maps with `lightMapIntensity`, primary/secondary `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
-- occlusion map (`material.aoMap`) applied to indirect lighting, with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
+- emissive color, intensity, and emissive map, with primary/secondary `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings; invalid intensity values fail clearly
+- light maps with `lightMapIntensity`, primary/secondary `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings; invalid intensity values fail clearly
+- occlusion map (`material.aoMap`) applied to indirect lighting, with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings; invalid intensity values fail clearly
 - alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
-- `MeshPhongMaterial.specularMap` red-channel specular strength, with primary/secondary `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level, reflection-probe, and supported material-level environment specular reflections
+- `MeshPhongMaterial.specularMap` red-channel specular strength, with finite `shininess`, primary/secondary `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level, reflection-probe, and supported material-level environment specular reflections
 - `MeshBasicMaterial.envMap` for one shared material-level reflection or refraction map, including legacy multiply/mix/add combine modes, `reflectivity`, and `refractionRatio`
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion

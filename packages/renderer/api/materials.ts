@@ -651,14 +651,17 @@ export function extractPbrProperties(
     const color = specularColor ?? [17 / 255, 17 / 255, 17 / 255, 1]
     props.specularColor = [color[0], color[1], color[2]]
   }
-  if (Number.isFinite(material.shininess) || material.isMeshPhongMaterial) {
-    props.shininess = Math.max(0.0001, material.shininess ?? 30)
+  const shininess = material.isMeshPhongMaterial
+    ? finiteNumberOrDefault(material.shininess, 'material.shininess', 30)
+    : optionalFiniteNumber(material.shininess, 'material.shininess')
+  if (shininess !== undefined) {
+    props.shininess = Math.max(0.0001, shininess)
   }
 
   const emissive = colorLikeToArray(material.emissive)
   if (emissive) {
     props.emissive = [emissive[0], emissive[1], emissive[2]]
-    props.emissiveIntensity = Number.isFinite(material.emissiveIntensity) ? material.emissiveIntensity! : 1
+    props.emissiveIntensity = finiteNumberOrDefault(material.emissiveIntensity, 'material.emissiveIntensity', 1)
   }
 
   const normalMapInfo = extractTextureFromSlot(material.normalMap)
@@ -689,7 +692,7 @@ export function extractPbrProperties(
     props.bumpMapAnisotropy = textureAnisotropy(material.bumpMap)
     props.bumpMapTransform = textureTransform(material.bumpMap)
     props.bumpMapUsesUv2 = textureUvChannel(material.bumpMap) > 0
-    props.bumpScale = Number.isFinite(material.bumpScale) ? material.bumpScale! : 1
+    props.bumpScale = finiteNumberOrDefault(material.bumpScale, 'material.bumpScale', 1)
   }
   if (material.isMeshMatcapMaterial) {
     const matcapMapInfo = extractTextureFromSlot(material.map)
@@ -748,8 +751,8 @@ export function extractPbrProperties(
     props.displacementMapHeight = displacementMapInfo.height
     props.displacementMapTransform = textureTransform(material.displacementMap)
     props.displacementMapUsesUv2 = textureUvChannel(material.displacementMap) > 0
-    props.displacementScale = Number.isFinite(material.displacementScale) ? material.displacementScale! : 1
-    props.displacementBias = Number.isFinite(material.displacementBias) ? material.displacementBias! : 0
+    props.displacementScale = finiteNumberOrDefault(material.displacementScale, 'material.displacementScale', 1)
+    props.displacementBias = finiteNumberOrDefault(material.displacementBias, 'material.displacementBias', 0)
   }
 
   const mrMapInfo = extractTextureFromSlot(material.metalnessMap ?? material.roughnessMap)
@@ -808,7 +811,7 @@ export function extractPbrProperties(
     props.aoMapAnisotropy = textureAnisotropy(material.aoMap)
     props.aoMapTransform = textureTransform(material.aoMap)
     props.aoMapUsesUv2 = textureUvChannel(material.aoMap) > 0
-    props.aoMapIntensity = Number.isFinite(material.aoMapIntensity) ? material.aoMapIntensity! : 1
+    props.aoMapIntensity = finiteNumberOrDefault(material.aoMapIntensity, 'material.aoMapIntensity', 1)
   }
 
   const lightMapInfo = extractTextureFromSlot(material.lightMap)
@@ -824,7 +827,7 @@ export function extractPbrProperties(
     props.lightMapTransform = textureTransform(material.lightMap)
     props.lightMapColorSpace = textureColorSpace(material.lightMap)
     props.lightMapUsesUv2 = textureUvChannel(material.lightMap) > 0
-    props.lightMapIntensity = Number.isFinite(material.lightMapIntensity) ? material.lightMapIntensity! : 1
+    props.lightMapIntensity = finiteNumberOrDefault(material.lightMapIntensity, 'material.lightMapIntensity', 1)
   }
 
   const alphaMapInfo = extractTextureFromSlot(material.alphaMap)
@@ -1181,6 +1184,10 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function finiteNumberOrDefault(value: unknown, label: string, fallback: number): number {
+  return optionalFiniteNumber(value, label) ?? fallback
 }
 
 function vector3LikeToArray(value: unknown): number[] | undefined {

@@ -646,6 +646,57 @@ test('invalid material alphaTest values fail clearly', () => {
   }
 })
 
+test('invalid material scalar values fail clearly', () => {
+  const texture = solidTexture(255, 255, 255)
+  const cases = [
+    ['shininess', () => {
+      const material = new THREE.MeshPhongMaterial({ color: 0xffffff })
+      material.shininess = 'glossy'
+      return material
+    }, /material\.shininess must be a finite number/i],
+    ['emissiveIntensity', () => {
+      const material = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xff0000 })
+      material.emissiveIntensity = Number.POSITIVE_INFINITY
+      return material
+    }, /material\.emissiveIntensity must be a finite number/i],
+    ['bumpScale', () => {
+      const material = new THREE.MeshNormalMaterial({ bumpMap: texture })
+      material.bumpScale = 'strong'
+      return material
+    }, /material\.bumpScale must be a finite number/i],
+    ['displacementScale', () => {
+      const material = new THREE.MeshStandardMaterial({ color: 0xffffff, displacementMap: texture })
+      material.displacementScale = Number.NaN
+      return material
+    }, /material\.displacementScale must be a finite number/i],
+    ['displacementBias', () => {
+      const material = new THREE.MeshStandardMaterial({ color: 0xffffff, displacementMap: texture })
+      material.displacementBias = 'nearer'
+      return material
+    }, /material\.displacementBias must be a finite number/i],
+    ['aoMapIntensity', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff, aoMap: texture })
+      material.aoMapIntensity = 'dark'
+      return material
+    }, /material\.aoMapIntensity must be a finite number/i],
+    ['lightMapIntensity', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff, lightMap: texture })
+      material.lightMapIntensity = Number.NEGATIVE_INFINITY
+      return material
+    }, /material\.lightMapIntensity must be a finite number/i],
+  ]
+
+  for (const [name, material, pattern] of cases) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material()))
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('different materials produce visibly different outputs', async () => {
   const camera = makeCamera()
 
