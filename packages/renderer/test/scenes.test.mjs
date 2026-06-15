@@ -1632,6 +1632,23 @@ test('unsupported material envMap inputs fail clearly', () => {
     )
   }
 
+  {
+    const invalidCombine = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      envMap,
+      combine: 999,
+    })
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), invalidCombine))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /material\.envMap combine.*MultiplyOperation.*MixOperation.*AddOperation/i,
+      'invalid material envMap combine',
+    )
+  }
+
   const firstEnvMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
   })
