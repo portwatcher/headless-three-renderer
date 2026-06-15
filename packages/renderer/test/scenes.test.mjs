@@ -7325,6 +7325,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ isWebGLMultipleRenderTargets: true, texture: {} }, /Multiple render target color attachments.*not supported/i, 'MRT flag'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
+    [{ depthTexture: { type: THREE.HalfFloatType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
   ]
 
   for (const [target, pattern, label] of targetCases) {

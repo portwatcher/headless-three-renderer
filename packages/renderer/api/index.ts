@@ -1197,6 +1197,7 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
   }
   assertSupportedSampleCount(target.samples, 'target.samples')
   assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
+  assertSupportedDepthTextureType(target.depthTexture)
 }
 
 function assertSupportedSampleCount(value: unknown, label: string): void {
@@ -1211,6 +1212,15 @@ function assertSupportedSampleCount(value: unknown, label: string): void {
       `MSAA sample count ${value} is not supported by @headless-three/renderer yet (${label}=${value}). Use 4 for 4x MSAA or the default single-sample render path.`,
     )
   }
+}
+
+function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike | undefined): void {
+  const type = depthTexture?.type
+  if (type == null) return
+  if (type === UnsignedShortType || type === UnsignedIntType || type === FloatType) return
+  throw new Error(
+    `target.depthTexture.type ${String(type)} is not supported by @headless-three/renderer yet. Use FloatType, UnsignedShortType, UnsignedIntType, or omit type for RGBA8 normalized depth readback.`,
+  )
 }
 
 function resolveSampleCount(options: RenderOptions): number {
