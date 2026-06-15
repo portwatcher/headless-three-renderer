@@ -4528,6 +4528,29 @@ test('base color map samples the selected secondary UV channel', () => {
   assert.ok(secondary.r > secondary.g + 40, `map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
 })
 
+test('base color map samples texture channel 2 from uv2 attributes', () => {
+  const map = rgbaTexture([
+    0, 255, 0, 255,
+    255, 0, 0, 255,
+  ], 2, 1)
+  map.channel = 2
+
+  const geometry = constantUvPlane(0.25, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+  setConstantUvAttribute(geometry, 'uv2', 0.75, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > mean.g + 40, `map channel=2 should sample the uv2 red texel (${mean.r} vs ${mean.g})`)
+})
+
 test('emissiveMap applies texture UV transforms', () => {
   const emissiveMap = rgbaTexture([
     0, 0, 0, 255,
@@ -5048,7 +5071,7 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
 
 test('unsupported texture channel indices fail clearly', () => {
   const map = solidTexture(255, 255, 255)
-  map.channel = 2
+  map.channel = 4
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -5059,13 +5082,32 @@ test('unsupported texture channel indices fail clearly', () => {
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /texture\.channel 2.*not supported.*channel 0.*channel 1/i,
+    /texture\.channel 4.*not supported.*channel 0.*1.*2.*3/i,
+  )
+})
+
+test('mixed non-primary texture channels fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.channel = 1
+  const alphaMap = solidTexture(255, 255, 255)
+  alphaMap.channel = 2
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map, alphaMap, alphaTest: 0.5 }),
+  ))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /multiple non-primary texture\.channel values.*1.*2.*one secondary UV attribute/i,
   )
 })
 
 test('unsupported line texture channel indices fail clearly', () => {
   const map = solidTexture(255, 255, 255)
-  map.channel = 2
+  map.channel = 4
 
   const geometry = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-1, 0, 0),
@@ -5077,7 +5119,7 @@ test('unsupported line texture channel indices fail clearly', () => {
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /texture\.channel 2.*not supported.*channel 0.*channel 1/i,
+    /texture\.channel 4.*not supported.*channel 0.*1.*2.*3/i,
   )
 })
 
@@ -8952,6 +8994,46 @@ test('LineBasicMaterial map samples the selected secondary UV channel', () => {
   const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
   const greenPixels = countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
   assert.ok(greenPixels > 2, `line map channel=1 should sample uv1 green texel (${greenPixels})`)
+})
+
+test('LineBasicMaterial map samples texture channel 2 from uv2 attributes', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.channel = 2
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geom.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geom.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Line(
+    geom,
+    new THREE.LineBasicMaterial({ color: 0xffffff, map }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(greenPixels > 2, `line map channel=2 should sample uv2 green texel (${greenPixels})`)
 })
 
 test('Line material arrays honor geometry groups', () => {

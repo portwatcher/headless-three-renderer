@@ -917,9 +917,9 @@ function finiteIntegerOrDefault(value: unknown, fallback: number): number {
 export function textureUvChannel(texture: ThreeTextureLike | null | undefined): number {
   if (!Number.isInteger(texture?.channel)) return 0
   const channel = texture!.channel!
-  if (channel === 0 || channel === 1) return channel
+  if (channel >= 0 && channel <= 3) return channel
   throw new Error(
-    `texture.channel ${channel} is not supported by @headless-three/renderer yet. Use channel 0 for primary UVs or channel 1 for secondary UVs until additional UV channel attributes are supported.`,
+    `texture.channel ${channel} is not supported by @headless-three/renderer yet. Use channel 0, 1, 2, or 3 for Three.js UV attributes.`,
   )
 }
 

@@ -1677,8 +1677,16 @@ function secondaryUvsForMaterial(
   ]
   let channel = 0
   for (const texture of textures) {
-    if (textureUvChannel(texture) > 0) {
-      channel = 1
+    const textureChannel = textureUvChannel(texture)
+    if (textureChannel === 0) continue
+    if (channel === 0) {
+      channel = textureChannel
+      continue
+    }
+    if (channel !== textureChannel) {
+      throw new Error(
+        `Material uses multiple non-primary texture.channel values (${channel} and ${textureChannel}), but @headless-three/renderer can bind one secondary UV attribute per draw. Use one shared non-primary channel or render separate passes.`,
+      )
     }
   }
   return channels[channel] ?? channels[0]
