@@ -10,6 +10,7 @@ import { assertValidPng, parsePngDimensions } from './helpers.mjs'
 
 const {
   Renderer,
+  createNodeGltfLoader,
   createEncodedImageTextureLoader,
   installLocalFileFetch,
   render,
@@ -67,6 +68,21 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('Node glTF loader option booleans fail clearly', async () => {
+  await assert.rejects(
+    () => createNodeGltfLoader(process.cwd(), { installFetch: 'yes' }),
+    /options\.installFetch must be a boolean/i,
+  )
+
+  await assert.rejects(
+    () => createNodeGltfLoader(process.cwd(), {
+      installFetch: false,
+      registerTextureHandlers: 'yes',
+    }),
+    /options\.registerTextureHandlers must be a boolean/i,
+  )
 })
 
 test('renders a simple scene and returns a PNG buffer of the requested size', () => {

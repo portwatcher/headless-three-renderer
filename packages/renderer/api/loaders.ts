@@ -116,13 +116,16 @@ export async function createNodeGltfLoader(
   options: NodeGltfLoaderOptions = {},
 ): Promise<NodeGltfLoaderBundle> {
   const root = path.resolve(rootDir)
-  if (options.installFetch !== false) {
+  const installFetch = optionalBoolean(options.installFetch, 'options.installFetch')
+  const registerTextureHandlers = optionalBoolean(options.registerTextureHandlers, 'options.registerTextureHandlers')
+
+  if (installFetch !== false) {
     installLocalFileFetch()
   }
 
   const manager = options.manager ?? new LoadingManager()
   const encodedImages = createEncodedImageTextureLoader(root)
-  if (options.registerTextureHandlers !== false) {
+  if (registerTextureHandlers !== false) {
     registerEncodedImageHandlers(manager, encodedImages)
   }
 
@@ -291,6 +294,12 @@ function registerEncodedImageHandlers(manager: ThreeLoadingManagerLike, encodedI
 
 function arrayBufferView(buffer: Buffer): ArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
 }
 
 function registerLoaderPlugin(
