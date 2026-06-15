@@ -490,6 +490,8 @@ const UnsignedIntType = 1014
 const FloatType = 1015
 const HalfFloatType = 1016
 const UnsignedInt248Type = 1020
+const DepthFormat = 1026
+const DepthStencilFormat = 1027
 
 function renderCubeCamera(
   scene: ThreeSceneRootLike,
@@ -1218,6 +1220,7 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
   assertSupportedSampleCount(target.samples, 'target.samples')
   assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
   assertSupportedDepthTextureType(target.depthTexture)
+  assertSupportedDepthTextureFormat(target.depthTexture)
 }
 
 function assertSupportedSampleCount(value: unknown, label: string): void {
@@ -1247,6 +1250,28 @@ function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike |
   ) return
   throw new Error(
     `target.depthTexture.type ${String(type)} is not supported by @headless-three/renderer yet. Use FloatType, HalfFloatType, UnsignedByteType, UnsignedShortType, UnsignedIntType, UnsignedInt248Type, or omit type for RGBA8 normalized depth readback.`,
+  )
+}
+
+function assertSupportedDepthTextureFormat(depthTexture: RenderTargetTextureLike | undefined): void {
+  const format = depthTexture?.format
+  if (format == null) return
+  if (format === DepthFormat) {
+    if (depthTexture?.type === UnsignedInt248Type) {
+      throw new Error(
+        'target.depthTexture.format DepthFormat is not supported with UnsignedInt248Type by @headless-three/renderer. Use DepthStencilFormat with UnsignedInt248Type, or use DepthFormat with a scalar depth texture type.',
+      )
+    }
+    return
+  }
+  if (format === DepthStencilFormat) {
+    if (depthTexture?.type === UnsignedInt248Type) return
+    throw new Error(
+      'target.depthTexture.format DepthStencilFormat is only supported with UnsignedInt248Type by @headless-three/renderer. Use DepthFormat for scalar depth readback, or set type to UnsignedInt248Type for packed depth24-stencil8 readback.',
+    )
+  }
+  throw new Error(
+    `target.depthTexture.format ${String(format)} is not supported by @headless-three/renderer yet. Use DepthFormat, or DepthStencilFormat with UnsignedInt248Type.`,
   )
 }
 
