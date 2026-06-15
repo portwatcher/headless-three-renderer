@@ -2173,6 +2173,65 @@ test('MeshDistanceMaterial honors referencePosition and distance range', () => {
   )
 })
 
+test('MeshDistanceMaterial alphaMap cuts out discarded fragments', () => {
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshDistanceMaterial({ alphaMap, alphaTest: 0.5 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const discarded = meanRegion(rgba, 64, 64, 14, 24, 28, 40)
+  const visible = meanRegion(rgba, 64, 64, 36, 24, 50, 40)
+  assert.ok(discarded.r < 2, `alphaMap cutout should keep background distance (${discarded.r})`)
+  assert.ok(visible.r > 60, `opaque alphaMap region should write distance (${visible.r})`)
+})
+
+test('MeshDistanceMaterial displacementMap samples the selected secondary UV channel', () => {
+  function renderDisplaced(channel) {
+    const displacementMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    displacementMap.channel = channel
+
+    const geometry = constantUvPlane(0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshDistanceMaterial({
+        displacementMap,
+        displacementScale: 1.2,
+        displacementBias: 0,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const primary = renderDisplaced(0)
+  const secondary = renderDisplaced(1)
+  assert.ok(primary.r > secondary.r + 15, `displacementMap channel=1 should move the distance plane closer (${primary.r} vs ${secondary.r})`)
+})
+
 test('SpriteMaterial renders texture maps and opacity as a camera-facing billboard', () => {
   function renderSprite(opacity) {
     const scene = new THREE.Scene()
