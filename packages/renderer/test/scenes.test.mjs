@@ -6804,7 +6804,22 @@ test('ShaderMaterial without headless WGSL override fails clearly', () => {
   }
 })
 
-test('ShaderMaterial, RawShaderMaterial, and NodeMaterial can opt into custom WGSL fragment output', () => {
+test('unsupported base Material without headless WGSL override fails clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.Material()))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /Material.*not supported.*fragmentWgsl/i,
+  )
+})
+
+test('ShaderMaterial, RawShaderMaterial, NodeMaterial, and base Material can opt into custom WGSL fragment output', () => {
   function renderCustom(material) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -6827,6 +6842,7 @@ test('ShaderMaterial, RawShaderMaterial, and NodeMaterial can opt into custom WG
       isNodeMaterial: true,
       type: 'MeshBasicNodeMaterial',
     })],
+    ['Material', new THREE.Material()],
   ]
 
   for (const [name, material] of cases) {

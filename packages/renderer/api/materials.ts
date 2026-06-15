@@ -326,6 +326,7 @@ export function extractPbrProperties(
   const customFragmentShader = extractCustomFragmentShader(material)
   assertSupportedShaderMaterial(material, customFragmentShader)
   assertSupportedOnBeforeCompile(material, customFragmentShader)
+  assertSupportedMaterialClass(material, customFragmentShader)
   assertSupportedMaterialState(material, context)
   assertCompatiblePackedPhysicalMapSamplers(material)
   const props: PbrProperties = {}
@@ -1021,6 +1022,38 @@ function assertSupportedMaterialState(
       'MeshPhysicalMaterial iridescence is not supported by @headless-three/renderer yet. Disable iridescence or bake the effect into textures before rendering.',
     )
   }
+}
+
+function assertSupportedMaterialClass(
+  material: ThreeMaterialLike,
+  customFragmentShader: string | undefined,
+): void {
+  if (customFragmentShader || supportedMaterialClass(material)) return
+
+  const type = typeof material.type === 'string' && material.type.trim()
+    ? material.type
+    : 'Material'
+  throw new Error(
+    `${type} is not supported directly by @headless-three/renderer. Use a supported built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
+  )
+}
+
+function supportedMaterialClass(material: ThreeMaterialLike): boolean {
+  return material.isMeshBasicMaterial === true
+    || material.isMeshDepthMaterial === true
+    || material.isMeshDistanceMaterial === true
+    || material.isMeshLambertMaterial === true
+    || material.isMeshMatcapMaterial === true
+    || material.isMeshNormalMaterial === true
+    || material.isMeshPhongMaterial === true
+    || material.isMeshStandardMaterial === true
+    || material.isMeshPhysicalMaterial === true
+    || material.isMeshToonMaterial === true
+    || material.isShadowMaterial === true
+    || material.isLineBasicMaterial === true
+    || material.isLineDashedMaterial === true
+    || material.isPointsMaterial === true
+    || material.isSpriteMaterial === true
 }
 
 function hasCustomOnBeforeCompile(material: ThreeMaterialLike): boolean {
