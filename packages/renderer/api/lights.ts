@@ -185,8 +185,8 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   out.shadowMapHeight = mapSize.height
   const bias = optionalFiniteNumber(shadow?.bias, 'light.shadow.bias')
   const normalBias = optionalFiniteNumber(shadow?.normalBias, 'light.shadow.normalBias')
-  const radius = optionalFiniteNumber(shadow?.radius, 'light.shadow.radius')
-  optionalFiniteNumber(shadow?.blurSamples, 'light.shadow.blurSamples')
+  const radius = optionalNonNegativeFiniteNumber(shadow?.radius, 'light.shadow.radius')
+  optionalNonNegativeFiniteNumber(shadow?.blurSamples, 'light.shadow.blurSamples')
   if (bias !== undefined) out.shadowBias = bias
   if (normalBias !== undefined) out.shadowNormalBias = normalBias
   if (radius !== undefined) out.shadowRadius = radius
@@ -402,6 +402,15 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalNonNegativeFiniteNumber(value: unknown, label: string): number | undefined {
+  const number = optionalFiniteNumber(value, label)
+  if (number === undefined) return undefined
+  if (number < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+  return number
 }
 
 function optionalBoolean(value: unknown, label: string): boolean | undefined {
