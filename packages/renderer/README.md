@@ -101,7 +101,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
 - `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
-- `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, and directional/spot/point shadow casting
+- `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts
 - geometry groups with material arrays
 - mesh world transforms
 - `THREE.LOD` camera-distance level selection
@@ -132,7 +132,7 @@ The public API accepts only Three.js-like objects:
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
-- `Object3D.customDepthMaterial` and `customDistanceMaterial` for shadow caster alpha-tested and displacement material inputs
+- `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
 - emissive color, intensity, and emissive map, with `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings
 - light maps with `lightMapIntensity`, `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
 - occlusion map (`material.aoMap`) applied to indirect lighting, with `texture.channel` UV selection and wrap/filter sampler settings
@@ -249,7 +249,7 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `Object3D.customDepthMaterial` is honored for directional/spot shadow caster alpha-tested and displacement inputs, and `customDistanceMaterial` is honored for point-light shadow caster alpha-tested and displacement inputs. `THREE.Sprite` and `THREE.Points` can cast directional/spot/point shadows from expanded billboard quads; `THREE.Sprite.receiveShadow` and `THREE.Points.receiveShadow` fail clearly until those paths land. Additional shadow-casting lights and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular cube-face support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. `Object3D.customDepthMaterial` is honored for directional/spot mesh shadow caster alpha-tested and displacement inputs, and `customDistanceMaterial` is honored for point-light mesh shadow caster alpha-tested and displacement inputs; sprite and point billboard shadow casters also honor alpha-tested custom depth/distance material cutouts. `THREE.Sprite` and `THREE.Points` can cast directional/spot/point shadows from expanded billboard quads; `THREE.Sprite.receiveShadow` and `THREE.Points.receiveShadow` fail clearly until those paths land. Additional shadow-casting lights and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow and rectangular cube-face support lands. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
 
 Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has `{ left, right, top, bottom, near, far, split }` bounds.
 
@@ -273,4 +273,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Opacity, line material arrays with geometry groups, scene fog, and `material.fog = false` are honored. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, decode sRGB color maps, shrink with perspective distance by default, keep orthographic point size independent of camera depth, and cast directional/spot/point shadows from the expanded billboard quads. `THREE.Points.receiveShadow` fails clearly until that path lands.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Opacity, line material arrays with geometry groups, scene fog, and `material.fog = false` are honored. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, decode sRGB color maps, shrink with perspective distance by default, keep orthographic point size independent of camera depth, cast directional/spot/point shadows from the expanded billboard quads, and honor alpha-tested custom depth/distance material cutouts in shadow passes. `THREE.Points.receiveShadow` fails clearly until that path lands.

@@ -572,6 +572,8 @@ function appendSprite(
   const textureInfo = extractTextureData(material)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
+  const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
+  const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
 
   pushMesh(meshes, {
     positions,
@@ -591,13 +593,29 @@ function appendSprite(
     textureUsesUv2: textureInfo?.usesUv2,
     transform: IDENTITY_4X4.slice(),
     transparent: material?.transparent !== false,
-    castShadow: object.castShadow === true ? true : undefined,
+    castShadow: object.castShadow === true && !usesCustomShadowMaterial ? true : undefined,
     receiveShadow: undefined,
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
     ...sortInfo,
     ...extractPbrProperties(material, materialContext),
   })
+
+  if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
+    appendShadowOnlyBillboardMesh(
+      object,
+      camera,
+      meshes,
+      groupOrder,
+      clippingContext,
+      localClippingEnabled,
+      customShadowMaterial,
+      materialContext,
+      positions,
+      [0, 1, 2, 0, 2, 3],
+      uvs,
+    )
+  }
 }
 
 function appendPoints(
@@ -694,6 +712,8 @@ function appendPoints(
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
     const pbrProps = extractPbrProperties(material, materialContext)
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
+    const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
+    const usesCustomShadowMaterial = object.castShadow === true && customShadowMaterial != null
 
     pushMesh(meshes, {
       positions: outputPositions,
@@ -715,7 +735,7 @@ function appendPoints(
       transform: IDENTITY_4X4.slice(),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       topology: 'triangles',
-      castShadow: object.castShadow === true ? true : undefined,
+      castShadow: object.castShadow === true && !usesCustomShadowMaterial ? true : undefined,
       receiveShadow: false,
       clipShadows: clipShadowsForMaterial(material, clippingContext),
       ...clipping,
@@ -723,7 +743,69 @@ function appendPoints(
       ...pbrProps,
       shadingModel: 'basic',
     })
+
+    if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
+      appendShadowOnlyBillboardMesh(
+        object,
+        camera,
+        meshes,
+        groupOrder,
+        clippingContext,
+        localClippingEnabled,
+        customShadowMaterial,
+        materialContext,
+        outputPositions,
+        outputIndices,
+        outputUvs,
+      )
+    }
   }
+}
+
+function appendShadowOnlyBillboardMesh(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  meshes: FlattenedMesh[],
+  groupOrder: number,
+  clippingContext: ClippingContext,
+  localClippingEnabled: boolean,
+  material: ThreeMaterialLike,
+  materialContext: MaterialExtractionContext,
+  positions: number[],
+  indices: number[],
+  uvs: number[],
+): void {
+  const textureInfo = extractTextureData(material)
+  const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
+  const clipping = clippingState(clippingContext, material, localClippingEnabled)
+  const hiddenMainPass = shadowOnlyMainPassState()
+
+  pushMesh(meshes, {
+    positions,
+    indices,
+    uvs,
+    color: materialColor(material),
+    texture: textureInfo?.data,
+    textureWidth: textureInfo?.width ?? undefined,
+    textureHeight: textureInfo?.height ?? undefined,
+    textureWrapS: textureInfo?.wrapS,
+    textureWrapT: textureInfo?.wrapT,
+    textureMagFilter: textureInfo?.magFilter,
+    textureMinFilter: textureInfo?.minFilter,
+    textureAnisotropy: textureInfo?.anisotropy,
+    textureTransform: textureInfo?.transform,
+    textureColorSpace: textureInfo?.colorSpace,
+    textureUsesUv2: textureInfo?.usesUv2,
+    transform: IDENTITY_4X4.slice(),
+    topology: 'triangles',
+    castShadow: true,
+    receiveShadow: false,
+    clipShadows: clipShadowsForMaterial(material, clippingContext),
+    ...clipping,
+    ...sortInfo,
+    ...extractPbrProperties(material, materialContext),
+    ...hiddenMainPass,
+  })
 }
 
 function assertUnsupportedSpriteShadows(object: ThreeObject3DLike): void {
