@@ -116,7 +116,7 @@ The public API accepts only Three.js-like objects:
 ### Materials & Textures
 
 - material base color and opacity
-- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGB/RGBA numeric DataTexture inputs, with primary/secondary `texture.channel` UV selection and sRGB color-space decode
+- `material.map` (base color texture) — PNG, JPEG, WebP, and raw one-channel, two-channel, RGB, or RGBA numeric DataTexture inputs, with primary/secondary `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
 - base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots
 - `texture.channel` supports channel 0 for primary UVs and channel 1 for secondary UVs on supported map slots; higher channel indices fail clearly until additional UV attributes are supported
@@ -160,10 +160,10 @@ The public API accepts only Three.js-like objects:
 
 Texture image data can be:
 
-- Raw RGB/RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
+- Raw one-channel, two-channel, RGB, or RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
 
-Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Browser `Image`/`ImageBitmap`/canvas-like texture objects are not readable in Node and fail clearly until normalized to encoded bytes or raw pixel data. Raw one-channel, two-channel, and mismatched-length texture payloads fail clearly until those formats are implemented.
+Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Browser `Image`/`ImageBitmap`/canvas-like texture objects are not readable in Node and fail clearly until normalized to encoded bytes or raw pixel data. Mismatched-length raw texture payloads fail clearly.
 
 ### Lights
 

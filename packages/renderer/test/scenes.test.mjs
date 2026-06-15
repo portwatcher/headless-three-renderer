@@ -4882,6 +4882,31 @@ test('texture anisotropy inputs render with native samplers', () => {
   assert.ok(mean.r > 120 && mean.g > 120 && mean.b > 120, `anisotropic mapped plane should render visibly (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('one- and two-channel raw DataTexture maps expand for texture rendering', () => {
+  function renderMap(map) {
+    map.needsUpdate = true
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace })
+    return meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  }
+
+  const redMap = new THREE.DataTexture(new Uint8Array([220]), 1, 1, THREE.RedFormat)
+  const red = renderMap(redMap)
+  assert.ok(red.r > 180 && red.g > 180 && red.b > 180, `one-channel raw texture should expand to grayscale (${red.r}, ${red.g}, ${red.b})`)
+
+  const rgMap = new THREE.DataTexture(new Uint8Array([230, 24]), 1, 1, THREE.RGFormat)
+  const rg = renderMap(rgMap)
+  assert.ok(rg.r > 190, `two-channel raw texture should preserve red (${rg.r})`)
+  assert.ok(rg.g < 80, `two-channel raw texture should preserve green (${rg.g})`)
+  assert.ok(rg.b < 40, `two-channel raw texture should leave blue empty (${rg.b})`)
+})
+
 test('explicit texture mipmaps fail clearly', () => {
   const map = solidTexture(255, 255, 255)
   map.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
@@ -4947,12 +4972,12 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
       scene.background = new THREE.Color(0, 0, 0)
       scene.add(new THREE.Mesh(
         new THREE.PlaneGeometry(2, 2),
-        new THREE.MeshBasicMaterial({ map: invalidRawTexture(new Uint8Array([255, 0])) }),
+        new THREE.MeshBasicMaterial({ map: invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1])) }),
       ))
-    }, /texture raw texture data.*RGB or RGBA.*texture rendering/i],
+    }, /texture raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*texture rendering.*mismatched/i],
     ['background', (scene) => {
-      scene.background = invalidRawTexture(new Uint8Array([255, 0]))
-    }, /background raw texture data.*RGB or RGBA.*texture rendering/i],
+      scene.background = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
+    }, /background.*raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*texture rendering.*mismatched/i],
     ['environment', (scene) => {
       scene.environment = invalidRawTexture(new Uint8Array([255, 0]))
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],

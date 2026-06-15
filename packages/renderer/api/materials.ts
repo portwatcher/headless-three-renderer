@@ -273,7 +273,7 @@ function extractEnvironmentMapFromTexture(
     }
 
     // UnsignedByteType / default: convert to RGBA8
-    const rgba = toRgba8(rawData as any, image.width, image.height)
+    const rgba = toRgba8(rawData as any, image.width, image.height, { narrowChannels: false })
     if (rgba) {
       return {
         data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength),
@@ -1404,14 +1404,20 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
 }
 
 function unsupportedRawTextureDataError(label: string, usage: string): Error {
+  const supported = usage === 'texture rendering'
+    ? 'one-channel, two-channel, RGB, or RGBA numeric pixel data'
+    : 'RGB or RGBA numeric pixel data'
+  const unsupported = usage === 'texture rendering'
+    ? 'mismatched data lengths are not supported yet'
+    : 'one-channel, two-channel, and mismatched data lengths are not supported yet'
   return new Error(
-    `${label} raw texture data must contain RGB or RGBA numeric pixel data for ${usage}; one-channel, two-channel, and mismatched data lengths are not supported yet.`,
+    `${label} raw texture data must contain ${supported} for ${usage}; ${unsupported}.`,
   )
 }
 
 function unsupportedTextureImageError(label: string, usage: string): Error {
   return new Error(
-    `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, or raw RGB/RGBA numeric pixel data as { data, width, height } before rendering.`,
+    `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, or raw one-channel, two-channel, RGB, or RGBA numeric pixel data as { data, width, height } before rendering.`,
   )
 }
 
@@ -1595,8 +1601,14 @@ function areFiniteNumbers(...values: number[]): boolean {
   return true
 }
 
-function toRgba8(data: ArrayLike<number>, width: number, height: number): Uint8Array | null {
+function toRgba8(
+  data: ArrayLike<number>,
+  width: number,
+  height: number,
+  options: { narrowChannels?: boolean } = {},
+): Uint8Array | null {
   const pixels = width * height
+  const allowNarrowChannels = options.narrowChannels !== false
 
   if (data instanceof Uint8Array || data instanceof Uint8ClampedArray) {
     if (data.length === pixels * 4) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -1606,6 +1618,26 @@ function toRgba8(data: ArrayLike<number>, width: number, height: number): Uint8A
         out[i * 4] = data[i * 3]
         out[i * 4 + 1] = data[i * 3 + 1]
         out[i * 4 + 2] = data[i * 3 + 2]
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    if (allowNarrowChannels && data.length === pixels * 2) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = data[i * 2]
+        out[i * 4 + 1] = data[i * 2 + 1]
+        out[i * 4 + 2] = 0
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    if (allowNarrowChannels && data.length === pixels) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = data[i]
+        out[i * 4 + 1] = data[i]
+        out[i * 4 + 2] = data[i]
         out[i * 4 + 3] = 255
       }
       return out
@@ -1631,16 +1663,70 @@ function toRgba8(data: ArrayLike<number>, width: number, height: number): Uint8A
       }
       return out
     }
+    if (allowNarrowChannels && data.length === pixels * 2) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = Math.max(0, Math.min(255, Math.round(data[i * 2] * 255)))
+        out[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(data[i * 2 + 1] * 255)))
+        out[i * 4 + 2] = 0
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    if (allowNarrowChannels && data.length === pixels) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        const value = Math.max(0, Math.min(255, Math.round(data[i] * 255)))
+        out[i * 4] = value
+        out[i * 4 + 1] = value
+        out[i * 4 + 2] = value
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
     return null
   }
 
   // Uint16Array or other numeric typed arrays — treat as 8-bit range after clamping
-  if (ArrayBuffer.isView(data) && data.length === pixels * 4) {
-    const out = new Uint8Array(pixels * 4)
-    for (let i = 0; i < pixels * 4; i++) {
-      out[i] = Math.max(0, Math.min(255, (data as any)[i]))
+  if (ArrayBuffer.isView(data)) {
+    if (data.length === pixels * 4) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels * 4; i++) {
+        out[i] = Math.max(0, Math.min(255, (data as any)[i]))
+      }
+      return out
     }
-    return out
+    if (data.length === pixels * 3) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = Math.max(0, Math.min(255, (data as any)[i * 3]))
+        out[i * 4 + 1] = Math.max(0, Math.min(255, (data as any)[i * 3 + 1]))
+        out[i * 4 + 2] = Math.max(0, Math.min(255, (data as any)[i * 3 + 2]))
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    if (allowNarrowChannels && data.length === pixels * 2) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        out[i * 4] = Math.max(0, Math.min(255, (data as any)[i * 2]))
+        out[i * 4 + 1] = Math.max(0, Math.min(255, (data as any)[i * 2 + 1]))
+        out[i * 4 + 2] = 0
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
+    if (allowNarrowChannels && data.length === pixels) {
+      const out = new Uint8Array(pixels * 4)
+      for (let i = 0; i < pixels; i++) {
+        const value = Math.max(0, Math.min(255, (data as any)[i]))
+        out[i * 4] = value
+        out[i * 4 + 1] = value
+        out[i * 4 + 2] = value
+        out[i * 4 + 3] = 255
+      }
+      return out
+    }
   }
 
   if (data.length === pixels * 4) {
@@ -1656,6 +1742,27 @@ function toRgba8(data: ArrayLike<number>, width: number, height: number): Uint8A
       out[i * 4] = Math.max(0, Math.min(255, data[i * 3]))
       out[i * 4 + 1] = Math.max(0, Math.min(255, data[i * 3 + 1]))
       out[i * 4 + 2] = Math.max(0, Math.min(255, data[i * 3 + 2]))
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels * 2) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = Math.max(0, Math.min(255, data[i * 2]))
+      out[i * 4 + 1] = Math.max(0, Math.min(255, data[i * 2 + 1]))
+      out[i * 4 + 2] = 0
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      const value = Math.max(0, Math.min(255, data[i]))
+      out[i * 4] = value
+      out[i * 4 + 1] = value
+      out[i * 4 + 2] = value
       out[i * 4 + 3] = 255
     }
     return out
