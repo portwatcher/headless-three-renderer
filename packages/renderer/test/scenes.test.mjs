@@ -3176,6 +3176,117 @@ test('transmissive bucket renders before ordinary transparent bucket', () => {
   assert.ok(mean.r > mean.b + 160, `ordinary transparent red should draw after transmissive blue (${mean.r} vs ${mean.b})`)
 })
 
+test('Renderer.setOpaqueSort overrides opaque draw ordering', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, depthWrite: false })
+  const redGeometry = new THREE.PlaneGeometry(2, 2)
+  const redColors = new Float32Array(redGeometry.getAttribute('position').count * 3)
+  for (let i = 0; i < redColors.length; i += 3) {
+    redColors[i] = 1
+  }
+  redGeometry.setAttribute('color', new THREE.BufferAttribute(redColors, 3))
+  const red = new THREE.Mesh(redGeometry, material)
+  scene.add(red)
+
+  const blueGeometry = new THREE.PlaneGeometry(2, 2)
+  const blueColors = new Float32Array(blueGeometry.getAttribute('position').count * 3)
+  for (let i = 0; i < blueColors.length; i += 3) {
+    blueColors[i + 2] = 1
+  }
+  blueGeometry.setAttribute('color', new THREE.BufferAttribute(blueColors, 3))
+  const blue = new THREE.Mesh(blueGeometry, material)
+  scene.add(blue)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  renderer.setOpaqueSort((a, b) => b.id - a.id)
+  const mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 160, `custom opaque sort should draw red after blue (${mean.r} vs ${mean.b})`)
+})
+
+test('Renderer.setTransparentSort overrides transparent depth sorting', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const red = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, depthWrite: false }),
+  )
+  red.position.z = 0.35
+  scene.add(red)
+
+  const blue = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, depthWrite: false }),
+  )
+  blue.position.z = -0.35
+  scene.add(blue)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  renderer.setTransparentSort((a, b) => a.id - b.id)
+  const mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.b > mean.r + 160, `custom transparent sort should draw blue after red (${mean.b} vs ${mean.r})`)
+})
+
+test('sortObjects=false preserves traversal order within transparent bucket', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const red = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, depthWrite: false }),
+  )
+  red.position.z = 0.35
+  scene.add(red)
+
+  const blue = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, depthWrite: false }),
+  )
+  blue.position.z = -0.35
+  scene.add(blue)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  renderer.sortObjects = false
+  const mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.b > mean.r + 160, `sortObjects=false should leave blue after red traversal order (${mean.b} vs ${mean.r})`)
+})
+
+test('invalid sort controls fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, sortObjects: 'yes' }),
+    /options\.sortObjects must be a boolean/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, opaqueSort: 'front' }),
+    /options\.opaqueSort must be a function or null/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, transparentSort: 1 }),
+    /options\.transparentSort must be a function or null/i,
+  )
+})
+
 test('invalid renderOrder values fail clearly', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)

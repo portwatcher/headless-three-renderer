@@ -16,6 +16,7 @@ import type {
   Color4,
   RenderObjectIdEntry,
   ThreeEulerLike,
+  RenderSortFunction,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -77,22 +78,37 @@ export type {
   RenderOptions,
   RenderTargetLike,
   RenderObjectIdEntry,
+  RenderSortFunction,
+  RenderSortItem,
   PostProcessingOptions,
 } from './types'
 
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
+  private opaqueSort: RenderSortFunction | null = null
+  private transparentSort: RenderSortFunction | null = null
+
+  sortObjects = true
 
   constructor() {
     this.native = new native.NativeRenderer()
   }
 
+  setOpaqueSort(method: RenderSortFunction | null): void {
+    this.opaqueSort = method
+  }
+
+  setTransparentSort(method: RenderSortFunction | null): void {
+    this.transparentSort = method
+  }
+
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+    const renderOptions = this.resolveRenderOptions(options)
     if (isCubeCamera(camera)) {
       const { buffer } = renderCubeCamera(
         scene,
         camera,
-        options,
+        renderOptions,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
       return buffer
@@ -102,24 +118,24 @@ export class Renderer {
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
-        options,
+        renderOptions,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      if (options.target) {
-        writeRenderTarget(options.target, buffer, width, height, objectIdEntries, depthData)
+      if (renderOptions.target) {
+        writeRenderTarget(renderOptions.target, buffer, width, height, objectIdEntries, depthData)
       }
       return buffer
     }
 
-    const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, options)
-    if (options.target) {
+    const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, renderOptions)
+    if (renderOptions.target) {
       const depthData = renderTargetDepthBuffer(
-        options.target,
+        renderOptions.target,
         nativeScene,
         nativeCamera,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+      writeRenderTarget(renderOptions.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
     }
     return buffer
   }
@@ -130,7 +146,7 @@ export class Renderer {
     target: RenderTargetLike = {},
     options: RenderOptions = {},
   ): RenderTargetLike {
-    const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
+    const targetOptions: RenderOptions = this.resolveRenderOptions({ ...options, target, format: options.format ?? 'rgba' })
     if (isCubeCamera(camera)) {
       const { target: cubeTarget } = renderCubeCamera(
         scene,
@@ -168,6 +184,15 @@ export class Renderer {
   ): { buffer: Buffer; nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
     const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
     return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, nativeCamera, objectIdEntries }
+  }
+
+  private resolveRenderOptions(options: RenderOptions): RenderOptions {
+    return {
+      ...options,
+      sortObjects: options.sortObjects ?? this.sortObjects,
+      opaqueSort: options.opaqueSort === undefined ? this.opaqueSort : options.opaqueSort,
+      transparentSort: options.transparentSort === undefined ? this.transparentSort : options.transparentSort,
+    }
   }
 }
 
@@ -276,6 +301,11 @@ function toNativeInput(
     options.localClippingEnabled !== false,
     shadowMaterialMode,
     environment.materialContext,
+    {
+      sortObjects: options.sortObjects,
+      opaqueSort: options.opaqueSort,
+      transparentSort: options.transparentSort,
+    },
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)
@@ -1238,10 +1268,23 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputColorSpace(options.outputColorSpace)
   assertFiniteNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
   assertFiniteNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
+  validateSortControls(options)
   validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
   if (options.target) validateUnsupportedRenderTargetOptions(options.target)
+}
+
+function validateSortControls(options: RenderOptions): void {
+  if (options.sortObjects != null && typeof options.sortObjects !== 'boolean') {
+    throw new TypeError(`options.sortObjects must be a boolean; received ${String(options.sortObjects)}.`)
+  }
+  if (options.opaqueSort != null && typeof options.opaqueSort !== 'function') {
+    throw new TypeError('options.opaqueSort must be a function or null.')
+  }
+  if (options.transparentSort != null && typeof options.transparentSort !== 'function') {
+    throw new TypeError('options.transparentSort must be a function or null.')
+  }
 }
 
 function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void {

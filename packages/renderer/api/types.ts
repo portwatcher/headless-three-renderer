@@ -433,6 +433,18 @@ export interface ThreeCubeCameraLike {
 
 export type ThreeRenderCameraLike = ThreeCameraLike | ThreeCubeCameraLike
 
+export interface RenderSortItem {
+  id: number
+  object?: ThreeObject3DLike
+  material?: ThreeMaterialLike
+  groupOrder: number
+  renderOrder: number
+  z: number
+  materialVariant: number
+}
+
+export type RenderSortFunction = (a: RenderSortItem, b: RenderSortItem) => number
+
 export interface RenderOptions {
   width?: number
   height?: number
@@ -451,6 +463,12 @@ export interface RenderOptions {
   outputColorSpace?: RenderOutputColorSpace
   /** Alternate flat render passes. Defaults to normal color rendering. */
   renderMode?: RenderMode
+  /** Whether render-list sorting is enabled. Defaults to true. */
+  sortObjects?: boolean
+  /** Custom opaque-bucket sort callback. `null` uses the default sort. */
+  opaqueSort?: RenderSortFunction | null
+  /** Custom transmissive/transparent-bucket sort callback. `null` uses the default sort. */
+  transparentSort?: RenderSortFunction | null
   /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   samples?: number
   /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */

@@ -7,6 +7,8 @@ import type {
   NativeSceneMesh,
   GeometryGroup,
   Color4,
+  RenderSortFunction,
+  RenderSortItem,
 } from './types'
 import { IDENTITY_4X4, matrixElements, clampInteger, clamp01 } from './math'
 import {
@@ -38,6 +40,7 @@ import {
 
 interface FlattenedMesh {
   mesh: NativeSceneMesh
+  sortItem: RenderSortItem
   groupOrder: number
   renderOrder: number
   sortZ: number
@@ -82,6 +85,17 @@ interface ClippingContext {
   clipShadows: boolean
 }
 
+interface SceneSortOptions {
+  sortObjects?: boolean
+  opaqueSort?: RenderSortFunction | null
+  transparentSort?: RenderSortFunction | null
+}
+
+interface MeshSortInfo {
+  keys: Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey' | 'materialVariant'>
+  item: RenderSortItem
+}
+
 export function flattenScene(
   scene: ThreeObject3DLike,
   camera?: ThreeCameraLike,
@@ -90,6 +104,7 @@ export function flattenScene(
   localClippingEnabled = true,
   shadowMaterialMode?: ShadowMaterialMode,
   materialContext: MaterialExtractionContext = {},
+  sortOptions: SceneSortOptions = {},
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
   const clippingContext: ClippingContext = {
@@ -98,8 +113,7 @@ export function flattenScene(
     clipShadows: false,
   }
   visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
-  return meshes
-    .sort(compareFlattenedMeshes)
+  return sortFlattenedMeshes(meshes, sortOptions)
     .map(({ mesh }) => mesh)
 }
 
@@ -262,9 +276,9 @@ function appendMesh(
           receiveShadow,
           clipShadows: clipShadowsForMaterial(material, clippingContext),
           ...clipping,
-          ...sortInfo,
+          ...sortInfo.keys,
           ...pbrProps,
-        })
+        }, sortInfo.item)
       }
     } else {
       if (group.count % 3 !== 0) {
@@ -320,9 +334,9 @@ function appendMesh(
           receiveShadow,
           clipShadows: clipShadowsForMaterial(material, clippingContext),
           ...clipping,
-          ...sortInfo,
+          ...sortInfo.keys,
           ...pbrProps,
-        })
+        }, sortInfo.item)
       }
     }
 
@@ -439,10 +453,10 @@ function appendShadowOnlyMeshGroup(
         receiveShadow: false,
         clipShadows: clipShadowsForMaterial(material, clippingContext),
         ...clipping,
-        ...sortInfo,
+        ...sortInfo.keys,
         ...pbrProps,
         ...hiddenMainPass,
-      })
+      }, sortInfo.item)
     }
     return
   }
@@ -501,10 +515,10 @@ function appendShadowOnlyMeshGroup(
       receiveShadow: false,
       clipShadows: clipShadowsForMaterial(material, clippingContext),
       ...clipping,
-      ...sortInfo,
+      ...sortInfo.keys,
       ...pbrProps,
       ...hiddenMainPass,
-    })
+    }, sortInfo.item)
   }
 }
 
@@ -629,9 +643,9 @@ function appendSprite(
     receiveShadow: undefined,
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
-    ...sortInfo,
+    ...sortInfo.keys,
     ...extractPbrProperties(material, materialContext),
-  })
+  }, sortInfo.item)
 
   if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
     appendShadowOnlyBillboardMesh(
@@ -772,10 +786,10 @@ function appendPoints(
       receiveShadow: false,
       clipShadows: clipShadowsForMaterial(material, clippingContext),
       ...clipping,
-      ...sortInfo,
+      ...sortInfo.keys,
       ...pbrProps,
       shadingModel: 'basic',
-    })
+    }, sortInfo.item)
 
     if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
       appendShadowOnlyBillboardMesh(
@@ -837,10 +851,10 @@ function appendShadowOnlyBillboardMesh(
     receiveShadow: false,
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
-    ...sortInfo,
+    ...sortInfo.keys,
     ...shadowPbrProperties(material, sourceMaterial, materialContext),
     ...hiddenMainPass,
-  })
+  }, sortInfo.item)
 }
 
 function shadowPbrProperties(
@@ -1067,7 +1081,8 @@ function appendLineOrPoints(
     }
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
     if (thickCenter && camera) {
-      sortInfo.sortZ = projectedWorldPointZ(thickCenter, camera)
+      sortInfo.keys.sortZ = projectedWorldPointZ(thickCenter, camera)
+      sortInfo.item.z = sortInfo.keys.sortZ
     }
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
 
@@ -1098,8 +1113,8 @@ function appendLineOrPoints(
       shadingModel: 'basic',
       topology: thickLine ? 'triangles' : topology,
       ...clipping,
-      ...sortInfo,
-    })
+      ...sortInfo.keys,
+    }, sortInfo.item)
   }
 }
 
@@ -1298,9 +1313,10 @@ function clipShadowsForMaterial(material: ThreeMaterialLike | undefined, clippin
   return material?.clipShadows === true || clippingContext.clipShadows ? true : undefined
 }
 
-function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh): void {
+function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh, sortItem: RenderSortItem): void {
   meshes.push({
     mesh,
+    sortItem,
     groupOrder: mesh.groupOrder ?? 0,
     renderOrder: mesh.renderOrder ?? 0,
     sortZ: mesh.sortZ ?? 0,
@@ -1312,20 +1328,108 @@ function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh): void {
 
 function sortInfoForObject(
   object: ThreeObject3DLike,
-  material: { id?: number } | undefined,
+  material: ThreeMaterialLike | undefined,
   camera: ThreeCameraLike | undefined,
   sortIndex: number,
   groupOrder: number,
   transform?: number[],
-): Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey' | 'materialVariant'> {
+): MeshSortInfo {
+  const renderOrder = finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
+  const z = camera ? projectedObjectZ(object, camera, transform) : 0
+  const id = unsignedSortKey(object.id, sortIndex)
+  const materialSortKey = finiteOrDefault(material?.id, 0)
+  const materialVariant = materialVariantForObject(object)
   return {
-    groupOrder,
-    renderOrder: finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0),
-    sortZ: camera ? projectedObjectZ(object, camera, transform) : 0,
-    sortIndex: unsignedSortKey(object.id, sortIndex),
-    materialSortKey: finiteOrDefault(material?.id, 0),
-    materialVariant: materialVariantForObject(object),
+    keys: {
+      groupOrder,
+      renderOrder,
+      sortZ: z,
+      sortIndex: id,
+      materialSortKey,
+      materialVariant,
+    },
+    item: {
+      id,
+      object,
+      material,
+      groupOrder,
+      renderOrder,
+      z,
+      materialVariant,
+    },
   }
+}
+
+function sortFlattenedMeshes(meshes: FlattenedMesh[], options: SceneSortOptions): FlattenedMesh[] {
+  const sortObjects = options.sortObjects !== false
+  const buckets = partitionFlattenedMeshes(meshes)
+
+  if (!sortObjects) {
+    normalizeSortKeys(buckets.opaque)
+    normalizeSortKeys(buckets.transmissive)
+    normalizeSortKeys(buckets.transparent)
+    return [...buckets.opaque, ...buckets.transmissive, ...buckets.transparent]
+  }
+
+  if (options.opaqueSort) {
+    buckets.opaque.sort(compareWithSort(options.opaqueSort))
+    normalizeSortKeys(buckets.opaque)
+  } else {
+    buckets.opaque.sort(compareFlattenedMeshes)
+  }
+
+  if (options.transparentSort) {
+    const transparentSort = compareWithSort(options.transparentSort)
+    buckets.transmissive.sort(transparentSort)
+    buckets.transparent.sort(transparentSort)
+    normalizeSortKeys(buckets.transmissive)
+    normalizeSortKeys(buckets.transparent)
+  } else {
+    buckets.transmissive.sort(compareTransparentFlattenedMeshes)
+    buckets.transparent.sort(compareTransparentFlattenedMeshes)
+  }
+
+  return [...buckets.opaque, ...buckets.transmissive, ...buckets.transparent]
+}
+
+function partitionFlattenedMeshes(meshes: FlattenedMesh[]): {
+  opaque: FlattenedMesh[]
+  transmissive: FlattenedMesh[]
+  transparent: FlattenedMesh[]
+} {
+  const opaque: FlattenedMesh[] = []
+  const transmissive: FlattenedMesh[] = []
+  const transparent: FlattenedMesh[] = []
+
+  for (const mesh of meshes) {
+    if (finitePositive(mesh.mesh.transmission)) {
+      transmissive.push(mesh)
+    } else if (meshDefaultsTransparent(mesh.mesh)) {
+      transparent.push(mesh)
+    } else {
+      opaque.push(mesh)
+    }
+  }
+
+  return { opaque, transmissive, transparent }
+}
+
+function compareWithSort(sort: RenderSortFunction): (a: FlattenedMesh, b: FlattenedMesh) => number {
+  return (a, b) => {
+    const result = Number(sort(a.sortItem, b.sortItem))
+    return Number.isFinite(result) ? result : 0
+  }
+}
+
+function normalizeSortKeys(meshes: FlattenedMesh[]): void {
+  meshes.forEach((entry, index) => {
+    entry.mesh.groupOrder = 0
+    entry.mesh.renderOrder = 0
+    entry.mesh.materialSortKey = 0
+    entry.mesh.materialVariant = 0
+    entry.mesh.sortZ = 0
+    entry.mesh.sortIndex = index
+  })
 }
 
 function compareFlattenedMeshes(a: FlattenedMesh, b: FlattenedMesh): number {
@@ -1335,6 +1439,28 @@ function compareFlattenedMeshes(a: FlattenedMesh, b: FlattenedMesh): number {
     || a.materialVariant - b.materialVariant
     || a.sortZ - b.sortZ
     || a.sortIndex - b.sortIndex
+}
+
+function compareTransparentFlattenedMeshes(a: FlattenedMesh, b: FlattenedMesh): number {
+  return a.groupOrder - b.groupOrder
+    || a.renderOrder - b.renderOrder
+    || b.sortZ - a.sortZ
+    || a.sortIndex - b.sortIndex
+}
+
+function meshDefaultsTransparent(mesh: NativeSceneMesh): boolean {
+  if (mesh.alphaHash === true) return false
+  if (mesh.transparent === true) return true
+  if (mesh.transparent === false) return false
+  return materialAlpha(mesh) < 0.999
+}
+
+function materialAlpha(mesh: NativeSceneMesh): number {
+  return mesh.color && mesh.color.length >= 4 ? finiteOrDefault(mesh.color[3], 1) : 1
+}
+
+function finitePositive(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0.0001
 }
 
 function materialVariantForObject(object: ThreeObject3DLike): number {
