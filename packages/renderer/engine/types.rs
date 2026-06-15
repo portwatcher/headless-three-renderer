@@ -675,6 +675,8 @@ pub struct SceneMesh {
     pub ao_map_anisotropy: Option<f64>,
     /// AO map UV transform `[a, c, tx, b, d, ty]`.
     pub ao_map_transform: Option<Vec<f64>>,
+    /// Whether AO map sampling uses the secondary UV stream.
+    pub ao_map_uses_uv2: Option<bool>,
     /// AO map intensity multiplier (0..1). Defaults to 1.
     pub ao_map_intensity: Option<f64>,
     /// Optional light map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).
@@ -698,6 +700,8 @@ pub struct SceneMesh {
     pub light_map_transform: Option<Vec<f64>>,
     /// Light-map texture color space. `"srgb"` is decoded to linear before shading.
     pub light_map_color_space: Option<String>,
+    /// Whether light-map sampling uses the secondary UV stream.
+    pub light_map_uses_uv2: Option<bool>,
     /// Light map intensity multiplier. Defaults to 1.
     pub light_map_intensity: Option<f64>,
     /// Optional alpha map image data (raw RGBA8 bytes or encoded PNG/JPEG/WebP).

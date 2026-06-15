@@ -60,7 +60,9 @@ struct Uniforms {
   // map_transform_rows[3].w = metallic-roughness map uses secondary UV stream.
   // map_transform_rows[4].w = emissive map is sRGB.
   // map_transform_rows[5].w = emissive map uses secondary UV stream.
+  // map_transform_rows[7].w = AO map uses secondary UV stream.
   // map_transform_rows[8].w = light map is sRGB.
+  // map_transform_rows[9].w = light map uses secondary UV stream.
   map_transform_rows: array<vec4<f32>, 12>,
   // Row pairs for current physical-extension map transforms.
   // physical_map_transform_rows[1].w = clearcoat map uses secondary UV stream.
@@ -602,12 +604,14 @@ fn transform_emissive_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
   return transform_slot_uv(emissive_uv, 4u);
 }
 
-fn transform_ao_map_uv(uv: vec2<f32>) -> vec2<f32> {
-  return transform_slot_uv(uv, 6u);
+fn transform_ao_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let ao_uv = select(uv, uv2, uniforms.map_transform_rows[7u].w > 0.5);
+  return transform_slot_uv(ao_uv, 6u);
 }
 
-fn transform_light_map_uv(uv: vec2<f32>) -> vec2<f32> {
-  return transform_slot_uv(uv, 8u);
+fn transform_light_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
+  let light_uv = select(uv, uv2, uniforms.map_transform_rows[9u].w > 0.5);
+  return transform_slot_uv(light_uv, 8u);
 }
 
 fn transform_specular_map_uv(uv: vec2<f32>, uv2: vec2<f32>) -> vec2<f32> {
@@ -910,13 +914,13 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
   var ao: f32 = 1.0;
   if uniforms.ao_params.y > 0.5 {
-    let ao_sample = textureSample(t_ao, s_ao, transform_ao_map_uv(uv2)).r;
+    let ao_sample = textureSample(t_ao, s_ao, transform_ao_map_uv(uv, uv2)).r;
     ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
   }
   let has_light_map = uniforms.ao_params.w > 0.5;
   var light_map_irradiance = vec3<f32>(0.0);
   if has_light_map {
-    light_map_irradiance = decode_light_map_sample(textureSample(t_light_map, s_light_map, transform_light_map_uv(uv2))).rgb * max(uniforms.physical_params4.z, 0.0);
+    light_map_irradiance = decode_light_map_sample(textureSample(t_light_map, s_light_map, transform_light_map_uv(uv, uv2))).rgb * max(uniforms.physical_params4.z, 0.0);
   }
   let light_map_diffuse = albedo * light_map_irradiance * (1.0 / PI) * ao;
 

@@ -809,6 +809,7 @@ export function extractPbrProperties(
     props.aoMapMinFilter = minFilterModeToString(material.aoMap)
     props.aoMapAnisotropy = textureAnisotropy(material.aoMap)
     props.aoMapTransform = textureTransform(material.aoMap)
+    props.aoMapUsesUv2 = textureUvChannel(material.aoMap) > 0
     props.aoMapIntensity = Number.isFinite(material.aoMapIntensity) ? material.aoMapIntensity! : 1
   }
 
@@ -824,6 +825,7 @@ export function extractPbrProperties(
     props.lightMapAnisotropy = textureAnisotropy(material.lightMap)
     props.lightMapTransform = textureTransform(material.lightMap)
     props.lightMapColorSpace = textureColorSpace(material.lightMap)
+    props.lightMapUsesUv2 = textureUvChannel(material.lightMap) > 0
     props.lightMapIntensity = Number.isFinite(material.lightMapIntensity) ? material.lightMapIntensity! : 1
   }
 

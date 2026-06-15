@@ -828,6 +828,7 @@ export interface NativeSceneMesh {
   aoMapMinFilter?: string
   aoMapAnisotropy?: number
   aoMapTransform?: number[]
+  aoMapUsesUv2?: boolean
   aoMapIntensity?: number
   lightMap?: Buffer
   lightMapWidth?: number
@@ -839,6 +840,7 @@ export interface NativeSceneMesh {
   lightMapAnisotropy?: number
   lightMapTransform?: number[]
   lightMapColorSpace?: string
+  lightMapUsesUv2?: boolean
   lightMapIntensity?: number
   specularMap?: Buffer
   specularMapWidth?: number
@@ -1211,6 +1213,7 @@ export interface PbrProperties {
   aoMapMinFilter?: string
   aoMapAnisotropy?: number
   aoMapTransform?: number[]
+  aoMapUsesUv2?: boolean
   aoMapIntensity?: number
   lightMap?: Buffer
   lightMapWidth?: number
@@ -1222,6 +1225,7 @@ export interface PbrProperties {
   lightMapAnisotropy?: number
   lightMapTransform?: number[]
   lightMapColorSpace?: string
+  lightMapUsesUv2?: boolean
   lightMapIntensity?: number
   specularMap?: Buffer
   specularMapWidth?: number

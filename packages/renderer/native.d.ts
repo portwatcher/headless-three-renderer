@@ -713,6 +713,8 @@ export interface SceneMesh {
   aoMapAnisotropy?: number
   /** AO map UV transform `[a, c, tx, b, d, ty]`. */
   aoMapTransform?: Array<number>
+  /** Whether AO map sampling uses the secondary UV stream. */
+  aoMapUsesUv2?: boolean
   /** AO map intensity multiplier (0..1). Defaults to 1. */
   aoMapIntensity?: number
   /**
@@ -738,6 +740,8 @@ export interface SceneMesh {
   lightMapTransform?: Array<number>
   /** Light-map texture color space. `"srgb"` is decoded to linear before shading. */
   lightMapColorSpace?: string
+  /** Whether light-map sampling uses the secondary UV stream. */
+  lightMapUsesUv2?: boolean
   /** Light map intensity multiplier. Defaults to 1. */
   lightMapIntensity?: number
   /**

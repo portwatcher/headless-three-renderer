@@ -3401,41 +3401,46 @@ test('InstancedBufferGeometry expands per-instance offsets and colors', () => {
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `instance colors should avoid blue contribution (${mean.b})`)
 })
 
-test('aoMap samples the selected secondary UV channel', () => {
-  const aoMap = rgbaTexture([
-    255, 255, 255, 255,
-    255, 255, 255, 255,
-    0, 0, 0, 255,
-    0, 0, 0, 255,
-  ], 4, 1)
-  aoMap.channel = 1
+test('aoMap samples the selected UV channel', () => {
+  function renderWithChannel(channel) {
+    const aoMap = rgbaTexture([
+      255, 255, 255, 255,
+      255, 255, 255, 255,
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+    ], 4, 1)
+    aoMap.channel = channel
 
-  const geometry = new THREE.PlaneGeometry(2, 2)
-  const primaryUv = new Float32Array(geometry.getAttribute('uv').count * 2)
-  const secondaryUv = new Float32Array(geometry.getAttribute('uv').count * 2)
-  for (let i = 0; i < geometry.getAttribute('uv').count; i++) {
-    primaryUv[i * 2] = 0.125
-    primaryUv[i * 2 + 1] = 0.5
-    secondaryUv[i * 2] = 0.875
-    secondaryUv[i * 2 + 1] = 0.5
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    const primaryUv = new Float32Array(geometry.getAttribute('uv').count * 2)
+    const secondaryUv = new Float32Array(geometry.getAttribute('uv').count * 2)
+    for (let i = 0; i < geometry.getAttribute('uv').count; i++) {
+      primaryUv[i * 2] = 0.125
+      primaryUv[i * 2 + 1] = 0.5
+      secondaryUv[i * 2] = 0.875
+      secondaryUv[i * 2 + 1] = 0.5
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(primaryUv, 2))
+    geometry.setAttribute('uv1', new THREE.BufferAttribute(secondaryUv, 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({ color: 0xffffff, aoMap, aoMapIntensity: 1 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   }
-  geometry.setAttribute('uv', new THREE.BufferAttribute(primaryUv, 2))
-  geometry.setAttribute('uv1', new THREE.BufferAttribute(secondaryUv, 2))
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(
-    geometry,
-    new THREE.MeshBasicMaterial({ color: 0xffffff, aoMap, aoMapIntensity: 1 }),
-  ))
-
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
-
-  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
-  const mean = meanRgba(rgba)
-  assert.ok(mean.r < 20, `aoMap channel=1 should darken the plane through uv1 (${mean.r})`)
+  const primary = renderWithChannel(0)
+  const secondary = renderWithChannel(1)
+  assert.ok(primary.r > secondary.r + 100, `aoMap channel=0 should sample bright primary UVs (${primary.r} vs ${secondary.r})`)
+  assert.ok(secondary.r < 20, `aoMap channel=1 should darken the plane through uv1 (${secondary.r})`)
 })
 
 test('aoMap applies texture UV transforms on the selected channel', () => {
@@ -5672,35 +5677,36 @@ test('lightMap decodes sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 10, `linear lightMap should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
-test('lightMap samples the selected secondary UV channel', () => {
-  const lightMap = rgbaTexture([
-    255, 0, 0, 255,
-    0, 255, 0, 255,
-  ], 2, 1)
-  lightMap.channel = 1
+test('lightMap samples the selected UV channel', () => {
+  function renderWithChannel(channel) {
+    const lightMap = rgbaTexture([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 1)
+    lightMap.channel = channel
 
-  const geometry = constantUvPlane(0.25, 0.5)
-  const uv1 = new Float32Array(geometry.getAttribute('uv').count * 2)
-  for (let i = 0; i < geometry.getAttribute('uv').count; i++) {
-    uv1[i * 2] = 0.75
-    uv1[i * 2 + 1] = 0.5
+    const geometry = constantUvPlane(0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      lightMap,
+      lightMapIntensity: 3,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   }
-  geometry.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2))
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    lightMap,
-    lightMapIntensity: 3,
-  })))
-
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
-
-  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
-  assert.ok(mean.g > mean.r + 40, `lightMap.channel should sample uv1 green texel, got ${mean.g} vs ${mean.r}`)
+  const primary = renderWithChannel(0)
+  const secondary = renderWithChannel(1)
+  assert.ok(primary.r > primary.g + 40, `lightMap channel=0 should sample primary red texel, got ${primary.r} vs ${primary.g}`)
+  assert.ok(secondary.g > secondary.r + 40, `lightMap channel=1 should sample uv1 green texel, got ${secondary.g} vs ${secondary.r}`)
 })
 
 test('lightMap applies texture UV transforms on the selected channel', () => {
