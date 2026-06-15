@@ -3749,6 +3749,50 @@ test('invalid material render-state numeric values fail clearly', () => {
   }
 })
 
+test('invalid material render-state boolean values fail clearly', () => {
+  const cases = [
+    ['alphaHash', (material) => {
+      material.alphaHash = 'yes'
+    }, /material\.alphaHash must be a boolean/i],
+    ['alphaToCoverage', (material) => {
+      material.alphaToCoverage = 1
+    }, /material\.alphaToCoverage must be a boolean/i],
+    ['premultipliedAlpha', (material) => {
+      material.premultipliedAlpha = 'yes'
+    }, /material\.premultipliedAlpha must be a boolean/i],
+    ['transparent', (material) => {
+      material.transparent = 'yes'
+    }, /material\.transparent must be a boolean/i],
+    ['depthTest', (material) => {
+      material.depthTest = 'yes'
+    }, /material\.depthTest must be a boolean/i],
+    ['depthWrite', (material) => {
+      material.depthWrite = 1
+    }, /material\.depthWrite must be a boolean/i],
+    ['colorWrite', (material) => {
+      material.colorWrite = 'no'
+    }, /material\.colorWrite must be a boolean/i],
+    ['polygonOffset', (material) => {
+      material.polygonOffset = 'yes'
+    }, /material\.polygonOffset must be a boolean/i],
+    ['stencilWrite', (material) => {
+      material.stencilWrite = 1
+    }, /material\.stencilWrite must be a boolean/i],
+    ['flatShading', (material) => {
+      material.flatShading = 'flat'
+    }, /material\.flatShading must be a boolean/i],
+    ['fog', (material) => {
+      material.fog = 'scene'
+    }, /material\.fog must be a boolean/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    mutate(material)
+    assertMaterialRenderStateFails(material, pattern, `${name} should fail clearly`)
+  }
+})
+
 test('unsupported material stencil constants fail clearly', () => {
   for (const field of ['stencilFunc', 'stencilFail', 'stencilZFail', 'stencilZPass']) {
     const material = new THREE.MeshBasicMaterial({

@@ -915,17 +915,18 @@ export function extractPbrProperties(
   if (alphaTest !== undefined && alphaTest > 0) {
     props.alphaTest = clamp01(alphaTest)
   }
-  if (material.alphaHash === true) {
+  if (optionalBoolean(material.alphaHash, 'material.alphaHash') === true) {
     props.alphaHash = true
   }
-  if (material.alphaToCoverage === true) {
+  if (optionalBoolean(material.alphaToCoverage, 'material.alphaToCoverage') === true) {
     props.alphaToCoverage = true
   }
-  if (material.premultipliedAlpha === true) {
+  if (optionalBoolean(material.premultipliedAlpha, 'material.premultipliedAlpha') === true) {
     props.premultipliedAlpha = true
   }
-  if (typeof material.transparent === 'boolean') {
-    props.transparent = material.transparent
+  const transparent = optionalBoolean(material.transparent, 'material.transparent')
+  if (transparent !== undefined) {
+    props.transparent = transparent
   }
   const blending = materialBlending(material)
   if (blending) {
@@ -953,21 +954,25 @@ export function extractPbrProperties(
       }
     }
   }
-  if (typeof material.depthTest === 'boolean') {
-    props.depthTest = material.depthTest
+  const depthTest = optionalBoolean(material.depthTest, 'material.depthTest')
+  if (depthTest !== undefined) {
+    props.depthTest = depthTest
   }
   const depthFunc = materialDepthFunc(material)
   if (depthFunc) {
     props.depthFunc = depthFunc
   }
-  if (typeof material.depthWrite === 'boolean') {
-    props.depthWrite = material.depthWrite
+  const depthWrite = optionalBoolean(material.depthWrite, 'material.depthWrite')
+  if (depthWrite !== undefined) {
+    props.depthWrite = depthWrite
   }
-  if (typeof material.colorWrite === 'boolean') {
-    props.colorWrite = material.colorWrite
+  const colorWrite = optionalBoolean(material.colorWrite, 'material.colorWrite')
+  if (colorWrite !== undefined) {
+    props.colorWrite = colorWrite
   }
-  if (typeof material.polygonOffset === 'boolean') {
-    props.polygonOffset = material.polygonOffset
+  const polygonOffset = optionalBoolean(material.polygonOffset, 'material.polygonOffset')
+  if (polygonOffset !== undefined) {
+    props.polygonOffset = polygonOffset
     const polygonOffsetFactor = optionalFiniteNumber(material.polygonOffsetFactor, 'material.polygonOffsetFactor')
     if (polygonOffsetFactor !== undefined) {
       props.polygonOffsetFactor = polygonOffsetFactor
@@ -977,8 +982,9 @@ export function extractPbrProperties(
       props.polygonOffsetUnits = polygonOffsetUnits
     }
   }
-  if (typeof material.stencilWrite === 'boolean') {
-    props.stencilWrite = material.stencilWrite
+  const stencilWrite = optionalBoolean(material.stencilWrite, 'material.stencilWrite')
+  if (stencilWrite !== undefined) {
+    props.stencilWrite = stencilWrite
   }
   const stencilWriteMask = optionalFiniteNumber(material.stencilWriteMask, 'material.stencilWriteMask')
   if (stencilWriteMask !== undefined) {
@@ -1012,10 +1018,10 @@ export function extractPbrProperties(
   if (shadowSide) {
     props.shadowSide = shadowSide
   }
-  if (material.flatShading === true) {
+  if (optionalBoolean(material.flatShading, 'material.flatShading') === true) {
     props.flatShading = true
   }
-  if (material.fog === false) {
+  if (optionalBoolean(material.fog, 'material.fog') === false) {
     props.fog = false
   }
 
@@ -1260,6 +1266,12 @@ function optionalFiniteNumber(value: unknown, label: string): number | undefined
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalBoolean(value: unknown, label: string): boolean | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
 }
 
 function optionalFiniteNumberOrInfinityDefault(value: unknown, label: string): number | undefined {
