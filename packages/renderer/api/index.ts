@@ -1388,7 +1388,10 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
   if (target.depthTexture != null) assertRenderTargetTextureLike(target.depthTexture, 'target.depthTexture')
   assertSupportedSampleCount(target.samples, 'target.samples')
   assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
-  assertSupportedRenderTargetColorTexture(renderTargetColorTexture(target))
+  const colorTexture = renderTargetColorTexture(target)
+  assertSupportedRenderTargetTextureDimensionality(colorTexture, 'target color texture')
+  assertSupportedRenderTargetTextureDimensionality(target.depthTexture, 'target.depthTexture')
+  assertSupportedRenderTargetColorTexture(colorTexture)
   assertSupportedDepthTextureType(target.depthTexture)
   assertSupportedDepthTextureFormat(target.depthTexture)
 }
@@ -1547,6 +1550,20 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
   if (type != null && type !== UnsignedByteType && type !== FloatType && type !== HalfFloatType) {
     throw new Error(
       `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
+    )
+  }
+}
+
+function assertSupportedRenderTargetTextureDimensionality(texture: RenderTargetTextureLike | undefined, label: string): void {
+  if (!texture) return
+  if (
+    texture.isDataArrayTexture === true ||
+    texture.isData3DTexture === true ||
+    texture.isArrayTexture === true ||
+    texture.is3DTexture === true
+  ) {
+    throw new Error(
+      `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer render targets yet. Use a single 2D texture target or render layers separately.`,
     )
   }
 }

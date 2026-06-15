@@ -492,6 +492,10 @@ export interface RenderTargetTextureLike {
     data?: RenderTargetImageLike | RenderTargetImageLike[]
   }
   isCubeTexture?: boolean
+  isDataArrayTexture?: boolean
+  isData3DTexture?: boolean
+  isArrayTexture?: boolean
+  is3DTexture?: boolean
   format?: number
   /** Color targets support UnsignedByteType RGBA8 buffers plus normalized FloatType and HalfFloatType readback arrays. */
   type?: number
