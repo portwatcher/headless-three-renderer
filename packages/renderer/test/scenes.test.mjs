@@ -3123,6 +3123,46 @@ test('camera layers filter renderable objects', () => {
   assert.ok(mean.g > mean.r + 20, `layer 1 object should dominate over filtered layer 0 object (${mean.g} vs ${mean.r})`)
 })
 
+test('invalid layer masks fail clearly', () => {
+  const camera = makeCamera()
+
+  const objectScene = new THREE.Scene()
+  const object = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+  object.layers.mask = 'visible'
+  objectScene.add(object)
+  assert.throws(
+    () => renderRgba(objectScene, camera, { width: 32, height: 32 }),
+    /object\.layers\.mask must be a finite number/i,
+  )
+
+  const cameraScene = new THREE.Scene()
+  cameraScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+  const invalidCamera = makeCamera()
+  invalidCamera.layers.mask = 'camera'
+  assert.throws(
+    () => renderRgba(cameraScene, invalidCamera, { width: 32, height: 32 }),
+    /camera\.layers\.mask must be a finite number/i,
+  )
+
+  const lightScene = new THREE.Scene()
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.layers.mask = 'bright'
+  lightScene.add(light)
+  assert.throws(
+    () => extractLights(lightScene, camera),
+    /object\.layers\.mask must be a finite number/i,
+  )
+
+  const probeScene = new THREE.Scene()
+  const probe = new THREE.LightProbe(undefined, 1)
+  probe.layers.mask = Number.NaN
+  probeScene.add(probe)
+  assert.throws(
+    () => extractLightProbe(probeScene, camera),
+    /object\.layers\.mask must be a finite number/i,
+  )
+})
+
 test('transparent renderOrder overrides traversal order', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
