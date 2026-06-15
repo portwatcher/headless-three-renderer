@@ -399,14 +399,17 @@ export function extractPbrProperties(
     props.useEnvironmentMap = false
   }
 
-  if (Number.isFinite(material.metalness)) {
-    props.metallic = clamp01(material.metalness!)
+  const metalness = optionalFiniteNumber(material.metalness, 'material.metalness')
+  if (metalness !== undefined) {
+    props.metallic = clamp01(metalness)
   }
-  if (Number.isFinite(material.roughness)) {
-    props.roughness = clamp01(material.roughness!)
+  const roughness = optionalFiniteNumber(material.roughness, 'material.roughness')
+  if (roughness !== undefined) {
+    props.roughness = clamp01(roughness)
   }
-  if (Number.isFinite(material.clearcoat)) {
-    props.clearcoat = clamp01(material.clearcoat!)
+  const clearcoat = optionalFiniteNumber(material.clearcoat, 'material.clearcoat')
+  if (clearcoat !== undefined) {
+    props.clearcoat = clamp01(clearcoat)
   }
   const clearcoatMapInfo = extractTextureFromSlot(material.clearcoatMap)
   if (clearcoatMapInfo) {
@@ -421,8 +424,9 @@ export function extractPbrProperties(
     props.clearcoatMapTransform = textureTransform(material.clearcoatMap)
     props.clearcoatMapUsesUv2 = textureUvChannel(material.clearcoatMap) > 0
   }
-  if (Number.isFinite(material.clearcoatRoughness)) {
-    props.clearcoatRoughness = clamp01(material.clearcoatRoughness!)
+  const clearcoatRoughness = optionalFiniteNumber(material.clearcoatRoughness, 'material.clearcoatRoughness')
+  if (clearcoatRoughness !== undefined) {
+    props.clearcoatRoughness = clamp01(clearcoatRoughness)
   }
   const clearcoatRoughnessMapInfo = extractTextureFromSlot(material.clearcoatRoughnessMap)
   if (clearcoatRoughnessMapInfo) {
@@ -451,11 +455,14 @@ export function extractPbrProperties(
     props.clearcoatNormalMapUsesUv2 = textureUvChannel(material.clearcoatNormalMap) > 0
   }
   if (material.clearcoatNormalScale) {
-    props.clearcoatNormalScale = [material.clearcoatNormalScale.x ?? 1, material.clearcoatNormalScale.y ?? 1]
+    props.clearcoatNormalScale = [
+      finiteNumberOrDefault(material.clearcoatNormalScale.x, 'material.clearcoatNormalScale.x', 1),
+      finiteNumberOrDefault(material.clearcoatNormalScale.y, 'material.clearcoatNormalScale.y', 1),
+    ]
   }
 
   const sheenColor = colorLikeToArray(material.sheenColor)
-  const sheen = Number.isFinite(material.sheen) ? clamp01(material.sheen!) : 0
+  const sheen = clamp01(optionalFiniteNumber(material.sheen, 'material.sheen') ?? 0)
   if (sheenColor && sheen > 0) {
     props.sheenColor = [
       sheenColor[0] * sheen,
@@ -463,8 +470,9 @@ export function extractPbrProperties(
       sheenColor[2] * sheen,
     ]
   }
-  if (Number.isFinite(material.sheenRoughness)) {
-    props.sheenRoughness = clamp01(material.sheenRoughness!)
+  const sheenRoughness = optionalFiniteNumber(material.sheenRoughness, 'material.sheenRoughness')
+  if (sheenRoughness !== undefined) {
+    props.sheenRoughness = clamp01(sheenRoughness)
   }
   const sheenColorMapInfo = extractTextureFromSlot(material.sheenColorMap)
   if (sheenColorMapInfo) {
@@ -494,11 +502,13 @@ export function extractPbrProperties(
     props.sheenRoughnessMapUsesUv2 = textureUvChannel(material.sheenRoughnessMap) > 0
   }
 
-  if (Number.isFinite(material.anisotropy)) {
-    props.anisotropy = clamp01(Math.abs(material.anisotropy!))
+  const anisotropy = optionalFiniteNumber(material.anisotropy, 'material.anisotropy')
+  if (anisotropy !== undefined) {
+    props.anisotropy = clamp01(Math.abs(anisotropy))
   }
-  if (Number.isFinite(material.anisotropyRotation)) {
-    props.anisotropyRotation = material.anisotropyRotation!
+  const anisotropyRotation = optionalFiniteNumber(material.anisotropyRotation, 'material.anisotropyRotation')
+  if (anisotropyRotation !== undefined) {
+    props.anisotropyRotation = anisotropyRotation
   }
   const anisotropyMapInfo = extractTextureFromSlot(material.anisotropyMap)
   if (anisotropyMapInfo) {
@@ -514,8 +524,9 @@ export function extractPbrProperties(
     props.anisotropyMapUsesUv2 = textureUvChannel(material.anisotropyMap) > 0
   }
 
-  if (Number.isFinite(material.iridescence)) {
-    props.iridescence = clamp01(material.iridescence!)
+  const iridescence = optionalFiniteNumber(material.iridescence, 'material.iridescence')
+  if (iridescence !== undefined) {
+    props.iridescence = clamp01(iridescence)
   }
   const iridescenceMapInfo = extractTextureFromSlot(material.iridescenceMap)
   if (iridescenceMapInfo) {
@@ -530,17 +541,16 @@ export function extractPbrProperties(
     props.iridescenceMapTransform = textureTransform(material.iridescenceMap)
     props.iridescenceMapUsesUv2 = textureUvChannel(material.iridescenceMap) > 0
   }
-  if (Number.isFinite(material.iridescenceIOR)) {
-    props.iridescenceIor = Math.max(1, Math.min(2.333, material.iridescenceIOR!))
+  const iridescenceIor = optionalFiniteNumber(material.iridescenceIOR, 'material.iridescenceIOR')
+  if (iridescenceIor !== undefined) {
+    props.iridescenceIor = Math.max(1, Math.min(2.333, iridescenceIor))
   }
   const iridescenceThicknessRange = material.iridescenceThicknessRange
   if (iridescenceThicknessRange && iridescenceThicknessRange.length >= 2) {
-    const min = iridescenceThicknessRange[0]
-    const max = iridescenceThicknessRange[1]
-    if (Number.isFinite(min) && Number.isFinite(max)) {
-      props.iridescenceThicknessMin = Math.max(0, min)
-      props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
-    }
+    const min = requiredFiniteNumber(iridescenceThicknessRange[0], 'material.iridescenceThicknessRange[0]')
+    const max = requiredFiniteNumber(iridescenceThicknessRange[1], 'material.iridescenceThicknessRange[1]')
+    props.iridescenceThicknessMin = Math.max(0, min)
+    props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
   }
   const iridescenceThicknessMapInfo = extractTextureFromSlot(material.iridescenceThicknessMap)
   if (iridescenceThicknessMapInfo) {
@@ -556,11 +566,13 @@ export function extractPbrProperties(
     props.iridescenceThicknessMapUsesUv2 = textureUvChannel(material.iridescenceThicknessMap) > 0
   }
 
-  if (Number.isFinite(material.transmission)) {
-    props.transmission = clamp01(material.transmission!)
+  const transmission = optionalFiniteNumber(material.transmission, 'material.transmission')
+  if (transmission !== undefined) {
+    props.transmission = clamp01(transmission)
   }
-  if (Number.isFinite(material.dispersion)) {
-    props.dispersion = Math.max(0, material.dispersion!)
+  const dispersion = optionalFiniteNumber(material.dispersion, 'material.dispersion')
+  if (dispersion !== undefined) {
+    props.dispersion = Math.max(0, dispersion)
   }
   const transmissionMapInfo = extractTextureFromSlot(material.transmissionMap)
   if (transmissionMapInfo) {
@@ -575,11 +587,13 @@ export function extractPbrProperties(
     props.transmissionMapTransform = textureTransform(material.transmissionMap)
     props.transmissionMapUsesUv2 = textureUvChannel(material.transmissionMap) > 0
   }
-  if (Number.isFinite(material.ior)) {
-    props.ior = Math.max(1, Math.min(2.333, material.ior!))
+  const ior = optionalFiniteNumber(material.ior, 'material.ior')
+  if (ior !== undefined) {
+    props.ior = Math.max(1, Math.min(2.333, ior))
   }
-  if (Number.isFinite(material.thickness)) {
-    props.thickness = Math.max(0, material.thickness!)
+  const thickness = optionalFiniteNumber(material.thickness, 'material.thickness')
+  if (thickness !== undefined) {
+    props.thickness = Math.max(0, thickness)
   }
   const thicknessMapInfo = extractTextureFromSlot(material.thicknessMap)
   if (thicknessMapInfo) {
@@ -594,8 +608,12 @@ export function extractPbrProperties(
     props.thicknessMapTransform = textureTransform(material.thicknessMap)
     props.thicknessMapUsesUv2 = textureUvChannel(material.thicknessMap) > 0
   }
-  if (Number.isFinite(material.attenuationDistance)) {
-    props.attenuationDistance = Math.max(0, material.attenuationDistance!)
+  const attenuationDistance = optionalFiniteNumberOrInfinityDefault(
+    material.attenuationDistance,
+    'material.attenuationDistance',
+  )
+  if (attenuationDistance !== undefined) {
+    props.attenuationDistance = Math.max(0, attenuationDistance)
   }
   const attenuationColor = colorLikeToArray(material.attenuationColor)
   if (attenuationColor) {
@@ -609,8 +627,9 @@ export function extractPbrProperties(
       physicalSpecularColor[2],
     ]
   }
-  if (Number.isFinite(material.specularIntensity)) {
-    props.physicalSpecularIntensity = clamp01(material.specularIntensity!)
+  const specularIntensity = optionalFiniteNumber(material.specularIntensity, 'material.specularIntensity')
+  if (specularIntensity !== undefined) {
+    props.physicalSpecularIntensity = clamp01(specularIntensity)
   }
   const specularColorMapInfo = extractTextureFromSlot(material.specularColorMap)
   if (specularColorMapInfo) {
@@ -1193,6 +1212,16 @@ function firstOptionalFiniteNumber(entries: Array<[unknown, string]>): number | 
 
 function optionalFiniteNumber(value: unknown, label: string): number | undefined {
   if (value == null) return undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
+function optionalFiniteNumberOrInfinityDefault(value: unknown, label: string): number | undefined {
+  if (value === Number.POSITIVE_INFINITY) return undefined
+  return optionalFiniteNumber(value, label)
+}
+
+function requiredFiniteNumber(value: unknown, label: string): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
 }

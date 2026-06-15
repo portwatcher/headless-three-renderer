@@ -6635,6 +6635,79 @@ test('MeshPhysicalMaterial extensions and maps affect rendered output', () => {
   assert.ok(diff > 0.5, `expected physical extensions to change output, mean abs diff=${diff.toFixed(3)}`)
 })
 
+test('invalid physical material scalar values fail clearly', () => {
+  const cases = [
+    ['metalness', (material) => {
+      material.metalness = 'metal'
+    }, /material\.metalness must be a finite number/i],
+    ['roughness', (material) => {
+      material.roughness = Number.NaN
+    }, /material\.roughness must be a finite number/i],
+    ['clearcoat', (material) => {
+      material.clearcoat = 'coat'
+    }, /material\.clearcoat must be a finite number/i],
+    ['clearcoatRoughness', (material) => {
+      material.clearcoatRoughness = Number.POSITIVE_INFINITY
+    }, /material\.clearcoatRoughness must be a finite number/i],
+    ['clearcoatNormalScale.x', (material) => {
+      material.clearcoatNormalScale = new THREE.Vector2(1, 1)
+      material.clearcoatNormalScale.x = 'wide'
+    }, /material\.clearcoatNormalScale\.x must be a finite number/i],
+    ['sheen', (material) => {
+      material.sheen = 'soft'
+    }, /material\.sheen must be a finite number/i],
+    ['sheenRoughness', (material) => {
+      material.sheenRoughness = Number.NaN
+    }, /material\.sheenRoughness must be a finite number/i],
+    ['anisotropy', (material) => {
+      material.anisotropy = 'aligned'
+    }, /material\.anisotropy must be a finite number/i],
+    ['anisotropyRotation', (material) => {
+      material.anisotropyRotation = Number.NEGATIVE_INFINITY
+    }, /material\.anisotropyRotation must be a finite number/i],
+    ['iridescence', (material) => {
+      material.iridescence = 'rainbow'
+    }, /material\.iridescence must be a finite number/i],
+    ['iridescenceIOR', (material) => {
+      material.iridescenceIOR = Number.NaN
+    }, /material\.iridescenceIOR must be a finite number/i],
+    ['iridescenceThicknessRange', (material) => {
+      material.iridescenceThicknessRange = [100, 'thick']
+    }, /material\.iridescenceThicknessRange\[1\] must be a finite number/i],
+    ['transmission', (material) => {
+      material.transmission = 'glass'
+    }, /material\.transmission must be a finite number/i],
+    ['dispersion', (material) => {
+      material.dispersion = Number.NaN
+    }, /material\.dispersion must be a finite number/i],
+    ['ior', (material) => {
+      material.ior = 'dense'
+    }, /material\.ior must be a finite number/i],
+    ['thickness', (material) => {
+      material.thickness = Number.POSITIVE_INFINITY
+    }, /material\.thickness must be a finite number/i],
+    ['attenuationDistance', (material) => {
+      material.attenuationDistance = 'short'
+    }, /material\.attenuationDistance must be a finite number/i],
+    ['specularIntensity', (material) => {
+      material.specularIntensity = Number.NaN
+    }, /material\.specularIntensity must be a finite number/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff })
+    mutate(material)
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('MeshPhysicalMaterial specular intensity and color affect direct specular', () => {
   function renderMaterial(material) {
     const scene = new THREE.Scene()
