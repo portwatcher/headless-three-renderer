@@ -267,6 +267,21 @@ test('rgba format returns raw pixel buffer of the expected byte length', () => {
   assert.equal(buf.length, SIZE * SIZE * 4, 'rgba buffer must be width*height*4 bytes')
 })
 
+test('unsupported output format values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xff00ff })))
+  const camera = makeCamera()
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'webp' }),
+    /options\.format webp is not supported.*png.*rgba/i,
+  )
+  assert.throws(
+    () => renderToTarget(scene, camera, {}, { width: 32, height: 32, format: 'webp' }),
+    /options\.format webp is not supported.*png.*rgba/i,
+  )
+})
+
 function makeLayeredArrayCamera(width = 64, height = 64) {
   const leftCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   leftCamera.position.set(0, 0, 3)

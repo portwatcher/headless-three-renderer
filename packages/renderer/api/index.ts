@@ -551,9 +551,7 @@ function validateCubeCamera(camera: ThreeCubeCameraLike, options: RenderOptions)
   if (!isCubeCamera(camera)) {
     throw new TypeError('render(scene, camera) expected a THREE.CubeCamera-compatible object.')
   }
-  if (options.format != null && options.format !== 'png' && options.format !== 'rgba') {
-    throw new Error(`unsupported CubeCamera output format \`${options.format}\`; expected \`png\` or \`rgba\``)
-  }
+  assertSupportedOutputFormat(options.format, 'options.format')
 }
 
 function cubeSubCameras(camera: ThreeCubeCameraLike): ThreeCameraLike[] {
@@ -790,9 +788,7 @@ function validateArrayCameraOutput(camera: ThreeCameraLike, options: RenderOptio
   if (!camera || cameraLike.isCamera !== true) {
     throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera')
   }
-  if (options.format != null && options.format !== 'png' && options.format !== 'rgba') {
-    throw new Error(`unsupported ArrayCamera output format \`${options.format}\`; expected \`png\` or \`rgba\``)
-  }
+  assertSupportedOutputFormat(options.format, 'options.format')
 }
 
 function arraySubCameras(camera: ThreeCameraLike): ThreeCameraLike[] {
@@ -1196,6 +1192,7 @@ function nonZeroFinite(value: unknown): boolean {
 }
 
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
+  assertSupportedOutputFormat(options.format, 'options.format')
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
   if (options.target) validateUnsupportedRenderTargetOptions(options.target)
@@ -1235,6 +1232,14 @@ function assertSupportedSampleCount(value: unknown, label: string): void {
       `MSAA sample count ${value} is not supported by @headless-three/renderer yet (${label}=${value}). Use 4 for 4x MSAA or the default single-sample render path.`,
     )
   }
+}
+
+function assertSupportedOutputFormat(value: unknown, label: string): void {
+  if (value == null) return
+  if (value === 'png' || value === 'rgba') return
+  throw new Error(
+    `${label} ${String(value)} is not supported by @headless-three/renderer. Use "png" or "rgba".`,
+  )
 }
 
 function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike | undefined): void {
