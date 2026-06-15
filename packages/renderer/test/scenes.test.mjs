@@ -11915,6 +11915,22 @@ test('invalid shadow numeric values fail clearly', () => {
     ['camera.left', (light) => {
       light.shadow.camera.left = 'left'
     }, /light\.shadow\.camera\.left must be a finite number/i],
+    ['camera.right before left', (light) => {
+      light.shadow.camera.left = 4
+      light.shadow.camera.right = 4
+    }, /light\.shadow\.camera\.right must be greater than light\.shadow\.camera\.left/i],
+    ['camera.left beyond default right', (light) => {
+      light.shadow.camera.left = 10
+      delete light.shadow.camera.right
+    }, /light\.shadow\.camera\.left must be less than the effective light\.shadow\.camera\.right/i],
+    ['camera.top below bottom', (light) => {
+      light.shadow.camera.top = -6
+      light.shadow.camera.bottom = -6
+    }, /light\.shadow\.camera\.top must be greater than light\.shadow\.camera\.bottom/i],
+    ['camera.bottom beyond default top', (light) => {
+      light.shadow.camera.bottom = 10
+      delete light.shadow.camera.top
+    }, /light\.shadow\.camera\.bottom must be less than the effective light\.shadow\.camera\.top/i],
     ['camera container', (light) => {
       light.shadow.camera = 'camera'
     }, /light\.shadow\.camera must be an object/i],

@@ -4,6 +4,7 @@ import { objectLayersMatchCamera } from './layers'
 import { matrixElements } from './math'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
+type ShadowCameraLike = NonNullable<NonNullable<ThreeObject3DLike['shadow']>['camera']>
 const MAX_NATIVE_LIGHTS = 64
 const MAX_SHADOW_CASCADES = 4
 
@@ -193,15 +194,12 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   const cam = shadow?.camera
   if (cam != null) {
     assertPlainObject(cam, 'light.shadow.camera')
-    const left = optionalFiniteNumber(cam.left, 'light.shadow.camera.left')
-    const right = optionalFiniteNumber(cam.right, 'light.shadow.camera.right')
-    const top = optionalFiniteNumber(cam.top, 'light.shadow.camera.top')
-    const bottom = optionalFiniteNumber(cam.bottom, 'light.shadow.camera.bottom')
+    const bounds = shadowCameraOrthoBounds(cam, out)
     const clipDistances = shadowCameraClipDistances(cam, out)
-    if (left !== undefined) out.shadowCameraLeft = left
-    if (right !== undefined) out.shadowCameraRight = right
-    if (top !== undefined) out.shadowCameraTop = top
-    if (bottom !== undefined) out.shadowCameraBottom = bottom
+    if (bounds.shadowCameraLeft !== undefined) out.shadowCameraLeft = bounds.shadowCameraLeft
+    if (bounds.shadowCameraRight !== undefined) out.shadowCameraRight = bounds.shadowCameraRight
+    if (bounds.shadowCameraTop !== undefined) out.shadowCameraTop = bounds.shadowCameraTop
+    if (bounds.shadowCameraBottom !== undefined) out.shadowCameraBottom = bounds.shadowCameraBottom
     if (clipDistances.shadowCameraNear !== undefined) out.shadowCameraNear = clipDistances.shadowCameraNear
     if (clipDistances.shadowCameraFar !== undefined) out.shadowCameraFar = clipDistances.shadowCameraFar
   }
@@ -210,7 +208,7 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
 }
 
 function shadowCameraClipDistances(
-  camera: NonNullable<NonNullable<ThreeObject3DLike['shadow']>['camera']>,
+  camera: ShadowCameraLike,
   light: NativeSceneLight,
 ): Pick<NativeSceneLight, 'shadowCameraNear' | 'shadowCameraFar'> {
   const near = optionalFiniteNumber(camera.near, 'light.shadow.camera.near')
@@ -242,6 +240,43 @@ function defaultShadowCameraFar(light: NativeSceneLight): number {
   return light.lightType === 'point' && light.distance !== undefined && light.distance > 0
     ? light.distance
     : 500
+}
+
+function shadowCameraOrthoBounds(
+  camera: ShadowCameraLike,
+  light: NativeSceneLight,
+): Pick<NativeSceneLight, 'shadowCameraLeft' | 'shadowCameraRight' | 'shadowCameraTop' | 'shadowCameraBottom'> {
+  const left = optionalFiniteNumber(camera.left, 'light.shadow.camera.left')
+  const right = optionalFiniteNumber(camera.right, 'light.shadow.camera.right')
+  const top = optionalFiniteNumber(camera.top, 'light.shadow.camera.top')
+  const bottom = optionalFiniteNumber(camera.bottom, 'light.shadow.camera.bottom')
+
+  if (light.lightType === 'directional') {
+    const effectiveLeft = left ?? -5
+    const effectiveRight = right ?? 5
+    const effectiveTop = top ?? 5
+    const effectiveBottom = bottom ?? -5
+
+    if (effectiveRight <= effectiveLeft) {
+      if (right !== undefined) {
+        throw new TypeError('light.shadow.camera.right must be greater than light.shadow.camera.left.')
+      }
+      throw new TypeError('light.shadow.camera.left must be less than the effective light.shadow.camera.right.')
+    }
+    if (effectiveTop <= effectiveBottom) {
+      if (top !== undefined) {
+        throw new TypeError('light.shadow.camera.top must be greater than light.shadow.camera.bottom.')
+      }
+      throw new TypeError('light.shadow.camera.bottom must be less than the effective light.shadow.camera.top.')
+    }
+  }
+
+  return {
+    shadowCameraLeft: left,
+    shadowCameraRight: right,
+    shadowCameraTop: top,
+    shadowCameraBottom: bottom,
+  }
 }
 
 function shadowMapSizeOrDefault(mapSize: ShadowMapSizeLike, light: ThreeObject3DLike): { width: number; height: number } {
