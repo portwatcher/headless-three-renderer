@@ -21,6 +21,8 @@ const TEXTURED_QUAD = path.join(FIXTURE_DIR, 'textured-quad.gltf')
 const VERTEX_COLOR_QUAD = path.join(FIXTURE_DIR, 'vertex-color-quad.gltf')
 const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
 const SKINNED_QUAD = path.join(FIXTURE_DIR, 'skinned-quad.gltf')
+const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
+const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -244,19 +246,24 @@ test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
     }
   }
 
-  const vrmGltf = await loadVrmFromFile(SIMPLE_TRIANGLE, {
+  const vrmGltf = await loadVrmFromFile(SYNTHETIC_VRM, {
     VRMLoaderPlugin: FakeVRMLoaderPlugin,
   })
   assert.ok(findFirst(vrmGltf.scene, (object) => object.isMesh === true), 'VRM helper should still parse glTF scenes')
   assert.ok(vrmPluginParser, 'VRM helper should install the supplied VRMLoaderPlugin')
+  assert.ok(vrmPluginParser.json?.extensionsUsed?.includes('VRMC_vrm'), 'VRM fixture should expose VRMC_vrm metadata to the plugin')
 
-  const animationGltf = await loadVrmAnimationFromFile(SIMPLE_TRIANGLE, {
+  const animationGltf = await loadVrmAnimationFromFile(SYNTHETIC_VRMA, {
     VRMLoaderPlugin: FakeModelLoaderPlugin,
     VRMAnimationLoaderPlugin: FakeVRMAnimationLoaderPlugin,
   })
   assert.ok(findFirst(animationGltf.scene, (object) => object.isMesh === true), 'VRMA helper should still parse glTF scenes')
   assert.ok(modelPluginParser, 'VRMA helper should install the supplied VRMLoaderPlugin when provided')
   assert.ok(animationPluginParser, 'VRMA helper should install the supplied VRMAnimationLoaderPlugin')
+  assert.ok(
+    animationPluginParser.json?.extensionsUsed?.includes('VRMC_vrm_animation'),
+    'VRMA fixture should expose VRMC_vrm_animation metadata to the plugin',
+  )
 })
 
 test('loadGltfFromFile resolves external glTF image files from the model directory', async () => {
