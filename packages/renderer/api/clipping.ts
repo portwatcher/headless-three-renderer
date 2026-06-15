@@ -12,8 +12,8 @@ export function extractClippingPlanes(
   if (!Array.isArray(input) || input.length === 0) return []
 
   const planes: NativeClippingPlane[] = []
-  for (const plane of input) {
-    const parsed = parseClippingPlane(plane)
+  for (let i = 0; i < input.length; i += 1) {
+    const parsed = parseClippingPlane(input[i], `${label}[${i}]`)
     if (!parsed) continue
     if (planes.length >= maxPlanes) {
       throw new Error(
@@ -30,41 +30,60 @@ export function flattenClippingPlanes(planes: readonly NativeClippingPlane[]): n
   return planes.flatMap((plane) => plane)
 }
 
-function parseClippingPlane(plane: ThreePlaneLike | null | undefined): NativeClippingPlane | null {
+function parseClippingPlane(plane: ThreePlaneLike | null | undefined, label: string): NativeClippingPlane | null {
   if (!plane) return null
 
-  if (isArrayLike(plane) && plane.length >= 4) {
-    return normalizedPlane([numberAt(plane, 0), numberAt(plane, 1), numberAt(plane, 2), numberAt(plane, 3)])
+  if (isArrayLike(plane)) {
+    if (plane.length < 4) {
+      throw new TypeError(`${label} must contain four finite numbers.`)
+    }
+    return normalizedPlane([
+      requiredFiniteNumber(plane[0], `${label}[0]`),
+      requiredFiniteNumber(plane[1], `${label}[1]`),
+      requiredFiniteNumber(plane[2], `${label}[2]`),
+      requiredFiniteNumber(plane[3], `${label}[3]`),
+    ], label)
   }
 
   const normal = (plane as { normal?: unknown }).normal
   const constant = (plane as { constant?: unknown }).constant
-  if (typeof constant !== 'number' || !Number.isFinite(constant)) return null
+  const finiteConstant = requiredFiniteNumber(constant, `${label}.constant`)
 
-  if (isArrayLike(normal) && normal.length >= 3) {
-    return normalizedPlane([numberAt(normal, 0), numberAt(normal, 1), numberAt(normal, 2), constant])
+  if (isArrayLike(normal)) {
+    if (normal.length < 3) {
+      throw new TypeError(`${label}.normal must contain three finite numbers.`)
+    }
+    return normalizedPlane([
+      requiredFiniteNumber(normal[0], `${label}.normal[0]`),
+      requiredFiniteNumber(normal[1], `${label}.normal[1]`),
+      requiredFiniteNumber(normal[2], `${label}.normal[2]`),
+      finiteConstant,
+    ], label)
   }
 
   const vector = normal as { x?: unknown; y?: unknown; z?: unknown } | undefined
-  return normalizedPlane([numberFrom(vector?.x), numberFrom(vector?.y), numberFrom(vector?.z), constant])
+  return normalizedPlane([
+    requiredFiniteNumber(vector?.x, `${label}.normal.x`),
+    requiredFiniteNumber(vector?.y, `${label}.normal.y`),
+    requiredFiniteNumber(vector?.z, `${label}.normal.z`),
+    finiteConstant,
+  ], label)
 }
 
-function normalizedPlane(values: NativeClippingPlane): NativeClippingPlane | null {
+function normalizedPlane(values: NativeClippingPlane, label: string): NativeClippingPlane {
   const [x, y, z, constant] = values
-  if (![x, y, z, constant].every(Number.isFinite)) return null
   const length = Math.hypot(x, y, z)
-  if (length <= 1e-8) return null
+  if (length <= 1e-8) {
+    throw new TypeError(`${label}.normal must have non-zero finite length.`)
+  }
   return [x / length, y / length, z / length, constant / length]
 }
 
-function isArrayLike(value: unknown): value is ArrayLike<number> {
+function isArrayLike(value: unknown): value is ArrayLike<unknown> {
   return !!value && typeof (value as { length?: unknown }).length === 'number'
 }
 
-function numberAt(values: ArrayLike<number>, index: number): number {
-  return numberFrom(values[index])
-}
-
-function numberFrom(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : Number.NaN
+function requiredFiniteNumber(value: unknown, label: string): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
 }

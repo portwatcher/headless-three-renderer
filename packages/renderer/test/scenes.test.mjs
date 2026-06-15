@@ -4144,6 +4144,44 @@ test('clippingPlanes over the native plane budget fail clearly', () => {
   }
 })
 
+test('invalid clippingPlane values fail clearly', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['options constant', () => {
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      const plane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)
+      plane.constant = Number.NaN
+      return () => renderRgba(scene, camera, { width: 64, height: 64, clippingPlanes: [plane] })
+    }, /options\.clippingPlanes\[0\]\.constant must be a finite number/i],
+    ['material normal', () => {
+      const scene = new THREE.Scene()
+      const material = new THREE.MeshBasicMaterial()
+      const plane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)
+      plane.normal.x = 'right'
+      material.clippingPlanes = [plane]
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+      return () => renderRgba(scene, camera, { width: 64, height: 64 })
+    }, /material\.clippingPlanes\[0\]\.normal\.x must be a finite number/i],
+    ['group zero normal', () => {
+      const scene = new THREE.Scene()
+      const group = new THREE.Group()
+      group.isClippingGroup = true
+      group.clippingPlanes = [[0, 0, 0, 0]]
+      group.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      scene.add(group)
+      return () => renderRgba(scene, camera, { width: 64, height: 64 })
+    }, /ClippingGroup\.clippingPlanes\[0\]\.normal must have non-zero finite length/i],
+  ]
+
+  for (const [label, makeRender, pattern] of cases) {
+    assert.throws(makeRender(), pattern, label)
+  }
+})
+
 test('localClippingEnabled false ignores material planes but preserves global planes', () => {
   const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
   material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
