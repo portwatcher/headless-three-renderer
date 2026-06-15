@@ -421,7 +421,7 @@ export function extractPbrProperties(
     props.clearcoatMapMagFilter = filterModeToString(material.clearcoatMap?.magFilter)
     props.clearcoatMapMinFilter = minFilterModeToString(material.clearcoatMap)
     props.clearcoatMapAnisotropy = textureAnisotropy(material.clearcoatMap, 'material.clearcoatMap')
-    props.clearcoatMapTransform = textureTransform(material.clearcoatMap)
+    props.clearcoatMapTransform = textureTransform(material.clearcoatMap, 'material.clearcoatMap')
     props.clearcoatMapUsesUv2 = textureUvChannel(material.clearcoatMap) > 0
   }
   const clearcoatRoughness = optionalFiniteNumber(material.clearcoatRoughness, 'material.clearcoatRoughness')
@@ -438,7 +438,7 @@ export function extractPbrProperties(
     props.clearcoatRoughnessMapMagFilter = filterModeToString(material.clearcoatRoughnessMap?.magFilter)
     props.clearcoatRoughnessMapMinFilter = minFilterModeToString(material.clearcoatRoughnessMap)
     props.clearcoatRoughnessMapAnisotropy = textureAnisotropy(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
-    props.clearcoatRoughnessMapTransform = textureTransform(material.clearcoatRoughnessMap)
+    props.clearcoatRoughnessMapTransform = textureTransform(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
     props.clearcoatRoughnessMapUsesUv2 = textureUvChannel(material.clearcoatRoughnessMap) > 0
   }
   const clearcoatNormalMapInfo = extractTextureFromSlot(material.clearcoatNormalMap)
@@ -451,7 +451,7 @@ export function extractPbrProperties(
     props.clearcoatNormalMapMagFilter = filterModeToString(material.clearcoatNormalMap?.magFilter)
     props.clearcoatNormalMapMinFilter = minFilterModeToString(material.clearcoatNormalMap)
     props.clearcoatNormalMapAnisotropy = textureAnisotropy(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
-    props.clearcoatNormalMapTransform = textureTransform(material.clearcoatNormalMap)
+    props.clearcoatNormalMapTransform = textureTransform(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
     props.clearcoatNormalMapUsesUv2 = textureUvChannel(material.clearcoatNormalMap) > 0
   }
   if (material.clearcoatNormalScale) {
@@ -484,7 +484,7 @@ export function extractPbrProperties(
     props.sheenColorMapMagFilter = filterModeToString(material.sheenColorMap?.magFilter)
     props.sheenColorMapMinFilter = minFilterModeToString(material.sheenColorMap)
     props.sheenColorMapAnisotropy = textureAnisotropy(material.sheenColorMap, 'material.sheenColorMap')
-    props.sheenColorMapTransform = textureTransform(material.sheenColorMap)
+    props.sheenColorMapTransform = textureTransform(material.sheenColorMap, 'material.sheenColorMap')
     props.sheenColorMapColorSpace = textureColorSpace(material.sheenColorMap)
     props.sheenColorMapUsesUv2 = textureUvChannel(material.sheenColorMap) > 0
   }
@@ -498,7 +498,7 @@ export function extractPbrProperties(
     props.sheenRoughnessMapMagFilter = filterModeToString(material.sheenRoughnessMap?.magFilter)
     props.sheenRoughnessMapMinFilter = minFilterModeToString(material.sheenRoughnessMap)
     props.sheenRoughnessMapAnisotropy = textureAnisotropy(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
-    props.sheenRoughnessMapTransform = textureTransform(material.sheenRoughnessMap)
+    props.sheenRoughnessMapTransform = textureTransform(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
     props.sheenRoughnessMapUsesUv2 = textureUvChannel(material.sheenRoughnessMap) > 0
   }
 
@@ -520,7 +520,7 @@ export function extractPbrProperties(
     props.anisotropyMapMagFilter = filterModeToString(material.anisotropyMap?.magFilter)
     props.anisotropyMapMinFilter = minFilterModeToString(material.anisotropyMap)
     props.anisotropyMapAnisotropy = textureAnisotropy(material.anisotropyMap, 'material.anisotropyMap')
-    props.anisotropyMapTransform = textureTransform(material.anisotropyMap)
+    props.anisotropyMapTransform = textureTransform(material.anisotropyMap, 'material.anisotropyMap')
     props.anisotropyMapUsesUv2 = textureUvChannel(material.anisotropyMap) > 0
   }
 
@@ -538,7 +538,7 @@ export function extractPbrProperties(
     props.iridescenceMapMagFilter = filterModeToString(material.iridescenceMap?.magFilter)
     props.iridescenceMapMinFilter = minFilterModeToString(material.iridescenceMap)
     props.iridescenceMapAnisotropy = textureAnisotropy(material.iridescenceMap, 'material.iridescenceMap')
-    props.iridescenceMapTransform = textureTransform(material.iridescenceMap)
+    props.iridescenceMapTransform = textureTransform(material.iridescenceMap, 'material.iridescenceMap')
     props.iridescenceMapUsesUv2 = textureUvChannel(material.iridescenceMap) > 0
   }
   const iridescenceIor = optionalFiniteNumber(material.iridescenceIOR, 'material.iridescenceIOR')
@@ -562,7 +562,7 @@ export function extractPbrProperties(
     props.iridescenceThicknessMapMagFilter = filterModeToString(material.iridescenceThicknessMap?.magFilter)
     props.iridescenceThicknessMapMinFilter = minFilterModeToString(material.iridescenceThicknessMap)
     props.iridescenceThicknessMapAnisotropy = textureAnisotropy(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
-    props.iridescenceThicknessMapTransform = textureTransform(material.iridescenceThicknessMap)
+    props.iridescenceThicknessMapTransform = textureTransform(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
     props.iridescenceThicknessMapUsesUv2 = textureUvChannel(material.iridescenceThicknessMap) > 0
   }
 
@@ -584,7 +584,7 @@ export function extractPbrProperties(
     props.transmissionMapMagFilter = filterModeToString(material.transmissionMap?.magFilter)
     props.transmissionMapMinFilter = minFilterModeToString(material.transmissionMap)
     props.transmissionMapAnisotropy = textureAnisotropy(material.transmissionMap, 'material.transmissionMap')
-    props.transmissionMapTransform = textureTransform(material.transmissionMap)
+    props.transmissionMapTransform = textureTransform(material.transmissionMap, 'material.transmissionMap')
     props.transmissionMapUsesUv2 = textureUvChannel(material.transmissionMap) > 0
   }
   const ior = optionalFiniteNumber(material.ior, 'material.ior')
@@ -605,7 +605,7 @@ export function extractPbrProperties(
     props.thicknessMapMagFilter = filterModeToString(material.thicknessMap?.magFilter)
     props.thicknessMapMinFilter = minFilterModeToString(material.thicknessMap)
     props.thicknessMapAnisotropy = textureAnisotropy(material.thicknessMap, 'material.thicknessMap')
-    props.thicknessMapTransform = textureTransform(material.thicknessMap)
+    props.thicknessMapTransform = textureTransform(material.thicknessMap, 'material.thicknessMap')
     props.thicknessMapUsesUv2 = textureUvChannel(material.thicknessMap) > 0
   }
   const attenuationDistance = optionalFiniteNumberOrInfinityDefault(
@@ -641,7 +641,7 @@ export function extractPbrProperties(
     props.specularColorMapMagFilter = filterModeToString(material.specularColorMap?.magFilter)
     props.specularColorMapMinFilter = minFilterModeToString(material.specularColorMap)
     props.specularColorMapAnisotropy = textureAnisotropy(material.specularColorMap, 'material.specularColorMap')
-    props.specularColorMapTransform = textureTransform(material.specularColorMap)
+    props.specularColorMapTransform = textureTransform(material.specularColorMap, 'material.specularColorMap')
     props.specularColorMapColorSpace = textureColorSpace(material.specularColorMap)
     props.specularColorMapUsesUv2 = textureUvChannel(material.specularColorMap) > 0
   }
@@ -655,7 +655,7 @@ export function extractPbrProperties(
     props.specularIntensityMapMagFilter = filterModeToString(material.specularIntensityMap?.magFilter)
     props.specularIntensityMapMinFilter = minFilterModeToString(material.specularIntensityMap)
     props.specularIntensityMapAnisotropy = textureAnisotropy(material.specularIntensityMap, 'material.specularIntensityMap')
-    props.specularIntensityMapTransform = textureTransform(material.specularIntensityMap)
+    props.specularIntensityMapTransform = textureTransform(material.specularIntensityMap, 'material.specularIntensityMap')
     props.specularIntensityMapUsesUv2 = textureUvChannel(material.specularIntensityMap) > 0
   }
 
@@ -687,7 +687,7 @@ export function extractPbrProperties(
     props.normalMapMagFilter = filterModeToString(material.normalMap?.magFilter)
     props.normalMapMinFilter = minFilterModeToString(material.normalMap)
     props.normalMapAnisotropy = textureAnisotropy(material.normalMap, 'material.normalMap')
-    props.normalMapTransform = textureTransform(material.normalMap)
+    props.normalMapTransform = textureTransform(material.normalMap, 'material.normalMap')
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
   }
   if (material.normalScale) {
@@ -706,7 +706,7 @@ export function extractPbrProperties(
     props.bumpMapMagFilter = filterModeToString(material.bumpMap?.magFilter)
     props.bumpMapMinFilter = minFilterModeToString(material.bumpMap)
     props.bumpMapAnisotropy = textureAnisotropy(material.bumpMap, 'material.bumpMap')
-    props.bumpMapTransform = textureTransform(material.bumpMap)
+    props.bumpMapTransform = textureTransform(material.bumpMap, 'material.bumpMap')
     props.bumpMapUsesUv2 = textureUvChannel(material.bumpMap) > 0
     props.bumpScale = finiteNumberOrDefault(material.bumpScale, 'material.bumpScale', 1)
   }
@@ -721,7 +721,7 @@ export function extractPbrProperties(
       props.matcapMapMagFilter = filterModeToString(material.map?.magFilter)
       props.matcapMapMinFilter = minFilterModeToString(material.map)
       props.matcapMapAnisotropy = textureAnisotropy(material.map, 'material.map')
-      props.matcapMapTransform = textureTransform(material.map)
+      props.matcapMapTransform = textureTransform(material.map, 'material.map')
       props.matcapMapColorSpace = textureColorSpace(material.map)
       props.matcapMapUsesUv2 = textureUvChannel(material.map) > 0
     }
@@ -776,7 +776,7 @@ export function extractPbrProperties(
     props.displacementMap = displacementMapInfo.data
     props.displacementMapWidth = displacementMapInfo.width
     props.displacementMapHeight = displacementMapInfo.height
-    props.displacementMapTransform = textureTransform(material.displacementMap)
+    props.displacementMapTransform = textureTransform(material.displacementMap, 'material.displacementMap')
     props.displacementMapUsesUv2 = textureUvChannel(material.displacementMap) > 0
     props.displacementScale = finiteNumberOrDefault(material.displacementScale, 'material.displacementScale', 1)
     props.displacementBias = finiteNumberOrDefault(material.displacementBias, 'material.displacementBias', 0)
@@ -796,7 +796,10 @@ export function extractPbrProperties(
       mrMap,
       material.metalnessMap ? 'material.metalnessMap' : 'material.roughnessMap',
     )
-    props.metallicRoughnessTextureTransform = textureTransform(mrMap)
+    props.metallicRoughnessTextureTransform = textureTransform(
+      mrMap,
+      material.metalnessMap ? 'material.metalnessMap' : 'material.roughnessMap',
+    )
     props.metallicRoughnessTextureUsesUv2 = textureUvChannel(mrMap) > 0
   }
 
@@ -810,7 +813,7 @@ export function extractPbrProperties(
     props.specularMapMagFilter = filterModeToString(material.specularMap?.magFilter)
     props.specularMapMinFilter = minFilterModeToString(material.specularMap)
     props.specularMapAnisotropy = textureAnisotropy(material.specularMap, 'material.specularMap')
-    props.specularMapTransform = textureTransform(material.specularMap)
+    props.specularMapTransform = textureTransform(material.specularMap, 'material.specularMap')
     props.specularMapUsesUv2 = textureUvChannel(material.specularMap) > 0
   }
 
@@ -824,7 +827,7 @@ export function extractPbrProperties(
     props.emissiveMapMagFilter = filterModeToString(material.emissiveMap?.magFilter)
     props.emissiveMapMinFilter = minFilterModeToString(material.emissiveMap)
     props.emissiveMapAnisotropy = textureAnisotropy(material.emissiveMap, 'material.emissiveMap')
-    props.emissiveMapTransform = textureTransform(material.emissiveMap)
+    props.emissiveMapTransform = textureTransform(material.emissiveMap, 'material.emissiveMap')
     props.emissiveMapColorSpace = textureColorSpace(material.emissiveMap)
     props.emissiveMapUsesUv2 = textureUvChannel(material.emissiveMap) > 0
   }
@@ -839,7 +842,7 @@ export function extractPbrProperties(
     props.aoMapMagFilter = filterModeToString(material.aoMap?.magFilter)
     props.aoMapMinFilter = minFilterModeToString(material.aoMap)
     props.aoMapAnisotropy = textureAnisotropy(material.aoMap, 'material.aoMap')
-    props.aoMapTransform = textureTransform(material.aoMap)
+    props.aoMapTransform = textureTransform(material.aoMap, 'material.aoMap')
     props.aoMapUsesUv2 = textureUvChannel(material.aoMap) > 0
     props.aoMapIntensity = finiteNumberOrDefault(material.aoMapIntensity, 'material.aoMapIntensity', 1)
   }
@@ -854,7 +857,7 @@ export function extractPbrProperties(
     props.lightMapMagFilter = filterModeToString(material.lightMap?.magFilter)
     props.lightMapMinFilter = minFilterModeToString(material.lightMap)
     props.lightMapAnisotropy = textureAnisotropy(material.lightMap, 'material.lightMap')
-    props.lightMapTransform = textureTransform(material.lightMap)
+    props.lightMapTransform = textureTransform(material.lightMap, 'material.lightMap')
     props.lightMapColorSpace = textureColorSpace(material.lightMap)
     props.lightMapUsesUv2 = textureUvChannel(material.lightMap) > 0
     props.lightMapIntensity = finiteNumberOrDefault(material.lightMapIntensity, 'material.lightMapIntensity', 1)
@@ -870,7 +873,7 @@ export function extractPbrProperties(
     props.alphaMapMagFilter = filterModeToString(material.alphaMap?.magFilter)
     props.alphaMapMinFilter = minFilterModeToString(material.alphaMap)
     props.alphaMapAnisotropy = textureAnisotropy(material.alphaMap, 'material.alphaMap')
-    props.alphaMapTransform = textureTransform(material.alphaMap)
+    props.alphaMapTransform = textureTransform(material.alphaMap, 'material.alphaMap')
     props.alphaMapUsesUv2 = textureUvChannel(material.alphaMap) > 0
   }
 
@@ -1416,7 +1419,7 @@ export function extractTextureData(material: ThreeMaterialLike | undefined): Tex
     magFilter: filterModeToString(map?.magFilter),
     minFilter: minFilterModeToString(map),
     anisotropy: textureAnisotropy(map, label),
-    transform: material?.isMeshMatcapMaterial ? undefined : textureTransform(map),
+    transform: material?.isMeshMatcapMaterial ? undefined : textureTransform(map, label),
     colorSpace: textureColorSpace(map),
     usesUv2: material?.isMeshMatcapMaterial ? false : textureUvChannel(map) > 0,
   }
@@ -1444,7 +1447,7 @@ export function extractBackgroundTexture(
     magFilter: filterModeToString(map?.magFilter),
     minFilter: minFilterModeToString(map),
     anisotropy: textureAnisotropy(map, label),
-    transform: textureTransform(map),
+    transform: textureTransform(map, label),
     colorSpace: textureColorSpace(map),
     mapping: backgroundTextureMapping(map),
   }
@@ -1954,25 +1957,27 @@ function textureAnisotropy(map: ThreeTextureLike | null | undefined, label: stri
   return Math.max(1, Math.min(16, Math.floor(value)))
 }
 
-function textureTransform(map: ThreeTextureLike | null | undefined): number[] | undefined {
+function textureTransform(map: ThreeTextureLike | null | undefined, label: string): number[] | undefined {
   const flipY = map?.flipY !== false
   const flipTransform = flipY ? undefined : [1, 0, 0, 0, -1, 1]
   if (!map) return flipTransform
 
-  if (map.matrixAutoUpdate === false && map.matrix?.elements?.length === 9) {
-    const e = map.matrix.elements
-    if (areFiniteNumbers(e[0], e[1], e[3], e[4], e[6], e[7])) {
-      return composeTextureTransformWithFlipY([e[0], e[3], e[6], e[1], e[4], e[7]], flipY)
+  if (map.matrixAutoUpdate === false) {
+    const e = map.matrix?.elements
+    if (!e || e.length !== 9) {
+      throw new TypeError(`${label}.matrix.elements must contain nine finite numbers.`)
     }
+    validateFiniteMatrix3(e, `${label}.matrix.elements`)
+    return composeTextureTransformWithFlipY([e[0], e[3], e[6], e[1], e[4], e[7]], flipY)
   }
 
-  const tx = finiteOrDefault(map.offset?.x, 0)
-  const ty = finiteOrDefault(map.offset?.y, 0)
-  const sx = finiteOrDefault(map.repeat?.x, 1)
-  const sy = finiteOrDefault(map.repeat?.y, 1)
-  const rotation = finiteOrDefault(map.rotation, 0)
-  const cx = finiteOrDefault(map.center?.x, 0)
-  const cy = finiteOrDefault(map.center?.y, 0)
+  const tx = finiteTextureTransformNumber(map.offset?.x, `${label}.offset.x`, 0)
+  const ty = finiteTextureTransformNumber(map.offset?.y, `${label}.offset.y`, 0)
+  const sx = finiteTextureTransformNumber(map.repeat?.x, `${label}.repeat.x`, 1)
+  const sy = finiteTextureTransformNumber(map.repeat?.y, `${label}.repeat.y`, 1)
+  const rotation = finiteTextureTransformNumber(map.rotation, `${label}.rotation`, 0)
+  const cx = finiteTextureTransformNumber(map.center?.x, `${label}.center.x`, 0)
+  const cy = finiteTextureTransformNumber(map.center?.y, `${label}.center.y`, 0)
   if (tx === 0 && ty === 0 && sx === 1 && sy === 1 && rotation === 0 && cx === 0 && cy === 0) {
     return flipTransform
   }
@@ -2024,11 +2029,18 @@ function finiteOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
-function areFiniteNumbers(...values: number[]): boolean {
-  for (let i = 0; i < values.length; i += 1) {
-    if (!Number.isFinite(values[i])) return false
+function finiteTextureTransformNumber(value: unknown, label: string, fallback: number): number {
+  if (value == null) return fallback
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
+function validateFiniteMatrix3(values: ArrayLike<unknown>, label: string): void {
+  for (let i = 0; i < 9; i += 1) {
+    if (typeof values[i] !== 'number' || !Number.isFinite(values[i])) {
+      throw new TypeError(`${label}[${i}] must be a finite number.`)
+    }
   }
-  return true
 }
 
 function toRgba8(

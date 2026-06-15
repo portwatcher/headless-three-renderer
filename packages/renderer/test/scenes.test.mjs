@@ -5596,6 +5596,55 @@ test('invalid texture anisotropy values fail clearly', () => {
   }
 })
 
+test('invalid texture transform values fail clearly', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['material map offset', () => {
+      const map = solidTexture(255, 255, 255)
+      map.offset.x = 'left'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.offset\.x must be a finite number/i],
+    ['normalMap matrix', () => {
+      const normalMap = solidTexture(128, 128, 255)
+      normalMap.matrixAutoUpdate = false
+      normalMap.matrix.elements[0] = Number.NaN
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshStandardMaterial({ normalMap })))
+      scene.add(new THREE.AmbientLight(0xffffff, 1))
+      return scene
+    }, /material\.normalMap\.matrix\.elements\[0\] must be a finite number/i],
+    ['background rotation', () => {
+      const background = solidTexture(0, 0, 255)
+      background.rotation = Number.POSITIVE_INFINITY
+      const scene = new THREE.Scene()
+      scene.background = background
+      return scene
+    }, /background\.rotation must be a finite number/i],
+    ['physical extension repeat', () => {
+      const clearcoatMap = solidTexture(255, 255, 255)
+      clearcoatMap.repeat.y = 'tall'
+      const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff, clearcoat: 1 })
+      material.clearcoatMap = clearcoatMap
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+      return scene
+    }, /material\.clearcoatMap\.repeat\.y must be a finite number/i],
+  ]
+
+  for (const [label, makeScene, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(), camera, { width: 64, height: 64 }),
+      pattern,
+      label,
+    )
+  }
+})
+
 test('one- and two-channel raw DataTexture maps expand for texture rendering', () => {
   function renderMap(map) {
     map.needsUpdate = true
