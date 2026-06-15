@@ -103,6 +103,7 @@ export class Renderer {
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+    assertRenderOptionsLike(options, 'options')
     const renderOptions = this.resolveRenderOptions(options)
     if (isCubeCamera(camera)) {
       const { buffer } = renderCubeCamera(
@@ -147,6 +148,7 @@ export class Renderer {
     options: RenderOptions = {},
   ): RenderTargetLike {
     assertRenderTargetLike(target, 'target')
+    assertRenderOptionsLike(options, 'options')
     const targetOptions: RenderOptions = this.resolveRenderOptions({ ...options, target, format: options.format ?? 'rgba' })
     if (isCubeCamera(camera)) {
       const { target: cubeTarget } = renderCubeCamera(
@@ -198,6 +200,7 @@ export class Renderer {
 }
 
 export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
+  assertRenderOptionsLike(options, 'options')
   if (isCubeCamera(camera)) {
     const { buffer } = renderCubeCamera(scene, camera, options, native.renderNative)
     return buffer
@@ -227,6 +230,7 @@ export function renderToTarget(
   options: RenderOptions = {},
 ): RenderTargetLike {
   assertRenderTargetLike(target, 'target')
+  assertRenderOptionsLike(options, 'options')
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
   if (isCubeCamera(camera)) {
     const { target: cubeTarget } = renderCubeCamera(scene, camera, targetOptions, native.renderNative)
@@ -1287,6 +1291,12 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
     assertRenderTargetLike(options.target, 'options.target')
   }
   if (options.target) validateUnsupportedRenderTargetOptions(options.target)
+}
+
+function assertRenderOptionsLike(value: unknown, label: string): asserts value is RenderOptions {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an options object.`)
+  }
 }
 
 function assertRenderTargetLike(value: unknown, label: string): asserts value is RenderTargetLike {

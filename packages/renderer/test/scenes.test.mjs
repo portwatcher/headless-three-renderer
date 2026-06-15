@@ -5,7 +5,7 @@ import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
-const { Renderer, renderToTarget } = pkg
+const { Renderer, render, renderToTarget } = pkg
 const { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } = lightsApi
 
 const SIZE = 128
@@ -279,6 +279,29 @@ test('unsupported output format values fail clearly', () => {
   assert.throws(
     () => renderToTarget(scene, camera, {}, { width: 32, height: 32, format: 'webp' }),
     /options\.format webp is not supported.*png.*rgba/i,
+  )
+})
+
+test('invalid render options containers fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xff00ff })))
+  const camera = makeCamera()
+
+  assert.throws(
+    () => render(scene, camera, null),
+    /options must be an options object/i,
+  )
+  assert.throws(
+    () => new Renderer().render(scene, camera, 'bad'),
+    /options must be an options object/i,
+  )
+  assert.throws(
+    () => renderToTarget(scene, camera, {}, null),
+    /options must be an options object/i,
+  )
+  assert.throws(
+    () => new Renderer().renderToTarget(scene, camera, {}, []),
+    /options must be an options object/i,
   )
 })
 
