@@ -2783,6 +2783,23 @@ test('MeshDistanceMaterial wireframe renders distance on triangle edges', () => 
   assert.ok(wireRatio < solidRatio * 0.35, `wireframe distance material should not fill faces (${wireRatio} vs ${solidRatio})`)
 })
 
+test('unsupported main-pass mesh wireframe materials fail clearly', () => {
+  const camera = makeCamera()
+  const cases = [
+    new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, wireframe: true }),
+  ]
+
+  for (const material of cases) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(), material))
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 64, height: 64 }),
+      /material\.wireframe.*only supported.*MeshDepthMaterial.*MeshDistanceMaterial/i,
+    )
+  }
+})
+
 test('MeshDistanceMaterial honors referencePosition and distance range', () => {
   function renderDistanceAt(z) {
     const scene = new THREE.Scene()
@@ -4090,6 +4107,9 @@ test('invalid material render-state boolean values fail clearly', () => {
     ['fog', (material) => {
       material.fog = 'scene'
     }, /material\.fog must be a boolean/i],
+    ['wireframe', (material) => {
+      material.wireframe = 'yes'
+    }, /material\.wireframe must be a boolean/i],
   ]
 
   for (const [name, mutate, pattern] of cases) {
