@@ -705,6 +705,15 @@ test('renderMode mask preserves alphaMap cutouts', () => {
   assert.ok(rightMean.r > 250 && rightMean.g > 250 && rightMean.b > 250, `alphaMap green=255 should keep mask pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
+test('invalid renderMode values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial()))
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32, renderMode: 'normals' }),
+    /options\.renderMode must be "color", "mask", or "object-id"/i,
+  )
+})
+
 test('invalid material alphaTest values fail clearly', () => {
   const cases = [
     ['mesh', () => {
@@ -9633,6 +9642,10 @@ test('invalid post-processing option values fail clearly', () => {
   scene.background = new THREE.Color(1, 0, 0)
   const camera = makeCamera()
 
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: [] }),
+    /options\.postProcessing must be an object/i,
+  )
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { exposure: Number.NaN } }),
     /options\.postProcessing\.exposure must be a finite number/i,

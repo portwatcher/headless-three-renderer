@@ -1386,7 +1386,7 @@ function assertSupportedOutputColorSpace(value: unknown): void {
 
 function validatePostProcessingOptions(value: unknown): void {
   if (value == null || value === false) return
-  if (typeof value !== 'object') {
+  if (typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('options.postProcessing must be an object.')
   }
   const post = value as RenderOptions['postProcessing']

@@ -100,9 +100,9 @@ The public API accepts only Three.js-like objects:
 - `options.localClippingEnabled`: `false` disables material-local clipping planes while preserving `options.clippingPlanes`; defaults to `true`, and invalid values fail clearly.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes; unsupported values fail clearly.
 - `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and texture background output conversion; unsupported values fail clearly.
-- `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, or `'object-id'` for flat RGB object IDs.
+- `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, or `'object-id'` for flat RGB object IDs; invalid values fail clearly.
 - `options.target`: a target-like object populated with raw RGBA8 readback data for a single color output, including `target.texture`, `target.textures[0]`, or one-element `target.texture` arrays.
-- `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`); invalid effect values fail clearly.
+- `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`); malformed containers and invalid effect values fail clearly.
 
 ### Geometry & Scene
 
@@ -270,9 +270,9 @@ Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatibl
 
 `renderToTarget(scene, camera, target, options)` and `options.target` populate a target-like object with `{ width, height, data }` plus `target.texture.image.data` when a texture object is present. Target rendering defaults to raw RGBA8. A target `depthTexture` object receives normalized depth readback for the same viewport/scissor and visible depth-tested geometry, including alpha-tested cutouts and transparent material default/explicit `depthWrite` behavior; `THREE.FloatType` depth textures receive scalar `Float32Array` data, `HalfFloatType` depth textures receive `Uint16Array` half-float data, `UnsignedByteType`/`UnsignedShortType`/`UnsignedIntType` depth textures receive scalar unsigned typed arrays, `UnsignedInt248Type` receives `Uint32Array` data with normalized depth24 in the high bits and zero stencil bytes, and plain depth target objects receive RGBA8 bytes. Multiple color attachments and 4x MSAA sample counts resolve into target readback buffers; malformed targets, unsupported sample counts, color target texture format/type requests outside RGBA8, explicit depth texture types, and depth texture format/type pairings fail clearly.
 
-Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert; invalid effect values fail clearly.
+Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert; malformed containers and invalid effect values fail clearly.
 
-`options.renderMode` can request flat auxiliary passes. `'mask'` clears to black and writes white for visible geometry. `'object-id'` clears to RGB zero and encodes each object's adapter sort ID plus one into RGB bytes, making `format: 'rgba'` the preferred inspection path. Target-based object-id renders populate `target.objectIdEntries` and `target.objectIdMap` for reverse lookup from encoded RGB IDs. These modes bypass scene backgrounds, lighting, environment, fog, and post-processing while preserving depth testing, culling, clipping planes, base texture alpha, `material.alphaMap`, `alphaTest`, and `alphaHash`.
+`options.renderMode` can request flat auxiliary passes. `'mask'` clears to black and writes white for visible geometry. `'object-id'` clears to RGB zero and encodes each object's adapter sort ID plus one into RGB bytes, making `format: 'rgba'` the preferred inspection path. Target-based object-id renders populate `target.objectIdEntries` and `target.objectIdMap` for reverse lookup from encoded RGB IDs. These modes bypass scene backgrounds, lighting, environment, fog, and post-processing while preserving depth testing, culling, clipping planes, base texture alpha, `material.alphaMap`, `alphaTest`, and `alphaHash`; invalid render modes fail clearly.
 
 ### Custom WGSL Fragment Materials
 
