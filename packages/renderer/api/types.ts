@@ -466,6 +466,7 @@ export interface RenderTargetTextureLike {
     data?: RenderTargetImageLike | RenderTargetImageLike[]
   }
   isCubeTexture?: boolean
+  format?: number
   type?: number
   needsUpdate?: boolean
   needsPMREMUpdate?: boolean
@@ -488,7 +489,7 @@ export interface RenderTargetLike {
   textures?: RenderTargetTextureLike[]
   objectIdEntries?: RenderObjectIdEntry[]
   objectIdMap?: Record<string, RenderObjectIdEntry>
-  /** Optional normalized depth readback texture-like target. FloatType receives Float32Array data; HalfFloatType receives Uint16Array half-float data; unsigned depth types receive scalar Uint8Array/Uint16Array/Uint32Array data; plain objects receive RGBA8 bytes. */
+  /** Optional normalized depth readback texture-like target. FloatType receives Float32Array data; HalfFloatType receives Uint16Array half-float data; unsigned depth types receive scalar Uint8Array/Uint16Array/Uint32Array data; UnsignedInt248Type packs depth24 in the high bits with zero stencil; plain objects receive RGBA8 bytes. */
   depthTexture?: RenderTargetTextureLike
   /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   samples?: number

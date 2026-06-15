@@ -7826,6 +7826,47 @@ test('renderToTarget populates THREE.DepthTexture with unsigned scalar depth', (
   assert.ok(leftDepth > rightDepth + 1_000_000_000, `near unsigned depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
 })
 
+test('renderToTarget populates UnsignedInt248Type depthTexture with depth24-stencil8-like data', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const near = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  near.position.set(-0.7, 0, 1)
+
+  const far = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  far.position.set(0.7, 0, -3)
+  scene.add(near, far)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = new THREE.DepthTexture(64, 64, THREE.UnsignedInt248Type)
+  depthTexture.format = THREE.DepthStencilFormat
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+
+  assert.ok(depthTexture.image.data instanceof Uint32Array, 'UnsignedInt248Type depthTexture should receive Uint32Array data')
+  assert.equal(depthTexture.image.data.length, 64 * 64)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.source.data.width, 64)
+  assert.equal(depthTexture.source.data.height, 64)
+
+  for (let i = 0; i < depthTexture.image.data.length; i += 197) {
+    assert.equal(depthTexture.image.data[i] & 0xff, 0, `stencil byte should be zero at ${i}`)
+  }
+
+  const leftDepth24 = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38) / 0x100
+  const rightDepth24 = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38) / 0x100
+  assert.ok(leftDepth24 > rightDepth24 + 1_000_000, `near depth24 should be greater than far depth (${leftDepth24} vs ${rightDepth24})`)
+  assert.ok(leftDepth24 <= 0xffffff && rightDepth24 >= 0, `depth24 values should be normalized (${leftDepth24}, ${rightDepth24})`)
+})
+
 test('renderToTarget depthTexture honors scissor clipping', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
