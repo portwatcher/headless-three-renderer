@@ -704,13 +704,7 @@ export function extractPbrProperties(
     }
   }
   if (material.isMeshDepthMaterial) {
-    const depthPacking = finiteIntegerOrDefault(material.depthPacking, BasicDepthPacking)
-    props.depthPacking = [
-      BasicDepthPacking,
-      RGBADepthPacking,
-      RGBDepthPacking,
-      RGDepthPacking,
-    ].includes(depthPacking) ? depthPacking : BasicDepthPacking
+    props.depthPacking = materialDepthPacking(material) ?? BasicDepthPacking
   }
   if (material.isMeshDistanceMaterial) {
     const hints = material.userData?.headlessThreeRenderer ?? material.userData?.headlessRenderer ?? {}
@@ -1126,6 +1120,21 @@ function materialSide(material: ThreeMaterialLike): string | undefined {
     default:
       throw new Error(
         `material.side ${String(material.side)} is not supported by @headless-three/renderer. Use FrontSide, BackSide, or DoubleSide.`,
+      )
+  }
+}
+
+function materialDepthPacking(material: ThreeMaterialLike): number | undefined {
+  if (material.depthPacking == null) return undefined
+  switch (material.depthPacking) {
+    case BasicDepthPacking:
+    case RGBADepthPacking:
+    case RGBDepthPacking:
+    case RGDepthPacking:
+      return material.depthPacking
+    default:
+      throw new Error(
+        `material.depthPacking ${String(material.depthPacking)} is not supported by @headless-three/renderer. Use BasicDepthPacking, RGBADepthPacking, RGBDepthPacking, or RGDepthPacking.`,
       )
   }
 }

@@ -2068,6 +2068,18 @@ test('MeshDepthMaterial depthPacking encodes packed depth variants', () => {
   assertChannels(rg.mean, packDepthToRG(rg.fragDepth), 'rg', 8)
 })
 
+test('unsupported MeshDepthMaterial depthPacking values fail clearly', () => {
+  const material = new THREE.MeshDepthMaterial()
+  material.depthPacking = 999
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /material\.depthPacking 999.*not supported/i,
+  )
+})
+
 test('MeshDepthMaterial wireframe renders triangle edges without filling faces', () => {
   function renderDepthWireframe(wireframe) {
     const scene = new THREE.Scene()

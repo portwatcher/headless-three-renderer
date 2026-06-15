@@ -133,7 +133,7 @@ The public API accepts only Three.js-like objects:
 - `MeshMatcapMaterial.map` color maps with primary/secondary `texture.channel` UV selection and transforms
 - displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, and texture transforms
 - `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode and wrap/filter sampler settings; direct conformance also covers toon base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts
-- `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
+- `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing, with clear failures for unsupported depth-packing constants
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, plus alpha-map cutouts and CPU-baked displacement
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
 - `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
