@@ -164,24 +164,26 @@ function applyFixtureRenderMode(fixture) {
   if (mode === 'color') {
     return () => {}
   }
-  if (mode !== 'normal') {
-    throw new Error(`Browser reference generation only supports color and normal render modes; received ${mode}.`)
+  if (mode !== 'normal' && mode !== 'mask') {
+    throw new Error(`Browser reference generation only supports color, mask, and normal render modes; received ${mode}.`)
   }
   if (fixture.scene?.isScene !== true) {
-    throw new Error('Browser reference normal render mode requires a THREE.Scene fixture.')
+    throw new Error('Browser reference render modes require a THREE.Scene fixture.')
   }
 
   const previousOverrideMaterial = fixture.scene.overrideMaterial
   const previousBackground = fixture.scene.background
-  const normalMaterial = new THREE.MeshNormalMaterial()
+  const overrideMaterial = mode === 'normal'
+    ? new THREE.MeshNormalMaterial()
+    : new THREE.MeshBasicMaterial({ color: 0xffffff })
 
-  fixture.scene.overrideMaterial = normalMaterial
+  fixture.scene.overrideMaterial = overrideMaterial
   fixture.scene.background = new THREE.Color(0, 0, 0)
 
   return () => {
     fixture.scene.overrideMaterial = previousOverrideMaterial
     fixture.scene.background = previousBackground
-    normalMaterial.dispose()
+    overrideMaterial.dispose()
   }
 }
 

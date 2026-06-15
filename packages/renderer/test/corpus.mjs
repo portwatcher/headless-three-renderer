@@ -15,6 +15,7 @@ export function createSceneCorpus() {
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
+    maskRenderModeCorpus(),
     normalRenderModeCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
@@ -206,6 +207,29 @@ function linearOutputColorSpaceCorpus() {
       outputColorSpace: THREE.LinearSRGBColorSpace,
     },
     background: [46, 46, 46],
+    minNonBackgroundRatio: 0.08,
+  }
+}
+
+function maskRenderModeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.6, 0.05, 0.05)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.25, 1.25),
+    new THREE.MeshBasicMaterial({ color: 0x0088ff }),
+  ))
+
+  return {
+    name: 'mask-render-mode-plane',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      renderMode: 'mask',
+    },
+    background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
   }
 }
