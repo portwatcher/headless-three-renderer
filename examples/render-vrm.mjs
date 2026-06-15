@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises'
 import * as THREE from 'three'
 import {
+  applyVrmAnimation,
   loadVrmAnimationFromFile,
   loadVrmFromFile,
   render,
@@ -44,13 +45,15 @@ try {
     if (!vrmAnimation) {
       throw new Error(`No VRMA animation was found in ${animationPath}. Confirm that the file is a VRM Animation asset.`)
     }
-    const clip = packages.createVRMAnimationClip(vrmAnimation, vrm)
-    const mixer = new THREE.AnimationMixer(vrm.scene)
-    mixer.clipAction(clip).play()
-    mixer.update(animationTime)
+    await applyVrmAnimation(vrm, vrmAnimation, {
+      createVRMAnimationClip: packages.createVRMAnimationClip,
+      time: animationTime,
+    })
   }
 
-  vrm.update?.(0)
+  if (!animationPath) {
+    vrm.update?.(0)
+  }
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.04, 0.045, 0.055)

@@ -3,11 +3,34 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { LoadingManager, Texture } = require('three') as {
+const { AnimationMixer, LoadingManager, Texture } = require('three') as {
+  AnimationMixer: AnimationMixerConstructor
   LoadingManager: new () => ThreeLoadingManagerLike
   Texture: new () => TextureLike
 }
 
+export type VrmAnimationActionLike = {
+  play(): unknown
+}
+export type VrmAnimationMixerLike = {
+  clipAction(clip: unknown): VrmAnimationActionLike
+  setTime?(time: number): unknown
+  update?(delta: number): unknown
+}
+export type AnimationMixerConstructor = new (root: unknown) => VrmAnimationMixerLike
+export type VrmAnimationClipFactory = (vrmAnimation: unknown, vrm: unknown) => unknown
+export type ApplyVrmAnimationOptions = {
+  AnimationMixer?: AnimationMixerConstructor
+  createVRMAnimationClip?: VrmAnimationClipFactory
+  time?: number
+  updateDelta?: number
+  updateVrm?: boolean
+}
+export type AppliedVrmAnimation = {
+  action: VrmAnimationActionLike
+  clip: unknown
+  mixer: VrmAnimationMixerLike
+}
 type TextureLike = {
   image?: unknown
   source: { data?: unknown }
@@ -213,6 +236,51 @@ export async function loadVrmAnimationFromFile<T = unknown>(
       await configureLoaderCallback?.(loader)
     },
   })
+}
+
+export async function applyVrmAnimation(
+  vrm: unknown,
+  vrmAnimation: unknown,
+  options: ApplyVrmAnimationOptions = {},
+): Promise<AppliedVrmAnimation> {
+  const helperOptions = objectOptions(options, 'options') as ApplyVrmAnimationOptions
+  const model = objectOptions(vrm, 'vrm') as { scene?: unknown; update?: unknown }
+  objectOptions(vrmAnimation, 'vrmAnimation')
+  if (model.scene == null || typeof model.scene !== 'object') {
+    throw new TypeError('vrm.scene must be an object.')
+  }
+
+  const time = optionalNonNegativeNumber(helperOptions.time, 'options.time') ?? 0
+  const updateDelta = optionalNonNegativeNumber(helperOptions.updateDelta, 'options.updateDelta') ?? 0
+  const updateVrm = optionalBoolean(helperOptions.updateVrm, 'options.updateVrm') ?? true
+  const createClip = optionalFunction(helperOptions.createVRMAnimationClip, 'options.createVRMAnimationClip')
+    ?? await importVrmAnimationClipFactory()
+  const Mixer = optionalFunction(helperOptions.AnimationMixer, 'options.AnimationMixer') ?? AnimationMixer
+  const clip = createClip(vrmAnimation, vrm)
+  const mixer = new Mixer(model.scene)
+  if (typeof mixer.clipAction !== 'function') {
+    throw new TypeError('AnimationMixer must provide a clipAction() function.')
+  }
+  const action = mixer.clipAction(clip)
+  if (!action || typeof action.play !== 'function') {
+    throw new TypeError('AnimationMixer.clipAction() must return an action with play().')
+  }
+  action.play()
+  if (typeof mixer.setTime === 'function') {
+    mixer.setTime(time)
+  } else if (typeof mixer.update === 'function') {
+    mixer.update(time)
+  } else {
+    throw new TypeError('AnimationMixer must provide setTime() or update().')
+  }
+
+  if (updateVrm && model.update != null) {
+    if (typeof model.update !== 'function') {
+      throw new TypeError('vrm.update must be a function when provided.')
+    }
+    model.update(updateDelta)
+  }
+  return { action, clip, mixer }
 }
 
 function encodedImageDataUriBuffer(url: string): Buffer | null {
@@ -486,6 +554,12 @@ function optionalBoolean(value: unknown, label: string): boolean | undefined {
   throw new TypeError(`${label} must be a boolean.`)
 }
 
+function optionalNonNegativeNumber(value: unknown, label: string): number | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value
+  throw new TypeError(`${label} must be a finite non-negative number.`)
+}
+
 function validateNodeGltfLoaderOptions(options: NodeGltfLoaderOptions): {
   configureLoader?: ConfigureGltfLoader
   installFetch?: boolean
@@ -580,4 +654,18 @@ async function importVrmAnimationLoaderPlugin(): Promise<VrmLoaderPluginConstruc
     throw new Error('@pixiv/three-vrm-animation did not export VRMAnimationLoaderPlugin.')
   }
   return module.VRMAnimationLoaderPlugin as VrmLoaderPluginConstructor
+}
+
+async function importVrmAnimationClipFactory(): Promise<VrmAnimationClipFactory> {
+  let module: any
+  try {
+    module = await dynamicImport('@pixiv/three-vrm-animation')
+  } catch {
+    throw new Error('Missing optional dependency @pixiv/three-vrm-animation. Install it in your project or pass createVRMAnimationClip to applyVrmAnimation().')
+  }
+
+  if (typeof module.createVRMAnimationClip !== 'function') {
+    throw new Error('@pixiv/three-vrm-animation did not export createVRMAnimationClip.')
+  }
+  return module.createVRMAnimationClip as VrmAnimationClipFactory
 }

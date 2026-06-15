@@ -10,6 +10,7 @@ import { assertValidPng, parsePngDimensions } from './helpers.mjs'
 
 const {
   Renderer,
+  applyVrmAnimation,
   createNodeGltfLoader,
   createEncodedImageTextureLoader,
   installLocalFileFetch,
@@ -23,6 +24,7 @@ const {
 test('module exports Renderer class and render function', () => {
   assert.equal(typeof Renderer, 'function')
   assert.equal(typeof render, 'function')
+  assert.equal(typeof applyVrmAnimation, 'function')
   assert.equal(typeof createEncodedImageTextureLoader, 'function')
   assert.equal(typeof installLocalFileFetch, 'function')
   assert.equal(typeof loadGltfFromFile, 'function')
@@ -89,6 +91,58 @@ test('Node glTF loader option booleans fail clearly', async () => {
     }),
     /options\.registerTextureHandlers must be a boolean/i,
   )
+})
+
+test('VRM animation helper creates a clip, seeks the mixer, and updates the avatar', async () => {
+  const calls = []
+  const scene = { name: 'avatar-scene' }
+  const vrm = {
+    scene,
+    update(delta) {
+      calls.push(['vrm.update', delta])
+    },
+  }
+  const vrmAnimation = { name: 'wave' }
+
+  class FakeAnimationMixer {
+    constructor(root) {
+      calls.push(['mixer.constructor', root])
+    }
+
+    clipAction(clip) {
+      calls.push(['mixer.clipAction', clip])
+      return {
+        play() {
+          calls.push(['action.play'])
+        },
+      }
+    }
+
+    setTime(time) {
+      calls.push(['mixer.setTime', time])
+    }
+  }
+
+  const result = await applyVrmAnimation(vrm, vrmAnimation, {
+    AnimationMixer: FakeAnimationMixer,
+    createVRMAnimationClip(animation, model) {
+      calls.push(['createVRMAnimationClip', animation, model])
+      return { animation, model }
+    },
+    time: 1.25,
+    updateDelta: 0.1,
+  })
+
+  assert.equal(result.clip.animation, vrmAnimation)
+  assert.equal(result.clip.model, vrm)
+  assert.deepEqual(calls, [
+    ['createVRMAnimationClip', vrmAnimation, vrm],
+    ['mixer.constructor', scene],
+    ['mixer.clipAction', result.clip],
+    ['action.play'],
+    ['mixer.setTime', 1.25],
+    ['vrm.update', 0.1],
+  ])
 })
 
 test('Node loader helper path and option containers fail clearly', async () => {
@@ -166,6 +220,34 @@ test('Node loader helper path and option containers fail clearly', async () => {
   await assert.rejects(
     () => loadVrmAnimationFromFile('avatar.vrma', { VRMAnimationLoaderPlugin: 'yes' }),
     /options\.VRMAnimationLoaderPlugin must be a function/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation(null, {}, {
+      AnimationMixer: class FakeAnimationMixer {},
+      createVRMAnimationClip() {},
+    }),
+    /vrm must be an object/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: class FakeAnimationMixer {},
+      createVRMAnimationClip() {},
+      time: 'soon',
+    }),
+    /options\.time must be a finite non-negative number/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {}, update: 'yes' }, {}, {
+      AnimationMixer: class FakeAnimationMixer {
+        clipAction() {
+          return { play() {} }
+        }
+
+        setTime() {}
+      },
+      createVRMAnimationClip() {},
+    }),
+    /vrm\.update must be a function/i,
   )
 })
 

@@ -30,6 +30,7 @@ import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
 
 export {
+  applyVrmAnimation,
   EncodedImageTextureLoader,
   createEncodedImageTextureLoader,
   createNodeGltfLoader,
@@ -41,6 +42,9 @@ export {
 } from './loaders'
 
 export type {
+  AppliedVrmAnimation,
+  AnimationMixerConstructor,
+  ApplyVrmAnimationOptions,
   ConfigureGltfLoader,
   LoadGltfFromFileOptions,
   LoadVrmAnimationFromFileOptions,
@@ -49,6 +53,9 @@ export type {
   NodeGltfLoaderOptions,
   ThreeGltfLoaderLike,
   ThreeLoadingManagerLike,
+  VrmAnimationActionLike,
+  VrmAnimationClipFactory,
+  VrmAnimationMixerLike,
   VrmLoaderPluginConstructor,
 } from './loaders'
 

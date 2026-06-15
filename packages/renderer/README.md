@@ -70,6 +70,7 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 It also exports Node loader helpers:
 
+- `applyVrmAnimation(vrm, vrmAnimation, options)`: creates a VRMA animation clip with `createVRMAnimationClip`, seeks a `THREE.AnimationMixer` to `options.time`, and updates the VRM scene for still-frame rendering.
 - `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed; malformed helper paths and option containers fail clearly.
 - `loadVrmFromFile(filePath, options)`: loads local VRM files with `@pixiv/three-vrm`'s `VRMLoaderPlugin` registered. The Pixiv package remains an optional dependency in your project.
 - `loadVrmAnimationFromFile(filePath, options)`: loads local VRMA files with `@pixiv/three-vrm-animation`'s `VRMAnimationLoaderPlugin` registered. The animation package remains optional.
@@ -206,13 +207,13 @@ Compatible with:
 
 The repository includes runnable local examples for [glTF/GLB](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs) and [VRM/VRMA](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs) assets.
 
-Call `mixer.update(dt)` and `scene.updateMatrixWorld(true)` before `render()` to bake the current pose:
+Use `applyVrmAnimation()` or your own `AnimationMixer`, then call `scene.updateMatrixWorld(true)` before `render()` to bake the current pose:
 
 ```js
 import * as THREE from 'three'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { loadVrmAnimationFromFile, loadVrmFromFile, render } from '@headless-three/renderer'
+import { applyVrmAnimation, loadVrmAnimationFromFile, loadVrmFromFile, render } from '@headless-three/renderer'
 
 // Load VRM model
 const modelGltf = await loadVrmFromFile('./avatar.vrm', { VRMLoaderPlugin })
@@ -227,15 +228,14 @@ const animGltf = await loadVrmAnimationFromFile('./dance.vrma', {
   VRMAnimationLoaderPlugin,
 })
 const vrmAnimation = animGltf.userData.vrmAnimations[0]
-const clip = createVRMAnimationClip(vrmAnimation, vrm)
 
 // Animate to a specific time
-const mixer = new THREE.AnimationMixer(vrm.scene)
-mixer.clipAction(clip).play()
-mixer.update(1.5) // seek to 1.5 seconds
+await applyVrmAnimation(vrm, vrmAnimation, {
+  createVRMAnimationClip,
+  time: 1.5,
+})
 
 // Update world matrices then render
-vrm.update(0)
 vrm.scene.updateMatrixWorld(true)
 
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20)
