@@ -869,6 +869,8 @@ export interface SceneMesh {
   sortZ?: number
   /** Stable object id / adapter insertion-order tie-breaker. */
   sortIndex?: number
+  /** WebGLRenderer material variant sort key: skinned meshes add 1, instanced meshes add 2. */
+  materialVariant?: number
   /** Material id sort key used for opaque draw ordering. */
   materialSortKey?: number
 }

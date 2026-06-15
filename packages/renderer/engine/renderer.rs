@@ -3686,6 +3686,7 @@ fn compare_opaque_meshes(a: &PreparedMesh, b: &PreparedMesh) -> std::cmp::Orderi
     compare_f32(a.group_order, b.group_order)
         .then_with(|| compare_f32(a.render_order, b.render_order))
         .then_with(|| a.material_sort_key.cmp(&b.material_sort_key))
+        .then_with(|| a.material_variant.cmp(&b.material_variant))
         .then_with(|| compare_f32(a.sort_z, b.sort_z))
         .then_with(|| a.sort_index.cmp(&b.sort_index))
 }

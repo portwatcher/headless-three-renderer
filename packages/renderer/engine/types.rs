@@ -821,6 +821,8 @@ pub struct SceneMesh {
     pub sort_z: Option<f64>,
     /// Stable object id / adapter insertion-order tie-breaker.
     pub sort_index: Option<u32>,
+    /// WebGLRenderer material variant sort key: skinned meshes add 1, instanced meshes add 2.
+    pub material_variant: Option<u32>,
     /// Material id sort key used for opaque draw ordering.
     pub material_sort_key: Option<u32>,
 }

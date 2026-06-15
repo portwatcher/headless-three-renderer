@@ -920,6 +920,7 @@ export interface NativeSceneMesh {
   renderOrder?: number
   sortZ?: number
   sortIndex?: number
+  materialVariant?: number
   materialSortKey?: number
 }
 

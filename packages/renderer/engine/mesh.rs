@@ -180,6 +180,7 @@ pub struct PreparedMesh {
     pub render_order: f32,
     pub sort_z: f32,
     pub sort_index: u32,
+    pub material_variant: u32,
     pub material_sort_key: u32,
 }
 
@@ -1552,6 +1553,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         render_order: finite_f32(mesh.render_order.unwrap_or(0.0), "mesh renderOrder")?,
         sort_z: finite_f32(mesh.sort_z.unwrap_or(0.0), "mesh sortZ")?,
         sort_index: mesh.sort_index.unwrap_or(mesh_index as u32),
+        material_variant: mesh.material_variant.unwrap_or(0),
         material_sort_key: mesh.material_sort_key.unwrap_or(0),
     })
 }

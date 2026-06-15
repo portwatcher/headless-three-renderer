@@ -42,6 +42,7 @@ interface FlattenedMesh {
   renderOrder: number
   sortZ: number
   materialSortKey: number
+  materialVariant: number
   sortIndex: number
 }
 
@@ -1304,6 +1305,7 @@ function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh): void {
     renderOrder: mesh.renderOrder ?? 0,
     sortZ: mesh.sortZ ?? 0,
     materialSortKey: mesh.materialSortKey ?? 0,
+    materialVariant: mesh.materialVariant ?? 0,
     sortIndex: mesh.sortIndex ?? meshes.length,
   })
 }
@@ -1315,13 +1317,14 @@ function sortInfoForObject(
   sortIndex: number,
   groupOrder: number,
   transform?: number[],
-): Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey'> {
+): Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey' | 'materialVariant'> {
   return {
     groupOrder,
     renderOrder: finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0),
     sortZ: camera ? projectedObjectZ(object, camera, transform) : 0,
     sortIndex: unsignedSortKey(object.id, sortIndex),
     materialSortKey: finiteOrDefault(material?.id, 0),
+    materialVariant: materialVariantForObject(object),
   }
 }
 
@@ -1329,8 +1332,13 @@ function compareFlattenedMeshes(a: FlattenedMesh, b: FlattenedMesh): number {
   return a.groupOrder - b.groupOrder
     || a.renderOrder - b.renderOrder
     || a.materialSortKey - b.materialSortKey
+    || a.materialVariant - b.materialVariant
     || a.sortZ - b.sortZ
     || a.sortIndex - b.sortIndex
+}
+
+function materialVariantForObject(object: ThreeObject3DLike): number {
+  return (object.isInstancedMesh === true ? 2 : 0) + (object.isSkinnedMesh === true ? 1 : 0)
 }
 
 function projectedObjectZ(object: ThreeObject3DLike, camera: ThreeCameraLike, transform?: ArrayLike<number>): number {

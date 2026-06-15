@@ -3117,6 +3117,33 @@ test('Group renderOrder supplies groupOrder for transparent children', () => {
   assert.ok(mean.r > mean.b + 10, `higher groupOrder red plane should render on top (${mean.r} vs ${mean.b})`)
 })
 
+test('opaque sorting honors material variant before depth', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true })
+
+  const instanced = new THREE.InstancedMesh(new THREE.PlaneGeometry(2, 2), material, 1)
+  instanced.setMatrixAt(0, new THREE.Matrix4())
+  instanced.setColorAt(0, new THREE.Color(0, 0, 1))
+  scene.add(instanced)
+
+  const redGeometry = new THREE.PlaneGeometry(2, 2)
+  const redColors = new Float32Array(redGeometry.getAttribute('position').count * 3)
+  for (let i = 0; i < redColors.length; i += 3) {
+    redColors[i] = 1
+  }
+  redGeometry.setAttribute('color', new THREE.BufferAttribute(redColors, 3))
+  scene.add(new THREE.Mesh(redGeometry, material))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.b > mean.r + 60, `instanced material variant should draw after the normal mesh (${mean.b} vs ${mean.r})`)
+})
+
 test('invalid renderOrder values fail clearly', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)

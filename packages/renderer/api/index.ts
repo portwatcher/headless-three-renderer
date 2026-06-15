@@ -425,6 +425,7 @@ function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'
     renderOrder: mesh.renderOrder,
     sortZ: mesh.sortZ,
     sortIndex: mesh.sortIndex,
+    materialVariant: mesh.materialVariant,
     materialSortKey: mesh.materialSortKey,
   }
 }
