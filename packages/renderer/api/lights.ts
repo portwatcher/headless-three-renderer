@@ -340,7 +340,13 @@ export function extractLightProbe(scene: ThreeObject3DLike, camera?: ThreeCamera
 
   visitForLightProbe(scene, camera, (light) => {
     const source = light.sh?.coefficients
-    if (!Array.isArray(source) || source.length < 9) return
+    if (source == null) return
+    if (!Array.isArray(source)) {
+      throw new TypeError('LightProbe.sh.coefficients must be an array of 9 coefficients.')
+    }
+    if (source.length < 9) {
+      throw new TypeError('LightProbe.sh.coefficients must contain 9 coefficients.')
+    }
 
     const intensity = finiteNumberOrDefault(light.intensity, 'LightProbe.intensity', 1)
     for (let i = 0; i < 9; i += 1) {
