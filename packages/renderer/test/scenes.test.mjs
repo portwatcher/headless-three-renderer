@@ -308,6 +308,25 @@ test('invalid output dimensions fail clearly', () => {
   )
 })
 
+test('invalid camera clipping distances fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  const camera = makeCamera()
+  camera.near = Number.NaN
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    /camera\.near must be a finite number/i,
+  )
+
+  camera.near = 0.01
+  camera.far = 'deep'
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    /camera\.far must be a finite number/i,
+  )
+})
+
 function makeLayeredArrayCamera(width = 64, height = 64) {
   const leftCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   leftCamera.position.set(0, 0, 3)

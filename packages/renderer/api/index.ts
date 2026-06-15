@@ -319,8 +319,8 @@ function toNativeInput(
   const nativeCamera: NativeCamera = {
     width: size.width,
     height: size.height,
-    near: finiteOrUndefined(camera.near),
-    far: finiteOrUndefined(camera.far),
+    near: optionalFiniteNumber(camera.near, 'camera.near'),
+    far: optionalFiniteNumber(camera.far, 'camera.far'),
     viewProjection: cameraViewProjection(camera),
     viewMatrix: cameraViewMatrix(camera),
     cameraPosition: cameraWorldPosition(camera),

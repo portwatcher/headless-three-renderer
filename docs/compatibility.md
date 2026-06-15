@@ -42,7 +42,7 @@ Status keys:
 | Feature | Status | Notes |
 |---|---|---|
 | Perspective cameras | Supported | Uses the camera projection and inverse world matrices. |
-| Orthographic/custom projection cameras | Supported | Any camera with `projectionMatrix` and `matrixWorldInverse`. |
+| Orthographic/custom projection cameras | Supported | Any camera with `projectionMatrix` and `matrixWorldInverse`; invalid clipping distances fail clearly. |
 | Array/cube cameras | Partial | `THREE.ArrayCamera` sub-cameras compose into PNG, RGBA, and target output using each sub-camera viewport, including target depth readback. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; PMREM/native environment-capture automation and exact WebGL viewport/face semantics remain planned. |
 | Scene background color | Supported | `THREE.Color` scene background or `options.background`, including `scene.backgroundIntensity` and `options.backgroundIntensity`. |
 | Background textures/cubemaps | Partial | 2D, equirectangular, and raw or encoded six-face cube texture backgrounds from `scene.background` or `options.background` are rendered with texture sRGB decode, background intensity, approximate `backgroundBlurriness`, and output color-space conversion. 2D backgrounds honor wrap modes and UV transforms; equirectangular/cube backgrounds sample from camera direction. Invalid background control option values and PMREM/CubeUV background mappings fail clearly; exact mapping/color-space/blur parity remain planned. |
