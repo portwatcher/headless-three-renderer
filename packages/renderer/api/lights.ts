@@ -4,6 +4,7 @@ import { objectLayersMatchCamera } from './layers'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
 const MAX_NATIVE_LIGHTS = 32
+const MAX_SHADOW_CASCADES = 4
 
 export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike): NativeSceneLight[] | undefined {
   const lights: NativeSceneLight[] = []
@@ -217,7 +218,7 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
   const splits: number[] = []
   const bounds: number[] = []
 
-  for (const cascade of cascades.slice(0, 4)) {
+  for (const cascade of cascades) {
     if (!cascade || typeof cascade !== 'object') continue
     const left = numberOrNull(cascade.left)
     const right = numberOrNull(cascade.right)
@@ -227,6 +228,11 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
     const far = numberOrNull(cascade.far)
     if (left == null || right == null || top == null || bottom == null || near == null || far == null) {
       continue
+    }
+    if (bounds.length / 6 >= MAX_SHADOW_CASCADES) {
+      throw new Error(
+        `Directional shadow cascade hints support at most ${MAX_SHADOW_CASCADES} valid cascades in @headless-three/renderer. Reduce light.userData.headlessThreeRenderer.shadowCascades or render separate shadow passes.`,
+      )
     }
     bounds.push(left, right, top, bottom, near, far)
     const split = numberOrNull(cascade.split ?? cascade.distance ?? cascade.farDistance)

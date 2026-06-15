@@ -7885,6 +7885,38 @@ test('directional cascaded shadow hints render successfully', () => {
   assert.equal(rgba.length, 64 * 64 * 4)
 })
 
+test('directional shadow cascade hints over four valid cascades fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff }),
+  ))
+
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.position.set(4, 6, 3)
+  light.target.position.set(0, 0, 0)
+  light.castShadow = true
+  light.userData.headlessThreeRenderer = {
+    shadowCascades: Array.from({ length: 5 }, (_, index) => ({
+      left: -2 - index,
+      right: 2 + index,
+      top: 2 + index,
+      bottom: -2 - index,
+      near: 0.1,
+      far: 12 + index,
+      split: 2 + index,
+    })),
+  }
+  scene.add(light)
+  scene.add(light.target)
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /shadow cascade hints.*at most 4 valid cascades/i,
+  )
+})
+
 test('multiple shadow-casting lights fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
