@@ -5748,6 +5748,21 @@ test('outputColorSpace controls material and texture background output conversio
   )
 })
 
+test('unsupported outputColorSpace values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  const camera = makeCamera()
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, outputColorSpace: 'display-p3' }),
+    /options\.outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+  )
+  assert.throws(
+    () => renderToTarget(scene, camera, {}, { width: 32, height: 32, outputColorSpace: 'display-p3' }),
+    /options\.outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+  )
+})
+
 test('emissiveMap decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const emissiveMap = solidTexture(128, 128, 128)

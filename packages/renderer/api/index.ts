@@ -1222,6 +1222,7 @@ function nonZeroFinite(value: unknown): boolean {
 
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputFormat(options.format, 'options.format')
+  assertSupportedOutputColorSpace(options.outputColorSpace)
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
   if (options.target) validateUnsupportedRenderTargetOptions(options.target)
@@ -1269,6 +1270,20 @@ function assertSupportedOutputFormat(value: unknown, label: string): void {
   if (value === 'png' || value === 'rgba') return
   throw new Error(
     `${label} ${String(value)} is not supported by @headless-three/renderer. Use "png" or "rgba".`,
+  )
+}
+
+function assertSupportedOutputColorSpace(value: unknown): void {
+  if (value == null) return
+  if (
+    value === 'srgb' ||
+    value === 'srgb-linear' ||
+    value === 'linear-srgb' ||
+    value === 'linearsrgb' ||
+    value === 'linear'
+  ) return
+  throw new Error(
+    `options.outputColorSpace ${String(value)} is not supported by @headless-three/renderer. Use THREE.SRGBColorSpace or THREE.LinearSRGBColorSpace.`,
   )
 }
 
