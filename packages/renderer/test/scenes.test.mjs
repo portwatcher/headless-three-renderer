@@ -5412,6 +5412,46 @@ test('texture anisotropy inputs render with native samplers', () => {
   assert.ok(mean.r > 120 && mean.g > 120 && mean.b > 120, `anisotropic mapped plane should render visibly (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('invalid texture anisotropy values fail clearly', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['material map', () => {
+      const map = solidTexture(255, 255, 255)
+      map.anisotropy = 'high'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.anisotropy must be a finite number/i],
+    ['background texture', () => {
+      const background = solidTexture(0, 0, 255)
+      background.anisotropy = Number.POSITIVE_INFINITY
+      const scene = new THREE.Scene()
+      scene.background = background
+      return scene
+    }, /background\.anisotropy must be a finite number/i],
+    ['packed physical map', () => {
+      const clearcoatMap = solidTexture(255, 255, 255)
+      clearcoatMap.anisotropy = Number.NaN
+      const scene = new THREE.Scene()
+      const material = new THREE.MeshPhysicalMaterial({ color: 0xffffff, clearcoat: 1 })
+      material.clearcoatMap = clearcoatMap
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+      return scene
+    }, /material\.clearcoatMap\.anisotropy must be a finite number/i],
+  ]
+
+  for (const [name, makeScene, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(), camera, { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('one- and two-channel raw DataTexture maps expand for texture rendering', () => {
   function renderMap(map) {
     map.needsUpdate = true
