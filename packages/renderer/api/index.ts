@@ -259,6 +259,12 @@ function toNativeInput(
       options.backgroundBlurriness !== undefined ? 'options.backgroundBlurriness' : 'scene.backgroundBlurriness',
     )
     : undefined
+  const backgroundIntensity = colorMode
+    ? optionalFiniteNumber(
+      options.backgroundIntensity ?? scene.backgroundIntensity,
+      options.backgroundIntensity !== undefined ? 'options.backgroundIntensity' : 'scene.backgroundIntensity',
+    )
+    : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
   const lights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
@@ -289,7 +295,7 @@ function toNativeInput(
     width: size.width,
     height: size.height,
     background: colorMode ? resolveBackground(scene, options) : [0, 0, 0, 1],
-    backgroundIntensity: colorMode ? options.backgroundIntensity ?? scene.backgroundIntensity : undefined,
+    backgroundIntensity,
     viewport: pixelRectToArray(viewport),
     scissor: pixelRectToArray(scissor),
     backgroundTexture: backgroundTexture?.data,

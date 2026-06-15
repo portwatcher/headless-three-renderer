@@ -11051,6 +11051,14 @@ test('invalid background control values fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32, backgroundIntensity: Number.POSITIVE_INFINITY }),
     /options\.backgroundIntensity must be a finite number/i,
   )
+
+  scene.backgroundIntensity = 'bright'
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.backgroundIntensity must be a finite number/i,
+  )
+  scene.backgroundIntensity = 1
+
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, backgroundBlurriness: 'strong' }),
     /options\.backgroundBlurriness must be a finite number/i,
