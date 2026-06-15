@@ -84,7 +84,7 @@ See the versioned [compatibility matrix](https://github.com/portwatcher/headless
 
 The public API accepts only Three.js-like objects:
 
-- `scene`: a `THREE.Scene` or `THREE.Object3D` root; malformed scene containers fail clearly.
+- `scene`: a `THREE.Scene` or `THREE.Object3D` root; malformed scene containers and visibility flags fail clearly.
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. Malformed camera containers, invalid aspect-derived dimensions, clipping distances, and matrix values fail clearly. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; exact WebGL face semantics remain limited.
 - `options`: an options object; malformed option containers fail clearly.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`; invalid explicit dimensions fail clearly.
@@ -112,7 +112,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates, with invalid attribute values failing clearly
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar and size-attenuation values fail clearly
 - geometry groups with material arrays
-- mesh world transforms, with invalid transform matrix values failing clearly
+- mesh world transforms and object visibility flags, with invalid transform matrix or visibility values failing clearly
 - `THREE.LOD` camera-distance/zoom level selection, with invalid camera zoom or level distance/hysteresis values failing clearly
 - vertex colors, with invalid `material.vertexColors` values failing clearly
 - scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `scene.backgroundRotation`/`options.backgroundRotation`, `options.environmentIntensity`, and equirectangular/cube `scene.environmentRotation`/`options.environmentRotation`; invalid background color/control/rotation values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
@@ -121,7 +121,7 @@ The public API accepts only Three.js-like objects:
 
 ### Materials & Textures
 
-- material base color and opacity, with invalid color/opacity values failing clearly
+- material base color, opacity, and visibility, with invalid color/opacity/visible values failing clearly
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw one-channel, two-channel, RGB, or RGBA numeric DataTexture inputs, with `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`; unsupported texture color-space/encoding values fail clearly
 - base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots; invalid transform and transform-boolean values fail clearly

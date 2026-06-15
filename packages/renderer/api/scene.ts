@@ -128,7 +128,8 @@ function visitObject(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
 ): void {
-  if (!object || object.visible === false) return
+  if (!object) return
+  if (optionalObjectBoolean(object.visible, 'object.visible') === false) return
 
   const nextGroupOrder = object.isGroup === true
     ? finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)

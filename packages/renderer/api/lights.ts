@@ -17,7 +17,7 @@ export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike
 
 function visitLights(object: ThreeObject3DLike, camera: ThreeCameraLike | undefined, lights: NativeSceneLight[]): void {
   if (!object) return
-  if (object.visible === false) return
+  if (optionalBoolean(object.visible, 'object.visible') === false) return
 
   if (object.isLight === true && objectLayersMatchCamera(object, camera)) {
     const light = extractLight(object)
@@ -400,7 +400,7 @@ function visitForLightProbe(
   callback: (light: ThreeObject3DLike) => void,
 ): void {
   if (!object) return
-  if (object.visible === false) return
+  if (optionalBoolean(object.visible, 'object.visible') === false) return
   if (object.isLightProbe === true && objectLayersMatchCamera(object, camera)) callback(object)
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {
@@ -450,7 +450,7 @@ function visitForAmbient(
   callback: (light: ThreeObject3DLike) => void,
 ): void {
   if (!object) return
-  if (object.visible === false) return
+  if (optionalBoolean(object.visible, 'object.visible') === false) return
   if (object.isAmbientLight === true && objectLayersMatchCamera(object, camera)) callback(object)
   const children = Array.isArray(object.children) ? object.children : []
   for (const child of children) {

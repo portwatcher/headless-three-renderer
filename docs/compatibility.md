@@ -22,7 +22,7 @@ Status keys:
 
 | Feature | Status | Notes |
 |---|---|---|
-| Scene graph root traversal | Supported | Accepts `THREE.Scene` or `THREE.Object3D` roots and honors `visible === false` on ancestors. |
+| Scene graph root traversal | Supported | Accepts `THREE.Scene` or `THREE.Object3D` roots and honors `visible === false` on ancestors; malformed `object.visible` values fail clearly. |
 | `THREE.Mesh` | Supported | Indexed and non-indexed `BufferGeometry`, groups, material arrays, transforms, normals, UVs, and vertex colors; invalid geometry attribute and transform matrix values fail clearly. |
 | `THREE.SkinnedMesh` | Supported | CPU skinning from skeleton bones and inverse bind matrices; invalid bone, inverse bind, and mesh bind matrix values fail clearly. |
 | `THREE.InstancedMesh` | Supported | CPU-expanded per instance with `instanceMatrix` and `instanceColor`; this favors compatibility over native GPU instancing performance. |
@@ -67,7 +67,7 @@ Status keys:
 | `MeshDistanceMaterial` | Partial | Red-channel distance output is supported, including wireframe output, optional `referencePosition`, `nearDistance`, and `farDistance` overrides plus base/alpha map alpha testing and CPU-baked displacement through the common material path. Direct conformance covers alpha-map cutouts and displacement-map UV channel selection. `Object3D.customDistanceMaterial` is honored for point-light mesh shadow caster alpha-tested and displacement inputs, plus alpha-tested sprite/point billboard shadow cutouts; wireframe custom shadow materials fail clearly and packed distance variants remain planned. |
 | `MeshToonMaterial` | Partial | Lit toon shading supports Three.js' no-gradient-map fallback bands, red-channel `gradientMap` ramps, and the common map, normal, bump, emissive, AO, light-map, alpha, displacement, side, fog, and shadow paths. Direct conformance covers fallback bands, gradient-map sampler/color-space behavior, base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts. Exact browser-golden edge-case parity remains planned. |
 | `ShadowMaterial` | Partial | Transparent shadow receiver output is supported for the renderer's current shadow map path, including `material.color`, `material.opacity`, scene fog, `material.fog` opt-out, and output color-space conversion. Exact WebGLRenderer edge-case parity and multiple shadow-casting lights remain planned. |
-| Base color and opacity | Supported | Includes transparent sorting path; invalid color and opacity values fail clearly. |
+| Base color, opacity, and visibility | Supported | Includes transparent sorting path and `material.visible === false` skipping; invalid color, opacity, and material visibility values fail clearly. |
 | Vertex colors | Supported | Multiplied with material color; invalid `material.vertexColors` values fail clearly. |
 | `material.side` | Supported | Front, back, and double-sided culling; unsupported side constants fail clearly. |
 | Alpha test | Supported | Fragment discard cutoff. |

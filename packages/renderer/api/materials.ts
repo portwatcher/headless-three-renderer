@@ -182,11 +182,13 @@ function extractMaterialEnvironmentMap(
   const materials = new WeakSet<ThreeMaterialLike>()
 
   const visit = (object: ThreeObject3DLike): void => {
-    if (!object || object.visible === false) return
+    if (!object) return
+    if (optionalBoolean(object.visible, 'object.visible') === false) return
 
     for (const material of objectMaterials(object.material)) {
       const materialEnvMap = material?.envMap
-      if (!materialEnvMap || material.visible === false) continue
+      if (!materialEnvMap) continue
+      if (optionalBoolean(material.visible, 'material.visible') === false) continue
       if (!supportsNativeMaterialEnvironmentMap(material)) continue
       assertSupportedMaterialEnvironmentMap(material)
       if (hasNonZeroVector3Like(material.envMapRotation)) {
@@ -418,6 +420,7 @@ export function extractPbrProperties(
   assertSupportedMaterialClass(material, customFragmentShader)
   assertSupportedMaterialState(material, context)
   assertCompatiblePackedPhysicalMapSamplers(material)
+  optionalBoolean(material.visible, 'material.visible')
   optionalBoolean(material.vertexColors, 'material.vertexColors')
   const props: PbrProperties = {}
 

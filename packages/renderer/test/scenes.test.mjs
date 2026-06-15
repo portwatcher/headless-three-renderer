@@ -10944,6 +10944,37 @@ test('material alphaToCoverage approximates shadow caster alpha cutouts', () => 
   assert.ok(cutoutLum > fullLum + 15, `alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
 })
 
+test('invalid visibility flag values fail clearly', () => {
+  const camera = makeCamera()
+
+  const objectScene = new THREE.Scene()
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+  mesh.visible = 'yes'
+  objectScene.add(mesh)
+  assert.throws(
+    () => renderRgba(objectScene, camera, { width: 32, height: 32 }),
+    /object\.visible must be a boolean/i,
+  )
+
+  const materialScene = new THREE.Scene()
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  material.visible = 'yes'
+  materialScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+  assert.throws(
+    () => renderRgba(materialScene, camera, { width: 32, height: 32 }),
+    /material\.visible must be a boolean/i,
+  )
+
+  const lightScene = new THREE.Scene()
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.visible = 'yes'
+  lightScene.add(light)
+  assert.throws(
+    () => extractLights(lightScene),
+    /object\.visible must be a boolean/i,
+  )
+})
+
 test('non-square point-light shadow map sizes fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
