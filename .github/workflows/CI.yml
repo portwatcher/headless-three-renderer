@@ -127,6 +127,10 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:corpus
 
+      - name: Golden reference harness
+        working-directory: packages/renderer
+        run: pnpm run test:golden
+
       - name: Scale budget tests
         working-directory: packages/renderer
         run: pnpm run test:scale
