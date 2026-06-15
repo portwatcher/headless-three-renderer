@@ -8360,6 +8360,25 @@ test('post-processing options modify the final image', () => {
   assert.ok(mean.g > mean.r, `inverted red background should have stronger green than red (${mean.g} vs ${mean.r})`)
 })
 
+test('invalid post-processing option values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  const camera = makeCamera()
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { exposure: Number.NaN } }),
+    /options\.postProcessing\.exposure must be a finite number/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { invert: 'yes' } }),
+    /options\.postProcessing\.invert must be a finite number or boolean/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { enabled: 'yes' } }),
+    /options\.postProcessing\.enabled must be a boolean/i,
+  )
+})
+
 test('scene-level reflection probe feeds physical IBL when scene.environment is absent', () => {
   const camera = makeCamera()
 

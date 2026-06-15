@@ -1223,6 +1223,7 @@ function nonZeroFinite(value: unknown): boolean {
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputFormat(options.format, 'options.format')
   assertSupportedOutputColorSpace(options.outputColorSpace)
+  validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
   if (options.target) validateUnsupportedRenderTargetOptions(options.target)
@@ -1285,6 +1286,36 @@ function assertSupportedOutputColorSpace(value: unknown): void {
   throw new Error(
     `options.outputColorSpace ${String(value)} is not supported by @headless-three/renderer. Use THREE.SRGBColorSpace or THREE.LinearSRGBColorSpace.`,
   )
+}
+
+function validatePostProcessingOptions(value: unknown): void {
+  if (value == null || value === false) return
+  if (typeof value !== 'object') {
+    throw new TypeError('options.postProcessing must be an object.')
+  }
+  const post = value as RenderOptions['postProcessing']
+  if (post?.enabled != null && typeof post.enabled !== 'boolean') {
+    throw new TypeError('options.postProcessing.enabled must be a boolean.')
+  }
+  if (post?.enabled === false) return
+  assertFinitePostProcessingNumber(post?.exposure, 'options.postProcessing.exposure')
+  assertFinitePostProcessingNumber(post?.contrast, 'options.postProcessing.contrast')
+  assertFinitePostProcessingNumber(post?.saturation, 'options.postProcessing.saturation')
+  assertFinitePostProcessingNumber(post?.vignette, 'options.postProcessing.vignette')
+  assertFinitePostProcessingBlend(post?.grayscale, 'options.postProcessing.grayscale')
+  assertFinitePostProcessingBlend(post?.invert, 'options.postProcessing.invert')
+}
+
+function assertFinitePostProcessingNumber(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value === 'number' && Number.isFinite(value)) return
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
+function assertFinitePostProcessingBlend(value: unknown, label: string): void {
+  if (value == null || typeof value === 'boolean') return
+  if (typeof value === 'number' && Number.isFinite(value)) return
+  throw new TypeError(`${label} must be a finite number or boolean.`)
 }
 
 function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {
