@@ -6,7 +6,7 @@ import lightsApi from '../dist/lights.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
 const { Renderer, renderToTarget } = pkg
-const { extractLights, extractAmbientIntensity, extractLightProbe } = lightsApi
+const { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } = lightsApi
 
 const SIZE = 128
 const BG = [26, 26, 26] // 0.1 * 255
@@ -6682,6 +6682,16 @@ test('invalid light numeric values fail clearly', () => {
       light.intensity = 'bright'
       return light
     }, /light\.intensity must be a finite number/i],
+    ['directional target matrix', () => {
+      const light = new THREE.DirectionalLight(0xffffff, 1)
+      light.target.matrixWorld.elements[14] = Number.NaN
+      return light
+    }, /DirectionalLight\.target\.matrixWorld\.elements\[14\] must be a finite number/i],
+    ['point transform matrix', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.matrixWorld.elements[12] = Number.NaN
+      return light
+    }, /PointLight\.matrixWorld\.elements\[12\] must be a finite number/i],
     ['point distance', () => {
       const light = new THREE.PointLight(0xffffff, 1)
       light.distance = 'far'
@@ -6717,6 +6727,11 @@ test('invalid light numeric values fail clearly', () => {
       light.height = Number.NaN
       return light
     }, /RectAreaLight\.height must be a finite number/i],
+    ['rect transform matrix', () => {
+      const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
+      light.matrixWorld.elements[8] = Number.NEGATIVE_INFINITY
+      return light
+    }, /RectAreaLight\.matrixWorld\.elements\[8\] must be a finite number/i],
   ]
 
   for (const [name, makeLight, pattern] of directCases) {

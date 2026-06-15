@@ -98,11 +98,11 @@ Status keys:
 | Feature | Status | Notes |
 |---|---|---|
 | Ambient light | Supported | Summed scene ambient lights, camera-layer filtered; invalid color/intensity values fail clearly. |
-| Directional light | Supported | Position/target direction and intensity; invalid color/intensity values fail clearly. |
-| Point light | Supported | Distance and decay attenuation; invalid color, distance, decay, and intensity values fail clearly. |
-| Spot light | Supported | Angle, penumbra, distance, and decay; invalid color, angle, penumbra, distance, decay, and intensity values fail clearly. |
-| Hemisphere light | Supported | Sky/ground gradient ambient term; invalid sky/ground color and intensity values fail clearly. |
-| `RectAreaLight` | Partial | One-sided finite-area direct-light approximation using the light center, local `-Z` direction, width, and height. Invalid color/intensity/size values fail clearly; exact Three.js LTC/LUT behavior remains planned. |
+| Directional light | Supported | Position/target direction and intensity; invalid color, intensity, and transform matrix values fail clearly. |
+| Point light | Supported | Distance and decay attenuation; invalid color, distance, decay, intensity, and transform matrix values fail clearly. |
+| Spot light | Supported | Angle, penumbra, distance, and decay; invalid color, angle, penumbra, distance, decay, intensity, and transform matrix values fail clearly. |
+| Hemisphere light | Supported | Sky/ground gradient ambient term; invalid sky/ground color, intensity, and transform matrix values fail clearly. |
+| `RectAreaLight` | Partial | One-sided finite-area direct-light approximation using the light center, local `-Z` direction, width, and height. Invalid color/intensity/size/transform matrix values fail clearly; exact Three.js LTC/LUT behavior remains planned. |
 | Light layers | Supported | Lights are filtered against the active camera layers. |
 | Light limit | Partial | Up to 64 visible non-ambient lights are supported and covered by scale tests. Larger visible non-ambient light sets fail clearly until native light arrays are expanded. |
 | Shadows | Partial | Directional, spot, point, and up to four directional cascaded shadow maps are supported for one shadow-casting light; additional visible shadow-casting lights fail clearly. |

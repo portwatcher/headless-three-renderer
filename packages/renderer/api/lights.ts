@@ -1,6 +1,7 @@
 import type { ThreeCameraLike, ThreeObject3DLike, NativeSceneLight } from './types'
 import { strictColorLikeToArray } from './color'
 import { objectLayersMatchCamera } from './layers'
+import { matrixElements } from './math'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
 const MAX_NATIVE_LIGHTS = 64
@@ -34,14 +35,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   const intensity = finiteNumberOrDefault(light.intensity, 'light.intensity', 1)
 
   if (light.isDirectionalLight === true) {
-    const pos = light.matrixWorld
-      ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]]
-      : [0, 10, 0]
-    let targetPos = [0, 0, 0]
-    if (light.target?.matrixWorld) {
-      const te = light.target.matrixWorld.elements
-      targetPos = [te[12], te[13], te[14]]
-    }
+    const pos = positionFromMatrix(light.matrixWorld, 'DirectionalLight.matrixWorld', [0, 10, 0])
+    const targetPos = positionFromMatrix(light.target?.matrixWorld, 'DirectionalLight.target.matrixWorld', [0, 0, 0])
     const direction = [
       targetPos[0] - pos[0],
       targetPos[1] - pos[1],
@@ -68,9 +63,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   }
 
   if (light.isPointLight === true) {
-    const pos = light.matrixWorld
-      ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]]
-      : [0, 0, 0]
+    const pos = positionFromMatrix(light.matrixWorld, 'PointLight.matrixWorld', [0, 0, 0])
     const out: NativeSceneLight = {
       lightType: 'point',
       color: [color[0], color[1], color[2]],
@@ -87,14 +80,8 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   }
 
   if (light.isSpotLight === true) {
-    const pos = light.matrixWorld
-      ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]]
-      : [0, 0, 0]
-    let targetPos = [0, 0, 0]
-    if (light.target?.matrixWorld) {
-      const te = light.target.matrixWorld.elements
-      targetPos = [te[12], te[13], te[14]]
-    }
+    const pos = positionFromMatrix(light.matrixWorld, 'SpotLight.matrixWorld', [0, 0, 0])
+    const targetPos = positionFromMatrix(light.target?.matrixWorld, 'SpotLight.target.matrixWorld', [0, 0, 0])
     const direction = [
       targetPos[0] - pos[0],
       targetPos[1] - pos[1],
@@ -125,13 +112,11 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   }
 
   if (light.isRectAreaLight === true) {
-    const pos = light.matrixWorld
-      ? [light.matrixWorld.elements[12], light.matrixWorld.elements[13], light.matrixWorld.elements[14]]
-      : [0, 0, 0]
+    const matrix = matrixElementsOrUndefined(light.matrixWorld, 'RectAreaLight.matrixWorld')
+    const pos = matrix ? [matrix[12], matrix[13], matrix[14]] : [0, 0, 0]
     let direction = [0, 0, -1]
-    if (light.matrixWorld) {
-      const e = light.matrixWorld.elements
-      direction = [-e[8], -e[9], -e[10]]
+    if (matrix) {
+      direction = [-matrix[8], -matrix[9], -matrix[10]]
     }
     const len = Math.sqrt(direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2)
     if (len > 0) {
@@ -153,9 +138,9 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
   if (light.isHemisphereLight === true) {
     const groundColor = strictColorLikeToArray(light.groundColor, 'HemisphereLight.groundColor') ?? [0.04, 0.02, 0.0, 1]
     let direction = [0, 1, 0]
-    if (light.matrixWorld) {
-      const e = light.matrixWorld.elements
-      const ux = e[4], uy = e[5], uz = e[6]
+    const matrix = matrixElementsOrUndefined(light.matrixWorld, 'HemisphereLight.matrixWorld')
+    if (matrix) {
+      const ux = matrix[4], uy = matrix[5], uz = matrix[6]
       const ulen = Math.sqrt(ux * ux + uy * uy + uz * uz)
       if (ulen > 0) {
         direction = [ux / ulen, uy / ulen, uz / ulen]
@@ -172,6 +157,22 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
   // AmbientLight is handled separately
   return null
+}
+
+function positionFromMatrix(
+  matrix: ThreeObject3DLike['matrixWorld'] | undefined,
+  label: string,
+  fallback: number[],
+): number[] {
+  const elements = matrixElementsOrUndefined(matrix, label)
+  return elements ? [elements[12], elements[13], elements[14]] : fallback
+}
+
+function matrixElementsOrUndefined(
+  matrix: ThreeObject3DLike['matrixWorld'] | undefined,
+  label: string,
+) {
+  return matrix ? matrixElements(matrix, label) : undefined
 }
 
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
