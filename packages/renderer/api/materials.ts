@@ -1719,7 +1719,8 @@ function filterModeToString(mode: unknown): string | undefined {
 function minFilterModeToString(texture: ThreeTextureLike | null | undefined): string | undefined {
   const mode = texture?.minFilter
   if (mode == null) return undefined
-  const allowMipmaps = texture?.generateMipmaps !== false || hasExplicitMipmaps(texture)
+  const generateMipmaps = optionalTextureBoolean(texture?.generateMipmaps, 'texture.generateMipmaps')
+  const allowMipmaps = generateMipmaps !== false || hasExplicitMipmaps(texture)
   if (mode === NearestFilter) return 'nearest'
   if (mode === LinearFilter) return 'linear'
   if (mode === NearestMipmapNearestFilter) return allowMipmaps ? 'nearest-mipmap-nearest' : 'nearest'
@@ -2013,11 +2014,12 @@ function textureAnisotropy(map: ThreeTextureLike | null | undefined, label: stri
 }
 
 function textureTransform(map: ThreeTextureLike | null | undefined, label: string): number[] | undefined {
-  const flipY = map?.flipY !== false
+  const flipY = optionalTextureBoolean(map?.flipY, `${label}.flipY`) !== false
   const flipTransform = flipY ? undefined : [1, 0, 0, 0, -1, 1]
   if (!map) return flipTransform
 
-  if (map.matrixAutoUpdate === false) {
+  const matrixAutoUpdate = optionalTextureBoolean(map.matrixAutoUpdate, `${label}.matrixAutoUpdate`)
+  if (matrixAutoUpdate === false) {
     const e = map.matrix?.elements
     if (!e || e.length !== 9) {
       throw new TypeError(`${label}.matrix.elements must contain nine finite numbers.`)
@@ -2053,6 +2055,12 @@ function composeTextureTransformWithFlipY(transform: number[], flipY: boolean): 
   if (flipY) return transform
   const [a, c, tx, b, d, ty] = transform
   return [a, -c, c + tx, b, -d, d + ty]
+}
+
+function optionalTextureBoolean(value: unknown, label: string): boolean | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
 }
 
 function textureColorSpace(map: ThreeTextureLike | null | undefined): string | undefined {

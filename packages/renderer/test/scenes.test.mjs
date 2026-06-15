@@ -6017,6 +6017,20 @@ test('base color maps generate mip chains for mipmap min filters', () => {
   )
 })
 
+test('invalid texture mipmap boolean values fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.minFilter = THREE.NearestMipmapNearestFilter
+  map.generateMipmaps = 'yes'
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /texture\.generateMipmaps must be a boolean/i,
+  )
+})
+
 test('compressed texture inputs fail with a clear pre-decode error', () => {
   const compressedTexture = {
     isTexture: true,
@@ -6119,6 +6133,20 @@ test('invalid texture transform values fail clearly', () => {
       scene.add(new THREE.AmbientLight(0xffffff, 1))
       return scene
     }, /material\.normalMap\.matrix\.elements\[0\] must be a finite number/i],
+    ['material map flipY', () => {
+      const map = solidTexture(255, 255, 255)
+      map.flipY = 'no'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.flipY must be a boolean/i],
+    ['material map matrixAutoUpdate', () => {
+      const map = solidTexture(255, 255, 255)
+      map.matrixAutoUpdate = 'no'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.matrixAutoUpdate must be a boolean/i],
     ['background rotation', () => {
       const background = solidTexture(0, 0, 255)
       background.rotation = Number.POSITIVE_INFINITY
