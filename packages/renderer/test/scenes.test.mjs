@@ -2426,6 +2426,36 @@ test('MeshDistanceMaterial honors referencePosition and distance range', () => {
   )
 })
 
+test('invalid MeshDistanceMaterial range values fail clearly', () => {
+  const cases = [
+    ['nearDistance', (material) => {
+      material.nearDistance = 'near'
+    }, /material\.nearDistance must be a finite number/i],
+    ['farDistance', (material) => {
+      material.farDistance = Number.NaN
+    }, /material\.farDistance must be a finite number/i],
+    ['hint nearDistance', (material) => {
+      material.userData.headlessThreeRenderer = { nearDistance: 'near' }
+    }, /material\.userData\.headlessThreeRenderer\.nearDistance must be a finite number/i],
+    ['hint distanceFar', (material) => {
+      material.userData.headlessThreeRenderer = { distanceFar: Number.POSITIVE_INFINITY }
+    }, /material\.userData\.headlessThreeRenderer\.distanceFar must be a finite number/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const material = new THREE.MeshDistanceMaterial()
+    mutate(material)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('MeshDistanceMaterial alphaMap cuts out discarded fragments', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,

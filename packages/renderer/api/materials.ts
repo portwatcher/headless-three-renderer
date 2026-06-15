@@ -715,17 +715,28 @@ export function extractPbrProperties(
   }
   if (material.isMeshDistanceMaterial) {
     const hints = material.userData?.headlessThreeRenderer ?? material.userData?.headlessRenderer ?? {}
+    const hintsLabel = material.userData?.headlessThreeRenderer != null
+      ? 'material.userData.headlessThreeRenderer'
+      : 'material.userData.headlessRenderer'
     const referencePosition = vector3LikeToArray(
       material.referencePosition ?? hints.referencePosition ?? hints.distanceReferencePosition,
     )
     if (referencePosition) {
       props.distanceReferencePosition = referencePosition
     }
-    const nearDistance = finiteNumberOrUndefined(material.nearDistance ?? hints.nearDistance ?? hints.distanceNear)
+    const nearDistance = firstOptionalFiniteNumber([
+      [material.nearDistance, 'material.nearDistance'],
+      [hints.nearDistance, `${hintsLabel}.nearDistance`],
+      [hints.distanceNear, `${hintsLabel}.distanceNear`],
+    ])
     if (nearDistance !== undefined) {
       props.distanceNear = nearDistance
     }
-    const farDistance = finiteNumberOrUndefined(material.farDistance ?? hints.farDistance ?? hints.distanceFar)
+    const farDistance = firstOptionalFiniteNumber([
+      [material.farDistance, 'material.farDistance'],
+      [hints.farDistance, `${hintsLabel}.farDistance`],
+      [hints.distanceFar, `${hintsLabel}.distanceFar`],
+    ])
     if (farDistance !== undefined) {
       props.distanceFar = farDistance
     }
@@ -1176,8 +1187,11 @@ export function textureUvChannel(texture: ThreeTextureLike | null | undefined): 
   )
 }
 
-function finiteNumberOrUndefined(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+function firstOptionalFiniteNumber(entries: Array<[unknown, string]>): number | undefined {
+  for (const [value, label] of entries) {
+    if (value != null) return optionalFiniteNumber(value, label)
+  }
+  return undefined
 }
 
 function optionalFiniteNumber(value: unknown, label: string): number | undefined {
