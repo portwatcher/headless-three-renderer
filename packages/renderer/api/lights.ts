@@ -344,7 +344,7 @@ export function extractLightProbe(scene: ThreeObject3DLike, camera?: ThreeCamera
 
     const intensity = finiteNumberOrDefault(light.intensity, 'LightProbe.intensity', 1)
     for (let i = 0; i < 9; i += 1) {
-      const coefficient = coefficientToRgb(source[i])
+      const coefficient = coefficientToRgb(source[i], `LightProbe.sh.coefficients[${i}]`)
       if (!coefficient) continue
       coefficients[i * 3] += coefficient[0] * intensity
       coefficients[i * 3 + 1] += coefficient[1] * intensity
@@ -370,20 +370,40 @@ function visitForLightProbe(
   }
 }
 
-function coefficientToRgb(value: unknown): [number, number, number] | null {
+function coefficientToRgb(value: unknown, label: string): [number, number, number] | null {
   if (!value) return null
-  if (Array.isArray(value) || ArrayBuffer.isView(value)) {
-    const array = value as ArrayLike<number>
-    return finiteRgb(array[0], array[1], array[2])
+  const maybeArrayLike = value as { length?: unknown }
+  if (Array.isArray(value) || (ArrayBuffer.isView(value) && typeof maybeArrayLike.length === 'number')) {
+    const array = value as unknown as ArrayLike<number>
+    return [
+      requiredFiniteRgbComponent(array[0], `${label}[0]`),
+      requiredFiniteRgbComponent(array[1], `${label}[1]`),
+      requiredFiniteRgbComponent(array[2], `${label}[2]`),
+    ]
   }
   const v = value as { r?: number; g?: number; b?: number; x?: number; y?: number; z?: number }
-  return finiteRgb(v.r ?? v.x, v.g ?? v.y, v.b ?? v.z)
+  if ('r' in v || 'g' in v || 'b' in v) {
+    return [
+      requiredFiniteRgbComponent(v.r, `${label}.r`),
+      requiredFiniteRgbComponent(v.g, `${label}.g`),
+      requiredFiniteRgbComponent(v.b, `${label}.b`),
+    ]
+  }
+  if ('x' in v || 'y' in v || 'z' in v) {
+    return [
+      requiredFiniteRgbComponent(v.x, `${label}.x`),
+      requiredFiniteRgbComponent(v.y, `${label}.y`),
+      requiredFiniteRgbComponent(v.z, `${label}.z`),
+    ]
+  }
+  return null
 }
 
-function finiteRgb(r: unknown, g: unknown, b: unknown): [number, number, number] | null {
-  if (typeof r !== 'number' || typeof g !== 'number' || typeof b !== 'number') return null
-  if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null
-  return [r, g, b]
+function requiredFiniteRgbComponent(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  return value
 }
 
 function visitForAmbient(

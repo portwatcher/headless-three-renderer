@@ -6704,6 +6704,24 @@ test('invalid light numeric values fail clearly', () => {
     () => extractLightProbe(probeScene),
     /LightProbe\.intensity must be a finite number/i,
   )
+
+  const vectorCoefficientScene = new THREE.Scene()
+  const vectorCoefficientProbe = new THREE.LightProbe(undefined, 1)
+  vectorCoefficientProbe.sh.coefficients[0] = { x: 1, y: 'green', z: 0 }
+  vectorCoefficientScene.add(vectorCoefficientProbe)
+  assert.throws(
+    () => extractLightProbe(vectorCoefficientScene),
+    /LightProbe\.sh\.coefficients\[0\]\.y must be a finite number/i,
+  )
+
+  const arrayCoefficientScene = new THREE.Scene()
+  const arrayCoefficientProbe = new THREE.LightProbe(undefined, 1)
+  arrayCoefficientProbe.sh.coefficients[0] = [1, Number.NEGATIVE_INFINITY, 0]
+  arrayCoefficientScene.add(arrayCoefficientProbe)
+  assert.throws(
+    () => extractLightProbe(arrayCoefficientScene),
+    /LightProbe\.sh\.coefficients\[0\]\[1\] must be a finite number/i,
+  )
 })
 
 test('invalid light color values fail clearly', () => {
