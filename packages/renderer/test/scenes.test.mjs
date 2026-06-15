@@ -10495,6 +10495,8 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'color array texture'],
     [{ depthTexture: new THREE.Data3DTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target\.depthTexture uses an array or 3D texture/i, 'depth 3D texture'],
+    [{ texture: { isCubeTexture: true } }, /target color texture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube color texture'],
+    [{ depthTexture: { isCubeTexture: true } }, /target\.depthTexture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube depth texture'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.RedFormat } }, /target color texture format .*not supported.*RGBAFormat/i, 'color texture format'],

@@ -136,6 +136,8 @@ export class Renderer {
       return buffer
     }
 
+    if (renderOptions.target) assertNonCubeCameraRenderTargetTextures(renderOptions.target)
+
     if (isArrayCamera(camera)) {
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
@@ -182,6 +184,8 @@ export class Renderer {
       )
       return cubeTarget
     }
+
+    assertNonCubeCameraRenderTargetTextures(target)
 
     if (isArrayCamera(camera)) {
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
@@ -231,6 +235,8 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike,
     return buffer
   }
 
+  if (options.target) assertNonCubeCameraRenderTargetTextures(options.target)
+
   if (isArrayCamera(camera)) {
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, options, native.renderNative)
     if (options.target) {
@@ -263,6 +269,8 @@ export function renderToTarget(
     const { target: cubeTarget } = renderCubeCamera(scene, camera, targetOptions, native.renderNative)
     return cubeTarget
   }
+
+  assertNonCubeCameraRenderTargetTextures(target)
 
   if (isArrayCamera(camera)) {
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, targetOptions, native.renderNative)
@@ -1564,6 +1572,20 @@ function assertSupportedRenderTargetTextureDimensionality(texture: RenderTargetT
   ) {
     throw new Error(
       `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer render targets yet. Use a single 2D texture target or render layers separately.`,
+    )
+  }
+}
+
+function assertNonCubeCameraRenderTargetTextures(target: RenderTargetLike): void {
+  const colorTexture = renderTargetColorTexture(target)
+  if (colorTexture?.isCubeTexture === true) {
+    throw new Error(
+      'target color texture uses a cube texture, which is only supported when rendering with THREE.CubeCamera. Use a 2D texture target for regular cameras.',
+    )
+  }
+  if (target.depthTexture?.isCubeTexture === true) {
+    throw new Error(
+      'target.depthTexture uses a cube texture, which is only supported when rendering with THREE.CubeCamera. Use a 2D depth texture target for regular cameras.',
     )
   }
 }
