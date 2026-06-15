@@ -54,7 +54,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 | Task | Impact | Notes |
 |---|---:|---|
 | Add golden-image parity tests | High | Use browser Three.js/WebGLRenderer only as an offline/reference test generator. Production runtime remains Node + `wgpu`. |
-| Build a curated scene corpus | High | Initial generated invariant corpus covers transparent materials, skinning, morphs, avatar-style toon/skinned combinations, IBL, shadows, points/lines, LOD/groups, and pathological geometry in CI; committed glTF fixtures cover `GLTFLoader` geometry/material loading plus encoded data-URI texture loading in CI. Remaining work is committed glTF Sample Assets, external VRM/VRMA fixtures, and browser-generated references. |
+| Build a curated scene corpus | High | Initial generated invariant corpus covers transparent materials, skinning, morphs, avatar-style toon/skinned combinations, IBL, shadows, points/lines, LOD/groups, and pathological geometry in CI; glTF tests cover local geometry/material loading, encoded data-URI textures, and external buffer resolution in CI. Remaining work is committed glTF Sample Assets, external VRM/VRMA fixtures, and browser-generated references. |
 
 ## P1 - Scene Graph And Object Coverage
 

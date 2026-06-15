@@ -1,5 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
@@ -87,6 +89,41 @@ test('committed textured glTF fixture loads data URI image and renders texture',
   const right = meanRegion(rgba, 96, 96, 54, 36, 72, 60)
   assert.ok(left.r > left.g + 80, `left half should sample the red data URI texel (${left.r} vs ${left.g})`)
   assert.ok(right.g > right.r + 80, `right half should sample the green data URI texel (${right.g} vs ${right.r})`)
+})
+
+test('loadGltfFromFile resolves external glTF buffers from the model directory', async () => {
+  const source = JSON.parse(await readFile(SIMPLE_TRIANGLE, 'utf8'))
+  const bufferUri = source.buffers[0].uri
+  const encodedBuffer = bufferUri.slice(bufferUri.indexOf(',') + 1)
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'headless-three-gltf-'))
+  try {
+    await writeFile(path.join(tmp, 'triangle.bin'), Buffer.from(encodedBuffer, 'base64'))
+    source.buffers[0].uri = 'triangle.bin'
+    const modelPath = path.join(tmp, 'external-buffer.gltf')
+    await writeFile(modelPath, JSON.stringify(source))
+
+    const gltf = await loadGltfFixture(modelPath)
+    const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+    assert.ok(mesh, 'external-buffer fixture should load a mesh')
+
+    const camera = gltf.cameras[0]
+    assert.ok(camera, 'external-buffer fixture should load a camera')
+    camera.aspect = 1
+    camera.updateProjectionMatrix()
+    gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+    gltf.scene.updateMatrixWorld(true)
+    camera.updateMatrixWorld(true)
+
+    const rgba = new Renderer().render(gltf.scene, camera, {
+      width: 64,
+      height: 64,
+      format: 'rgba',
+      background: [0, 0, 0],
+    })
+    assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'external buffer glTF should render visible pixels')
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
 })
 
 async function loadGltfFixture(filePath, options) {
