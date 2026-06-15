@@ -50,7 +50,9 @@ export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOpti
     throw new TypeError('options.background must be a color, texture, or null.')
   }
   const color = strictColorLikeToArray(scene.background, 'scene.background')
-  return color ?? [0.04, 0.045, 0.05, 1]
+  if (color) return color
+  if (scene.background == null || hasBackgroundTexture) return [0.04, 0.045, 0.05, 1]
+  throw new TypeError('scene.background must be a color, texture, or null.')
 }
 
 function isColorShaped(value: ColorLikeWithAlpha): boolean {

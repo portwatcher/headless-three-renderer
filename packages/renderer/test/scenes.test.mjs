@@ -12603,6 +12603,16 @@ test('invalid background color values fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
     /scene\.background\.g must be a finite number/i,
   )
+  scene.background = 'red'
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.background must be a color, texture, or null/i,
+  )
+  scene.background = {}
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.background must be a color, texture, or null/i,
+  )
 
   scene.background = solidTexture(0, 255, 0)
   assert.throws(
