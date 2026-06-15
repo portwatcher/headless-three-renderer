@@ -1146,7 +1146,6 @@ impl GpuRenderer {
                 (Topology::Points, _, false) => "pipeline (points)",
                 (Topology::Points, _, true) => "pipeline (points, transparent)",
             };
-            let depth_write = !transparent;
             let color_targets = [Some(color_target_state(
                 default_blend_state(transparent),
                 true,
@@ -1176,7 +1175,7 @@ impl GpuRenderer {
                 },
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: DEPTH_FORMAT,
-                    depth_write_enabled: Some(depth_write),
+                    depth_write_enabled: Some(true),
                     depth_compare: Some(wgpu::CompareFunction::LessEqual),
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
@@ -3344,7 +3343,6 @@ fn pipeline_key(mesh: &GpuMesh) -> PipelineKey {
 }
 
 fn requires_pipeline_override(mesh: &PreparedMesh, sample_count: u32) -> bool {
-    let default_depth_write = !mesh.is_transparent;
     let default_blending = if mesh.is_transparent {
         BlendMode::Normal
     } else {
@@ -3352,7 +3350,7 @@ fn requires_pipeline_override(mesh: &PreparedMesh, sample_count: u32) -> bool {
     };
     !mesh.depth_test
         || mesh.depth_func != StencilCompare::LessEqual
-        || mesh.depth_write != default_depth_write
+        || !mesh.depth_write
         || !mesh.color_write
         || mesh.polygon_offset
         || mesh.stencil_write

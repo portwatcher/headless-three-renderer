@@ -1334,8 +1334,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let custom_blend = parse_custom_blend_state(mesh, blending, mesh_index)?;
     let depth_test = mesh.depth_test.unwrap_or(true);
     let depth_func = parse_depth_func(mesh.depth_func.as_deref(), mesh_index)?;
-    let default_depth_write = !is_transparent;
-    let depth_write = depth_test && mesh.depth_write.unwrap_or(default_depth_write);
+    let depth_write = depth_test && mesh.depth_write.unwrap_or(true);
     let color_write = mesh.color_write.unwrap_or(true);
     let polygon_offset = mesh.polygon_offset.unwrap_or(false);
     let polygon_offset_factor = finite_f32(
