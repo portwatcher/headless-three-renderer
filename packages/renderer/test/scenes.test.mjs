@@ -6652,6 +6652,56 @@ test('normalized unsigned integer raw DataTexture maps decode for material and b
   }
 })
 
+test('normalized unsigned integer raw environment textures decode for IBL', () => {
+  function byteEnvironmentTexture() {
+    const texture = solidTexture(128, 64, 255)
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  function unsignedShortEnvironmentTexture() {
+    const texture = new THREE.DataTexture(
+      new Uint16Array([0x8080, 0x4040, 0xffff, 0xffff]),
+      1,
+      1,
+      THREE.RGBAFormat,
+      THREE.UnsignedShortType,
+    )
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderEnvironment(kind, texture) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (kind === 'scene') {
+      scene.environment = texture
+      scene.environmentIntensity = 2.5
+    } else {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture, intensity: 2.5 },
+      }
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 16),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 }),
+    ))
+    return renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  for (const kind of ['scene', 'reflectionProbe']) {
+    const byteRender = renderEnvironment(kind, byteEnvironmentTexture())
+    const unsignedRender = renderEnvironment(kind, unsignedShortEnvironmentTexture())
+    const diff = meanAbsDiff(byteRender, unsignedRender)
+    assert.ok(diff < 2, `${kind} unsigned integer environment should match equivalent RGBA8 IBL (diff=${diff.toFixed(3)})`)
+  }
+})
+
 test('packed unsigned short raw DataTexture maps unpack RGBA channels', () => {
   const cases = [
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, 0x842f, 'red-dominant'],
