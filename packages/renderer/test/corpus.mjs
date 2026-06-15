@@ -14,6 +14,7 @@ export function createSceneCorpus() {
     lightProbeCorpus(),
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
+    linearOutputColorSpaceCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -182,6 +183,29 @@ function textureMatrixColorSpaceCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 5, 6],
     minNonBackgroundRatio: 0.1,
+  }
+}
+
+function linearOutputColorSpaceCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.18, 0.18, 0.18)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.55, 1.55),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.22, 0.08) }),
+  ))
+
+  return {
+    name: 'linear-output-color-space',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    },
+    background: [46, 46, 46],
+    minNonBackgroundRatio: 0.08,
   }
 }
 
