@@ -10723,8 +10723,20 @@ test('invalid post-processing option values fail clearly', () => {
     /options\.postProcessing\.exposure must be a finite number/i,
   )
   assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { vignette: -0.1 } }),
+    /options\.postProcessing\.vignette must be between 0 and 1/i,
+  )
+  assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { invert: 'yes' } }),
     /options\.postProcessing\.invert must be a finite number or boolean/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { invert: 1.5 } }),
+    /options\.postProcessing\.invert must be between 0 and 1/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { grayscale: -0.1 } }),
+    /options\.postProcessing\.grayscale must be between 0 and 1/i,
   )
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, postProcessing: { enabled: 'yes' } }),

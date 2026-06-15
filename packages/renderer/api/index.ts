@@ -1570,7 +1570,7 @@ function validatePostProcessingOptions(value: unknown): void {
   assertFinitePostProcessingNumber(post?.exposure, 'options.postProcessing.exposure')
   assertFinitePostProcessingNumber(post?.contrast, 'options.postProcessing.contrast')
   assertFinitePostProcessingNumber(post?.saturation, 'options.postProcessing.saturation')
-  assertFinitePostProcessingNumber(post?.vignette, 'options.postProcessing.vignette')
+  assertNormalizedPostProcessingNumber(post?.vignette, 'options.postProcessing.vignette')
   assertFinitePostProcessingBlend(post?.grayscale, 'options.postProcessing.grayscale')
   assertFinitePostProcessingBlend(post?.invert, 'options.postProcessing.invert')
 }
@@ -1579,9 +1579,21 @@ function assertFinitePostProcessingNumber(value: unknown, label: string): void {
   assertFiniteNumberOption(value, label)
 }
 
+function assertNormalizedPostProcessingNumber(value: unknown, label: string): void {
+  assertFiniteNumberOption(value, label)
+  if (typeof value === 'number' && (value < 0 || value > 1)) {
+    throw new TypeError(`${label} must be between 0 and 1.`)
+  }
+}
+
 function assertFinitePostProcessingBlend(value: unknown, label: string): void {
   if (value == null || typeof value === 'boolean') return
-  if (typeof value === 'number' && Number.isFinite(value)) return
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value < 0 || value > 1) {
+      throw new TypeError(`${label} must be between 0 and 1.`)
+    }
+    return
+  }
   throw new TypeError(`${label} must be a finite number or boolean.`)
 }
 
