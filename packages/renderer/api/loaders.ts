@@ -60,9 +60,12 @@ export type NodeGltfLoaderBundle = {
 }
 
 export class EncodedImageTextureLoader {
+  private readonly rootDir: string
   private loaderPath = ''
 
-  constructor(private readonly rootDir: string = process.cwd()) {}
+  constructor(rootDir: string = process.cwd()) {
+    this.rootDir = requiredString(rootDir, 'rootDir')
+  }
 
   setCrossOrigin(): this {
     return this
@@ -77,7 +80,7 @@ export class EncodedImageTextureLoader {
   }
 
   setPath(loaderPath: string): this {
-    this.loaderPath = loaderPath
+    this.loaderPath = requiredString(loaderPath, 'loaderPath')
     return this
   }
 
@@ -88,7 +91,8 @@ export class EncodedImageTextureLoader {
     onError?: TextureErrorCallback,
   ): TextureLike {
     const texture = new Texture()
-    const source = /^data:/i.test(url) ? url : (this.loaderPath ? `${this.loaderPath}${url}` : url)
+    const assetUrl = requiredString(url, 'url')
+    const source = /^data:/i.test(assetUrl) ? assetUrl : (this.loaderPath ? `${this.loaderPath}${assetUrl}` : assetUrl)
     const encodedDataUri = encodedImageDataUriBuffer(source)
     const data = encodedDataUri
       ? Promise.resolve(encodedDataUri)
@@ -115,35 +119,42 @@ export async function createNodeGltfLoader(
   rootDir: string = process.cwd(),
   options: NodeGltfLoaderOptions = {},
 ): Promise<NodeGltfLoaderBundle> {
-  const root = path.resolve(rootDir)
-  const installFetch = optionalBoolean(options.installFetch, 'options.installFetch')
-  const registerTextureHandlers = optionalBoolean(options.registerTextureHandlers, 'options.registerTextureHandlers')
+  const loaderOptions = objectOptions(options, 'options') as NodeGltfLoaderOptions
+  const root = path.resolve(requiredString(rootDir, 'rootDir'))
+  const {
+    configureLoader,
+    installFetch,
+    manager,
+    registerTextureHandlers,
+  } = validateNodeGltfLoaderOptions(loaderOptions)
+  const loadingManager = manager ?? new LoadingManager()
 
   if (installFetch !== false) {
     installLocalFileFetch()
   }
 
-  const manager = options.manager ?? new LoadingManager()
   const encodedImages = createEncodedImageTextureLoader(root)
   if (registerTextureHandlers !== false) {
-    registerEncodedImageHandlers(manager, encodedImages)
+    registerEncodedImageHandlers(loadingManager, encodedImages)
   }
 
   const { GLTFLoader } = await importGltfLoader()
-  const loader = new GLTFLoader(manager)
-  await options.configureLoader?.(loader)
-  return { encodedImages, loader, manager, rootDir: root }
+  const loader = new GLTFLoader(loadingManager)
+  await configureLoader?.(loader)
+  return { encodedImages, loader, manager: loadingManager, rootDir: root }
 }
 
 export async function loadGltfFromFile<T = unknown>(
   filePath: string,
   options: LoadGltfFromFileOptions = {},
 ): Promise<T> {
-  const absolute = path.resolve(filePath)
-  const root = path.resolve(options.rootDir ?? path.dirname(absolute))
-  const { loader } = await createNodeGltfLoader(root, options)
+  const loaderOptions = objectOptions(options, 'options') as LoadGltfFromFileOptions
+  validateLoadGltfFromFileOptions(loaderOptions)
+  const absolute = path.resolve(requiredString(filePath, 'filePath'))
+  const root = path.resolve(optionalString(loaderOptions.rootDir, 'options.rootDir') ?? path.dirname(absolute))
+  const baseUrl = optionalString(loaderOptions.baseUrl, 'options.baseUrl') ?? pathToFileURL(`${root}${path.sep}`).href
+  const { loader } = await createNodeGltfLoader(root, loaderOptions)
   const bytes = await readFile(absolute)
-  const baseUrl = options.baseUrl ?? pathToFileURL(`${root}${path.sep}`).href
 
   return await new Promise<T>((resolve, reject) => {
     loader.parse(arrayBufferView(bytes), baseUrl, (gltf) => resolve(gltf as T), reject)
@@ -154,18 +165,22 @@ export async function loadVrmFromFile<T = unknown>(
   filePath: string,
   options: LoadVrmFromFileOptions = {},
 ): Promise<T> {
+  const loaderOptions = objectOptions(options, 'options') as LoadVrmFromFileOptions
+  validateLoadGltfFromFileOptions(loaderOptions)
+  const validatedFilePath = requiredString(filePath, 'filePath')
   const {
     VRMLoaderPlugin,
     configureLoader,
     ...gltfOptions
-  } = options
-  const VrmPlugin = VRMLoaderPlugin ?? await importVrmLoaderPlugin()
+  } = loaderOptions
+  const configureLoaderCallback = optionalFunction(configureLoader, 'options.configureLoader')
+  const VrmPlugin = optionalFunction(VRMLoaderPlugin, 'options.VRMLoaderPlugin') ?? await importVrmLoaderPlugin()
 
-  return await loadGltfFromFile<T>(filePath, {
+  return await loadGltfFromFile<T>(validatedFilePath, {
     ...gltfOptions,
     configureLoader: async (loader) => {
       registerLoaderPlugin(loader, (parser) => new VrmPlugin(parser), 'VRMLoaderPlugin')
-      await configureLoader?.(loader)
+      await configureLoaderCallback?.(loader)
     },
   })
 }
@@ -174,22 +189,27 @@ export async function loadVrmAnimationFromFile<T = unknown>(
   filePath: string,
   options: LoadVrmAnimationFromFileOptions = {},
 ): Promise<T> {
+  const loaderOptions = objectOptions(options, 'options') as LoadVrmAnimationFromFileOptions
+  validateLoadGltfFromFileOptions(loaderOptions)
+  const validatedFilePath = requiredString(filePath, 'filePath')
   const {
     VRMAnimationLoaderPlugin,
     VRMLoaderPlugin,
     configureLoader,
     ...gltfOptions
-  } = options
-  const AnimationPlugin = VRMAnimationLoaderPlugin ?? await importVrmAnimationLoaderPlugin()
+  } = loaderOptions
+  const VrmPlugin = optionalFunction(VRMLoaderPlugin, 'options.VRMLoaderPlugin')
+  const configureLoaderCallback = optionalFunction(configureLoader, 'options.configureLoader')
+  const AnimationPlugin = optionalFunction(VRMAnimationLoaderPlugin, 'options.VRMAnimationLoaderPlugin') ?? await importVrmAnimationLoaderPlugin()
 
-  return await loadGltfFromFile<T>(filePath, {
+  return await loadGltfFromFile<T>(validatedFilePath, {
     ...gltfOptions,
     configureLoader: async (loader) => {
-      if (VRMLoaderPlugin) {
-        registerLoaderPlugin(loader, (parser) => new VRMLoaderPlugin(parser), 'VRMLoaderPlugin')
+      if (VrmPlugin) {
+        registerLoaderPlugin(loader, (parser) => new VrmPlugin(parser), 'VRMLoaderPlugin')
       }
       registerLoaderPlugin(loader, (parser) => new AnimationPlugin(parser), 'VRMAnimationLoaderPlugin')
-      await configureLoader?.(loader)
+      await configureLoaderCallback?.(loader)
     },
   })
 }
@@ -228,14 +248,16 @@ async function readBlobUrlBuffer(url: string): Promise<Buffer> {
 }
 
 export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd()): string {
-  if (/^data:/i.test(url)) {
+  const assetUrl = requiredString(url, 'url')
+  const root = requiredString(rootDir, 'rootDir')
+  if (/^data:/i.test(assetUrl)) {
     throw new Error('Data URI textures should be decoded or written to files before loading in Node.')
   }
-  if (/^file:/i.test(url)) return fileURLToPath(url)
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) {
-    throw new Error(`Remote texture URL is not a local file: ${url}`)
+  if (/^file:/i.test(assetUrl)) return fileURLToPath(assetUrl)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(assetUrl)) {
+    throw new Error(`Remote texture URL is not a local file: ${assetUrl}`)
   }
-  return path.isAbsolute(url) ? path.normalize(url) : path.resolve(rootDir, url)
+  return path.isAbsolute(assetUrl) ? path.normalize(assetUrl) : path.resolve(root, assetUrl)
 }
 
 export function installLocalFileFetch(): void {
@@ -300,6 +322,55 @@ function optionalBoolean(value: unknown, label: string): boolean | undefined {
   if (value == null) return undefined
   if (typeof value === 'boolean') return value
   throw new TypeError(`${label} must be a boolean.`)
+}
+
+function validateNodeGltfLoaderOptions(options: NodeGltfLoaderOptions): {
+  configureLoader?: ConfigureGltfLoader
+  installFetch?: boolean
+  manager?: ThreeLoadingManagerLike
+  registerTextureHandlers?: boolean
+} {
+  return {
+    configureLoader: optionalFunction(options.configureLoader, 'options.configureLoader'),
+    installFetch: optionalBoolean(options.installFetch, 'options.installFetch'),
+    manager: optionalLoadingManager(options.manager, 'options.manager'),
+    registerTextureHandlers: optionalBoolean(options.registerTextureHandlers, 'options.registerTextureHandlers'),
+  }
+}
+
+function validateLoadGltfFromFileOptions(options: LoadGltfFromFileOptions): void {
+  validateNodeGltfLoaderOptions(options)
+  optionalString(options.rootDir, 'options.rootDir')
+  optionalString(options.baseUrl, 'options.baseUrl')
+}
+
+function requiredString(value: unknown, label: string): string {
+  if (typeof value === 'string') return value
+  throw new TypeError(`${label} must be a string.`)
+}
+
+function optionalString(value: unknown, label: string): string | undefined {
+  if (value == null) return undefined
+  return requiredString(value, label)
+}
+
+function objectOptions(value: unknown, label: string): Record<string, unknown> {
+  if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  throw new TypeError(`${label} must be an object.`)
+}
+
+function optionalFunction<T>(value: T | null | undefined, label: string): T | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'function') return value
+  throw new TypeError(`${label} must be a function.`)
+}
+
+function optionalLoadingManager(value: ThreeLoadingManagerLike | null | undefined, label: string): ThreeLoadingManagerLike | undefined {
+  if (value == null) return undefined
+  if (typeof (value as any).addHandler === 'function') return value
+  throw new TypeError(`${label} must provide an addHandler() function.`)
 }
 
 function registerLoaderPlugin(

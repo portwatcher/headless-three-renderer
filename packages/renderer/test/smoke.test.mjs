@@ -13,6 +13,9 @@ const {
   createNodeGltfLoader,
   createEncodedImageTextureLoader,
   installLocalFileFetch,
+  loadGltfFromFile,
+  loadVrmAnimationFromFile,
+  loadVrmFromFile,
   render,
   resolveLocalAssetPath,
 } = pkg
@@ -22,6 +25,9 @@ test('module exports Renderer class and render function', () => {
   assert.equal(typeof render, 'function')
   assert.equal(typeof createEncodedImageTextureLoader, 'function')
   assert.equal(typeof installLocalFileFetch, 'function')
+  assert.equal(typeof loadGltfFromFile, 'function')
+  assert.equal(typeof loadVrmAnimationFromFile, 'function')
+  assert.equal(typeof loadVrmFromFile, 'function')
   assert.equal(typeof resolveLocalAssetPath, 'function')
 })
 
@@ -82,6 +88,84 @@ test('Node glTF loader option booleans fail clearly', async () => {
       registerTextureHandlers: 'yes',
     }),
     /options\.registerTextureHandlers must be a boolean/i,
+  )
+})
+
+test('Node loader helper path and option containers fail clearly', async () => {
+  assert.throws(
+    () => createEncodedImageTextureLoader(123),
+    /rootDir must be a string/i,
+  )
+
+  const imageLoader = createEncodedImageTextureLoader(process.cwd())
+  assert.throws(
+    () => imageLoader.setPath(123),
+    /loaderPath must be a string/i,
+  )
+  assert.throws(
+    () => imageLoader.load(123),
+    /url must be a string/i,
+  )
+  assert.throws(
+    () => resolveLocalAssetPath(123),
+    /url must be a string/i,
+  )
+  assert.throws(
+    () => resolveLocalAssetPath('tex.png', 123),
+    /rootDir must be a string/i,
+  )
+
+  await assert.rejects(
+    () => createNodeGltfLoader(123),
+    /rootDir must be a string/i,
+  )
+  await assert.rejects(
+    () => createNodeGltfLoader(process.cwd(), null),
+    /options must be an object/i,
+  )
+  await assert.rejects(
+    () => createNodeGltfLoader(process.cwd(), { configureLoader: 'yes' }),
+    /options\.configureLoader must be a function/i,
+  )
+  await assert.rejects(
+    () => createNodeGltfLoader(process.cwd(), { manager: {} }),
+    /options\.manager must provide an addHandler\(\) function/i,
+  )
+  await assert.rejects(
+    () => loadGltfFromFile(123),
+    /filePath must be a string/i,
+  )
+  await assert.rejects(
+    () => loadGltfFromFile('scene.gltf', null),
+    /options must be an object/i,
+  )
+  await assert.rejects(
+    () => loadGltfFromFile('scene.gltf', { rootDir: 123 }),
+    /options\.rootDir must be a string/i,
+  )
+  await assert.rejects(
+    () => loadGltfFromFile('scene.gltf', { baseUrl: 123, installFetch: false }),
+    /options\.baseUrl must be a string/i,
+  )
+  await assert.rejects(
+    () => loadVrmFromFile(123, { VRMLoaderPlugin: class VRMLoaderPlugin {} }),
+    /filePath must be a string/i,
+  )
+  await assert.rejects(
+    () => loadVrmFromFile('avatar.vrm', { rootDir: 123 }),
+    /options\.rootDir must be a string/i,
+  )
+  await assert.rejects(
+    () => loadVrmFromFile('avatar.vrm', { VRMLoaderPlugin: 'yes' }),
+    /options\.VRMLoaderPlugin must be a function/i,
+  )
+  await assert.rejects(
+    () => loadVrmAnimationFromFile(123, { VRMAnimationLoaderPlugin: class VRMAnimationLoaderPlugin {} }),
+    /filePath must be a string/i,
+  )
+  await assert.rejects(
+    () => loadVrmAnimationFromFile('avatar.vrma', { VRMAnimationLoaderPlugin: 'yes' }),
+    /options\.VRMAnimationLoaderPlugin must be a function/i,
   )
 })
 

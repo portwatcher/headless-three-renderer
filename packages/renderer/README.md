@@ -70,11 +70,11 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 It also exports Node loader helpers:
 
-- `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed.
+- `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed; malformed helper paths and option containers fail clearly.
 - `loadVrmFromFile(filePath, options)`: loads local VRM files with `@pixiv/three-vrm`'s `VRMLoaderPlugin` registered. The Pixiv package remains an optional dependency in your project.
 - `loadVrmAnimationFromFile(filePath, options)`: loads local VRMA files with `@pixiv/three-vrm-animation`'s `VRMAnimationLoaderPlugin` registered. The animation package remains optional.
-- `createNodeGltfLoader(rootDir, options)`: creates a configured `GLTFLoader` bundle for advanced flows, including plugin registration through `options.configureLoader`; malformed helper boolean options fail clearly.
-- `createEncodedImageTextureLoader(rootDir)` / `EncodedImageTextureLoader`: a `LoadingManager` image handler for local PNG/JPEG/WebP files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs that exposes encoded buffers directly to renderer-supported texture slots.
+- `createNodeGltfLoader(rootDir, options)`: creates a configured `GLTFLoader` bundle for advanced flows, including plugin registration through `options.configureLoader`; malformed helper boolean options, callback hooks, and custom managers fail clearly.
+- `createEncodedImageTextureLoader(rootDir)` / `EncodedImageTextureLoader`: a `LoadingManager` image handler for local PNG/JPEG/WebP files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs that exposes encoded buffers directly to renderer-supported texture slots; malformed helper paths fail clearly.
 - `installLocalFileFetch()`: a small `file://` fetch bridge for Three.js `FileLoader` when loading local external glTF buffers.
 - `resolveLocalAssetPath(url, rootDir)`: shared path resolution for local loader helpers.
 
