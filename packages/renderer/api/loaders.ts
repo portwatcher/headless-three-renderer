@@ -366,8 +366,13 @@ function rewriteGlbBufferViewImages(bytes: Buffer): Buffer | null {
 
   let changed = false
   for (const image of Array.isArray(json.images) ? json.images : []) {
-    if (!image || !Number.isInteger(image.bufferView) || typeof image.mimeType !== 'string') continue
-    if (!/^image\/(?:png|jpe?g|webp)$/i.test(image.mimeType)) continue
+    if (!image || !Number.isInteger(image.bufferView)) continue
+    if (typeof image.mimeType !== 'string') {
+      throw new Error('GLB bufferView image is missing mimeType. Embedded GLB images must declare PNG, JPEG, or WebP mimeType values.')
+    }
+    if (!/^image\/(?:png|jpe?g|webp)$/i.test(image.mimeType)) {
+      throw unsupportedEmbeddedImageTypeError('GLB bufferView image', image.mimeType)
+    }
     const imageBytes = glbBufferViewBytes(json, binChunk, image.bufferView)
     if (!imageBytes) continue
     image.uri = `data:${image.mimeType};base64,${imageBytes.toString('base64')}`
@@ -376,6 +381,13 @@ function rewriteGlbBufferViewImages(bytes: Buffer): Buffer | null {
   }
 
   return changed ? encodeGlb(json, binChunk) : null
+}
+
+function unsupportedEmbeddedImageTypeError(label: string, mimeType: string): Error {
+  if (/(?:ktx2|basis|compressed)/i.test(mimeType)) {
+    return new Error(`${label} uses compressed texture MIME type "${mimeType}". KTX2, Basis, and compressed texture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before loading.`)
+  }
+  return new Error(`${label} uses unsupported MIME type "${mimeType}". Embedded GLB images must be PNG, JPEG, or WebP encoded images.`)
 }
 
 function glbBufferViewBytes(json: any, binChunk: Buffer, index: number): Buffer | null {
