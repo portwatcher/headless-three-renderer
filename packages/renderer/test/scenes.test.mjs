@@ -7737,6 +7737,13 @@ test('unsupported environment and reflection probe mappings fail clearly', () =>
         },
       }
     }],
+    ['refraction reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: {
+          texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.EquirectangularRefractionMapping }),
+        },
+      }
+    }],
   ]
 
   for (const [name, setup] of cases) {
