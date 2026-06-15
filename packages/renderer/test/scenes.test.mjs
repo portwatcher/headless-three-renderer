@@ -369,6 +369,19 @@ test('invalid geometry attribute values fail clearly', () => {
   )
 })
 
+test('unsupported BatchedMesh inputs fail clearly', () => {
+  const camera = makeCamera()
+  const scene = new THREE.Scene()
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }))
+  mesh.isBatchedMesh = true
+  scene.add(mesh)
+
+  assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    /THREE\.BatchedMesh is not supported.*ordinary Mesh or InstancedMesh/i,
+  )
+})
+
 test('invalid output dimensions fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))

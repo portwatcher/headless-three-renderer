@@ -141,6 +141,12 @@ function visitObject(
   if (visibleToCamera) {
     updateLodObject(object, camera)
 
+    if (object.isBatchedMesh === true) {
+      throw new Error(
+        'THREE.BatchedMesh is not supported by @headless-three/renderer yet. Expand it to ordinary Mesh or InstancedMesh objects before rendering.',
+      )
+    }
+
     if (object.isMesh === true && object.geometry) {
       appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {

@@ -300,6 +300,7 @@ export interface ThreeObject3DLike {
   children?: ThreeObject3DLike[]
   userData?: Record<string, any>
   isMesh?: boolean
+  isBatchedMesh?: boolean
   isInstancedMesh?: boolean
   isSkinnedMesh?: boolean
   isLOD?: boolean

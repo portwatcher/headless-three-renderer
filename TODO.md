@@ -16,7 +16,7 @@ Current state: strong alpha for mesh-centric still rendering.
 Already supported in the current implementation:
 
 - `THREE.Scene` or `THREE.Object3D` root + `THREE.Camera` input, PNG/RGBA output with malformed scene/camera/option containers, unsupported format values, invalid explicit/aspect-derived dimensions, and invalid camera clipping/matrix values failing clearly, reusable renderer, and target-like raw RGBA output.
-- Meshes, skinned meshes, sprites, geometry groups, vertex colors, indices, normals, UVs, object visibility flags, and object world transforms, with invalid geometry attribute, visibility, and transform matrix values failing clearly.
+- Meshes, skinned meshes, sprites, geometry groups, vertex colors, indices, normals, UVs, object visibility flags, and object world transforms, with invalid geometry attribute, visibility, transform matrix values, and unsupported `THREE.BatchedMesh` inputs failing clearly.
 - `THREE.InstancedMesh` CPU expansion with `instanceMatrix` and `instanceColor`, with invalid explicit instance counts failing clearly.
 - `THREE.InstancedBufferGeometry` CPU expansion for mesh, point, and line geometry with common per-instance offset and color attributes, including dashed line expansion and invalid explicit instance counts or per-attribute repeat values failing clearly.
 - CPU skinning and morph target baking before native rendering, with invalid skinning matrix values, morph target influence values, and malformed morph mode flags failing clearly.
