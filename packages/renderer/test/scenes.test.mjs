@@ -6457,6 +6457,58 @@ test('HalfFloatType raw DataTexture maps decode for material and background text
   }
 })
 
+test('normalized unsigned integer raw DataTexture maps decode for material and background textures', () => {
+  const cases = [
+    [
+      'UnsignedShortType',
+      THREE.UnsignedShortType,
+      () => new Uint16Array([0x8000, 0x4000, 0xffff, 0xffff]),
+    ],
+    [
+      'UnsignedIntType',
+      THREE.UnsignedIntType,
+      () => new Uint32Array([0x80000000, 0x40000000, 0xffffffff, 0xffffffff]),
+    ],
+  ]
+
+  function rgbaTexture(type, data) {
+    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, type)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderTexture(kind, type, data) {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    if (kind === 'material') {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: rgbaTexture(type, data) })))
+    } else {
+      scene.background = rgbaTexture(type, data)
+    }
+    return meanRegion(
+      renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+  }
+
+  for (const [name, type, makeData] of cases) {
+    for (const kind of ['material', 'background']) {
+      const mean = renderTexture(kind, type, makeData())
+      assert.ok(mean.r > 105 && mean.r < 150, `${kind} ${name} red should normalize near 0.5 (${mean.r})`)
+      assert.ok(mean.g > 45 && mean.g < 100, `${kind} ${name} green should normalize near 0.25 (${mean.g})`)
+      assert.ok(mean.b > 180, `${kind} ${name} blue should normalize near 1.0 (${mean.b})`)
+    }
+  }
+})
+
 test('explicit raw texture mipmaps upload for material and background maps', () => {
   function mipmappedCheckerTexture() {
     const size = 16

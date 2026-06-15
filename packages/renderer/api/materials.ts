@@ -97,6 +97,8 @@ const RGDepthPacking = 3203
 
 // Three.js texture type constants
 const UnsignedByteType = 1009
+const UnsignedShortType = 1012
+const UnsignedIntType = 1014
 const HalfFloatType = 1016
 const FloatType = 1015
 const LinearEncoding = 3000
@@ -2123,6 +2125,14 @@ function toRgba8(
     if (!(data instanceof Uint16Array)) return null
     return halfFloatDataToRgba8(data, pixels, allowNarrowChannels)
   }
+  if (textureType === UnsignedShortType) {
+    if (!(data instanceof Uint16Array)) return null
+    return normalizedUnsignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0xffff)
+  }
+  if (textureType === UnsignedIntType) {
+    if (!(data instanceof Uint32Array)) return null
+    return normalizedUnsignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0xffffffff)
+  }
 
   if (data instanceof Uint8Array || data instanceof Uint8ClampedArray) {
     if (data.length === pixels * 4) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
@@ -2283,6 +2293,57 @@ function toRgba8(
   }
 
   return null
+}
+
+function normalizedUnsignedIntegerDataToRgba8(
+  data: Uint16Array | Uint32Array,
+  pixels: number,
+  allowNarrowChannels: boolean,
+  maxValue: number,
+): Uint8Array | null {
+  if (data.length === pixels * 4) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels * 4; i++) {
+      out[i] = normalizedUnsignedIntegerToByte(data[i], maxValue)
+    }
+    return out
+  }
+  if (data.length === pixels * 3) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = normalizedUnsignedIntegerToByte(data[i * 3], maxValue)
+      out[i * 4 + 1] = normalizedUnsignedIntegerToByte(data[i * 3 + 1], maxValue)
+      out[i * 4 + 2] = normalizedUnsignedIntegerToByte(data[i * 3 + 2], maxValue)
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels * 2) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = normalizedUnsignedIntegerToByte(data[i * 2], maxValue)
+      out[i * 4 + 1] = normalizedUnsignedIntegerToByte(data[i * 2 + 1], maxValue)
+      out[i * 4 + 2] = 0
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      const value = normalizedUnsignedIntegerToByte(data[i], maxValue)
+      out[i * 4] = value
+      out[i * 4 + 1] = value
+      out[i * 4 + 2] = value
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  return null
+}
+
+function normalizedUnsignedIntegerToByte(value: number, maxValue: number): number {
+  return Math.max(0, Math.min(255, Math.round((value / maxValue) * 255)))
 }
 
 function halfFloatDataToRgba8(
