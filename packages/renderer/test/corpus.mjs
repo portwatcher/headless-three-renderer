@@ -13,6 +13,7 @@ export function createSceneCorpus() {
     globalClippingPlaneCorpus(),
     lightProbeCorpus(),
     linearFogCorpus(),
+    textureMatrixColorSpaceCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -148,6 +149,39 @@ function linearFogCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 5, 8],
     minNonBackgroundRatio: 0.08,
+  }
+}
+
+function textureMatrixColorSpaceCorpus() {
+  const texture = new THREE.DataTexture(new Uint8Array([
+    64, 64, 64, 255,
+    64, 64, 64, 255,
+    224, 224, 224, 255,
+    224, 224, 224, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.matrixAutoUpdate = false
+  texture.matrix.setUvTransform(0.12, 0.18, 1.7, 1.7, Math.PI / 2, 0.5, 0.5)
+  texture.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.025)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, map: texture }),
+  ))
+
+  return {
+    name: 'texture-matrix-srgb-map',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 5, 6],
+    minNonBackgroundRatio: 0.1,
   }
 }
 
