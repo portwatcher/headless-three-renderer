@@ -145,7 +145,7 @@ The public API accepts only Three.js-like objects:
 - `MeshBasicMaterial.envMap` for one shared material-level reflection or refraction map, including legacy multiply/mix/add combine modes, `reflectivity`, and `refractionRatio`
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
-- `material.side`: `FrontSide`, `BackSide`, `DoubleSide`
+- `material.side`: `FrontSide`, `BackSide`, `DoubleSide`, with clear failures for unsupported side constants
 - `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths
 - alpha test (`material.alphaTest`) with fragment discard
 - transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes

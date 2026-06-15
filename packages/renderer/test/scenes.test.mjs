@@ -3058,6 +3058,16 @@ test('unsupported material stencil constants fail clearly', () => {
   }
 })
 
+test('unsupported material side values fail clearly', () => {
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  material.side = 999
+
+  assertMaterialRenderStateFails(
+    material,
+    /material\.side 999.*not supported/i,
+  )
+})
+
 test('NoBlending disables blending even for transparent materials', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

@@ -929,12 +929,9 @@ export function extractPbrProperties(
   if (Number.isFinite(material.stencilZPass)) {
     props.stencilZPass = materialStencilOperation(material.stencilZPass, 'material.stencilZPass')
   }
-  if (material.side === BackSide) {
-    props.side = 'back'
-  } else if (material.side === DoubleSide) {
-    props.side = 'double'
-  } else if (material.side === FrontSide) {
-    props.side = 'front'
+  const side = materialSide(material)
+  if (side) {
+    props.side = side
   }
   const shadowSide = materialShadowSide(material)
   if (shadowSide) {
@@ -1115,6 +1112,22 @@ function materialStencilOperation(value: unknown, label: string): number {
   throw new Error(
     `${label} ${String(value)} is not supported by @headless-three/renderer. Use a Three.js stencil operation constant such as KeepStencilOp, ReplaceStencilOp, or InvertStencilOp.`,
   )
+}
+
+function materialSide(material: ThreeMaterialLike): string | undefined {
+  if (material.side == null) return undefined
+  switch (material.side) {
+    case FrontSide:
+      return 'front'
+    case BackSide:
+      return 'back'
+    case DoubleSide:
+      return 'double'
+    default:
+      throw new Error(
+        `material.side ${String(material.side)} is not supported by @headless-three/renderer. Use FrontSide, BackSide, or DoubleSide.`,
+      )
+  }
 }
 
 export function materialShadowSide(material: ThreeMaterialLike | undefined): string | undefined {

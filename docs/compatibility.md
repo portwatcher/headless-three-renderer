@@ -69,7 +69,7 @@ Status keys:
 | `ShadowMaterial` | Partial | Transparent shadow receiver output is supported for the renderer's current shadow map path, including `material.color`, `material.opacity`, scene fog, `material.fog` opt-out, and output color-space conversion. Exact WebGLRenderer edge-case parity and multiple shadow-casting lights remain planned. |
 | Base color and opacity | Supported | Includes transparent sorting path. |
 | Vertex colors | Supported | Multiplied with material color. |
-| `material.side` | Supported | Front, back, and double-sided culling. |
+| `material.side` | Supported | Front, back, and double-sided culling; unsupported side constants fail clearly. |
 | Alpha test | Supported | Fragment discard cutoff. |
 | Alpha coverage | Partial | `material.alphaHash` applies deterministic stochastic discard before depth/color writes. `material.alphaToCoverage` uses native MSAA alpha-to-coverage when the effective sample count is greater than 1; exact WebGL sample-mask parity remains planned. |
 | Blending and depth/color state | Partial | Built-in `NoBlending`, `NormalBlending`, `AdditiveBlending`, `SubtractiveBlending`, and `MultiplyBlending` modes, `CustomBlending` equations/factors including constant color/alpha factors, plus `material.depthTest`, `material.depthWrite`, `material.colorWrite`, `material.polygonOffset`, standard material `premultipliedAlpha`, transparent default depth writes, stencil state, and 4x-MSAA `alphaToCoverage` are honored in the main pass. Unsupported blending, custom blend equation/factor, depth function, stencil function, and stencil operation constants fail clearly. Exact WebGLRenderer state parity and custom WGSL premultiplied-output wrapping remain planned. |
