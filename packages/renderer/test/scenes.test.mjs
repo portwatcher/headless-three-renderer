@@ -3276,6 +3276,12 @@ test('invalid billboard and line scalar values fail clearly', () => {
     ['point size', () => pointsScene((material) => {
       material.size = 'large'
     }), /material\.size must be a finite number/i],
+    ['point size zero', () => pointsScene((material) => {
+      material.size = 0
+    }), /material\.size must be positive/i],
+    ['point size negative', () => pointsScene((material) => {
+      material.size = -1
+    }), /material\.size must be positive/i],
     ['line width', () => {
       const material = new THREE.LineBasicMaterial({ color: 0xffffff })
       material.linewidth = Number.POSITIVE_INFINITY

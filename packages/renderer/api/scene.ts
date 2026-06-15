@@ -725,8 +725,7 @@ function appendPoints(
     const outputUvs: number[] = []
     const outputColors: number[] | undefined = useVertexColors ? [] : undefined
     const outputIndices: number[] = []
-    const pointSize = Math.max(0, finiteMaterialOrObjectNumber(material?.size, 'material.size', 1))
-    if (pointSize <= 0) continue
+    const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
 
     for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
       const offsetIndex = instancedPositionOffset ? instancedAttributeIndex(instancedPositionOffset, instance) : 0
