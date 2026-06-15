@@ -1466,6 +1466,12 @@ function finiteOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+function finiteCountOrDefault(value: unknown, label: string, fallback: number): number {
+  if (value == null) return fallback
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label} must be a finite number.`)
+}
+
 function unsignedSortKey(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : fallback
 }
@@ -1480,7 +1486,7 @@ function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number
     maxCount = Math.min(maxCount, attribute.count * meshPerAttribute(attribute))
   }
 
-  const requested = Number.isFinite(geometry.instanceCount) ? geometry.instanceCount! : Infinity
+  const requested = finiteCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity)
   const effectiveCount = Math.min(requested, maxCount)
   if (effectiveCount === Infinity) return 1
   return clampInteger(Math.floor(effectiveCount), 0, Math.max(0, Math.floor(maxCount)))
@@ -2060,7 +2066,7 @@ function meshInstances(object: ThreeObject3DLike, baseTransform: number[]): Mesh
   if (!instanceMatrix || instanceMatrix.count == null) return []
 
   const count = clampInteger(
-    Number.isFinite(object.count) ? object.count! : instanceMatrix.count,
+    finiteCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrix.count),
     0,
     instanceMatrix.count,
   )

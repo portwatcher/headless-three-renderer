@@ -101,8 +101,8 @@ The public API accepts only Three.js-like objects:
 ### Geometry & Scene
 
 - `THREE.Mesh` and `THREE.SkinnedMesh`
-- `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`
-- `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes
+- `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`; invalid explicit instance counts fail clearly
+- `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes; invalid explicit instance counts fail clearly
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts
 - geometry groups with material arrays

@@ -3483,6 +3483,37 @@ test('InstancedBufferGeometry expands per-instance offsets and colors', () => {
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `instance colors should avoid blue contribution (${mean.b})`)
 })
 
+test('invalid instance counts fail clearly', () => {
+  const camera = makeCamera()
+
+  const meshScene = new THREE.Scene()
+  const instancedMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    2,
+  )
+  instancedMesh.count = 'many'
+  meshScene.add(instancedMesh)
+  assert.throws(
+    () => renderRgba(meshScene, camera, { width: 64, height: 64 }),
+    /InstancedMesh\.count must be a finite number/i,
+  )
+
+  const base = new THREE.PlaneGeometry(0.85, 0.85)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.instanceCount = Number.NaN
+  const geometryScene = new THREE.Scene()
+  geometryScene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+
+  assert.throws(
+    () => renderRgba(geometryScene, camera, { width: 64, height: 64 }),
+    /geometry\.instanceCount must be a finite number/i,
+  )
+})
+
 test('aoMap samples the selected UV channel', () => {
   function renderWithChannel(channel) {
     const aoMap = rgbaTexture([
