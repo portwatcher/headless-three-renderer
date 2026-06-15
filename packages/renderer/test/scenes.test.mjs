@@ -1508,6 +1508,39 @@ test('MeshBasicMaterial material envMap supports refraction mapping', () => {
   assert.ok(refracted.r > refracted.g + 15, `refraction should sample the red environment half (${refracted.r}, ${refracted.g})`)
 })
 
+test('material envMap colorSpace controls LDR IBL decode', () => {
+  function renderColorSpace(colorSpace) {
+    const envMap = solidTexture(128, 128, 128)
+    envMap.colorSpace = colorSpace
+    envMap.mapping = THREE.EquirectangularReflectionMapping
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        envMap,
+        combine: THREE.MixOperation,
+        reflectivity: 1,
+      }),
+    ))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 20, `linear material envMap should render brighter than decoded sRGB (${linear.r} vs ${srgb.r})`)
+})
+
 test('scene environment does not affect MeshBasicMaterial without material envMap', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
