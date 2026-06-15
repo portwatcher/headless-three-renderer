@@ -818,6 +818,11 @@ export function extractPbrProperties(
     props.displacementMap = displacementMapInfo.data
     props.displacementMapWidth = displacementMapInfo.width
     props.displacementMapHeight = displacementMapInfo.height
+    props.displacementMapWrapS = wrapModeToString(material.displacementMap?.wrapS)
+    props.displacementMapWrapT = wrapModeToString(material.displacementMap?.wrapT)
+    props.displacementMapMagFilter = filterModeToString(material.displacementMap?.magFilter)
+    props.displacementMapMinFilter = minFilterModeToString(material.displacementMap)
+    props.displacementMapAnisotropy = textureAnisotropy(material.displacementMap, 'material.displacementMap')
     props.displacementMapTransform = textureTransform(material.displacementMap, 'material.displacementMap')
     props.displacementMapUsesUv2 = textureUvChannel(material.displacementMap) > 0
     props.displacementScale = finiteNumberOrDefault(material.displacementScale, 'material.displacementScale', 1)

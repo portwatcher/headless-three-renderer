@@ -861,12 +861,23 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let bump_scale = finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?;
 
     let displacement_map = match &mesh.displacement_map {
-        Some(tex_data) if !tex_data.is_empty() => Some(decode_texture(
-            tex_data,
-            mesh.displacement_map_width,
-            mesh.displacement_map_height,
-            mesh_index,
-        )?),
+        Some(tex_data) if !tex_data.is_empty() => {
+            let mut tex = decode_texture(
+                tex_data,
+                mesh.displacement_map_width,
+                mesh.displacement_map_height,
+                mesh_index,
+            )?;
+            apply_texture_sampling(
+                &mut tex,
+                mesh.displacement_map_wrap_s.as_deref(),
+                mesh.displacement_map_wrap_t.as_deref(),
+                mesh.displacement_map_mag_filter.as_deref(),
+                mesh.displacement_map_min_filter.as_deref(),
+                mesh.displacement_map_anisotropy,
+            );
+            Some(tex)
+        }
         _ => None,
     };
     let displacement_scale = finite_f32(
@@ -2195,13 +2206,69 @@ fn transform_uv(uv: [f32; 2], transform: [f32; 6]) -> [f32; 2] {
 }
 
 fn sample_texture_channel_uv(texture: &PreparedTexture, u: f32, v: f32, channel: usize) -> f32 {
-    let x = (u.clamp(0.0, 1.0) * texture.width as f32)
-        .floor()
-        .clamp(0.0, (texture.width - 1) as f32) as u32;
-    let y = (v.clamp(0.0, 1.0) * texture.height as f32)
-        .floor()
-        .clamp(0.0, (texture.height - 1) as f32) as u32;
+    match texture.mag_filter {
+        TextureFilter::Nearest => sample_texture_channel_nearest(texture, u, v, channel),
+        TextureFilter::Linear => sample_texture_channel_linear(texture, u, v, channel),
+    }
+}
+
+fn sample_texture_channel_nearest(
+    texture: &PreparedTexture,
+    u: f32,
+    v: f32,
+    channel: usize,
+) -> f32 {
+    let x = wrapped_texel_index(
+        (u * texture.width as f32).floor() as i32,
+        texture.width,
+        texture.wrap_s,
+    );
+    let y = wrapped_texel_index(
+        (v * texture.height as f32).floor() as i32,
+        texture.height,
+        texture.wrap_t,
+    );
     texture.rgba[((y * texture.width + x) * 4) as usize + channel] as f32 / 255.0
+}
+
+fn sample_texture_channel_linear(texture: &PreparedTexture, u: f32, v: f32, channel: usize) -> f32 {
+    let x = u * texture.width as f32 - 0.5;
+    let y = v * texture.height as f32 - 0.5;
+    let x0 = x.floor() as i32;
+    let y0 = y.floor() as i32;
+    let tx = x - x0 as f32;
+    let ty = y - y0 as f32;
+
+    let s00 = texel_channel(texture, x0, y0, channel);
+    let s10 = texel_channel(texture, x0 + 1, y0, channel);
+    let s01 = texel_channel(texture, x0, y0 + 1, channel);
+    let s11 = texel_channel(texture, x0 + 1, y0 + 1, channel);
+    let sx0 = s00 * (1.0 - tx) + s10 * tx;
+    let sx1 = s01 * (1.0 - tx) + s11 * tx;
+    sx0 * (1.0 - ty) + sx1 * ty
+}
+
+fn texel_channel(texture: &PreparedTexture, x: i32, y: i32, channel: usize) -> f32 {
+    let tx = wrapped_texel_index(x, texture.width, texture.wrap_s);
+    let ty = wrapped_texel_index(y, texture.height, texture.wrap_t);
+    texture.rgba[((ty * texture.width + tx) * 4) as usize + channel] as f32 / 255.0
+}
+
+fn wrapped_texel_index(index: i32, size: u32, wrap: WrapMode) -> u32 {
+    let size_i = size as i32;
+    match wrap {
+        WrapMode::ClampToEdge => index.clamp(0, size_i - 1) as u32,
+        WrapMode::Repeat => index.rem_euclid(size_i) as u32,
+        WrapMode::MirrorRepeat => {
+            let period = size_i * 2;
+            let wrapped = index.rem_euclid(period);
+            if wrapped >= size_i {
+                (period - wrapped - 1) as u32
+            } else {
+                wrapped as u32
+            }
+        }
+    }
 }
 
 enum ColorMode<'a> {

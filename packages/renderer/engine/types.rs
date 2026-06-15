@@ -626,6 +626,16 @@ pub struct SceneMesh {
     pub displacement_map_width: Option<u32>,
     /// Displacement map height in pixels (required when `displacement_map` is raw RGBA8 bytes).
     pub displacement_map_height: Option<u32>,
+    /// Displacement map horizontal wrap mode.
+    pub displacement_map_wrap_s: Option<String>,
+    /// Displacement map vertical wrap mode.
+    pub displacement_map_wrap_t: Option<String>,
+    /// Displacement map magnification filter.
+    pub displacement_map_mag_filter: Option<String>,
+    /// Displacement map minification filter.
+    pub displacement_map_min_filter: Option<String>,
+    /// Texture anisotropy clamp requested for this sampler. Defaults to 1.
+    pub displacement_map_anisotropy: Option<f64>,
     /// Displacement map UV transform `[a, c, tx, b, d, ty]`.
     pub displacement_map_transform: Option<Vec<f64>>,
     /// Whether displacement map sampling uses the secondary UV stream.

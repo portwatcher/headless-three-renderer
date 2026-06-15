@@ -2510,6 +2510,69 @@ test('displacementMap applies texture UV transforms before depth output', () => 
   assert.ok(displaced.r > flat.r + 15, `displaced depth plane should move nearer and render brighter (${displaced.r} vs ${flat.r})`)
 })
 
+test('displacementMap honors texture filters before depth output', () => {
+  function renderDisplaced(filter) {
+    const displacementMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    displacementMap.magFilter = filter
+    displacementMap.minFilter = filter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.5, 0.5),
+      new THREE.MeshDepthMaterial({
+        displacementMap,
+        displacementScale: 2.5,
+        displacementBias: 0,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const linear = renderDisplaced(THREE.LinearFilter)
+  const nearest = renderDisplaced(THREE.NearestFilter)
+  assert.ok(nearest.r > linear.r + 8, `nearest displacement should sample the high texel more strongly than linear filtering (${nearest.r} vs ${linear.r})`)
+})
+
+test('displacementMap honors repeat wrapping before depth output', () => {
+  function renderDisplaced(wrapS) {
+    const displacementMap = rgbaTexture([
+      255, 255, 255, 255,
+      0, 0, 0, 255,
+    ], 2, 1)
+    displacementMap.wrapS = wrapS
+    displacementMap.magFilter = THREE.NearestFilter
+    displacementMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(1.25, 0.5),
+      new THREE.MeshDepthMaterial({
+        displacementMap,
+        displacementScale: 2.5,
+        displacementBias: 0,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const clamped = renderDisplaced(THREE.ClampToEdgeWrapping)
+  const repeated = renderDisplaced(THREE.RepeatWrapping)
+  assert.ok(repeated.r > clamped.r + 15, `repeat wrapping should wrap displacement UVs to the high texel (${repeated.r} vs ${clamped.r})`)
+})
+
 test('displacementMap applies displacementBias independently of sampled height', () => {
   function renderDisplacementBias(displacementBias) {
     const scene = new THREE.Scene()

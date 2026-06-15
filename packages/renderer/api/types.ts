@@ -819,6 +819,11 @@ export interface NativeSceneMesh {
   displacementMap?: Buffer
   displacementMapWidth?: number
   displacementMapHeight?: number
+  displacementMapWrapS?: string
+  displacementMapWrapT?: string
+  displacementMapMagFilter?: string
+  displacementMapMinFilter?: string
+  displacementMapAnisotropy?: number
   displacementMapTransform?: number[]
   displacementMapUsesUv2?: boolean
   displacementScale?: number
@@ -1205,6 +1210,11 @@ export interface PbrProperties {
   displacementMap?: Buffer
   displacementMapWidth?: number
   displacementMapHeight?: number
+  displacementMapWrapS?: string
+  displacementMapWrapT?: string
+  displacementMapMagFilter?: string
+  displacementMapMinFilter?: string
+  displacementMapAnisotropy?: number
   displacementMapTransform?: number[]
   displacementMapUsesUv2?: boolean
   displacementScale?: number

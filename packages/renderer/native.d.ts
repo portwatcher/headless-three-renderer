@@ -662,6 +662,16 @@ export interface SceneMesh {
   displacementMapWidth?: number
   /** Displacement map height in pixels (required when `displacement_map` is raw RGBA8 bytes). */
   displacementMapHeight?: number
+  /** Displacement map horizontal wrap mode. */
+  displacementMapWrapS?: string
+  /** Displacement map vertical wrap mode. */
+  displacementMapWrapT?: string
+  /** Displacement map magnification filter. */
+  displacementMapMagFilter?: string
+  /** Displacement map minification filter. */
+  displacementMapMinFilter?: string
+  /** Texture anisotropy clamp requested for this sampler. Defaults to 1. */
+  displacementMapAnisotropy?: number
   /** Displacement map UV transform `[a, c, tx, b, d, ty]`. */
   displacementMapTransform?: Array<number>
   /** Whether displacement map sampling uses the secondary UV stream. */
