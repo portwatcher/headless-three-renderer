@@ -2866,6 +2866,42 @@ test('SpriteMaterial map honors explicit texture matrices', () => {
   assert.ok(mean.g > mean.r + 40, `explicit sprite map matrix should shift left sprite UVs from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('SpriteMaterial maps use generated sprite UVs for non-primary texture channels', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const alphaMap = rgbaTexture([
+    255, 255, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.channel = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map,
+    alphaMap,
+    color: 0xffffff,
+  }))
+  sprite.scale.set(2, 2, 1)
+  scene.add(sprite)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const left = meanRegion(rgba, 64, 64, 16, 26, 26, 38)
+  const right = meanRegion(rgba, 64, 64, 38, 26, 48, 38)
+  assert.ok(left.r > left.g + 40, `left generated sprite UVs should sample red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 40, `right generated sprite UVs should sample green (${right.g} vs ${right.r})`)
+})
+
 test('SpriteMaterial alphaMap applies texture UV transforms', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,

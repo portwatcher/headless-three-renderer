@@ -623,6 +623,8 @@ function appendSprite(
 
   const textureInfo = extractTextureData(material)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
+  const pbrProps = extractPbrProperties(material, materialContext)
+  pbrProps.alphaMapUsesUv2 = false
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
   const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
   const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
@@ -642,7 +644,7 @@ function appendSprite(
     textureAnisotropy: textureInfo?.anisotropy,
     textureTransform: textureInfo?.transform,
     textureColorSpace: textureInfo?.colorSpace,
-    textureUsesUv2: textureInfo?.usesUv2,
+    textureUsesUv2: false,
     transform: IDENTITY_4X4.slice(),
     transparent: material?.transparent !== false,
     castShadow: objectCastsShadow && !usesCustomShadowMaterial ? true : undefined,
@@ -650,7 +652,7 @@ function appendSprite(
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
     ...sortInfo.keys,
-    ...extractPbrProperties(material, materialContext),
+    ...pbrProps,
   }, sortInfo.item)
 
   if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
@@ -845,6 +847,8 @@ function appendShadowOnlyBillboardMesh(
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
   const hiddenMainPass = shadowOnlyMainPassState()
+  const shadowProps = shadowPbrProperties(material, sourceMaterial, materialContext)
+  shadowProps.alphaMapUsesUv2 = false
 
   pushMesh(meshes, {
     positions,
@@ -861,7 +865,7 @@ function appendShadowOnlyBillboardMesh(
     textureAnisotropy: textureInfo?.anisotropy,
     textureTransform: textureInfo?.transform,
     textureColorSpace: textureInfo?.colorSpace,
-    textureUsesUv2: textureInfo?.usesUv2,
+    textureUsesUv2: false,
     transform: IDENTITY_4X4.slice(),
     topology: 'triangles',
     castShadow: true,
@@ -869,7 +873,7 @@ function appendShadowOnlyBillboardMesh(
     clipShadows: clipShadowsForMaterial(material, clippingContext),
     ...clipping,
     ...sortInfo.keys,
-    ...shadowPbrProperties(material, sourceMaterial, materialContext),
+    ...shadowProps,
     ...hiddenMainPass,
   }, sortInfo.item)
 }
