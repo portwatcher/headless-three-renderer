@@ -448,7 +448,7 @@ export type RenderSortFunction = (a: RenderSortItem, b: RenderSortItem) => numbe
 export interface RenderOptions {
   width?: number
   height?: number
-  background?: number[] | ThreeColorLike | ThreeTextureLike
+  background?: number[] | ThreeColorLike | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
   backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null

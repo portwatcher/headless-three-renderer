@@ -42,7 +42,10 @@ export function normalizeColorArray(values: number[], label?: string): Color4 {
 }
 
 export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions): Color4 {
-  const color = strictColorLikeToArray(options.background, 'options.background') ?? strictColorLikeToArray(scene.background, 'scene.background')
+  const hasBackgroundOverride = options.background !== undefined
+  const color = hasBackgroundOverride
+    ? strictColorLikeToArray(options.background, 'options.background')
+    : strictColorLikeToArray(scene.background, 'scene.background')
   return color ?? [0.04, 0.045, 0.05, 1]
 }
 
