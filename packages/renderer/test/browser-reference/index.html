@@ -32,6 +32,11 @@
         margin-bottom: 20px;
       }
 
+      .actions {
+        display: flex;
+        gap: 10px;
+      }
+
       h1 {
         margin: 0;
         font-size: 20px;
@@ -53,6 +58,12 @@
       button:hover,
       a:hover {
         background: #2c333d;
+      }
+
+      a[aria-disabled="true"] {
+        cursor: not-allowed;
+        opacity: 0.5;
+        pointer-events: none;
       }
 
       #status {
@@ -91,7 +102,10 @@
   <body>
     <header>
       <h1>Browser Reference Corpus</h1>
-      <button id="download-all" type="button" disabled>Download All</button>
+      <div class="actions">
+        <a id="download-manifest" href="#" aria-disabled="true">Download Manifest</a>
+        <button id="download-all" type="button" disabled>Download All</button>
+      </div>
     </header>
     <div id="status">Rendering corpus with THREE.WebGLRenderer...</div>
     <main id="fixtures"></main>

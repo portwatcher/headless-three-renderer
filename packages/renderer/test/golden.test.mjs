@@ -5,6 +5,7 @@ import path from 'node:path'
 import native from '../native.js'
 import pkg from '../dist/index.js'
 import { createSceneCorpus } from './corpus.mjs'
+import { BROWSER_REFERENCE_MANIFEST_FILE, createBrowserReferenceManifest } from './browser-reference/manifest.mjs'
 
 const { Renderer } = pkg
 
@@ -18,8 +19,12 @@ test('generated corpus matches browser WebGLRenderer golden references', {
 }, async (t) => {
   assert.ok(Number.isFinite(maxMeanDiff) && maxMeanDiff >= 0, 'HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number')
 
+  const fixtures = createSceneCorpus()
+  const manifest = await readReferenceManifest(referenceDir)
+  validateReferenceManifest(manifest, createBrowserReferenceManifest(fixtures))
+
   const renderer = new Renderer()
-  for (const fixture of createSceneCorpus()) {
+  for (const fixture of fixtures) {
     await t.test(fixture.name, async () => {
       const referencePath = path.join(referenceDir, `${fixture.name}.png`)
       const referencePng = await readFile(referencePath)
@@ -43,6 +48,41 @@ test('generated corpus matches browser WebGLRenderer golden references', {
     })
   }
 })
+
+async function readReferenceManifest(referenceDir) {
+  const manifestPath = path.join(referenceDir, BROWSER_REFERENCE_MANIFEST_FILE)
+  let raw
+  try {
+    raw = await readFile(manifestPath, 'utf8')
+  } catch (error) {
+    throw new Error(
+      `Browser reference manifest is required at ${manifestPath}. Regenerate references with test/browser-reference/index.html and save ${BROWSER_REFERENCE_MANIFEST_FILE} with the PNG files.`,
+      { cause: error },
+    )
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`Browser reference manifest at ${manifestPath} is not valid JSON.`, { cause: error })
+  }
+}
+
+function validateReferenceManifest(actual, expected) {
+  assert.equal(actual.schemaVersion, expected.schemaVersion, 'browser reference manifest schemaVersion mismatch')
+  assert.equal(actual.generator, expected.generator, 'browser reference manifest generator mismatch')
+  assert.equal(actual.renderer, expected.renderer, 'browser reference manifest renderer mismatch')
+  assert.equal(
+    actual.threeRevision,
+    expected.threeRevision,
+    'browser reference manifest Three.js revision mismatch; regenerate references with the current dependency version',
+  )
+  assert.deepEqual(
+    actual.fixtures,
+    expected.fixtures,
+    'browser reference manifest fixture list mismatch; regenerate references from the current corpus',
+  )
+}
 
 function diffRgba(actual, expected) {
   assert.equal(actual.length, expected.length, 'RGBA buffers must have matching lengths')

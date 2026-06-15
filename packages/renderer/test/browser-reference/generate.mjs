@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import { createSceneCorpus } from '../corpus.mjs'
+import { BROWSER_REFERENCE_MANIFEST_FILE, createBrowserReferenceManifest } from './manifest.mjs'
 
 const fixturesEl = document.getElementById('fixtures')
 const statusEl = document.getElementById('status')
 const downloadAllButton = document.getElementById('download-all')
+const downloadManifestLink = document.getElementById('download-manifest')
 
 const renderer = new THREE.WebGLRenderer({
   alpha: true,
@@ -17,14 +19,18 @@ renderer.shadowMap.type = THREE.PCFShadowMap
 const downloadLinks = []
 
 try {
-  for (const fixture of createSceneCorpus()) {
+  const fixtures = createSceneCorpus()
+  const manifest = createBrowserReferenceManifest(fixtures)
+  setupManifestDownload(manifest)
+
+  for (const fixture of fixtures) {
     const reference = renderFixture(fixture)
     fixturesEl.appendChild(reference.element)
     downloadLinks.push(reference.link)
     await nextFrame()
   }
 
-  statusEl.textContent = `Rendered ${downloadLinks.length} browser reference PNGs. Save them as <fixture-name>.png in a reference directory.`
+  statusEl.textContent = `Rendered ${fixtures.length} browser reference PNGs. Save them and ${BROWSER_REFERENCE_MANIFEST_FILE} in one reference directory.`
   downloadAllButton.disabled = false
 } catch (error) {
   statusEl.textContent = error instanceof Error ? error.message : String(error)
@@ -36,6 +42,15 @@ downloadAllButton.addEventListener('click', () => {
     setTimeout(() => link.click(), index * 150)
   })
 })
+
+function setupManifestDownload(manifest) {
+  const json = `${JSON.stringify(manifest, null, 2)}\n`
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+  downloadManifestLink.href = url
+  downloadManifestLink.download = BROWSER_REFERENCE_MANIFEST_FILE
+  downloadManifestLink.removeAttribute('aria-disabled')
+  downloadLinks.push(downloadManifestLink)
+}
 
 function renderFixture(fixture) {
   const width = fixture.options.width
