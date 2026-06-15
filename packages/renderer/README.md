@@ -32,15 +32,14 @@ const imageBuffer = render(scene, camera, {
 fs.writeFileSync('render.png', imageBuffer)
 ```
 
-With `GLTFLoader`, render the loaded root directly:
+With local glTF/GLB assets, render the loaded root directly:
 
 ```js
 import fs from 'node:fs'
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { render } from '@headless-three/renderer'
+import { loadGltfFromFile, render } from '@headless-three/renderer'
 
-const gltf = await new GLTFLoader().loadAsync('./model.glb')
+const gltf = await loadGltfFromFile('./model.glb')
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
 camera.position.set(2, 1.5, 4)
@@ -69,6 +68,8 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 It also exports Node loader helpers:
 
+- `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed.
+- `createNodeGltfLoader(rootDir, options)`: creates a configured `GLTFLoader` bundle for advanced flows, including plugin registration through `options.configureLoader`.
 - `createEncodedImageTextureLoader(rootDir)` / `EncodedImageTextureLoader`: a `LoadingManager` image handler for local PNG/JPEG/WebP files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs that exposes encoded buffers directly to renderer-supported texture slots.
 - `installLocalFileFetch()`: a small `file://` fetch bridge for Three.js `FileLoader` when loading local external glTF buffers.
 - `resolveLocalAssetPath(url, rootDir)`: shared path resolution for local loader helpers.
@@ -200,24 +201,24 @@ Call `mixer.update(dt)` and `scene.updateMatrixWorld(true)` before `render()` to
 
 ```js
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm'
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation'
-import { render } from '@headless-three/renderer'
+import { loadGltfFromFile, render } from '@headless-three/renderer'
 
-const gltfLoader = new GLTFLoader()
-gltfLoader.register((parser) => new VRMLoaderPlugin(parser))
-gltfLoader.register((parser) => new VRMAnimationLoaderPlugin(parser))
+const configureVrmLoader = (loader) => {
+  loader.register((parser) => new VRMLoaderPlugin(parser))
+  loader.register((parser) => new VRMAnimationLoaderPlugin(parser))
+}
 
 // Load VRM model
-const modelGltf = await gltfLoader.loadAsync('./avatar.vrm')
+const modelGltf = await loadGltfFromFile('./avatar.vrm', { configureLoader: configureVrmLoader })
 const vrm = modelGltf.userData.vrm
 VRMUtils.removeUnnecessaryVertices(vrm.scene)
 VRMUtils.removeUnnecessaryJoints(vrm.scene)
 vrm.scene.rotation.y = Math.PI
 
 // Load VRMA animation
-const animGltf = await gltfLoader.loadAsync('./dance.vrma')
+const animGltf = await loadGltfFromFile('./dance.vrma', { configureLoader: configureVrmLoader })
 const vrmAnimation = animGltf.userData.vrmAnimations[0]
 const clip = createVRMAnimationClip(vrmAnimation, vrm)
 

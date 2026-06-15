@@ -7,46 +7,18 @@ in a plain Node process.
 
 ## Load A Local glTF Or GLB
 
-Prefer `GLTFLoader.parse()` with bytes read from disk. Pass a base URL ending in
-`/` so relative `.bin`, `.png`, `.jpg`, and `.webp` references resolve against
-the model directory.
+Use `loadGltfFromFile()` for local `.gltf` or `.glb` files. It reads bytes from
+disk, installs the local `file://` fetch bridge used by Three.js `FileLoader`,
+and registers encoded PNG/JPEG/WebP image handlers so external files, data URI
+images, and GLB bufferView images expose renderer-supported buffers.
 
 ```js
 import fs from 'node:fs/promises'
-import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import {
-  createEncodedImageTextureLoader,
-  installLocalFileFetch,
+  loadGltfFromFile,
   render,
 } from '@headless-three/renderer'
-
-async function loadGltfFromFile(filePath) {
-  installLocalFileFetch()
-
-  const absolute = path.resolve(filePath)
-  const root = path.dirname(absolute)
-  const bytes = await fs.readFile(absolute)
-
-  const manager = new THREE.LoadingManager()
-  const encodedImages = createEncodedImageTextureLoader(root)
-  manager.addHandler(/^blob:/i, encodedImages)
-  manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
-  manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
-
-  const loader = new GLTFLoader(manager)
-  const baseUrl = pathToFileURL(`${root}${path.sep}`).href
-
-  return await new Promise((resolve, reject) => {
-    loader.parse(arrayBufferView(bytes), baseUrl, resolve, reject)
-  })
-}
-
-function arrayBufferView(buffer) {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
-}
 
 const gltf = await loadGltfFromFile('./model.gltf')
 
@@ -58,6 +30,24 @@ const imageBuffer = render(gltf.scene, camera, { width: 1024, height: 1024 })
 await fs.writeFile('render.png', imageBuffer)
 ```
 
+If you need loader plugins, register them through the configuration hook before
+the file is parsed:
+
+```js
+import { loadGltfFromFile } from '@headless-three/renderer'
+import { VRMLoaderPlugin } from '@pixiv/three-vrm'
+
+const gltf = await loadGltfFromFile('./avatar.vrm', {
+  configureLoader(loader) {
+    loader.register((parser) => new VRMLoaderPlugin(parser))
+  },
+})
+```
+
+For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
+configured `{ loader, manager, encodedImages }` bundle so callers can add more
+handlers or reuse the loader directly.
+
 The repository includes the same pattern as a runnable script:
 
 ```bash
@@ -65,8 +55,9 @@ pnpm --filter @headless-three/renderer build:ts
 node examples/render-gltf.mjs ./model.gltf render.png
 ```
 
-`createEncodedImageTextureLoader()` returns a Three.js loader handler whose
-textures expose encoded PNG/JPEG/WebP bytes through `texture.image` and
+`createEncodedImageTextureLoader()` returns the lower-level Three.js loader
+handler used by `loadGltfFromFile()`. Its textures expose encoded PNG/JPEG/WebP
+bytes through `texture.image` and
 `texture.source.data`. The renderer decodes those bytes natively, so no DOM
 `Image`, canvas, or WebGL context is needed for external image files or
 PNG/JPEG/WebP data URI or Blob URL image references.

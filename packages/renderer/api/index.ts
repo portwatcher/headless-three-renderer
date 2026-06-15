@@ -31,8 +31,19 @@ import { extractClippingPlanes } from './clipping'
 export {
   EncodedImageTextureLoader,
   createEncodedImageTextureLoader,
+  createNodeGltfLoader,
   installLocalFileFetch,
+  loadGltfFromFile,
   resolveLocalAssetPath,
+} from './loaders'
+
+export type {
+  ConfigureGltfLoader,
+  LoadGltfFromFileOptions,
+  NodeGltfLoaderBundle,
+  NodeGltfLoaderOptions,
+  ThreeGltfLoaderLike,
+  ThreeLoadingManagerLike,
 } from './loaders'
 
 export type {

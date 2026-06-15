@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises'
-import path from 'node:path'
-import { pathToFileURL } from 'node:url'
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import {
-  createEncodedImageTextureLoader,
-  installLocalFileFetch,
+  loadGltfFromFile,
   render,
 } from '../packages/renderer/dist/index.js'
 
@@ -30,27 +26,6 @@ camera.updateMatrixWorld(true)
 const image = render(scene, camera, { width, height })
 await fs.writeFile(outputPath, image)
 console.log(`Rendered ${inputPath} to ${outputPath} (${width}x${height})`)
-
-async function loadGltfFromFile(filePath) {
-  installLocalFileFetch()
-
-  const absolute = path.resolve(filePath)
-  const root = path.dirname(absolute)
-  const bytes = await fs.readFile(absolute)
-
-  const manager = new THREE.LoadingManager()
-  const encodedImages = createEncodedImageTextureLoader(root)
-  manager.addHandler(/^blob:/i, encodedImages)
-  manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
-  manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
-
-  const loader = new GLTFLoader(manager)
-  const baseUrl = pathToFileURL(`${root}${path.sep}`).href
-
-  return await new Promise((resolve, reject) => {
-    loader.parse(arrayBufferView(bytes), baseUrl, resolve, reject)
-  })
-}
 
 function findRenderableCamera(scene, aspect) {
   let camera = null
@@ -84,10 +59,6 @@ function frameSceneCamera(scene, aspect) {
   camera.lookAt(center)
   camera.updateProjectionMatrix()
   return camera
-}
-
-function arrayBufferView(buffer) {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
 }
 
 function positiveInteger(value, fallback) {

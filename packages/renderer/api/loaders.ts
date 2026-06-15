@@ -1,9 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { Texture } = require('three') as { Texture: new () => TextureLike }
+const { LoadingManager, Texture } = require('three') as {
+  LoadingManager: new () => ThreeLoadingManagerLike
+  Texture: new () => TextureLike
+}
 
 type TextureLike = {
   image?: unknown
@@ -11,8 +14,40 @@ type TextureLike = {
   needsUpdate?: boolean
   isTexture?: boolean
 }
+export type ThreeLoadingManagerLike = {
+  addHandler(regex: RegExp, loader: unknown): unknown
+}
+export type ThreeGltfLoaderLike = {
+  parse(data: ArrayBuffer, path: string, onLoad: (gltf: unknown) => void, onError?: (error: unknown) => void): void
+  register?(callback: unknown): unknown
+}
+type GltfLoaderCtor = new (manager?: ThreeLoadingManagerLike) => ThreeGltfLoaderLike
+type GltfLoaderModule = {
+  GLTFLoader: GltfLoaderCtor
+}
 type TextureLoadCallback = (texture: TextureLike) => void
 type TextureErrorCallback = (error: unknown) => void
+
+export type ConfigureGltfLoader = (loader: ThreeGltfLoaderLike) => void | Promise<void>
+
+export type NodeGltfLoaderOptions = {
+  configureLoader?: ConfigureGltfLoader
+  installFetch?: boolean
+  manager?: ThreeLoadingManagerLike
+  registerTextureHandlers?: boolean
+}
+
+export type LoadGltfFromFileOptions = NodeGltfLoaderOptions & {
+  baseUrl?: string
+  rootDir?: string
+}
+
+export type NodeGltfLoaderBundle = {
+  encodedImages: EncodedImageTextureLoader
+  loader: ThreeGltfLoaderLike
+  manager: ThreeLoadingManagerLike
+  rootDir: string
+}
 
 export class EncodedImageTextureLoader {
   private loaderPath = ''
@@ -64,6 +99,42 @@ export class EncodedImageTextureLoader {
 
 export function createEncodedImageTextureLoader(rootDir?: string): EncodedImageTextureLoader {
   return new EncodedImageTextureLoader(rootDir)
+}
+
+export async function createNodeGltfLoader(
+  rootDir: string = process.cwd(),
+  options: NodeGltfLoaderOptions = {},
+): Promise<NodeGltfLoaderBundle> {
+  const root = path.resolve(rootDir)
+  if (options.installFetch !== false) {
+    installLocalFileFetch()
+  }
+
+  const manager = options.manager ?? new LoadingManager()
+  const encodedImages = createEncodedImageTextureLoader(root)
+  if (options.registerTextureHandlers !== false) {
+    registerEncodedImageHandlers(manager, encodedImages)
+  }
+
+  const { GLTFLoader } = await importGltfLoader()
+  const loader = new GLTFLoader(manager)
+  await options.configureLoader?.(loader)
+  return { encodedImages, loader, manager, rootDir: root }
+}
+
+export async function loadGltfFromFile<T = unknown>(
+  filePath: string,
+  options: LoadGltfFromFileOptions = {},
+): Promise<T> {
+  const absolute = path.resolve(filePath)
+  const root = path.resolve(options.rootDir ?? path.dirname(absolute))
+  const { loader } = await createNodeGltfLoader(root, options)
+  const bytes = await readFile(absolute)
+  const baseUrl = options.baseUrl ?? pathToFileURL(`${root}${path.sep}`).href
+
+  return await new Promise<T>((resolve, reject) => {
+    loader.parse(arrayBufferView(bytes), baseUrl, (gltf) => resolve(gltf as T), reject)
+  })
 }
 
 function encodedImageDataUriBuffer(url: string): Buffer | null {
@@ -156,4 +227,22 @@ export function installLocalFileFetch(): void {
   }
 
   globalScope[marker] = true
+}
+
+function registerEncodedImageHandlers(manager: ThreeLoadingManagerLike, encodedImages: EncodedImageTextureLoader): void {
+  manager.addHandler(/^blob:/i, encodedImages)
+  manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
+  manager.addHandler(/\.(png|jpe?g|webp)$/i, encodedImages)
+}
+
+function arrayBufferView(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
+}
+
+const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+  specifier: string,
+) => Promise<GltfLoaderModule>
+
+function importGltfLoader(): Promise<GltfLoaderModule> {
+  return dynamicImport('three/examples/jsm/loaders/GLTFLoader.js')
 }
