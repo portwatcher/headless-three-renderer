@@ -4,7 +4,8 @@ use glam::{Mat4, Vec3};
 use crate::ibl::{EnvMap, IblMaps, compute_ibl};
 use crate::lights::{GpuLight, MAX_LIGHTS, prepare_lights};
 use crate::mesh::{
-    PreparedTexture, TextureFilter, WrapMode, decode_texture_with_label, texture_anisotropy,
+    MipmapFilter, PreparedTexture, TextureFilter, WrapMode, decode_texture_with_label,
+    texture_anisotropy,
 };
 use crate::types::{Camera, RenderScene};
 use crate::util::{
@@ -173,8 +174,12 @@ impl RenderSettings {
                 texture.wrap_t = WrapMode::from_str_opt(scene.background_texture_wrap_t.as_deref());
                 texture.mag_filter =
                     TextureFilter::from_str_opt(scene.background_texture_mag_filter.as_deref());
-                texture.min_filter =
-                    TextureFilter::from_str_opt(scene.background_texture_min_filter.as_deref());
+                texture.min_filter = TextureFilter::from_min_filter_str(
+                    scene.background_texture_min_filter.as_deref(),
+                );
+                texture.mipmap_filter = MipmapFilter::from_min_filter_str(
+                    scene.background_texture_min_filter.as_deref(),
+                );
                 texture.anisotropy = texture_anisotropy(scene.background_texture_anisotropy);
                 Some(BackgroundTexture {
                     texture,

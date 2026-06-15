@@ -193,6 +193,7 @@ pub struct TextureSamplerSettings {
     pub wrap_t: WrapMode,
     pub mag_filter: TextureFilter,
     pub min_filter: TextureFilter,
+    pub mipmap_filter: MipmapFilter,
     pub anisotropy: u16,
 }
 
@@ -203,6 +204,7 @@ impl Default for TextureSamplerSettings {
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
             min_filter: TextureFilter::Linear,
+            mipmap_filter: MipmapFilter::None,
             anisotropy: 1,
         }
     }
@@ -215,6 +217,7 @@ impl TextureSamplerSettings {
             wrap_t: tex.wrap_t,
             mag_filter: tex.mag_filter,
             min_filter: tex.min_filter,
+            mipmap_filter: tex.mipmap_filter,
             anisotropy: tex.anisotropy,
         })
     }
@@ -452,6 +455,7 @@ pub struct PreparedTexture {
     pub wrap_t: WrapMode,
     pub mag_filter: TextureFilter,
     pub min_filter: TextureFilter,
+    pub mipmap_filter: MipmapFilter,
     pub anisotropy: u16,
 }
 
@@ -496,10 +500,44 @@ impl TextureFilter {
         }
     }
 
+    pub fn from_min_filter_str(value: Option<&str>) -> Self {
+        match value {
+            Some("nearest") | Some("nearest-mipmap-nearest") | Some("nearest-mipmap-linear") => {
+                Self::Nearest
+            }
+            _ => Self::Linear,
+        }
+    }
+
     pub fn to_filter_mode(self) -> wgpu::FilterMode {
         match self {
             Self::Nearest => wgpu::FilterMode::Nearest,
             Self::Linear => wgpu::FilterMode::Linear,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum MipmapFilter {
+    #[default]
+    None,
+    Nearest,
+    Linear,
+}
+
+impl MipmapFilter {
+    pub fn from_min_filter_str(value: Option<&str>) -> Self {
+        match value {
+            Some("nearest-mipmap-nearest") | Some("linear-mipmap-nearest") => Self::Nearest,
+            Some("nearest-mipmap-linear") | Some("linear-mipmap-linear") => Self::Linear,
+            _ => Self::None,
+        }
+    }
+
+    pub fn to_mipmap_filter_mode(self) -> wgpu::MipmapFilterMode {
+        match self {
+            Self::None | Self::Nearest => wgpu::MipmapFilterMode::Nearest,
+            Self::Linear => wgpu::MipmapFilterMode::Linear,
         }
     }
 }
@@ -1615,9 +1653,9 @@ fn parse_depth_func(value: Option<&str>, mesh_index: usize) -> Result<StencilCom
         "not-equal" => Ok(StencilCompare::NotEqual),
         "greater-equal" => Ok(StencilCompare::GreaterEqual),
         "always" => Ok(StencilCompare::Always),
-        other => bail!(
-            "scene.meshes[{mesh_index}].depthFunc has unsupported compare function `{other}`"
-        ),
+        other => {
+            bail!("scene.meshes[{mesh_index}].depthFunc has unsupported compare function `{other}`")
+        }
     }
 }
 
@@ -1627,7 +1665,9 @@ fn parse_shadow_side(value: Option<&str>, mesh_index: usize) -> Result<MeshSide>
         Some("front") => Ok(MeshSide::Front),
         Some("back") => Ok(MeshSide::Back),
         Some("double") => Ok(MeshSide::Double),
-        Some(other) => bail!("scene.meshes[{mesh_index}].shadowSide has unsupported side `{other}`"),
+        Some(other) => {
+            bail!("scene.meshes[{mesh_index}].shadowSide has unsupported side `{other}`")
+        }
     }
 }
 
@@ -1691,6 +1731,7 @@ pub fn decode_texture_with_label(
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
             min_filter: TextureFilter::Linear,
+            mipmap_filter: MipmapFilter::None,
             anisotropy: 1,
         });
     }
@@ -1706,6 +1747,7 @@ pub fn decode_texture_with_label(
         wrap_t: WrapMode::ClampToEdge,
         mag_filter: TextureFilter::Linear,
         min_filter: TextureFilter::Linear,
+        mipmap_filter: MipmapFilter::None,
         anisotropy: 1,
     })
 }
@@ -1756,7 +1798,8 @@ fn apply_texture_sampling(
     texture.wrap_s = WrapMode::from_str_opt(wrap_s);
     texture.wrap_t = WrapMode::from_str_opt(wrap_t);
     texture.mag_filter = TextureFilter::from_str_opt(mag_filter);
-    texture.min_filter = TextureFilter::from_str_opt(min_filter);
+    texture.min_filter = TextureFilter::from_min_filter_str(min_filter);
+    texture.mipmap_filter = MipmapFilter::from_min_filter_str(min_filter);
     texture.anisotropy = texture_anisotropy(anisotropy);
 }
 
@@ -1902,39 +1945,47 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
         }
     }
 
+    let physical_layers_sampler = TextureSamplerSettings::first_from_textures(&[
+        inputs.clearcoat,
+        inputs.clearcoat_roughness,
+        inputs.transmission,
+        inputs.thickness,
+        inputs.anisotropy,
+    ]);
+    let sheen_sampler =
+        TextureSamplerSettings::first_from_textures(&[inputs.sheen_color, inputs.sheen_roughness]);
+    let specular_sampler = TextureSamplerSettings::first_from_textures(&[
+        inputs.specular_color,
+        inputs.specular_intensity,
+    ]);
+
     Some(PreparedPhysicalMaps {
-        scalar_map: packed_texture(scalar, width, height),
-        sheen_map: packed_texture(sheen, width, height),
-        anisotropy_map: packed_texture(anisotropy, width, height),
-        specular_map: packed_texture(specular, width, height),
-        physical_layers_sampler: TextureSamplerSettings::first_from_textures(&[
-            inputs.clearcoat,
-            inputs.clearcoat_roughness,
-            inputs.transmission,
-            inputs.thickness,
-            inputs.anisotropy,
-        ]),
-        sheen_sampler: TextureSamplerSettings::first_from_textures(&[
-            inputs.sheen_color,
-            inputs.sheen_roughness,
-        ]),
-        specular_sampler: TextureSamplerSettings::first_from_textures(&[
-            inputs.specular_color,
-            inputs.specular_intensity,
-        ]),
+        scalar_map: packed_texture(scalar, width, height, physical_layers_sampler),
+        sheen_map: packed_texture(sheen, width, height, sheen_sampler),
+        anisotropy_map: packed_texture(anisotropy, width, height, physical_layers_sampler),
+        specular_map: packed_texture(specular, width, height, specular_sampler),
+        physical_layers_sampler,
+        sheen_sampler,
+        specular_sampler,
     })
 }
 
-fn packed_texture(rgba: Vec<u8>, width: u32, height: u32) -> PreparedTexture {
+fn packed_texture(
+    rgba: Vec<u8>,
+    width: u32,
+    height: u32,
+    sampler: TextureSamplerSettings,
+) -> PreparedTexture {
     PreparedTexture {
         rgba,
         width,
         height,
-        wrap_s: WrapMode::ClampToEdge,
-        wrap_t: WrapMode::ClampToEdge,
-        mag_filter: TextureFilter::Linear,
-        min_filter: TextureFilter::Linear,
-        anisotropy: 1,
+        wrap_s: sampler.wrap_s,
+        wrap_t: sampler.wrap_t,
+        mag_filter: sampler.mag_filter,
+        min_filter: sampler.min_filter,
+        mipmap_filter: sampler.mipmap_filter,
+        anisotropy: sampler.anisotropy,
     }
 }
 

@@ -7,8 +7,8 @@ use crate::ibl::IblMaps;
 use crate::lights::{GpuLight, MAX_LIGHTS};
 use crate::mesh::{
     BlendEquation, BlendFactor, BlendMode, CustomBlendState, MAX_CLIPPING_PLANES, MeshSide,
-    PreparedMesh, ShadingModel, StencilCompare, StencilOperation, TextureFilter,
-    TextureSamplerSettings, Topology, Vertex, WrapMode, prepare_meshes,
+    MipmapFilter, PreparedMesh, PreparedTexture, ShadingModel, StencilCompare, StencilOperation,
+    TextureFilter, TextureSamplerSettings, Topology, Vertex, WrapMode, prepare_meshes,
 };
 use crate::settings::{
     BackgroundTexture, BackgroundTextureMapping, OutputColorSpace, OutputFormat,
@@ -1913,12 +1913,14 @@ impl GpuRenderer {
         wrap_t: WrapMode,
         mag_filter: TextureFilter,
         min_filter: TextureFilter,
+        mipmap_mode: MipmapFilter,
         anisotropy: u16,
     ) -> wgpu::Sampler {
         if wrap_s == WrapMode::ClampToEdge
             && wrap_t == WrapMode::ClampToEdge
             && mag_filter == TextureFilter::Linear
             && min_filter == TextureFilter::Linear
+            && mipmap_mode == MipmapFilter::None
             && anisotropy <= 1
         {
             return self.sampler.clone();
@@ -1932,7 +1934,12 @@ impl GpuRenderer {
         let mipmap_filter = if anisotropy_clamp > 1 {
             wgpu::MipmapFilterMode::Linear
         } else {
-            wgpu::MipmapFilterMode::Nearest
+            mipmap_mode.to_mipmap_filter_mode()
+        };
+        let lod_max_clamp = if mipmap_mode == MipmapFilter::None && anisotropy_clamp <= 1 {
+            0.0
+        } else {
+            32.0
         };
         self.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("headless-three-renderer per-mesh sampler"),
@@ -1942,6 +1949,7 @@ impl GpuRenderer {
             mag_filter: mag_filter.to_filter_mode(),
             min_filter: min_filter.to_filter_mode(),
             mipmap_filter,
+            lod_max_clamp,
             anisotropy_clamp,
             ..Default::default()
         })
@@ -1953,6 +1961,7 @@ impl GpuRenderer {
             settings.wrap_t,
             settings.mag_filter,
             settings.min_filter,
+            settings.mipmap_filter,
             settings.anisotropy,
         )
     }
@@ -1973,6 +1982,7 @@ impl GpuRenderer {
             background.texture.wrap_t,
             background.texture.mag_filter,
             background.texture.min_filter,
+            background.texture.mipmap_filter,
             background.texture.anisotropy,
         );
         let background_flags = if background.is_srgb { 1.0 } else { 0.0 }
@@ -2043,40 +2053,30 @@ impl GpuRenderer {
         }
     }
 
-    fn upload_texture(
-        &self,
-        label: &'static str,
-        tex: &crate::mesh::PreparedTexture,
-    ) -> wgpu::Texture {
+    fn upload_texture(&self, label: &'static str, tex: &PreparedTexture) -> wgpu::Texture {
         let tex_size = wgpu::Extent3d {
             width: tex.width,
             height: tex.height,
             depth_or_array_layers: 1,
         };
+        let mip_level_count = texture_mip_level_count(tex.width, tex.height, tex.mipmap_filter);
         let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: tex_size,
-            mip_level_count: 1,
+            mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: COLOR_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &gpu_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
+        self.write_texture_mip_chain(
+            &gpu_texture,
+            0,
             &tex.rgba,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * tex.width),
-                rows_per_image: Some(tex.height),
-            },
-            tex_size,
+            tex.width,
+            tex.height,
+            mip_level_count,
         );
         gpu_texture
     }
@@ -2084,43 +2084,33 @@ impl GpuRenderer {
     fn upload_physical_layers_texture(
         &self,
         label: &'static str,
-        scalar: &crate::mesh::PreparedTexture,
-        anisotropy: Option<&crate::mesh::PreparedTexture>,
+        scalar: &PreparedTexture,
+        anisotropy: Option<&PreparedTexture>,
     ) -> wgpu::Texture {
         let tex_size = wgpu::Extent3d {
             width: scalar.width,
             height: scalar.height,
             depth_or_array_layers: 2,
         };
+        let mip_level_count =
+            texture_mip_level_count(scalar.width, scalar.height, scalar.mipmap_filter);
         let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
             size: tex_size,
-            mip_level_count: 1,
+            mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: COLOR_FORMAT,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        let layer_size = wgpu::Extent3d {
-            width: scalar.width,
-            height: scalar.height,
-            depth_or_array_layers: 1,
-        };
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &gpu_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
+        self.write_texture_mip_chain(
+            &gpu_texture,
+            0,
             &scalar.rgba,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * scalar.width),
-                rows_per_image: Some(scalar.height),
-            },
-            layer_size,
+            scalar.width,
+            scalar.height,
+            mip_level_count,
         );
 
         let mut default_anisotropy = Vec::new();
@@ -2136,22 +2126,83 @@ impl GpuRenderer {
                 default_anisotropy.as_slice()
             }
         };
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &gpu_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d { x: 0, y: 0, z: 1 },
-                aspect: wgpu::TextureAspect::All,
-            },
+        self.write_texture_mip_chain(
+            &gpu_texture,
+            1,
             anisotropy_rgba,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * scalar.width),
-                rows_per_image: Some(scalar.height),
-            },
-            layer_size,
+            scalar.width,
+            scalar.height,
+            mip_level_count,
         );
         gpu_texture
+    }
+
+    fn write_texture_mip_chain(
+        &self,
+        gpu_texture: &wgpu::Texture,
+        array_layer: u32,
+        rgba: &[u8],
+        width: u32,
+        height: u32,
+        mip_level_count: u32,
+    ) {
+        self.write_texture_mip(gpu_texture, 0, array_layer, rgba, width, height);
+        if mip_level_count <= 1 {
+            return;
+        }
+
+        let mut previous = rgba.to_vec();
+        let mut previous_width = width;
+        let mut previous_height = height;
+        for mip_level in 1..mip_level_count {
+            let (next, next_width, next_height) =
+                downsample_rgba_mip(&previous, previous_width, previous_height);
+            self.write_texture_mip(
+                gpu_texture,
+                mip_level,
+                array_layer,
+                &next,
+                next_width,
+                next_height,
+            );
+            previous = next;
+            previous_width = next_width;
+            previous_height = next_height;
+        }
+    }
+
+    fn write_texture_mip(
+        &self,
+        gpu_texture: &wgpu::Texture,
+        mip_level: u32,
+        array_layer: u32,
+        rgba: &[u8],
+        width: u32,
+        height: u32,
+    ) {
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: gpu_texture,
+                mip_level,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: array_layer,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            rgba,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * width),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
     }
 
     fn create_custom_pipeline(
@@ -2584,42 +2635,14 @@ impl GpuRenderer {
 
         let (texture_bind_group, _mesh_texture) = match &mesh.texture {
             Some(tex) => {
-                let tex_size = wgpu::Extent3d {
-                    width: tex.width,
-                    height: tex.height,
-                    depth_or_array_layers: 1,
-                };
-                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("headless-three-renderer mesh texture"),
-                    size: tex_size,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-                self.queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &gpu_texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &tex.rgba,
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(4 * tex.width),
-                        rows_per_image: Some(tex.height),
-                    },
-                    tex_size,
-                );
+                let gpu_texture = self.upload_texture("headless-three-renderer mesh texture", tex);
                 let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 let sampler_for_tex = self.sampler_for_texture(
                     tex.wrap_s,
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.mipmap_filter,
                     tex.anisotropy,
                 );
                 let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -2644,42 +2667,15 @@ impl GpuRenderer {
         let (normal_map_bind_group, _normal_map_texture) =
             match mesh.normal_map.as_ref().or(mesh.bump_map.as_ref()) {
                 Some(tex) => {
-                    let tex_size = wgpu::Extent3d {
-                        width: tex.width,
-                        height: tex.height,
-                        depth_or_array_layers: 1,
-                    };
-                    let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                        label: Some("headless-three-renderer normal or bump map"),
-                        size: tex_size,
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        format: COLOR_FORMAT,
-                        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                        view_formats: &[],
-                    });
-                    self.queue.write_texture(
-                        wgpu::TexelCopyTextureInfo {
-                            texture: &gpu_texture,
-                            mip_level: 0,
-                            origin: wgpu::Origin3d::ZERO,
-                            aspect: wgpu::TextureAspect::All,
-                        },
-                        &tex.rgba,
-                        wgpu::TexelCopyBufferLayout {
-                            offset: 0,
-                            bytes_per_row: Some(4 * tex.width),
-                            rows_per_image: Some(tex.height),
-                        },
-                        tex_size,
-                    );
+                    let gpu_texture =
+                        self.upload_texture("headless-three-renderer normal or bump map", tex);
                     let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
                     let sampler_for_tex = self.sampler_for_texture(
                         tex.wrap_s,
                         tex.wrap_t,
                         tex.mag_filter,
                         tex.min_filter,
+                        tex.mipmap_filter,
                         tex.anisotropy,
                     );
                     let tex_bind_group =
@@ -2704,42 +2700,15 @@ impl GpuRenderer {
 
         let (mr_map_bind_group, _mr_map_texture) = match &mesh.metallic_roughness_texture {
             Some(tex) => {
-                let tex_size = wgpu::Extent3d {
-                    width: tex.width,
-                    height: tex.height,
-                    depth_or_array_layers: 1,
-                };
-                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("headless-three-renderer metallic-roughness map"),
-                    size: tex_size,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-                self.queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &gpu_texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &tex.rgba,
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(4 * tex.width),
-                        rows_per_image: Some(tex.height),
-                    },
-                    tex_size,
-                );
+                let gpu_texture =
+                    self.upload_texture("headless-three-renderer metallic-roughness map", tex);
                 let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 let sampler_for_tex = self.sampler_for_texture(
                     tex.wrap_s,
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.mipmap_filter,
                     tex.anisotropy,
                 );
                 let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -2763,42 +2732,14 @@ impl GpuRenderer {
 
         let (emissive_map_bind_group, _emissive_map_texture) = match &mesh.emissive_map {
             Some(tex) => {
-                let tex_size = wgpu::Extent3d {
-                    width: tex.width,
-                    height: tex.height,
-                    depth_or_array_layers: 1,
-                };
-                let gpu_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                    label: Some("headless-three-renderer emissive map"),
-                    size: tex_size,
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: COLOR_FORMAT,
-                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                    view_formats: &[],
-                });
-                self.queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &gpu_texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d::ZERO,
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &tex.rgba,
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(4 * tex.width),
-                        rows_per_image: Some(tex.height),
-                    },
-                    tex_size,
-                );
+                let gpu_texture = self.upload_texture("headless-three-renderer emissive map", tex);
                 let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
                 let sampler_for_tex = self.sampler_for_texture(
                     tex.wrap_s,
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.mipmap_filter,
                     tex.anisotropy,
                 );
                 let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -2936,6 +2877,7 @@ impl GpuRenderer {
                         tex.wrap_t,
                         tex.mag_filter,
                         tex.min_filter,
+                        tex.mipmap_filter,
                         tex.anisotropy,
                     )
                 })
@@ -2949,6 +2891,7 @@ impl GpuRenderer {
                         tex.wrap_t,
                         tex.mag_filter,
                         tex.min_filter,
+                        tex.mipmap_filter,
                         tex.anisotropy,
                     )
                 })
@@ -2962,6 +2905,7 @@ impl GpuRenderer {
                         tex.wrap_t,
                         tex.mag_filter,
                         tex.min_filter,
+                        tex.mipmap_filter,
                         tex.anisotropy,
                     )
                 })
@@ -2972,6 +2916,7 @@ impl GpuRenderer {
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.mipmap_filter,
                     tex.anisotropy,
                 ),
                 _ => self.sampler.clone(),
@@ -2991,6 +2936,7 @@ impl GpuRenderer {
                     tex.wrap_t,
                     tex.mag_filter,
                     tex.min_filter,
+                    tex.mipmap_filter,
                     tex.anisotropy,
                 ),
                 (None, None, Some(maps)) => self.sampler_for_settings(maps.sheen_sampler),
@@ -3010,6 +2956,7 @@ impl GpuRenderer {
                         tex.wrap_t,
                         tex.mag_filter,
                         tex.min_filter,
+                        tex.mipmap_filter,
                         tex.anisotropy,
                     )
                 })
@@ -3176,6 +3123,56 @@ impl GpuRenderer {
             _clearcoat_normal_map: _clearcoat_normal_map_texture,
         })
     }
+}
+
+fn texture_mip_level_count(width: u32, height: u32, mipmap_filter: MipmapFilter) -> u32 {
+    if mipmap_filter == MipmapFilter::None {
+        return 1;
+    }
+
+    let mut levels = 1;
+    let mut mip_width = width.max(1);
+    let mut mip_height = height.max(1);
+    while mip_width > 1 || mip_height > 1 {
+        mip_width = (mip_width / 2).max(1);
+        mip_height = (mip_height / 2).max(1);
+        levels += 1;
+    }
+    levels
+}
+
+fn downsample_rgba_mip(source: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {
+    let next_width = (width / 2).max(1);
+    let next_height = (height / 2).max(1);
+    let mut output = vec![0u8; (next_width * next_height * 4) as usize];
+
+    for y in 0..next_height {
+        let source_y0 = y * height / next_height;
+        let source_y1 = ((y + 1) * height / next_height).max(source_y0 + 1);
+        for x in 0..next_width {
+            let source_x0 = x * width / next_width;
+            let source_x1 = ((x + 1) * width / next_width).max(source_x0 + 1);
+            let mut sum = [0u32; 4];
+            let mut count = 0u32;
+            for source_y in source_y0..source_y1.min(height) {
+                for source_x in source_x0..source_x1.min(width) {
+                    let source_index = ((source_y * width + source_x) * 4) as usize;
+                    sum[0] += source[source_index] as u32;
+                    sum[1] += source[source_index + 1] as u32;
+                    sum[2] += source[source_index + 2] as u32;
+                    sum[3] += source[source_index + 3] as u32;
+                    count += 1;
+                }
+            }
+            let output_index = ((y * next_width + x) * 4) as usize;
+            output[output_index] = (sum[0] / count) as u8;
+            output[output_index + 1] = (sum[1] / count) as u8;
+            output[output_index + 2] = (sum[2] / count) as u8;
+            output[output_index + 3] = (sum[3] / count) as u8;
+        }
+    }
+
+    (output, next_width, next_height)
 }
 
 fn side_index(side: MeshSide) -> usize {
@@ -4056,4 +4053,46 @@ fn create_cubemap_with_mips(
         }
     }
     texture
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{downsample_rgba_mip, texture_mip_level_count};
+    use crate::mesh::MipmapFilter;
+
+    #[test]
+    fn mip_level_count_tracks_min_filter_mode() {
+        assert_eq!(
+            texture_mip_level_count(8, 4, MipmapFilter::None),
+            1,
+            "non-mipmap filters keep a single uploaded level",
+        );
+        assert_eq!(texture_mip_level_count(8, 4, MipmapFilter::Nearest), 4);
+        assert_eq!(texture_mip_level_count(3, 5, MipmapFilter::Linear), 3);
+        assert_eq!(texture_mip_level_count(1, 1, MipmapFilter::Linear), 1);
+    }
+
+    #[test]
+    fn downsample_rgba_mip_averages_source_regions() {
+        let rgba = vec![
+            0, 0, 0, 255, 10, 20, 30, 255, 200, 0, 0, 255, 210, 20, 30, 255,
+        ];
+        let (mip, width, height) = downsample_rgba_mip(&rgba, 4, 1);
+        assert_eq!((width, height), (2, 1));
+        assert_eq!(
+            mip,
+            vec![5, 10, 15, 255, 205, 10, 15, 255],
+            "each output texel averages its covered source span",
+        );
+    }
+
+    #[test]
+    fn downsample_rgba_mip_covers_odd_dimensions() {
+        let rgba = vec![
+            0, 0, 0, 255, 60, 0, 0, 255, 120, 0, 0, 255, 180, 0, 0, 255, 240, 0, 0, 255,
+        ];
+        let (mip, width, height) = downsample_rgba_mip(&rgba, 5, 1);
+        assert_eq!((width, height), (2, 1));
+        assert_eq!(mip, vec![30, 0, 0, 255, 180, 0, 0, 255]);
+    }
 }

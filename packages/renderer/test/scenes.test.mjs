@@ -4924,6 +4924,51 @@ test('base color maps honor nearest texture filters', () => {
   assert.ok(nearest.r > linear.r + 20, `NearestFilter should preserve a stronger red texel (${nearest.r} vs ${linear.r})`)
 })
 
+test('base color maps generate mip chains for mipmap min filters', () => {
+  function checkerTexture(generateMipmaps) {
+    const size = 16
+    const data = []
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const value = (x + y) % 2 === 0 ? 0 : 255
+        data.push(value, value, value, 255)
+      }
+    }
+    const map = rgbaTexture(data, size, size)
+    map.wrapS = THREE.RepeatWrapping
+    map.wrapT = THREE.RepeatWrapping
+    map.repeat.set(128, 128)
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestMipmapNearestFilter
+    map.generateMipmaps = generateMipmaps
+    return map
+  }
+
+  function renderChecker(generateMipmaps) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map: checkerTexture(generateMipmaps) }),
+    ))
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    return renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace })
+  }
+
+  const mipmapped = renderChecker(true)
+  const baseOnly = renderChecker(false)
+  const gray = (r, g, b) => r > 96 && r < 160 && Math.abs(r - g) < 3 && Math.abs(r - b) < 3
+  const mipmappedGray = countRegionPixels(mipmapped, 64, 64, 4, 4, 60, 60, gray)
+  const baseOnlyGray = countRegionPixels(baseOnly, 64, 64, 4, 4, 60, 60, gray)
+
+  assert.ok(mipmappedGray > 2400, `generated mip chain should minify the checker to gray (${mipmappedGray})`)
+  assert.ok(
+    mipmappedGray > baseOnlyGray + 1800,
+    `mipmapped texture should have far more gray pixels than base-only sampling (${mipmappedGray} vs ${baseOnlyGray})`,
+  )
+})
+
 test('compressed texture inputs fail with a clear pre-decode error', () => {
   const compressedTexture = {
     isTexture: true,
