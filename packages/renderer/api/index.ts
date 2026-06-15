@@ -253,6 +253,12 @@ function toNativeInput(
   const backgroundTextureRotation = colorMode
     ? backgroundRotationToNative(scene.backgroundRotation, backgroundTexture)
     : undefined
+  const backgroundTextureBlurriness = colorMode && backgroundTexture
+    ? optionalFiniteNumber(
+      options.backgroundBlurriness ?? scene.backgroundBlurriness,
+      options.backgroundBlurriness !== undefined ? 'options.backgroundBlurriness' : 'scene.backgroundBlurriness',
+    )
+    : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
   const lights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
@@ -298,7 +304,7 @@ function toNativeInput(
     backgroundTextureColorSpace: backgroundTexture?.colorSpace,
     backgroundTextureMapping: backgroundTexture?.mapping,
     backgroundTextureRotation,
-    backgroundTextureBlurriness: colorMode ? finiteOrUndefined(options.backgroundBlurriness ?? scene.backgroundBlurriness) : undefined,
+    backgroundTextureBlurriness,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
     sampleCount: resolveSampleCount(options),
