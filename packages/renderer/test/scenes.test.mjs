@@ -3281,21 +3281,41 @@ test('invalid billboard and line scalar values fail clearly', () => {
       material.linewidth = Number.POSITIVE_INFINITY
       return lineScene(material)
     }, /material\.linewidth must be a finite number/i],
+    ['line width zero', () => {
+      const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+      material.linewidth = 0
+      return lineScene(material)
+    }, /material\.linewidth must be positive/i],
     ['dash size', () => {
       const material = new THREE.LineDashedMaterial({ color: 0xffffff })
       material.dashSize = 'long'
       return lineScene(material)
     }, /material\.dashSize must be a finite number/i],
+    ['dash size negative', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      material.dashSize = -0.1
+      return lineScene(material)
+    }, /material\.dashSize must be positive/i],
     ['dash gap', () => {
       const material = new THREE.LineDashedMaterial({ color: 0xffffff })
       material.gapSize = Number.NaN
       return lineScene(material)
     }, /material\.gapSize must be a finite number/i],
+    ['dash gap negative', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      material.gapSize = -0.1
+      return lineScene(material)
+    }, /material\.gapSize must be non-negative/i],
     ['dash scale', () => {
       const material = new THREE.LineDashedMaterial({ color: 0xffffff })
       material.scale = 'fast'
       return lineScene(material)
     }, /material\.scale must be a finite number/i],
+    ['dash scale zero', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      material.scale = 0
+      return lineScene(material)
+    }, /material\.scale must be positive/i],
   ]
 
   for (const [label, makeScene, pattern] of cases) {

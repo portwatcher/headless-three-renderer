@@ -1020,7 +1020,7 @@ function appendLineOrPoints(
     const textureInfo = extractTextureData(material)
     const drawStart = group.start
     const drawEnd = group.start + group.count
-    const lineWidth = finiteMaterialOrObjectNumber(material?.linewidth, 'material.linewidth', 1)
+    const lineWidth = positiveMaterialOrObjectNumber(material?.linewidth, 'material.linewidth', 1)
     const thickLine = topology === 'lines' && lineWidth > 1
 
     if (topology === 'lines') {
@@ -1666,6 +1666,14 @@ function nonNegativeMaterialOrObjectNumber(value: unknown, label: string, fallba
   return number
 }
 
+function positiveMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {
+  const number = finiteMaterialOrObjectNumber(value, label, fallback)
+  if (number <= 0) {
+    throw new TypeError(`${label} must be positive.`)
+  }
+  return number
+}
+
 function normalizedMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {
   const number = finiteMaterialOrObjectNumber(value, label, fallback)
   if (number < 0 || number > 1) {
@@ -2022,14 +2030,13 @@ function dashedLineAttributes(
   lineDistance: ThreeBufferAttributeLike | undefined,
   material: { dashSize?: number; gapSize?: number; scale?: number },
 ): DashedLineExpansion {
-  const dashSize = Math.max(0, finiteMaterialOrObjectNumber(material.dashSize, 'material.dashSize', 3))
-  const gapSize = Math.max(0, finiteMaterialOrObjectNumber(material.gapSize, 'material.gapSize', 1))
-  const scale = finiteMaterialOrObjectNumber(material.scale, 'material.scale', 1)
-  if (dashSize <= 0) return { positions: [] }
+  const dashSize = positiveMaterialOrObjectNumber(material.dashSize, 'material.dashSize', 3)
+  const gapSize = nonNegativeMaterialOrObjectNumber(material.gapSize, 'material.gapSize', 1)
+  const scale = positiveMaterialOrObjectNumber(material.scale, 'material.scale', 1)
 
   const segments = lineSegmentsWithDistances(positions, source, start, end, object, lineDistance)
   const out = createDashedLineExpansion(uvs, uvs2, colors)
-  if (scale <= 0 || gapSize <= 0) {
+  if (gapSize <= 0) {
     for (const segment of segments) {
       appendInterpolatedLine(out, positions, uvs, uvs2, colors, segment.a, segment.b, 0, 1)
     }
