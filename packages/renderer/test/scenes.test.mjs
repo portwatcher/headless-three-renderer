@@ -9913,6 +9913,42 @@ test('renderToTarget depthTexture honors transparent default depthWrite', () => 
   assert.ok(disabledDepth.r < 0.5, `transparent depthWrite=false should leave target depth clear (${disabledDepth.r})`)
 })
 
+test('renderToTarget color textures honor FloatType and HalfFloatType readback', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const center = ((32 * 64) + 32) * 4
+  const options = { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }
+
+  const floatTarget = { texture: { type: THREE.FloatType } }
+  renderToTarget(scene, camera, floatTarget, options)
+  const floatData = floatTarget.texture.image.data
+  assert.ok(floatData instanceof Float32Array, 'FloatType color target should receive Float32Array data')
+  assert.ok(Buffer.isBuffer(floatTarget.data), 'target.data should remain raw RGBA8 for compatibility')
+  assert.ok(floatData[center] > 0.5, `FloatType red channel should be normalized (${floatData[center]})`)
+  assert.ok(floatData[center + 1] < 0.05, `FloatType green channel should stay near zero (${floatData[center + 1]})`)
+  assert.ok(floatData[center + 3] > 0.99, `FloatType alpha channel should stay opaque (${floatData[center + 3]})`)
+
+  const halfTarget = { texture: { type: THREE.HalfFloatType } }
+  renderToTarget(scene, camera, halfTarget, options)
+  const halfData = halfTarget.texture.image.data
+  assert.ok(halfData instanceof Uint16Array, 'HalfFloatType color target should receive Uint16Array half-float data')
+  const halfRed = halfFloatToNumber(halfData[center])
+  const halfGreen = halfFloatToNumber(halfData[center + 1])
+  const halfAlpha = halfFloatToNumber(halfData[center + 3])
+  assert.ok(halfRed > 0.5, `HalfFloatType red channel should be normalized (${halfRed})`)
+  assert.ok(halfGreen < 0.05, `HalfFloatType green channel should stay near zero (${halfGreen})`)
+  assert.ok(halfAlpha > 0.99, `HalfFloatType alpha channel should stay opaque (${halfAlpha})`)
+})
+
 test('MSAA sampleCount 4 resolves antialiased color output and render targets', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -10002,7 +10038,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.RedFormat } }, /target color texture format .*not supported.*RGBAFormat/i, 'color texture format'],
-    [{ texture: { type: THREE.FloatType } }, /target color texture type .*not supported.*UnsignedByteType/i, 'color texture type'],
+    [{ texture: { type: THREE.UnsignedShortType } }, /target color texture type .*not supported.*UnsignedByteType.*HalfFloatType.*FloatType/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'depth-stencil format with scalar type'],

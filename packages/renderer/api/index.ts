@@ -775,7 +775,7 @@ function writeCubeRenderTarget(
 
   const texture = ensureCubeTargetTexture(target)
   texture.isCubeTexture = true
-  writeCubeTextureFaces(texture, faces, faceWidth, faceHeight, activeMipmapLevel)
+  writeCubeTextureFaces(texture, faces.map((face) => colorTextureData(texture, face)), faceWidth, faceHeight, activeMipmapLevel)
   texture.needsPMREMUpdate = true
   if (target.depthTexture && depthFaces) {
     if (depthFaces.length !== CUBE_FACE_COUNT) {
@@ -1544,9 +1544,9 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     )
   }
   const type = texture.type
-  if (type != null && type !== UnsignedByteType) {
+  if (type != null && type !== UnsignedByteType && type !== FloatType && type !== HalfFloatType) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType or omit type for RGBA8 readback.`,
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -1617,7 +1617,7 @@ function writeRenderTarget(
 
   const texture = renderTargetColorTexture(target)
   if (texture) {
-    writeRenderTargetTexture(texture, data, width, height)
+    writeRenderTargetTexture(texture, colorTextureData(texture, data), width, height)
   }
 
   if (target.depthTexture != null && depthData) {
@@ -1662,6 +1662,24 @@ function writeRenderTargetTexture(
     sourceData.width = width
     sourceData.height = height
   }
+}
+
+function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNullable<RenderTargetImageLike['data']> {
+  if (texture.type === FloatType) {
+    const color = new Float32Array(rgba.length)
+    for (let i = 0; i < rgba.length; i += 1) {
+      color[i] = rgba[i] / 255
+    }
+    return color
+  }
+  if (texture.type === HalfFloatType) {
+    const color = new Uint16Array(rgba.length)
+    for (let i = 0; i < rgba.length; i += 1) {
+      color[i] = normalizedFloatToHalf(rgba[i] / 255)
+    }
+    return color
+  }
+  return rgba
 }
 
 function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): NonNullable<RenderTargetImageLike['data']> {

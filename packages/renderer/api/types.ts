@@ -490,6 +490,7 @@ export interface RenderTargetTextureLike {
   }
   isCubeTexture?: boolean
   format?: number
+  /** Color targets support UnsignedByteType RGBA8 buffers plus normalized FloatType and HalfFloatType readback arrays. */
   type?: number
   needsUpdate?: boolean
   needsPMREMUpdate?: boolean
