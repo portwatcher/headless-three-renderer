@@ -89,7 +89,7 @@ type TextureImageInput = {
 /**
  * Extract environment map data from scene.environment.
  * Supports DataTexture (equirectangular) with Uint8, Float16, Float32 pixel data.
- * Passes raw typed-array bytes to Rust which handles format detection.
+ * Normalizes 3-channel inputs to RGBA before handing bytes to the native IBL path.
  */
 export function extractEnvironmentMap(scene: ThreeSceneRootLike): EnvironmentMapInfo | null {
   const probe = extractReflectionProbe(scene)
@@ -220,9 +220,13 @@ function extractEnvironmentMapFromTexture(
     const texType = (envTex as any).type ?? UnsignedByteType
     const rawData = image.data as ArrayBufferView & { buffer: ArrayBuffer; byteOffset: number; byteLength: number }
 
-    if (texType === HalfFloatType && rawData instanceof Uint16Array) {
-      // Pass raw half-float bytes — Rust ibl.rs decodes them
-      const channels = rawData.length / (image.width * image.height)
+    if (texType === HalfFloatType) {
+      if (!(rawData instanceof Uint16Array)) {
+        throw new Error(
+          `${label} HalfFloatType environment maps must provide Uint16Array RGB or RGBA pixel data.`,
+        )
+      }
+      const channels = rawTextureChannelCount(rawData, image.width, image.height, label, 'environment map rendering')
       let buf: Buffer
       if (channels === 3) {
         // Expand RGB16F → RGBA16F (half=0x3C00 is 1.0 for alpha)
@@ -241,8 +245,13 @@ function extractEnvironmentMapFromTexture(
       return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
-    if (texType === FloatType && rawData instanceof Float32Array) {
-      const channels = rawData.length / (image.width * image.height)
+    if (texType === FloatType) {
+      if (!(rawData instanceof Float32Array)) {
+        throw new Error(
+          `${label} FloatType environment maps must provide Float32Array RGB or RGBA pixel data.`,
+        )
+      }
+      const channels = rawTextureChannelCount(rawData, image.width, image.height, label, 'environment map rendering')
       let buf: Buffer
       if (channels === 3) {
         const pixels = image.width * image.height
@@ -271,6 +280,7 @@ function extractEnvironmentMapFromTexture(
         colorSpace: textureColorSpace(envTex),
       }
     }
+    throw unsupportedRawTextureDataError(label, 'environment map rendering')
   }
 
   // Encoded image buffer (e.g. loaded HDR encoded as PNG/EXR)
@@ -1112,7 +1122,7 @@ export function extractBackgroundTexture(
   }
   assertSupportedBackgroundTexture(map, label)
 
-  const base = extractTextureFromSlot(map)
+  const base = extractTextureFromSlot(map, label)
   if (!base) return null
 
   return {
@@ -1330,9 +1340,9 @@ function filterModeToString(mode: number | undefined): string | undefined {
   return undefined // default = linear
 }
 
-function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | null {
+function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'): TextureInfo | null {
   if (!map) return null
-  assertSupportedTextureInput(map, 'texture')
+  assertSupportedTextureInput(map, label)
 
   const image = (map as any).image ?? (map as any).source?.data
   if (!image) return null
@@ -1343,6 +1353,7 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | nu
     if (rgba) {
       return { data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength), width: image.width, height: image.height }
     }
+    throw unsupportedRawTextureDataError(label, 'texture rendering')
   }
 
   // Encoded image (PNG/JPEG/WebP Buffer from file loaders)
@@ -1363,6 +1374,26 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map']): TextureInfo | nu
   }
 
   return null
+}
+
+function unsupportedRawTextureDataError(label: string, usage: string): Error {
+  return new Error(
+    `${label} raw texture data must contain RGB or RGBA numeric pixel data for ${usage}; one-channel, two-channel, and mismatched data lengths are not supported yet.`,
+  )
+}
+
+function rawTextureChannelCount(
+  data: ArrayLike<number>,
+  width: number,
+  height: number,
+  label: string,
+  usage: string,
+): 3 | 4 {
+  const pixels = width * height
+  const length = typeof data.length === 'number' ? data.length : Number.NaN
+  const channels = length / pixels
+  if (channels === 3 || channels === 4) return channels
+  throw unsupportedRawTextureDataError(label, usage)
 }
 
 function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string): void {

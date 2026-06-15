@@ -4690,6 +4690,43 @@ test('unsupported texture inputs fail clearly for background and environment slo
   }
 })
 
+test('unsupported raw DataTexture channel layouts fail clearly', () => {
+  function invalidRawTexture(data, type = THREE.UnsignedByteType) {
+    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, type)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const cases = [
+    ['material map', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: invalidRawTexture(new Uint8Array([255, 0])) }),
+      ))
+    }, /texture raw texture data.*RGB or RGBA.*texture rendering/i],
+    ['background', (scene) => {
+      scene.background = invalidRawTexture(new Uint8Array([255, 0]))
+    }, /background raw texture data.*RGB or RGBA.*texture rendering/i],
+    ['environment', (scene) => {
+      scene.environment = invalidRawTexture(new Uint8Array([255, 0]))
+    }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['FloatType environment', (scene) => {
+      scene.environment = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
+    }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+  ]
+
+  for (const [name, setup, pattern] of cases) {
+    const scene = new THREE.Scene()
+    setup(scene)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('base color maps decode sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)

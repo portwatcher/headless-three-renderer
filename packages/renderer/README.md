@@ -113,7 +113,7 @@ The public API accepts only Three.js-like objects:
 ### Materials & Textures
 
 - material base color and opacity
-- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGBA8 DataTexture, with `texture.channel` UV selection and sRGB color-space decode
+- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGB/RGBA numeric DataTexture inputs, with `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
 - base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
@@ -156,10 +156,10 @@ The public API accepts only Three.js-like objects:
 
 Texture image data can be:
 
-- Raw RGBA8 pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
+- Raw RGB/RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`)
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
 
-Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGBA data or an encoded PNG/JPEG/WebP image before rendering.
+Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Raw one-channel, two-channel, and mismatched-length texture payloads fail clearly until those formats are implemented.
 
 ### Lights
 
@@ -181,7 +181,7 @@ Environment maps set on `scene.environment` are supported for image-based lighti
 - **Prefiltered specular cubemap** — GGX importance-sampled at multiple roughness mip levels
 - **BRDF integration LUT** — split-sum approximation lookup table
 
-Supported input formats: equirectangular images in RGBA8, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Scene-environment, reflection-probe, and supported material-level LDR inputs honor explicit `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; omitted color space defaults to sRGB for compatibility. `MeshBasicMaterial.envMap` supports legacy multiply/mix/add combine modes with `reflectivity` plus refraction mappings with `refractionRatio`; Phong/Lambert material env maps honor legacy multiply/mix/add combine modes plus `reflectivity`; non-Basic refraction mappings, PMREM/CubeUV environment inputs, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly until those paths land. `scene.environmentIntensity` is respected for scene environments.
+Supported input formats: equirectangular images in RGB/RGBA byte data, Float16 (`HalfFloatType`), or Float32 (`FloatType`), plus raw or encoded six-face cube reflection textures. Scene-environment, reflection-probe, and supported material-level LDR inputs honor explicit `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; omitted color space defaults to sRGB for compatibility. `MeshBasicMaterial.envMap` supports legacy multiply/mix/add combine modes with `reflectivity` plus refraction mappings with `refractionRatio`; Phong/Lambert material env maps honor legacy multiply/mix/add combine modes plus `reflectivity`; non-Basic refraction mappings, PMREM/CubeUV environment inputs, multiple distinct material env maps, multiple distinct material env-map rotations, and unsupported raw environment texture channel layouts fail clearly until those paths land. `scene.environmentIntensity` is respected for scene environments.
 
 Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular and cube texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
 
