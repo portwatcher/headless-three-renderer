@@ -2111,6 +2111,30 @@ test('displacementMap applies texture UV transforms before depth output', () => 
   assert.ok(displaced.r > flat.r + 15, `displaced depth plane should move nearer and render brighter (${displaced.r} vs ${flat.r})`)
 })
 
+test('displacementMap applies displacementBias independently of sampled height', () => {
+  function renderDisplacementBias(displacementBias) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshDepthMaterial({
+        displacementMap: solidTexture(0, 0, 0),
+        displacementScale: 0,
+        displacementBias,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const flat = renderDisplacementBias(0)
+  const biased = renderDisplacementBias(2.4)
+  assert.ok(biased.r > flat.r + 25, `positive displacementBias should move the plane nearer (${biased.r} vs ${flat.r})`)
+})
+
 test('displacementMap honors explicit texture matrices before depth output', () => {
   function renderDisplaced(matrixOffsetX) {
     const displacementMap = rgbaTexture([
