@@ -894,21 +894,22 @@ export function extractPbrProperties(
       props.blendEquation = materialBlendEquationOrDefault(material.blendEquation, 'material.blendEquation', AddEquation)
       props.blendSrc = materialBlendFactorOrDefault(material.blendSrc, 'material.blendSrc', SrcAlphaFactor)
       props.blendDst = materialBlendFactorOrDefault(material.blendDst, 'material.blendDst', OneMinusSrcAlphaFactor)
-      if (Number.isFinite(material.blendEquationAlpha)) {
+      if (material.blendEquationAlpha != null) {
         props.blendEquationAlpha = materialBlendEquation(material.blendEquationAlpha, 'material.blendEquationAlpha')
       }
-      if (Number.isFinite(material.blendSrcAlpha)) {
+      if (material.blendSrcAlpha != null) {
         props.blendSrcAlpha = materialBlendFactor(material.blendSrcAlpha, 'material.blendSrcAlpha')
       }
-      if (Number.isFinite(material.blendDstAlpha)) {
+      if (material.blendDstAlpha != null) {
         props.blendDstAlpha = materialBlendFactor(material.blendDstAlpha, 'material.blendDstAlpha')
       }
       const blendColor = colorLikeToArray(material.blendColor)
       if (blendColor) {
         props.blendColor = [blendColor[0], blendColor[1], blendColor[2]]
       }
-      if (Number.isFinite(material.blendAlpha)) {
-        props.blendAlpha = clamp01(material.blendAlpha!)
+      const blendAlpha = optionalFiniteNumber(material.blendAlpha, 'material.blendAlpha')
+      if (blendAlpha !== undefined) {
+        props.blendAlpha = clamp01(blendAlpha)
       }
     }
   }
@@ -927,35 +928,40 @@ export function extractPbrProperties(
   }
   if (typeof material.polygonOffset === 'boolean') {
     props.polygonOffset = material.polygonOffset
-    if (Number.isFinite(material.polygonOffsetFactor)) {
-      props.polygonOffsetFactor = material.polygonOffsetFactor!
+    const polygonOffsetFactor = optionalFiniteNumber(material.polygonOffsetFactor, 'material.polygonOffsetFactor')
+    if (polygonOffsetFactor !== undefined) {
+      props.polygonOffsetFactor = polygonOffsetFactor
     }
-    if (Number.isFinite(material.polygonOffsetUnits)) {
-      props.polygonOffsetUnits = material.polygonOffsetUnits!
+    const polygonOffsetUnits = optionalFiniteNumber(material.polygonOffsetUnits, 'material.polygonOffsetUnits')
+    if (polygonOffsetUnits !== undefined) {
+      props.polygonOffsetUnits = polygonOffsetUnits
     }
   }
   if (typeof material.stencilWrite === 'boolean') {
     props.stencilWrite = material.stencilWrite
   }
-  if (Number.isFinite(material.stencilWriteMask)) {
-    props.stencilWriteMask = finiteIntegerOrDefault(material.stencilWriteMask, 0xff)
+  const stencilWriteMask = optionalFiniteNumber(material.stencilWriteMask, 'material.stencilWriteMask')
+  if (stencilWriteMask !== undefined) {
+    props.stencilWriteMask = Math.trunc(stencilWriteMask)
   }
-  if (Number.isFinite(material.stencilFunc)) {
+  if (material.stencilFunc != null) {
     props.stencilFunc = materialStencilFunc(material.stencilFunc, 'material.stencilFunc')
   }
-  if (Number.isFinite(material.stencilRef)) {
-    props.stencilRef = finiteIntegerOrDefault(material.stencilRef, 0)
+  const stencilRef = optionalFiniteNumber(material.stencilRef, 'material.stencilRef')
+  if (stencilRef !== undefined) {
+    props.stencilRef = Math.trunc(stencilRef)
   }
-  if (Number.isFinite(material.stencilFuncMask)) {
-    props.stencilFuncMask = finiteIntegerOrDefault(material.stencilFuncMask, 0xff)
+  const stencilFuncMask = optionalFiniteNumber(material.stencilFuncMask, 'material.stencilFuncMask')
+  if (stencilFuncMask !== undefined) {
+    props.stencilFuncMask = Math.trunc(stencilFuncMask)
   }
-  if (Number.isFinite(material.stencilFail)) {
+  if (material.stencilFail != null) {
     props.stencilFail = materialStencilOperation(material.stencilFail, 'material.stencilFail')
   }
-  if (Number.isFinite(material.stencilZFail)) {
+  if (material.stencilZFail != null) {
     props.stencilZFail = materialStencilOperation(material.stencilZFail, 'material.stencilZFail')
   }
-  if (Number.isFinite(material.stencilZPass)) {
+  if (material.stencilZPass != null) {
     props.stencilZPass = materialStencilOperation(material.stencilZPass, 'material.stencilZPass')
   }
   const side = materialSide(material)
@@ -1032,7 +1038,7 @@ function materialBlending(material: ThreeMaterialLike): string | undefined {
 }
 
 function materialBlendEquationOrDefault(value: unknown, label: string, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback
+  if (value == null) return fallback
   return materialBlendEquation(value, label)
 }
 
@@ -1052,7 +1058,7 @@ function materialBlendEquation(value: unknown, label: string): number {
 }
 
 function materialBlendFactorOrDefault(value: unknown, label: string, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback
+  if (value == null) return fallback
   return materialBlendFactor(value, label)
 }
 

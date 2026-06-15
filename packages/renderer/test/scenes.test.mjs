@@ -3264,6 +3264,39 @@ test('unsupported custom blending constants fail clearly', () => {
   }
 })
 
+test('invalid material render-state numeric values fail clearly', () => {
+  const cases = [
+    ['blendAlpha', (material) => {
+      material.blending = THREE.CustomBlending
+      material.blendSrc = THREE.ConstantAlphaFactor
+      material.blendAlpha = 'opaque'
+    }, /material\.blendAlpha must be a finite number/i],
+    ['polygonOffsetFactor', (material) => {
+      material.polygonOffset = true
+      material.polygonOffsetFactor = 'front'
+    }, /material\.polygonOffsetFactor must be a finite number/i],
+    ['polygonOffsetUnits', (material) => {
+      material.polygonOffset = true
+      material.polygonOffsetUnits = Number.NaN
+    }, /material\.polygonOffsetUnits must be a finite number/i],
+    ['stencilWriteMask', (material) => {
+      material.stencilWriteMask = 'mask'
+    }, /material\.stencilWriteMask must be a finite number/i],
+    ['stencilRef', (material) => {
+      material.stencilRef = Number.POSITIVE_INFINITY
+    }, /material\.stencilRef must be a finite number/i],
+    ['stencilFuncMask', (material) => {
+      material.stencilFuncMask = 'mask'
+    }, /material\.stencilFuncMask must be a finite number/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    mutate(material)
+    assertMaterialRenderStateFails(material, pattern, `${name} should fail clearly`)
+  }
+})
+
 test('unsupported material stencil constants fail clearly', () => {
   for (const field of ['stencilFunc', 'stencilFail', 'stencilZFail', 'stencilZPass']) {
     const material = new THREE.MeshBasicMaterial({
