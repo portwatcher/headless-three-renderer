@@ -107,7 +107,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar values fail clearly
 - geometry groups with material arrays
 - mesh world transforms
-- `THREE.LOD` camera-distance level selection
+- `THREE.LOD` camera-distance level selection, with invalid level distance/hysteresis values failing clearly
 - vertex colors
 - scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `backgroundRotation`, and equirectangular/cube `environmentRotation`; invalid background control values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
 - render-option viewport/scissor rectangles and render-target viewport/scissor fields in output pixel coordinates
@@ -148,7 +148,7 @@ The public API accepts only Three.js-like objects:
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`, with clear failures for unsupported side constants
 - `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths; invalid fog parameter values fail clearly
 - alpha test (`material.alphaTest`) with fragment discard; invalid values fail clearly
-- transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes
+- transparency sorting (back-to-front) with `material.depthWrite` overrides, including Three.js' default transparent depth writes; invalid `renderOrder` values fail clearly
 - material render state: `depthTest`, `depthFunc`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders, `premultipliedAlpha`, stencil state, built-in blending modes, `CustomBlending` equations/factors, and clear failures for unsupported render-state constants or invalid numeric values
 - render-option global clipping planes and material-local clipping planes, with `options.localClippingEnabled: false` available to ignore material-local planes; invalid plane values and over-budget global/group/material combinations beyond eight active planes fail clearly
 - single shared material-level reflection/refraction `envMap` inputs are supported for `MeshBasicMaterial`, and shared reflection `envMap` inputs are supported for `MeshStandardMaterial`, `MeshPhysicalMaterial`, `MeshPhongMaterial`, and `MeshLambertMaterial` through the native IBL path; unsupported material classes, unsupported material env-map classes/options, non-Basic refraction mappings, PMREM/CubeUV mappings, multiple distinct material env maps, and multiple distinct material env-map rotations fail clearly

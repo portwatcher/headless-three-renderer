@@ -3013,6 +3013,38 @@ test('Group renderOrder supplies groupOrder for transparent children', () => {
   assert.ok(mean.r > mean.b + 10, `higher groupOrder red plane should render on top (${mean.r} vs ${mean.b})`)
 })
 
+test('invalid renderOrder values fail clearly', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['mesh renderOrder', () => {
+      const scene = new THREE.Scene()
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+      mesh.renderOrder = Number.NaN
+      scene.add(mesh)
+      return scene
+    }],
+    ['group renderOrder', () => {
+      const scene = new THREE.Scene()
+      const group = new THREE.Group()
+      group.renderOrder = 'front'
+      group.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      scene.add(group)
+      return scene
+    }],
+  ]
+
+  for (const [label, makeScene] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(), camera, { width: 64, height: 64 }),
+      /object\.renderOrder must be a finite number/i,
+      label,
+    )
+  }
+})
+
 test('transparent sort depth uses geometry bounding sphere center', () => {
   function offsetPlane(zOffset, color) {
     const geometry = new THREE.BufferGeometry()
@@ -6602,6 +6634,46 @@ test('LOD selects object level from active camera distance', () => {
 
   assert.ok(near.r > near.b + 10, `near LOD should render the red level (${near.r} vs ${near.b})`)
   assert.ok(far.b > far.r + 5, `far LOD should render the blue level (${far.b} vs ${far.r})`)
+})
+
+test('invalid LOD level values fail clearly', () => {
+  function makeLodScene(mutator) {
+    const lod = new THREE.LOD()
+    lod.addLevel(
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 })),
+      0,
+    )
+    lod.addLevel(
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x0000ff })),
+      4,
+    )
+    mutator(lod)
+
+    const scene = new THREE.Scene()
+    scene.add(lod)
+    return scene
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 6)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['distance', (lod) => {
+      lod.levels[1].distance = 'far'
+    }, /LOD\.levels\[1\]\.distance must be a finite number/i],
+    ['hysteresis', (lod) => {
+      lod.levels[1].hysteresis = Number.POSITIVE_INFINITY
+    }, /LOD\.levels\[1\]\.hysteresis must be a finite number/i],
+  ]
+
+  for (const [label, mutate, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeLodScene(mutate), camera, { width: 64, height: 64 }),
+      pattern,
+      label,
+    )
+  }
 })
 
 test('Fog and FogExp2 affect material output', () => {

@@ -116,7 +116,7 @@ function visitObject(
   if (!object || object.visible === false) return
 
   const nextGroupOrder = object.isGroup === true
-    ? finiteOrDefault(object.renderOrder, 0)
+    ? finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
     : groupOrder
   const visibleToCamera = objectLayersMatchCamera(object, camera)
   const nextClippingContext = visibleToCamera
@@ -1318,7 +1318,7 @@ function sortInfoForObject(
 ): Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey'> {
   return {
     groupOrder,
-    renderOrder: finiteOrDefault(object.renderOrder, 0),
+    renderOrder: finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0),
     sortZ: camera ? projectedObjectZ(object, camera, transform) : 0,
     sortIndex: unsignedSortKey(object.id, sortIndex),
     materialSortKey: finiteOrDefault(material?.id, 0),
@@ -1736,26 +1736,28 @@ function secondaryUvsForMaterial(
 function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | undefined): void {
   if (object.isLOD !== true || !camera || object.autoUpdate === false) return
 
+  const levels = object.levels
+  const normalizedLevels = normalizeLodLevels(levels)
+
   if (typeof object.update === 'function') {
     object.update(camera)
     return
   }
 
-  const levels = object.levels
-  if (!Array.isArray(levels) || levels.length <= 1) return
+  if (normalizedLevels.length <= 1) return
 
   const distance = distanceBetweenMatrices(camera.matrixWorld, object.matrixWorld) / finiteOrDefault(camera.zoom, 1)
-  levels[0].object.visible = true
+  normalizedLevels[0].object.visible = true
 
   let i = 1
-  for (; i < levels.length; i += 1) {
-    const level = levels[i]
-    let levelDistance = finiteOrDefault(level.distance, 0)
+  for (; i < normalizedLevels.length; i += 1) {
+    const level = normalizedLevels[i]
+    let levelDistance = level.distance
     if (level.object.visible) {
-      levelDistance -= levelDistance * finiteOrDefault(level.hysteresis, 0)
+      levelDistance -= levelDistance * level.hysteresis
     }
     if (distance >= levelDistance) {
-      levels[i - 1].object.visible = false
+      normalizedLevels[i - 1].object.visible = false
       level.object.visible = true
     } else {
       break
@@ -1764,9 +1766,18 @@ function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | un
 
   ;(object as { _currentLevel?: number })._currentLevel = i - 1
 
-  for (; i < levels.length; i += 1) {
-    levels[i].object.visible = false
+  for (; i < normalizedLevels.length; i += 1) {
+    normalizedLevels[i].object.visible = false
   }
+}
+
+function normalizeLodLevels(levels: unknown): Array<{ object: ThreeObject3DLike; distance: number; hysteresis: number }> {
+  if (!Array.isArray(levels)) return []
+  return levels.map((level, index) => ({
+    object: (level as { object?: ThreeObject3DLike }).object!,
+    distance: finiteMaterialOrObjectNumber((level as { distance?: unknown }).distance, `LOD.levels[${index}].distance`, 0),
+    hysteresis: finiteMaterialOrObjectNumber((level as { hysteresis?: unknown }).hysteresis, `LOD.levels[${index}].hysteresis`, 0),
+  }))
 }
 
 function distanceBetweenMatrices(a: ThreeCameraLike['matrixWorld'], b: ThreeObject3DLike['matrixWorld']): number {
