@@ -1,5 +1,5 @@
 import type { ThreeCameraLike, RenderOptions, Mat4 } from './types'
-import { OPENGL_TO_WGPU_CLIP, multiplyMatrices, matrixElements, isFinitePositive } from './math'
+import { OPENGL_TO_WGPU_CLIP, multiplyMatrices, matrixElements } from './math'
 
 const DEFAULT_WIDTH = 512
 const DEFAULT_HEIGHT = 512
@@ -16,12 +16,14 @@ export function resolveSize(camera: ThreeCameraLike, options: RenderOptions): { 
     widthLabel = camera.userData?.width != null ? 'camera.userData.width' : 'output width'
     heightLabel = camera.userData?.height != null ? 'camera.userData.height' : 'output height'
   }
-  if (height == null && width != null && isFinitePositive(camera.aspect)) {
-    height = Math.round(width / camera.aspect)
+  if (height == null && width != null && camera.aspect != null) {
+    const aspect = requiredPositiveFiniteNumber(camera.aspect, 'camera.aspect')
+    height = Math.round(width / aspect)
     heightLabel = 'camera.aspect-derived height'
   }
-  if (width == null && height != null && isFinitePositive(camera.aspect)) {
-    width = Math.round(height * camera.aspect!)
+  if (width == null && height != null && camera.aspect != null) {
+    const aspect = requiredPositiveFiniteNumber(camera.aspect, 'camera.aspect')
+    width = Math.round(height * aspect)
     widthLabel = 'camera.aspect-derived width'
   }
 
@@ -42,6 +44,16 @@ function optionalDimension(value: unknown, label: string): number | undefined {
   if (value == null) return undefined
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new TypeError(`${label} must be a finite number.`)
+  }
+  return value
+}
+
+function requiredPositiveFiniteNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  if (value <= 0) {
+    throw new TypeError(`${label} must be positive.`)
   }
   return value
 }

@@ -306,6 +306,20 @@ test('invalid output dimensions fail clearly', () => {
     () => new Renderer().render(scene, userDataCamera, { format: 'rgba' }),
     /camera\.userData\.width must be a positive integer/i,
   )
+
+  const invalidAspectCamera = makeCamera()
+  invalidAspectCamera.aspect = Number.NaN
+  assert.throws(
+    () => new Renderer().render(scene, invalidAspectCamera, { width: 32, format: 'rgba' }),
+    /camera\.aspect must be a finite number/i,
+  )
+
+  const zeroAspectCamera = makeCamera()
+  zeroAspectCamera.aspect = 0
+  assert.throws(
+    () => new Renderer().render(scene, zeroAspectCamera, { height: 32, format: 'rgba' }),
+    /camera\.aspect must be positive/i,
+  )
 })
 
 test('invalid camera clipping distances fail clearly', () => {
