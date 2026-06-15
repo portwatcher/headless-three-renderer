@@ -146,6 +146,7 @@ export class Renderer {
     target: RenderTargetLike = {},
     options: RenderOptions = {},
   ): RenderTargetLike {
+    assertRenderTargetLike(target, 'target')
     const targetOptions: RenderOptions = this.resolveRenderOptions({ ...options, target, format: options.format ?? 'rgba' })
     if (isCubeCamera(camera)) {
       const { target: cubeTarget } = renderCubeCamera(
@@ -225,6 +226,7 @@ export function renderToTarget(
   target: RenderTargetLike = {},
   options: RenderOptions = {},
 ): RenderTargetLike {
+  assertRenderTargetLike(target, 'target')
   const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
   if (isCubeCamera(camera)) {
     const { target: cubeTarget } = renderCubeCamera(scene, camera, targetOptions, native.renderNative)
@@ -1279,7 +1281,16 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
   validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
+  if (Object.prototype.hasOwnProperty.call(options, 'target') && options.target !== undefined) {
+    assertRenderTargetLike(options.target, 'options.target')
+  }
   if (options.target) validateUnsupportedRenderTargetOptions(options.target)
+}
+
+function assertRenderTargetLike(value: unknown, label: string): asserts value is RenderTargetLike {
+  if (value == null || typeof value !== 'object') {
+    throw new TypeError(`${label} must be a target-like object.`)
+  }
 }
 
 function validateSortControls(options: RenderOptions): void {

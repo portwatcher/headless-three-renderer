@@ -9538,6 +9538,15 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0x00ffaa })))
   const camera = makeCamera()
 
+  assert.throws(
+    () => renderToTarget(scene, camera, null, { width: 32, height: 32 }),
+    /target must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, target: 'bad' }),
+    /options\.target must be a target-like object/i,
+  )
+
   const targetCases = [
     [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'texture array'],
     [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
