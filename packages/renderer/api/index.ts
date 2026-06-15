@@ -237,7 +237,7 @@ function toNativeInput(
   const backgroundTextureRotation = colorMode
     ? backgroundRotationToNative(scene.backgroundRotation, backgroundTexture)
     : undefined
-  const clippingPlanes = extractClippingPlanes(options.clippingPlanes)
+  const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
   const lights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
   const flattenedMeshes = flattenScene(

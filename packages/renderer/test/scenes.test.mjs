@@ -3550,6 +3550,44 @@ test('render option clippingPlanes apply as global union planes', () => {
   assert.ok(clippedBottom.b > clippedBottom.g + 80, `bottom side should reveal blue background (${clippedBottom.b} vs ${clippedBottom.g})`)
 })
 
+test('clippingPlanes over the native plane budget fail clearly', () => {
+  function planes(count) {
+    return Array.from({ length: count }, (_, index) => new THREE.Plane(new THREE.Vector3(1, 0, 0), -index - 1))
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const cases = [
+    ['options', () => {
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      return () => renderRgba(scene, camera, { width: 64, height: 64, clippingPlanes: planes(9) })
+    }, /options\.clippingPlanes.*at most 8 active/i],
+    ['group', () => {
+      const scene = new THREE.Scene()
+      const group = new THREE.Group()
+      group.isClippingGroup = true
+      group.clippingPlanes = planes(9)
+      group.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      scene.add(group)
+      return () => renderRgba(scene, camera, { width: 64, height: 64 })
+    }, /ClippingGroup\.clippingPlanes.*at most 8 active/i],
+    ['material', () => {
+      const scene = new THREE.Scene()
+      const material = new THREE.MeshBasicMaterial()
+      material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)]
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+      return () => renderRgba(scene, camera, { width: 64, height: 64, clippingPlanes: planes(8) })
+    }, /material\.clippingPlanes.*at most 8 active/i],
+  ]
+
+  for (const [label, makeRender, pattern] of cases) {
+    assert.throws(makeRender(), pattern, label)
+  }
+})
+
 test('localClippingEnabled false ignores material planes but preserves global planes', () => {
   const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
   material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]

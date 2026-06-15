@@ -4,15 +4,23 @@ export const MAX_CLIPPING_PLANES = 8
 
 export type NativeClippingPlane = [number, number, number, number]
 
-export function extractClippingPlanes(input: readonly ThreePlaneLike[] | null | undefined): NativeClippingPlane[] {
+export function extractClippingPlanes(
+  input: readonly ThreePlaneLike[] | null | undefined,
+  label = 'clippingPlanes',
+  maxPlanes = MAX_CLIPPING_PLANES,
+): NativeClippingPlane[] {
   if (!Array.isArray(input) || input.length === 0) return []
 
   const planes: NativeClippingPlane[] = []
   for (const plane of input) {
     const parsed = parseClippingPlane(plane)
     if (!parsed) continue
+    if (planes.length >= maxPlanes) {
+      throw new Error(
+        `${label} exceeds the remaining native clipping plane budget (${maxPlanes} of ${MAX_CLIPPING_PLANES} remaining). @headless-three/renderer supports at most ${MAX_CLIPPING_PLANES} active global, group, and material clipping planes; reduce the active planes or render separate passes.`,
+      )
+    }
     planes.push(parsed)
-    if (planes.length >= MAX_CLIPPING_PLANES) break
   }
   return planes
 }

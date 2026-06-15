@@ -1025,7 +1025,7 @@ function clippingState(
   )
   const localBudget = Math.max(0, MAX_CLIPPING_PLANES - inheritedUnionPlanes.length - inheritedIntersectionPlanes.length)
   const localPlanes = localClippingEnabled
-    ? extractClippingPlanes(material?.clippingPlanes).slice(0, localBudget)
+    ? extractClippingPlanes(material?.clippingPlanes, 'material.clippingPlanes', localBudget)
     : []
   const localUnionPlanes = material?.clipIntersection === true ? [] : localPlanes
   const localIntersectionPlanes = material?.clipIntersection === true ? localPlanes : []
@@ -1042,21 +1042,19 @@ function clippingState(
 
 function clippingContextForObject(parent: ClippingContext, object: ThreeObject3DLike): ClippingContext {
   if (object.isClippingGroup !== true || object.enabled === false) return parent
-  const planes = extractClippingPlanes(object.clippingPlanes)
-  if (planes.length === 0) return parent
-
   const currentCount = parent.unionPlanes.length + parent.intersectionPlanes.length
-  const nextPlanes = planes.slice(0, Math.max(0, MAX_CLIPPING_PLANES - currentCount))
-  if (nextPlanes.length === 0) return parent
+  const remainingBudget = Math.max(0, MAX_CLIPPING_PLANES - currentCount)
+  const planes = extractClippingPlanes(object.clippingPlanes, 'ClippingGroup.clippingPlanes', remainingBudget)
+  if (planes.length === 0) return parent
 
   return object.clipIntersection === true
     ? {
       unionPlanes: parent.unionPlanes,
-      intersectionPlanes: [...parent.intersectionPlanes, ...nextPlanes],
+      intersectionPlanes: [...parent.intersectionPlanes, ...planes],
       clipShadows: parent.clipShadows || object.clipShadows === true,
     }
     : {
-      unionPlanes: [...parent.unionPlanes, ...nextPlanes],
+      unionPlanes: [...parent.unionPlanes, ...planes],
       intersectionPlanes: parent.intersectionPlanes,
       clipShadows: parent.clipShadows || object.clipShadows === true,
     }
