@@ -12,7 +12,7 @@ target platform and GPU backend.
 | Unique material textures | 64 maps | A texture-heavy scene renders an 8 x 8 grid where every plane has a unique `DataTexture`. |
 | Unique encoded material textures | 36 maps | An encoded-texture scene renders a 6 x 6 grid where every plane has a unique PNG buffer texture. |
 | Direct lights | 64 visible non-ambient lights | The supported native light-array budget is covered with 64 point lights plus ambient light. |
-| Excess direct lights | 33 visible non-ambient lights | Scenes above the supported direct-light budget fail clearly instead of silently dropping lights. |
+| Excess direct lights | 65 visible non-ambient lights | Scenes above the supported direct-light budget fail clearly instead of silently dropping lights. |
 | Output size | 96 x 96 RGBA | The scale tests intentionally use a small output to keep CI focused on scene breadth and adapter/native resource handling. |
 
 ## Platform Expectations
