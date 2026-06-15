@@ -851,13 +851,13 @@ function cameraViewport(camera: ThreeCameraLike): RenderPixelRectLike | undefine
 
 function normalizePixelRect(rect: RenderPixelRectLike, targetWidth: number, targetHeight: number, label: string): PixelRect {
   const [rawX, rawY, rawWidth, rawHeight] = pixelRectComponents(rect)
+  if (![rawX, rawY, rawWidth, rawHeight].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+    throw new TypeError(`${label} must contain finite x, y, width, and height values.`)
+  }
   const x = Math.round(rawX)
   const y = Math.round(rawY)
   const width = Math.round(rawWidth)
   const height = Math.round(rawHeight)
-  if (![x, y, width, height].every(Number.isFinite)) {
-    throw new TypeError(`${label} must contain finite x, y, width, and height values.`)
-  }
   if (x < 0 || y < 0) {
     throw new TypeError(`${label} x and y must be greater than or equal to 0.`)
   }

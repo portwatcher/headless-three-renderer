@@ -12697,6 +12697,10 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
     /options\.viewport width and height must be greater than 0/i,
   )
   assert.throws(
+    () => new Renderer().render(scene, camera, { width: 32, height: 32, viewport: { x: '0', y: 0, width: 16, height: 16 } }),
+    /options\.viewport must contain finite x, y, width, and height values/i,
+  )
+  assert.throws(
     () => new Renderer().render(scene, camera, { width: 32, height: 32, scissor: { x: 0, y: 0, width: 64, height: 16 } }),
     /options\.scissor must fit inside the render target/i,
   )
