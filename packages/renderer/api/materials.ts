@@ -678,7 +678,10 @@ export function extractPbrProperties(
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
   }
   if (material.normalScale) {
-    props.normalScale = [material.normalScale.x ?? 1, material.normalScale.y ?? 1]
+    props.normalScale = [
+      finiteNumberOrDefault(material.normalScale.x, 'material.normalScale.x', 1),
+      finiteNumberOrDefault(material.normalScale.y, 'material.normalScale.y', 1),
+    ]
   }
   const bumpMapInfo = extractTextureFromSlot(material.bumpMap)
   if (bumpMapInfo) {

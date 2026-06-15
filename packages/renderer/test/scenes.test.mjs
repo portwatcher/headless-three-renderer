@@ -664,6 +664,11 @@ test('invalid material scalar values fail clearly', () => {
       material.bumpScale = 'strong'
       return material
     }, /material\.bumpScale must be a finite number/i],
+    ['normalScale.x', () => {
+      const material = new THREE.MeshStandardMaterial({ color: 0xffffff, normalMap: texture })
+      material.normalScale.x = 'wide'
+      return material
+    }, /material\.normalScale\.x must be a finite number/i],
     ['displacementScale', () => {
       const material = new THREE.MeshStandardMaterial({ color: 0xffffff, displacementMap: texture })
       material.displacementScale = Number.NaN
