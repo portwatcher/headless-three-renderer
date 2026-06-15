@@ -3763,6 +3763,9 @@ test('invalid material render-state boolean values fail clearly', () => {
     ['transparent', (material) => {
       material.transparent = 'yes'
     }, /material\.transparent must be a boolean/i],
+    ['vertexColors', (material) => {
+      material.vertexColors = 'yes'
+    }, /material\.vertexColors must be a boolean/i],
     ['depthTest', (material) => {
       material.depthTest = 'yes'
     }, /material\.depthTest must be a boolean/i],
@@ -3791,6 +3794,28 @@ test('invalid material render-state boolean values fail clearly', () => {
     mutate(material)
     assertMaterialRenderStateFails(material, pattern, `${name} should fail clearly`)
   }
+})
+
+test('invalid material sizeAttenuation values fail clearly', () => {
+  const spriteScene = new THREE.Scene()
+  const spriteMaterial = new THREE.SpriteMaterial({ color: 0xffffff })
+  spriteMaterial.sizeAttenuation = 'no'
+  spriteScene.add(new THREE.Sprite(spriteMaterial))
+  assert.throws(
+    () => renderRgba(spriteScene, makeCamera(), { width: 32, height: 32 }),
+    /material\.sizeAttenuation must be a boolean/i,
+  )
+
+  const pointsScene = new THREE.Scene()
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  const pointsMaterial = new THREE.PointsMaterial({ color: 0xffffff })
+  pointsMaterial.sizeAttenuation = 1
+  pointsScene.add(new THREE.Points(geometry, pointsMaterial))
+  assert.throws(
+    () => renderRgba(pointsScene, makeCamera(), { width: 32, height: 32 }),
+    /material\.sizeAttenuation must be a boolean/i,
+  )
 })
 
 test('unsupported material stencil constants fail clearly', () => {

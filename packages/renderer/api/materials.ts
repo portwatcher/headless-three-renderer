@@ -418,6 +418,7 @@ export function extractPbrProperties(
   assertSupportedMaterialClass(material, customFragmentShader)
   assertSupportedMaterialState(material, context)
   assertCompatiblePackedPhysicalMapSamplers(material)
+  optionalBoolean(material.vertexColors, 'material.vertexColors')
   const props: PbrProperties = {}
 
   const usesMaterialEnvironmentMap = material.envMap != null

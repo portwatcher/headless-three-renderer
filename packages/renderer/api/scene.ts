@@ -584,7 +584,8 @@ function appendSprite(
   let scaleX = columnLength3(matrix, 0)
   let scaleY = columnLength3(matrix, 4)
 
-  if (material?.sizeAttenuation === false && camera?.isPerspectiveCamera === true) {
+  const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
+  if (sizeAttenuation === false && camera?.isPerspectiveCamera === true) {
     const viewZ = viewSpaceZ(worldPosition, camera)
     if (Number.isFinite(viewZ)) {
       scaleX *= -viewZ
@@ -882,6 +883,10 @@ function validateObjectShadowFlags(object: ThreeObject3DLike): void {
 }
 
 function optionalObjectBoolean(value: unknown, label: string): boolean | undefined {
+  return optionalSceneBoolean(value, label)
+}
+
+function optionalSceneBoolean(value: unknown, label: string): boolean | undefined {
   if (value == null) return undefined
   if (typeof value === 'boolean') return value
   throw new TypeError(`${label} must be a boolean.`)
@@ -1601,7 +1606,8 @@ function pointWorldSize(
   const projectionY = Math.abs(finiteOrDefault(camera?.projectionMatrix?.elements?.[5], 1))
   if (projectionY <= 0) return 0
 
-  if (camera?.isPerspectiveCamera === true && material?.sizeAttenuation !== false) {
+  const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
+  if (camera?.isPerspectiveCamera === true && sizeAttenuation !== false) {
     return pointSize / projectionY
   }
 
