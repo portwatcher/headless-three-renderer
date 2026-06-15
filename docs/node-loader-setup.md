@@ -55,6 +55,15 @@ pnpm --filter @headless-three/renderer build:ts
 node examples/render-gltf.mjs ./model.gltf render.png
 ```
 
+For VRM avatars and optional VRMA animation clips, install the Pixiv loader
+packages in your project and use the VRM example:
+
+```bash
+pnpm add @pixiv/three-vrm @pixiv/three-vrm-animation
+pnpm --filter @headless-three/renderer build:ts
+node examples/render-vrm.mjs ./avatar.vrm ./dance.vrma render.png
+```
+
 `createEncodedImageTextureLoader()` returns the lower-level Three.js loader
 handler used by `loadGltfFromFile()`. Its textures expose encoded PNG/JPEG/WebP
 bytes through `texture.image` and

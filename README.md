@@ -18,6 +18,7 @@ Headless Three.js ecosystem for rendering Three.js scenes outside the browser.
 ## Examples
 
 - [Render a local glTF/GLB asset](./examples/render-gltf.mjs)
+- [Render a VRM avatar, optionally with VRMA animation](./examples/render-vrm.mjs)
 
 ## Development
 
