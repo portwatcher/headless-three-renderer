@@ -10945,6 +10945,21 @@ test('backgroundIntensity scales background color clears', () => {
   assert.ok(override.r > dimmed.r + 80, `options.backgroundIntensity should override scene.backgroundIntensity (${override.r} vs ${dimmed.r})`)
 })
 
+test('invalid background control option values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  const camera = makeCamera()
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, backgroundIntensity: Number.POSITIVE_INFINITY }),
+    /options\.backgroundIntensity must be a finite number/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, backgroundBlurriness: 'strong' }),
+    /options\.backgroundBlurriness must be a finite number/i,
+  )
+})
+
 test('empty scene renders a texture background', () => {
   const scene = new THREE.Scene()
   scene.background = solidTexture(0, 255, 0)

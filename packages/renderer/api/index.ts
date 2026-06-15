@@ -1223,6 +1223,8 @@ function nonZeroFinite(value: unknown): boolean {
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputFormat(options.format, 'options.format')
   assertSupportedOutputColorSpace(options.outputColorSpace)
+  assertFiniteNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
+  assertFiniteNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
   validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
@@ -1307,15 +1309,19 @@ function validatePostProcessingOptions(value: unknown): void {
 }
 
 function assertFinitePostProcessingNumber(value: unknown, label: string): void {
-  if (value == null) return
-  if (typeof value === 'number' && Number.isFinite(value)) return
-  throw new TypeError(`${label} must be a finite number.`)
+  assertFiniteNumberOption(value, label)
 }
 
 function assertFinitePostProcessingBlend(value: unknown, label: string): void {
   if (value == null || typeof value === 'boolean') return
   if (typeof value === 'number' && Number.isFinite(value)) return
   throw new TypeError(`${label} must be a finite number or boolean.`)
+}
+
+function assertFiniteNumberOption(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value === 'number' && Number.isFinite(value)) return
+  throw new TypeError(`${label} must be a finite number.`)
 }
 
 function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {

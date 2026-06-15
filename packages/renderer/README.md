@@ -86,8 +86,8 @@ The public API accepts only Three.js-like objects:
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; exact WebGL face semantics remain limited.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`.
 - `options.background`: `[r, g, b]`, `[r, g, b, a]`, a `THREE.Color`, or a supported 2D/equirectangular/cube texture. Defaults to `scene.background`.
-- `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds.
-- `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds.
+- `options.backgroundIntensity`: overrides `scene.backgroundIntensity` for supported color and texture backgrounds; invalid values fail clearly.
+- `options.backgroundBlurriness`: overrides `scene.backgroundBlurriness` for supported texture backgrounds; invalid values fail clearly.
 - `options.viewport`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for viewport-limited draws; invalid rectangles fail clearly.
 - `options.scissor`: `[x, y, width, height]` or `{ x, y, width, height }` output pixel rectangle, using a top-left origin, for scissor-clipped draws; invalid rectangles fail clearly.
 - `options.clippingPlanes`: global world-space clipping planes for the render.
