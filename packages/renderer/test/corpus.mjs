@@ -13,6 +13,7 @@ export function createSceneCorpus() {
     materialEnvMapCorpus(),
     meshDepthMaterialCorpus(),
     meshMatcapMaterialCorpus(),
+    meshToonMaterialCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
     lightProbeCorpus(),
@@ -422,6 +423,32 @@ function meshMatcapMaterialCorpus() {
     camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 6, 8],
+    minNonBackgroundRatio: 0.02,
+  }
+}
+
+function meshToonMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.03, 0.025, 0.035)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.12))
+  const key = new THREE.DirectionalLight(0xffffff, 1.8)
+  key.position.set(2, 3, 3)
+  scene.add(key)
+
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 24, 16),
+    new THREE.MeshToonMaterial({
+      color: 0x66ccff,
+      gradientMap: gradientTexture(),
+    }),
+  ))
+
+  return {
+    name: 'mesh-toon-gradient-map',
+    scene,
+    camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [8, 6, 9],
     minNonBackgroundRatio: 0.02,
   }
 }
