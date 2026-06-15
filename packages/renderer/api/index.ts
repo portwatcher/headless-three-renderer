@@ -419,9 +419,9 @@ function toNativeInput(
 
 function normalizedRenderMode(mode: RenderOptions['renderMode']): RenderMode {
   if (mode == null) return 'color'
-  if (mode === 'color' || mode === 'mask' || mode === 'object-id') return mode
+  if (mode === 'color' || mode === 'mask' || mode === 'object-id' || mode === 'normal') return mode
   throw new TypeError(
-    `options.renderMode must be "color", "mask", or "object-id"; received ${String(mode)}`,
+    `options.renderMode must be "color", "mask", "object-id", or "normal"; received ${String(mode)}`,
   )
 }
 
@@ -439,7 +439,9 @@ function applyRenderMode(meshes: NativeSceneMesh[], mode: RenderMode): NativeSce
 function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'>, index: number): NativeSceneMesh {
   const color = mode === 'mask'
     ? [1, 1, 1, materialAlpha(mesh)] as Color4
-    : objectIdColor(mesh, index)
+    : mode === 'object-id'
+      ? objectIdColor(mesh, index)
+      : [1, 1, 1, materialAlpha(mesh)] as Color4
   return {
     positions: mesh.positions,
     indices: mesh.indices,
@@ -494,7 +496,7 @@ function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'
     side: mesh.side,
     shadingModel: 'basic',
     topology: mesh.topology,
-    customFragmentShader: renderModeFragment(color),
+    customFragmentShader: renderModeFragment(mode, color),
     castShadow: false,
     receiveShadow: false,
     groupOrder: mesh.groupOrder,
@@ -552,7 +554,13 @@ function objectSortId(mesh: NativeSceneMesh, index: number): number {
     : index
 }
 
-function renderModeFragment(color: Color4): string {
+function renderModeFragment(mode: Exclude<RenderMode, 'color'>, color: Color4): string {
+  if (mode === 'normal') {
+    return [
+      'let view_normal = normalize((uniforms.view * vec4<f32>(normal, 0.0)).xyz);',
+      'return vec4<f32>(view_normal * 0.5 + vec3<f32>(0.5), 1.0);',
+    ].join('\n')
+  }
   return `return vec4<f32>(${formatWgslFloat(color[0])}, ${formatWgslFloat(color[1])}, ${formatWgslFloat(color[2])}, 1.0);`
 }
 

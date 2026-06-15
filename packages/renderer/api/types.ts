@@ -4,7 +4,7 @@
 
 export type RenderOutputFormat = 'png' | 'rgba'
 export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'linear'
-export type RenderMode = 'color' | 'mask' | 'object-id'
+export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal'
 
 export interface ThreeColorLike {
   r: number

@@ -101,7 +101,7 @@ The public API accepts only Three.js-like objects:
 - `options.localClippingEnabled`: `false` disables material-local clipping planes while preserving `options.clippingPlanes`; defaults to `true`, and invalid values fail clearly.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes; unsupported values fail clearly.
 - `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and texture background output conversion; unsupported values fail clearly.
-- `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, or `'object-id'` for flat RGB object IDs; invalid values fail clearly.
+- `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, `'object-id'` for flat RGB object IDs, or `'normal'` for view-space normal colors; invalid values fail clearly.
 - `options.target`: a non-array target-like object populated with raw RGBA8 readback data for a single color output, including `target.texture`, `target.textures[0]`, or one-element `target.texture` arrays.
 - `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`); malformed containers and invalid effect values fail clearly.
 
@@ -272,7 +272,7 @@ Output uses the Narkowicz ACES Filmic tone mapping fit with a three.js-compatibl
 
 Built-in post-processing can be enabled with `options.postProcessing`. Supported effects are exposure, contrast, saturation, vignette, grayscale, and invert; malformed containers and invalid effect values fail clearly.
 
-`options.renderMode` can request flat auxiliary passes. `'mask'` clears to black and writes white for visible geometry. `'object-id'` clears to RGB zero and encodes each object's adapter sort ID plus one into RGB bytes, making `format: 'rgba'` the preferred inspection path. Target-based object-id renders populate `target.objectIdEntries` and `target.objectIdMap` for reverse lookup from encoded RGB IDs. These modes bypass scene backgrounds, lighting, environment, fog, and post-processing while preserving depth testing, culling, clipping planes, base texture alpha, `material.alphaMap`, `alphaTest`, and `alphaHash`; invalid render modes fail clearly.
+`options.renderMode` can request flat auxiliary passes. `'mask'` clears to black and writes white for visible geometry. `'object-id'` clears to RGB zero and encodes each object's adapter sort ID plus one into RGB bytes, making `format: 'rgba'` the preferred inspection path. `'normal'` clears to black and writes view-space normal colors matching `MeshNormalMaterial` for visible geometry. Target-based object-id renders populate `target.objectIdEntries` and `target.objectIdMap` for reverse lookup from encoded RGB IDs. These modes bypass scene backgrounds, lighting, environment, fog, and post-processing while preserving depth testing, culling, clipping planes, base texture alpha, `material.alphaMap`, `alphaTest`, and `alphaHash`; invalid render modes fail clearly.
 
 ### Custom WGSL Fragment Materials
 

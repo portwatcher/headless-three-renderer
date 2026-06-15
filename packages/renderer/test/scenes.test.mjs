@@ -682,6 +682,39 @@ test('renderMode object-id outputs stable per-object RGB IDs', () => {
   assert.ok(background.r < 2 && background.g < 2 && background.b < 2, `object-id background should be black (${background.r}, ${background.g}, ${background.b})`)
 })
 
+test('renderMode normal outputs view-space normal colors', () => {
+  function makeScene(material) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), material)
+    mesh.rotation.y = Math.PI * 0.25
+    scene.add(mesh)
+    return scene
+  }
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderModeNormals = renderRgba(
+    makeScene(new THREE.MeshBasicMaterial({ color: 0xff0000 })),
+    camera,
+    { width: 64, height: 64, renderMode: 'normal' },
+  )
+  const materialNormals = renderRgba(
+    makeScene(new THREE.MeshNormalMaterial()),
+    camera,
+    { width: 64, height: 64 },
+  )
+
+  const diff = meanAbsDiff(renderModeNormals, materialNormals)
+  const center = meanRegion(renderModeNormals, 64, 64, 28, 28, 36, 36)
+  const background = meanRegion(renderModeNormals, 64, 64, 0, 0, 8, 8)
+  assert.ok(diff < 1, `renderMode normal should match MeshNormalMaterial output (diff=${diff.toFixed(2)})`)
+  assert.ok(center.r > 120 && center.b > 200, `normal pass center should encode tilted view normal (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(background.r < 2 && background.g < 2 && background.b < 2, `normal background should be black (${background.r}, ${background.g}, ${background.b})`)
+})
+
 test('renderMode object-id target includes reverse lookup metadata', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -740,7 +773,7 @@ test('invalid renderMode values fail clearly', () => {
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial()))
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 32, height: 32, renderMode: 'normals' }),
-    /options\.renderMode must be "color", "mask", or "object-id"/i,
+    /options\.renderMode must be "color", "mask", "object-id", or "normal"/i,
   )
 })
 
