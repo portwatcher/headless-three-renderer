@@ -41,11 +41,15 @@ export function normalizeColorArray(values: number[], label?: string): Color4 {
   ]
 }
 
-export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions): Color4 {
+export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions, hasBackgroundTexture = false): Color4 {
   const hasBackgroundOverride = options.background !== undefined
-  const color = hasBackgroundOverride
-    ? strictColorLikeToArray(options.background, 'options.background')
-    : strictColorLikeToArray(scene.background, 'scene.background')
+  if (hasBackgroundOverride) {
+    const color = strictColorLikeToArray(options.background, 'options.background')
+    if (color) return color
+    if (options.background == null || hasBackgroundTexture) return [0.04, 0.045, 0.05, 1]
+    throw new TypeError('options.background must be a color, texture, or null.')
+  }
+  const color = strictColorLikeToArray(scene.background, 'scene.background')
   return color ?? [0.04, 0.045, 0.05, 1]
 }
 

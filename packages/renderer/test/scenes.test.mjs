@@ -12550,6 +12550,14 @@ test('invalid background color values fail clearly', () => {
     () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: [1, 0] }),
     /options\.background must be \[r, g, b\] or \[r, g, b, a\]/i,
   )
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: 'red' }),
+    /options\.background must be a color, texture, or null/i,
+  )
+  assert.throws(
+    () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: {} }),
+    /options\.background must be a color, texture, or null/i,
+  )
 
   const scene = new THREE.Scene()
   scene.background = { isColor: true, r: 0, g: Number.NaN, b: 1 }

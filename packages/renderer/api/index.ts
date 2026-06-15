@@ -345,7 +345,7 @@ function toNativeInput(
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
-    background: colorMode ? resolveBackground(scene, options) : [0, 0, 0, 1],
+    background: colorMode ? resolveBackground(scene, options, backgroundTexture != null) : [0, 0, 0, 1],
     backgroundIntensity,
     viewport: pixelRectToArray(viewport),
     scissor: pixelRectToArray(scissor),
