@@ -3144,6 +3144,38 @@ test('opaque sorting honors material variant before depth', () => {
   assert.ok(mean.b > mean.r + 60, `instanced material variant should draw after the normal mesh (${mean.b} vs ${mean.r})`)
 })
 
+test('transmissive bucket renders before ordinary transparent bucket', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      opacity: 1,
+      transparent: true,
+      depthWrite: false,
+    }),
+  ))
+
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.05,
+      transmission: 1,
+      thickness: 0.2,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 160, `ordinary transparent red should draw after transmissive blue (${mean.r} vs ${mean.b})`)
+})
+
 test('invalid renderOrder values fail clearly', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)

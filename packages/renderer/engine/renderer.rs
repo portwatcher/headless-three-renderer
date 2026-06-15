@@ -1440,7 +1440,7 @@ impl GpuRenderer {
             None => (self.default_shadow_bind_group.clone(), None),
         };
 
-        let (opaque_order, transparent_order) = partition_draw_order(meshes);
+        let (opaque_order, transmissive_order, transparent_order) = partition_draw_order(meshes);
 
         let unpadded_bytes_per_row = settings.width * 4;
         let padded_bytes_per_row =
@@ -1570,7 +1570,7 @@ impl GpuRenderer {
             }
         }
 
-        if !transparent_order.is_empty() {
+        if !transmissive_order.is_empty() || !transparent_order.is_empty() {
             let scene_color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("headless-three-renderer scene color texture"),
                 size: texture_size,
@@ -1651,7 +1651,7 @@ impl GpuRenderer {
             pass.set_bind_group(5, &ibl_bind_group, &[]);
             pass.set_bind_group(7, &scene_shadow_bind_group, &[]);
             let mut current_pipeline: Option<PipelineKey> = None;
-            for &i in &transparent_order {
+            for &i in transmissive_order.iter().chain(transparent_order.iter()) {
                 let mesh = &gpu_meshes[i];
                 if let Some(pipeline) = &mesh.pipeline_override {
                     pass.set_pipeline(pipeline);
@@ -3662,12 +3662,15 @@ impl GpuRenderer {
     }
 }
 
-fn partition_draw_order(meshes: &[PreparedMesh]) -> (Vec<usize>, Vec<usize>) {
+fn partition_draw_order(meshes: &[PreparedMesh]) -> (Vec<usize>, Vec<usize>, Vec<usize>) {
     let mut opaque = Vec::new();
+    let mut transmissive = Vec::new();
     let mut transparent = Vec::new();
 
     for (i, mesh) in meshes.iter().enumerate() {
-        if mesh.is_transparent {
+        if mesh.transmission > 0.0001 {
+            transmissive.push(i);
+        } else if mesh.is_transparent {
             transparent.push(i);
         } else {
             opaque.push(i);
@@ -3677,9 +3680,10 @@ fn partition_draw_order(meshes: &[PreparedMesh]) -> (Vec<usize>, Vec<usize>) {
     opaque.sort_by(|&a, &b| compare_opaque_meshes(&meshes[a], &meshes[b]));
 
     // Sort transparent meshes back-to-front (farthest first)
+    transmissive.sort_by(|&a, &b| compare_transparent_meshes(&meshes[a], &meshes[b]));
     transparent.sort_by(|&a, &b| compare_transparent_meshes(&meshes[a], &meshes[b]));
 
-    (opaque, transparent)
+    (opaque, transmissive, transparent)
 }
 
 fn compare_opaque_meshes(a: &PreparedMesh, b: &PreparedMesh) -> std::cmp::Ordering {
