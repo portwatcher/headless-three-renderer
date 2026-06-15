@@ -4858,6 +4858,41 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
   }
 })
 
+test('unsupported texture channel indices fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.channel = 2
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map }),
+  ))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /texture\.channel 2.*not supported.*channel 0.*channel 1/i,
+  )
+})
+
+test('unsupported line texture channel indices fail clearly', () => {
+  const map = solidTexture(255, 255, 255)
+  map.channel = 2
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(1, 0, 0),
+  ])
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ map })))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /texture\.channel 2.*not supported.*channel 0.*channel 1/i,
+  )
+})
+
 test('base color maps decode sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)

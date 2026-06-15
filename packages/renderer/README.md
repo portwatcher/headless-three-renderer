@@ -113,31 +113,32 @@ The public API accepts only Three.js-like objects:
 ### Materials & Textures
 
 - material base color and opacity
-- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGB/RGBA numeric DataTexture inputs, with `texture.channel` UV selection and sRGB color-space decode
+- `material.map` (base color texture) — PNG, JPEG, WebP, and raw RGB/RGBA numeric DataTexture inputs, with primary/secondary `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`
 - base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots
+- `texture.channel` supports channel 0 for primary UVs and channel 1 for secondary UVs on supported map slots; higher channel indices fail clearly until additional UV attributes are supported
 - material and texture background output conversion supports `THREE.SRGBColorSpace` and `THREE.LinearSRGBColorSpace`; texture backgrounds decode `THREE.SRGBColorSpace`
 - base/background, normal/bump, metallic/roughness, emissive, AO/light, alpha, Phong specular, toon gradient, matcap color-map, and packed physical-extension texture-group wrap modes plus `NearestFilter`/`LinearFilter`-family `magFilter` and `minFilter`
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, specular intensity/color, IOR, attenuation, approximate dispersion, and roughness-aware environment-backed or scene-color transmission / refraction
-- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include `texture.channel` UV selection, texture transforms including explicit matrices, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
+- physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, specular color/intensity, transmission, and thickness; all current physical-extension maps include primary/secondary `texture.channel` UV selection, texture transforms including explicit matrices, packed texture-group sampler settings, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
 - custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
-- metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with `texture.channel` UV selection and wrap/filter sampler settings
-- normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with `texture.channel` UV selection and wrap/filter sampler settings
+- metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
+- normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
 - `MeshNormalMaterial` and `MeshMatcapMaterial` normal-map output
 - `material.flatShading` per-face normals for triangle meshes without normal maps
-- `MeshMatcapMaterial.map` color maps with `texture.channel` UV selection and transforms
-- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, `texture.channel` UV selection, and texture transforms
+- `MeshMatcapMaterial.map` color maps with primary/secondary `texture.channel` UV selection and transforms
+- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, and texture transforms
 - `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode and wrap/filter sampler settings; direct conformance also covers toon base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, plus alpha-map cutouts and CPU-baked displacement
 - `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
 - `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
-- emissive color, intensity, and emissive map, with `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings
-- light maps with `lightMapIntensity`, `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
-- occlusion map (`material.aoMap`) applied to indirect lighting, with `texture.channel` UV selection and wrap/filter sampler settings
-- alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with `texture.channel` UV selection and wrap/filter sampler settings
-- `MeshPhongMaterial.specularMap` red-channel specular strength, with `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level, reflection-probe, and supported material-level environment specular reflections
+- emissive color, intensity, and emissive map, with primary/secondary `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings
+- light maps with `lightMapIntensity`, primary/secondary `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings
+- occlusion map (`material.aoMap`) applied to indirect lighting, with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
+- alpha map (`material.alphaMap`) using Three.js' green-channel opacity convention, with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
+- `MeshPhongMaterial.specularMap` red-channel specular strength, with primary/secondary `texture.channel` UV selection, texture transforms, wrap/filter sampler settings, and masking for scene-level, reflection-probe, and supported material-level environment specular reflections
 - `MeshBasicMaterial.envMap` for one shared material-level reflection or refraction map, including legacy multiply/mix/add combine modes, `reflectivity`, and `refractionRatio`
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
@@ -151,7 +152,7 @@ The public API accepts only Three.js-like objects:
 - unsupported `MeshPhysicalMaterial` iridescence inputs fail clearly
 - texture wrap modes: repeat, mirror, clamp-to-edge
 - texture anisotropy values greater than 1 use native anisotropic samplers for supported material/background texture slots when the effective sampler is linear-filtered
-- line material arrays honor geometry groups; dashed line material segments honor dash/gap/scale settings and custom `lineDistance` attributes, and preserve map UV transforms including explicit matrices, selected map UV channels, and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
+- line material arrays honor geometry groups; dashed line material segments honor dash/gap/scale settings and custom `lineDistance` attributes, and preserve map UV transforms including explicit matrices, selected primary/secondary map UV channels, and interpolated vertex colors for common `LineDashedMaterial` cases, including instanced line geometry
 - line material `linewidth` values other than 1 fail clearly until thick-line support lands
 
 Texture image data can be:
@@ -273,4 +274,4 @@ Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not transla
 
 ### Lines and Points
 
-`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Opacity, line material arrays with geometry groups, scene fog, and `material.fog = false` are honored. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, decode sRGB color maps, shrink with perspective distance by default, keep orthographic point size independent of camera depth, cast directional/spot/point shadows from the expanded billboard quads, and honor alpha-tested custom depth/distance material cutouts in shadow passes. `THREE.Points.receiveShadow` fails clearly until that path lands.
+`THREE.Line`, `THREE.LineSegments`, `THREE.LineLoop`, and `THREE.Points` are supported. Lines and points render as unlit (basic) primitives and ignore lighting / normals. Opacity, line material arrays with geometry groups, scene fog, and `material.fog = false` are honored. `LineBasicMaterial.map` samples line UVs, including texture UV transforms, primary/secondary `texture.channel` UV selection, texture RGB with sRGB color-space decode, and alpha-tested texture alpha; dashed lines honor custom `lineDistance` attributes, and dashed line maps preserve texture UV transforms and the selected primary/secondary UV channel while reconstructing dash segments. `PointsMaterial` maps and alpha maps use point-sprite UVs, honor texture UV transforms, decode sRGB color maps, shrink with perspective distance by default, keep orthographic point size independent of camera depth, cast directional/spot/point shadows from the expanded billboard quads, and honor alpha-tested custom depth/distance material cutouts in shadow passes. `THREE.Points.receiveShadow` fails clearly until that path lands.

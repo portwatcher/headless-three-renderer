@@ -911,8 +911,13 @@ function finiteIntegerOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback
 }
 
-function textureUvChannel(texture: ThreeTextureLike | null | undefined): number {
-  return Number.isInteger(texture?.channel) ? Math.max(0, texture!.channel!) : 0
+export function textureUvChannel(texture: ThreeTextureLike | null | undefined): number {
+  if (!Number.isInteger(texture?.channel)) return 0
+  const channel = texture!.channel!
+  if (channel === 0 || channel === 1) return channel
+  throw new Error(
+    `texture.channel ${channel} is not supported by @headless-three/renderer yet. Use channel 0 for primary UVs or channel 1 for secondary UVs until additional UV channel attributes are supported.`,
+  )
 }
 
 function finiteNumberOrUndefined(value: unknown): number | undefined {

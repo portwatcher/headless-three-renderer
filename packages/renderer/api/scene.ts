@@ -17,7 +17,14 @@ import {
   readColorAttribute,
   readIndexAttribute,
 } from './attributes'
-import { materialForGroup, materialColor, extractPbrProperties, extractTextureData, type MaterialExtractionContext } from './materials'
+import {
+  materialForGroup,
+  materialColor,
+  extractPbrProperties,
+  extractTextureData,
+  textureUvChannel,
+  type MaterialExtractionContext,
+} from './materials'
 import { applyCpuSkinning } from './skinning'
 import { applyMorphTargets } from './morphs'
 import { objectLayersMatchCamera } from './layers'
@@ -1427,7 +1434,7 @@ function secondaryUvsForMaterial(
     alphaMap?: { channel?: number } | null
   } | undefined,
 ): number[] | null {
-  const channelTexture = [
+  const textures = [
     material?.clearcoatMap,
     material?.clearcoatRoughnessMap,
     material?.clearcoatNormalMap,
@@ -1449,31 +1456,14 @@ function secondaryUvsForMaterial(
     material?.aoMap,
     material?.specularMap,
     material?.alphaMap,
-  ].find((texture) => texture && Number.isInteger(texture.channel) && texture.channel! > 0)
-  const texture = channelTexture
-    ?? material?.clearcoatMap
-    ?? material?.clearcoatRoughnessMap
-    ?? material?.clearcoatNormalMap
-    ?? material?.sheenColorMap
-    ?? material?.sheenRoughnessMap
-    ?? material?.anisotropyMap
-    ?? material?.normalMap
-    ?? material?.bumpMap
-    ?? material?.transmissionMap
-    ?? material?.thicknessMap
-    ?? material?.specularColorMap
-    ?? material?.specularIntensityMap
-    ?? material?.displacementMap
-    ?? material?.map
-    ?? material?.metalnessMap
-    ?? material?.roughnessMap
-    ?? material?.emissiveMap
-    ?? material?.lightMap
-    ?? material?.aoMap
-    ?? material?.specularMap
-    ?? material?.alphaMap
-  const channel = texture && Number.isInteger(texture.channel) ? texture.channel! : 0
-  return channels[Math.max(0, Math.min(channel, channels.length - 1))] ?? channels[0]
+  ]
+  let channel = 0
+  for (const texture of textures) {
+    if (textureUvChannel(texture) > 0) {
+      channel = 1
+    }
+  }
+  return channels[channel] ?? channels[0]
 }
 
 function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | undefined): void {
