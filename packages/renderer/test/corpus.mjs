@@ -5,6 +5,7 @@ export const CORPUS_RENDER_SIZE = 96
 export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
+    equirectangularBackgroundCorpus(),
     customSortGroupCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
@@ -85,6 +86,37 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function equirectangularBackgroundCorpus() {
+  const background = new THREE.DataTexture(new Uint8Array([
+    255, 48, 32, 255,
+    255, 48, 32, 255,
+    255, 48, 32, 255,
+    255, 48, 32, 255,
+    32, 200, 96, 255,
+    32, 200, 96, 255,
+    32, 200, 96, 255,
+    32, 200, 96, 255,
+  ]), 8, 1, THREE.RGBAFormat)
+  background.mapping = THREE.EquirectangularReflectionMapping
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+  background.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = background
+  scene.backgroundIntensity = 0.85
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI, 0)
+
+  return {
+    name: 'equirectangular-background-rotation',
+    scene,
+    camera: makeCamera([0, 0, 0], [0, 0, -1]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
   }
 }
 
