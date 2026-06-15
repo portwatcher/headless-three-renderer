@@ -66,11 +66,17 @@ function renderFixture(fixture) {
   renderer.setScissorTest(false)
   renderer.outputColorSpace = outputColorSpace(fixture.options.outputColorSpace)
 
-  fixture.scene.updateMatrixWorld(true)
-  fixture.camera.updateMatrixWorld(true)
-  renderer.render(fixture.scene, fixture.camera)
+  const restoreRendererOptions = applyFixtureRendererOptions(fixture)
+  let dataUrl
+  try {
+    fixture.scene.updateMatrixWorld(true)
+    fixture.camera.updateMatrixWorld(true)
+    renderer.render(fixture.scene, fixture.camera)
+    dataUrl = renderer.domElement.toDataURL('image/png')
+  } finally {
+    restoreRendererOptions()
+  }
 
-  const dataUrl = renderer.domElement.toDataURL('image/png')
   const image = new Image(width, height)
   image.alt = fixture.name
   image.src = dataUrl
@@ -87,6 +93,20 @@ function renderFixture(fixture) {
   element.append(image, title, link)
 
   return { element, link }
+}
+
+function applyFixtureRendererOptions(fixture) {
+  const previousSortObjects = renderer.sortObjects
+
+  renderer.sortObjects = fixture.options.sortObjects ?? true
+  renderer.setOpaqueSort(fixture.options.opaqueSort ?? null)
+  renderer.setTransparentSort(fixture.options.transparentSort ?? null)
+
+  return () => {
+    renderer.sortObjects = previousSortObjects
+    renderer.setOpaqueSort(null)
+    renderer.setTransparentSort(null)
+  }
 }
 
 function outputColorSpace(value) {

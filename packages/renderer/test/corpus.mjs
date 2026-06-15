@@ -5,6 +5,7 @@ export const CORPUS_RENDER_SIZE = 96
 export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
+    customSortGroupCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -84,6 +85,46 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function customSortGroupCorpus() {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.9, 0,
+    0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, 0.9, 0,
+    -0.9, -0.9, 0,
+    0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, 0.9, 0,
+  ]), 3))
+  geometry.addGroup(0, 6, 0)
+  geometry.addGroup(6, 6, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, [
+    new THREE.MeshBasicMaterial({ color: 0xff3344, depthTest: false }),
+    new THREE.MeshBasicMaterial({ color: 0x2266ff, depthTest: false }),
+  ]))
+
+  return {
+    name: 'custom-opaque-sort-group-items',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      opaqueSort: (a, b) => b.group.materialIndex - a.group.materialIndex,
+    },
+    background: [0, 0, 0],
   }
 }
 
