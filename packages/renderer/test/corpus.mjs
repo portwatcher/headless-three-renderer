@@ -12,6 +12,7 @@ export function createSceneCorpus() {
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
     globalClippingPlaneCorpus(),
+    materialLocalClippingCorpus(),
     lightProbeCorpus(),
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
@@ -303,6 +304,32 @@ function globalClippingPlaneCorpus() {
       clippingPlanes: [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)],
     },
     background: [0, 0, 31],
+    minNonBackgroundRatio: 0.05,
+  }
+}
+
+function materialLocalClippingCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.08)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({
+      color: 0x22ccff,
+      clippingPlanes: [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)],
+    }),
+  ))
+
+  return {
+    name: 'material-local-clipping-plane',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      localClippingEnabled: true,
+    },
+    background: [5, 5, 20],
     minNonBackgroundRatio: 0.05,
   }
 }
