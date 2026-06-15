@@ -1483,13 +1483,13 @@ function unsignedSortKey(value: unknown, fallback: number): number {
 }
 
 function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number {
-  const attributes = Object.values(geometry.attributes ?? {})
-  const instancedAttributes = attributes.filter((attribute): attribute is ThreeBufferAttributeLike => isInstancedAttribute(attribute))
+  const attributes = Object.entries(geometry.attributes ?? {})
+  const instancedAttributes = attributes.filter((entry): entry is [string, ThreeBufferAttributeLike] => isInstancedAttribute(entry[1]))
   if (geometry.isInstancedBufferGeometry !== true && instancedAttributes.length === 0) return 1
 
   let maxCount = Infinity
-  for (const attribute of instancedAttributes) {
-    maxCount = Math.min(maxCount, attribute.count * meshPerAttribute(attribute))
+  for (const [name, attribute] of instancedAttributes) {
+    maxCount = Math.min(maxCount, attribute.count * meshPerAttribute(attribute, `geometry.attributes.${name}.meshPerAttribute`))
   }
 
   const requested = finiteCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity)
@@ -1502,8 +1502,13 @@ function isInstancedAttribute(attribute: ThreeBufferAttributeLike | undefined | 
   return attribute?.isInstancedBufferAttribute === true
 }
 
-function meshPerAttribute(attribute: ThreeBufferAttributeLike): number {
-  return Math.max(1, Math.floor(finiteOrDefault(attribute.meshPerAttribute, 1)))
+function meshPerAttribute(attribute: ThreeBufferAttributeLike, label = 'InstancedBufferAttribute.meshPerAttribute'): number {
+  const value = attribute.meshPerAttribute
+  if (value == null) return 1
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.max(1, Math.floor(value))
+  }
+  throw new TypeError(`${label} must be a positive finite number.`)
 }
 
 function instancedAttributeIndex(attribute: ThreeBufferAttributeLike, instanceIndex: number): number {

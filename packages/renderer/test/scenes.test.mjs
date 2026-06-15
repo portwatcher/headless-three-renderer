@@ -3800,6 +3800,21 @@ test('invalid instance counts fail clearly', () => {
     () => renderRgba(geometryScene, camera, { width: 64, height: 64 }),
     /geometry\.instanceCount must be a finite number/i,
   )
+
+  const meshPerAttributeScene = new THREE.Scene()
+  const meshPerAttributeGeometry = new THREE.InstancedBufferGeometry()
+  meshPerAttributeGeometry.index = base.index
+  meshPerAttributeGeometry.setAttribute('position', base.getAttribute('position'))
+  meshPerAttributeGeometry.setAttribute('uv', base.getAttribute('uv'))
+  const instanceOffset = new THREE.InstancedBufferAttribute(new Float32Array([0, 0, 0]), 3)
+  instanceOffset.meshPerAttribute = 'many'
+  meshPerAttributeGeometry.setAttribute('instanceOffset', instanceOffset)
+  meshPerAttributeScene.add(new THREE.Mesh(meshPerAttributeGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+
+  assert.throws(
+    () => renderRgba(meshPerAttributeScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.instanceOffset\.meshPerAttribute must be a positive finite number/i,
+  )
 })
 
 test('invalid morph target influence values fail clearly', () => {
