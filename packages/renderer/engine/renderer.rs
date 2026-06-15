@@ -79,7 +79,7 @@ pub struct Uniforms {
     pub shadow_params2: [f32; 4],
     /// x/y/z = cascade split distances, w = shadow layer count.
     pub shadow_params3: [f32; 4],
-    /// x = PCF radius multiplier, y = clip shadow caster fragments by clipping planes, z = explicit shadow side (0 double/no-cull, 1 front, 2 back).
+    /// x = PCF radius multiplier, y = clip shadow caster fragments by clipping planes, z = explicit shadow side (0 double/no-cull, 1 front, 2 back), w = shadow-only alpha cutoff.
     pub shadow_params4: [f32; 4],
     /// x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
     pub physical_params1: [f32; 4],
@@ -2502,7 +2502,7 @@ impl GpuRenderer {
                         s.radius,
                         if mesh.clip_shadows { 1.0 } else { 0.0 },
                         shadow_side_mode(mesh.shadow_side),
-                        0.0,
+                        shadow_alpha_cutoff(mesh),
                     ]
                 })
                 .unwrap_or([1.0, 0.0, 0.0, 0.0]),
@@ -3191,6 +3191,14 @@ fn shadow_side_mode(side: MeshSide) -> f32 {
         MeshSide::Double => 0.0,
         MeshSide::Front => 1.0,
         MeshSide::Back => 2.0,
+    }
+}
+
+fn shadow_alpha_cutoff(mesh: &PreparedMesh) -> f32 {
+    if mesh.alpha_to_coverage {
+        0.5_f32.max(mesh.alpha_test)
+    } else {
+        0.0
     }
 }
 

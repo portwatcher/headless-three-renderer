@@ -90,7 +90,7 @@ struct Uniforms {
   shadow_params2: vec4<f32>,
   // x/y/z = cascade split distances, w = shadow layer count.
   shadow_params3: vec4<f32>,
-  // x = PCF radius multiplier, y = clip shadow caster fragments by clipping_planes, z = explicit shadow side (0=double/no-cull, 1=front, 2=back).
+  // x = PCF radius multiplier, y = clip shadow caster fragments by clipping_planes, z = explicit shadow side (0=double/no-cull, 1=front, 2=back), w = shadow-only alpha cutoff.
   shadow_params4: vec4<f32>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
@@ -289,7 +289,7 @@ fn fs_shadow(input: ShadowVertexOutput, @builtin(front_facing) front_facing: boo
     alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
   }
 
-  let alpha_cutoff = uniforms.emissive.w;
+  let alpha_cutoff = max(uniforms.emissive.w, uniforms.shadow_params4.w);
   if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
     discard;
   }
