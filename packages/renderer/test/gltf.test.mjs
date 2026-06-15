@@ -18,6 +18,7 @@ const {
 const FIXTURE_DIR = fileURLToPath(new URL('./fixtures/', import.meta.url))
 const SIMPLE_TRIANGLE = path.join(FIXTURE_DIR, 'simple-triangle.gltf')
 const TEXTURED_QUAD = path.join(FIXTURE_DIR, 'textured-quad.gltf')
+const VERTEX_COLOR_QUAD = path.join(FIXTURE_DIR, 'vertex-color-quad.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -65,6 +66,36 @@ test('committed textured glTF fixture loads data URI image and renders texture',
 
   assertTexturedQuadLoadsEncodedMap(gltf, 'textured fixture')
   assertTexturedQuadRendersTexture(gltf, 'textured quad')
+})
+
+test('committed vertex-color glTF fixture renders COLOR_0 attributes', async () => {
+  const gltf = await loadGltfFixture(VERTEX_COLOR_QUAD)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'vertex-color fixture should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('color')?.count, 4)
+  assert.equal(mesh.material.vertexColors, true)
+
+  const camera = gltf.cameras[0]
+  assert.ok(camera, 'vertex-color fixture should load a camera')
+  camera.aspect = 1
+  camera.updateProjectionMatrix()
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(rgba.length, 96 * 96 * 4)
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'vertex-color quad should render visible pixels')
+
+  const left = meanRegion(rgba, 96, 96, 24, 36, 42, 60)
+  const right = meanRegion(rgba, 96, 96, 54, 36, 72, 60)
+  assert.ok(left.r > left.g + 60, `left half should be dominated by COLOR_0 red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 60, `right half should be dominated by COLOR_0 green (${right.g} vs ${right.r})`)
 })
 
 test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
