@@ -8538,6 +8538,9 @@ test('malformed environment and reflection probe texture values fail clearly', (
     ['malformed legacy reflection probe list', (scene) => {
       scene.userData.headlessRenderer = { probes: {} }
     }, /scene\.userData\.headlessRenderer\.probes must be an array/i],
+    ['scene userData container', (scene) => {
+      scene.userData = 'probes'
+    }, /scene\.userData must be an object/i],
     ['modern reflection hint container', (scene) => {
       scene.userData.headlessThreeRenderer = 'probes'
     }, /scene\.userData\.headlessThreeRenderer must be an object/i],
@@ -13571,6 +13574,9 @@ test('invalid directional shadow cascade hints fail clearly', () => {
   })
 
   const containerCases = [
+    ['light userData container', (light) => {
+      light.userData = 'cascades'
+    }, /light\.userData must be an object/i],
     ['modern hint container', (light) => {
       light.userData.headlessThreeRenderer = 'cascades'
     }, /light\.userData\.headlessThreeRenderer must be an object/i],

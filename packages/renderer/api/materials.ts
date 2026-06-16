@@ -427,9 +427,14 @@ function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeText
 }
 
 function sceneRendererHints(scene: ThreeSceneRootLike): { value: Record<string, unknown>; label: string } | undefined {
-  const value = scene.userData?.headlessThreeRenderer ?? scene.userData?.headlessRenderer
+  const userData = scene.userData
+  if (userData == null) return undefined
+  if (typeof userData !== 'object' || Array.isArray(userData)) {
+    throw new TypeError('scene.userData must be an object.')
+  }
+  const value = userData.headlessThreeRenderer ?? userData.headlessRenderer
   if (value == null) return undefined
-  const label = scene.userData?.headlessThreeRenderer != null
+  const label = userData.headlessThreeRenderer != null
     ? 'scene.userData.headlessThreeRenderer'
     : 'scene.userData.headlessRenderer'
   if (typeof value !== 'object' || Array.isArray(value)) {

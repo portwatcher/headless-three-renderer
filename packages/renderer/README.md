@@ -196,7 +196,7 @@ Supported input formats: equirectangular images in RGB/RGBA byte data, Float16 (
 
 Scene-level reflection probes are supported through `scene.userData.headlessThreeRenderer.reflectionProbe` or the first entry in `reflectionProbes`. Probe textures use the same equirectangular and cube texture formats as `scene.environment` and feed the same diffuse/specular IBL path.
 
-`scene.userData.headlessThreeRenderer` and the legacy `scene.userData.headlessRenderer` key must be objects when present.
+`scene.userData` must be an object when present; `scene.userData.headlessThreeRenderer` and the legacy `scene.userData.headlessRenderer` key must also be objects when present.
 
 ### Skinning / Skeletal Animation
 
@@ -261,9 +261,11 @@ Morph targets are applied on the CPU before rendering. Both **relative** (glTF d
 
 ### Shadows
 
-Directional, spot, point, and up to four directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. Common shadow options including `light.shadow.bias`, `light.shadow.normalBias`, `light.shadow.radius`, and PCF-irrelevant `light.shadow.blurSamples` inputs are accepted, explicit mesh `material.shadowSide` values filter shadow-caster faces, and `material.alphaToCoverage` approximates shadow-caster alpha cutouts with a 0.5 cutoff. `Object3D.customDepthMaterial` is honored for directional/spot mesh shadow caster alpha-tested and displacement inputs, and `customDistanceMaterial` is honored for point-light mesh shadow caster alpha-tested and displacement inputs; sprite and point billboard shadow casters also honor alpha-tested custom depth/distance material cutouts. `THREE.Sprite` and `THREE.Points` can cast directional/spot/point shadows from expanded billboard quads, and `receiveShadow` is accepted as a WebGL-compatible no-op on their unlit material paths. Malformed shadow flags/containers, invalid shadow numeric values, additional shadow-casting lights, malformed cascade hint containers/values, over-budget cascade hints, and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow, deeper cascade support, and rectangular cube-face support land. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
+Directional, spot, point, and up to four directional cascaded shadow maps are supported for one visible shadow-casting light. Set `light.castShadow = true`, configure `light.shadow.camera`, and mark meshes with `mesh.castShadow = true` / `mesh.receiveShadow = true`. Common shadow options including `light.shadow.bias`, `light.shadow.normalBias`, `light.shadow.radius`, and PCF-irrelevant `light.shadow.blurSamples` inputs are accepted, explicit mesh `material.shadowSide` values filter shadow-caster faces, and `material.alphaToCoverage` approximates shadow-caster alpha cutouts with a 0.5 cutoff. `Object3D.customDepthMaterial` is honored for directional/spot mesh shadow caster alpha-tested and displacement inputs, and `customDistanceMaterial` is honored for point-light mesh shadow caster alpha-tested and displacement inputs; sprite and point billboard shadow casters also honor alpha-tested custom depth/distance material cutouts. `THREE.Sprite` and `THREE.Points` can cast directional/spot/point shadows from expanded billboard quads, and `receiveShadow` is accepted as a WebGL-compatible no-op on their unlit material paths. Malformed shadow flags/containers, invalid shadow numeric values, additional shadow-casting lights, malformed light userData/cascade hint containers/values, over-budget cascade hints, and non-square point-light `light.shadow.mapSize` values fail clearly until native multi-shadow, deeper cascade support, and rectangular cube-face support land. The renderer renders a depth-only pass and samples it with 3×3 PCF and a normal-offset bias.
 
 Directional cascades can be provided with `light.userData.headlessThreeRenderer.shadowCascades`, where each cascade has finite `{ left, right, top, bottom, near, far, split }` bounds.
+
+`light.userData` must be an object when present before cascade hints are read.
 
 ### Tone Mapping
 

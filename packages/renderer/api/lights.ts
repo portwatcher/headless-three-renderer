@@ -368,7 +368,12 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
 }
 
 function shadowCascadeHints(light: ThreeObject3DLike): { value: unknown; label: string } | null {
-  const modernHints = light.userData?.headlessThreeRenderer
+  const userData = light.userData
+  if (userData != null && (typeof userData !== 'object' || Array.isArray(userData))) {
+    throw new TypeError('light.userData must be an object.')
+  }
+
+  const modernHints = userData?.headlessThreeRenderer
   if (modernHints != null) {
     assertPlainObject(modernHints, 'light.userData.headlessThreeRenderer')
     if (modernHints.shadowCascades != null) {
@@ -385,7 +390,7 @@ function shadowCascadeHints(light: ThreeObject3DLike): { value: unknown; label: 
     }
   }
 
-  const legacyHints = light.userData?.headlessRenderer
+  const legacyHints = userData?.headlessRenderer
   if (legacyHints != null) {
     assertPlainObject(legacyHints, 'light.userData.headlessRenderer')
     if (legacyHints.shadowCascades != null) {
