@@ -2697,6 +2697,43 @@ test('MeshDepthMaterial wireframe renders triangle edges without filling faces',
   assert.ok(wireRatio < solidRatio * 0.35, `wireframe depth material should not fill faces (${wireRatio} vs ${solidRatio})`)
 })
 
+test('MeshDepthMaterial base and alpha maps cut out discarded fragments', () => {
+  function renderDepthMaterial(makeMaterial) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), makeMaterial()))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const map = rgbaTexture([
+    255, 255, 255, 0,
+    255, 255, 255, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+
+  for (const [label, makeMaterial] of [
+    ['base texture', () => new THREE.MeshDepthMaterial({ map, alphaTest: 0.5 })],
+    ['alphaMap', () => new THREE.MeshDepthMaterial({ alphaMap, alphaTest: 0.5 })],
+  ]) {
+    const rgba = renderDepthMaterial(makeMaterial)
+    const discarded = meanRegion(rgba, 64, 64, 14, 24, 28, 40)
+    const visible = meanRegion(rgba, 64, 64, 36, 24, 50, 40)
+    assert.ok(discarded.r < 2, `${label} cutout should keep background depth (${discarded.r})`)
+    assert.ok(visible.r > discarded.r + 3, `opaque ${label} region should write depth (${visible.r} vs ${discarded.r})`)
+  }
+})
+
 test('displacementMap applies texture UV transforms before depth output', () => {
   function renderDisplaced(offsetX) {
     const displacementMap = rgbaTexture([
@@ -3022,6 +3059,32 @@ test('MeshDistanceMaterial alphaMap cuts out discarded fragments', () => {
   const visible = meanRegion(rgba, 64, 64, 36, 24, 50, 40)
   assert.ok(discarded.r < 2, `alphaMap cutout should keep background distance (${discarded.r})`)
   assert.ok(visible.r > 60, `opaque alphaMap region should write distance (${visible.r})`)
+})
+
+test('MeshDistanceMaterial base texture alpha cuts out discarded fragments', () => {
+  const map = rgbaTexture([
+    255, 255, 255, 0,
+    255, 255, 255, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshDistanceMaterial({ map, alphaTest: 0.5 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const discarded = meanRegion(rgba, 64, 64, 14, 24, 28, 40)
+  const visible = meanRegion(rgba, 64, 64, 36, 24, 50, 40)
+  assert.ok(discarded.r < 2, `base texture cutout should keep background distance (${discarded.r})`)
+  assert.ok(visible.r > 60, `opaque base texture region should write distance (${visible.r})`)
 })
 
 test('MeshDistanceMaterial displacementMap samples the selected secondary UV channel', () => {
