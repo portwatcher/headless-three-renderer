@@ -1578,6 +1578,11 @@ test('invalid material scalar values fail clearly', () => {
       material.normalScale.x = 'wide'
       return material
     }, /material\.normalScale\.x must be a finite number/i],
+    ['normalScale container', () => {
+      const material = new THREE.MeshStandardMaterial({ color: 0xffffff, normalMap: texture })
+      material.normalScale = 'wide'
+      return material
+    }, /material\.normalScale must be a Vector2-like object/i],
     ['displacementScale', () => {
       const material = new THREE.MeshStandardMaterial({ color: 0xffffff, displacementMap: texture })
       material.displacementScale = Number.NaN

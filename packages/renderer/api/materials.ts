@@ -743,7 +743,10 @@ export function extractPbrProperties(
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
     props.normalMapType = materialNormalMapType(material)
   }
-  if (material.normalScale) {
+  if (material.normalScale != null) {
+    if (typeof material.normalScale !== 'object') {
+      throw new TypeError('material.normalScale must be a Vector2-like object.')
+    }
     props.normalScale = [
       finiteNumberOrDefault(material.normalScale.x, 'material.normalScale.x', 1),
       finiteNumberOrDefault(material.normalScale.y, 'material.normalScale.y', 1),
