@@ -50,6 +50,7 @@ export function createSceneCorpus() {
     dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
     batchedMeshCorpus(),
+    batchedMeshInactiveGeometryCorpus(),
     batchedMeshCullingCorpus(),
     batchedMeshCustomSortCorpus(),
     lodAndGroupsCorpus(),
@@ -1719,6 +1720,58 @@ function batchedMeshCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.03,
+  }
+}
+
+function batchedMeshInactiveGeometryCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.42, 0.42)
+  const batch = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count * 2,
+    source.index.count * 2,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  const activeGeometryId = batch.addGeometry(source)
+  const inactiveGeometryId = batch.addGeometry(source.clone())
+  const left = batch.addInstance(activeGeometryId)
+  const right = batch.addInstance(inactiveGeometryId)
+  batch.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.52, 0, 0))
+  batch.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.52, 0, 0))
+  batch.setColorAt(left, new THREE.Color(1, 0.05, 0.05))
+  batch.setColorAt(right, new THREE.Color(0.05, 1, 0.05))
+  batch._geometryInfo[inactiveGeometryId].active = false
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-inactive-geometry',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.01,
+    validate(rgba, { width, height }) {
+      const y = Math.floor(height / 2)
+      const leftOffset = (y * width + Math.floor(width * 0.29)) * 4
+      const rightOffset = (y * width + Math.floor(width * 0.71)) * 4
+      const leftR = rgba[leftOffset]
+      const leftG = rgba[leftOffset + 1]
+      const rightR = rgba[rightOffset]
+      const rightG = rgba[rightOffset + 1]
+      const rightB = rgba[rightOffset + 2]
+      if (leftR <= leftG + 80) {
+        throw new Error(`active BatchedMesh geometry should render red, got red=${leftR} green=${leftG}`)
+      }
+      if (rightR > 8 || rightG > 8 || rightB > 8) {
+        throw new Error(`inactive BatchedMesh geometry should remain black, got rgb(${rightR}, ${rightG}, ${rightB})`)
+      }
+    },
   }
 }
 
