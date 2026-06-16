@@ -545,6 +545,40 @@ test('malformed BatchedMesh culling bounds fail clearly', () => {
   }
 })
 
+test('malformed BatchedMesh geometry ranges fail clearly', () => {
+  const camera = makeCamera()
+  const source = new THREE.PlaneGeometry(1, 1)
+  const makeScene = (range) => {
+    const batched = new THREE.BatchedMesh(
+      1,
+      source.getAttribute('position').count,
+      source.index.count,
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    const geometryId = batched.addGeometry(source)
+    batched.addInstance(geometryId)
+    batched.getGeometryRangeAt = () => range
+    const scene = new THREE.Scene()
+    scene.add(batched)
+    return scene
+  }
+
+  const cases = [
+    ['missing range', null, /THREE\.BatchedMesh geometry range 0 is not readable/i],
+    ['active flag', { start: 0, count: 6, active: 'yes' }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.active must be a boolean/i],
+    ['negative start', { start: -1, count: 6 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.start must be a non-negative integer/i],
+    ['non-integer count', { start: 0, count: 1.5 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.count must be a non-negative integer/i],
+  ]
+
+  for (const [label, range, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(range), camera, { width: 32, height: 32 }),
+      pattern,
+      label,
+    )
+  }
+})
+
 test('invalid BatchedMesh sort controls fail clearly', () => {
   const camera = makeCamera()
   const source = new THREE.PlaneGeometry(1, 1)
