@@ -10325,6 +10325,16 @@ test('invalid light numeric values fail clearly', () => {
       light.target = []
       return light
     }, /SpotLight\.target must be an object/i],
+    ['spot transform matrix', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.matrixWorld.elements[12] = Number.NaN
+      return light
+    }, /SpotLight\.matrixWorld\.elements\[12\] must be a finite number/i],
+    ['spot target matrix', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.target.matrixWorld.elements[13] = Number.NaN
+      return light
+    }, /SpotLight\.target\.matrixWorld\.elements\[13\] must be a finite number/i],
     ['spot decay negative', () => {
       const light = new THREE.SpotLight(0xffffff, 1)
       light.decay = -0.5
