@@ -11453,6 +11453,38 @@ test('ShaderMaterial without headless WGSL override fails clearly', () => {
   }
 })
 
+test('custom WGSL fragment override values fail clearly', () => {
+  const cases = [
+    ['top-level customFragmentWgsl', (material) => {
+      material.customFragmentWgsl = {}
+    }, /material\.customFragmentWgsl must be a string/i],
+    ['documented fragmentWgsl', (material) => {
+      material.userData.headlessThreeRenderer = { fragmentWgsl: 1 }
+    }, /material\.userData\.headlessThreeRenderer\.fragmentWgsl must be a string/i],
+    ['legacy fragmentWgsl', (material) => {
+      material.userData.headlessRenderer = { fragmentWgsl: false }
+    }, /material\.userData\.headlessRenderer\.fragmentWgsl must be a string/i],
+  ]
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  for (const [name, configure, pattern] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    configure(material)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('unsupported base Material without headless WGSL override fails clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

@@ -1399,26 +1399,47 @@ function eulerLikeOrder(value: unknown): string {
 function extractCustomFragmentShader(material: ThreeMaterialLike | undefined): string | undefined {
   if (!material) return undefined
 
-  const userData = material.userData ?? {}
-  const hints = userData.headlessThreeRenderer ?? userData.headlessRenderer ?? {}
-  const candidates = [
-    material.customFragmentWgsl,
-    material.customFragmentShader,
-    material.headlessFragmentWgsl,
-    material.headlessFragmentShader,
-    hints.fragmentWgsl,
-    hints.fragmentShader,
-    hints.customFragmentWgsl,
-    hints.customFragmentShader,
+  const candidates: Array<[unknown, string]> = [
+    [material.customFragmentWgsl, 'material.customFragmentWgsl'],
+    [material.customFragmentShader, 'material.customFragmentShader'],
+    [material.headlessFragmentWgsl, 'material.headlessFragmentWgsl'],
+    [material.headlessFragmentShader, 'material.headlessFragmentShader'],
   ]
 
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim().length > 0) {
-      return candidate.trim()
-    }
+  const hints = customFragmentHints(material.userData)
+  if (hints) {
+    candidates.push(
+      [hints.value.fragmentWgsl, `${hints.label}.fragmentWgsl`],
+      [hints.value.fragmentShader, `${hints.label}.fragmentShader`],
+      [hints.value.customFragmentWgsl, `${hints.label}.customFragmentWgsl`],
+      [hints.value.customFragmentShader, `${hints.label}.customFragmentShader`],
+    )
+  }
+
+  for (const [value, label] of candidates) {
+    const candidate = customFragmentCandidate(value, label)
+    if (candidate) return candidate
   }
 
   return undefined
+}
+
+function customFragmentHints(userData: Record<string, any> | undefined): { value: Record<string, unknown>; label: string } | undefined {
+  const value = userData?.headlessThreeRenderer ?? userData?.headlessRenderer
+  if (value == null || typeof value !== 'object') return undefined
+  const label = userData?.headlessThreeRenderer != null
+    ? 'material.userData.headlessThreeRenderer'
+    : 'material.userData.headlessRenderer'
+  return { value: value as Record<string, unknown>, label }
+}
+
+function customFragmentCandidate(value: unknown, label: string): string | undefined {
+  if (value == null) return undefined
+  if (typeof value !== 'string') {
+    throw new TypeError(`${label} must be a string.`)
+  }
+  const candidate = value.trim()
+  return candidate.length > 0 ? candidate : undefined
 }
 
 function assertSupportedShaderMaterial(
