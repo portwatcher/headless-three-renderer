@@ -18,6 +18,7 @@ export function createSceneCorpus() {
     meshToonMaterialCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
+    nestedClippingGroupCorpus(),
     lightProbeCorpus(),
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
@@ -436,6 +437,40 @@ function materialLocalClippingCorpus() {
     },
     background: [5, 5, 20],
     minNonBackgroundRatio: 0.05,
+  }
+}
+
+function nestedClippingGroupCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.12)
+
+  const parent = new THREE.Group()
+  parent.isClippingGroup = true
+  parent.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+
+  const child = new THREE.Group()
+  child.isClippingGroup = true
+  child.clipIntersection = true
+  child.clippingPlanes = [
+    new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0),
+  ]
+
+  child.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff5533 }),
+  ))
+  parent.add(child)
+  scene.add(parent)
+
+  return {
+    name: 'nested-clipping-groups',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 31],
+    minNonBackgroundRatio: 0.04,
+    browserReference: false,
   }
 }
 

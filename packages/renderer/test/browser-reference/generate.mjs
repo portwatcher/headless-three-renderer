@@ -1,7 +1,11 @@
 import * as THREE from 'three'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { createSceneCorpus } from '../corpus.mjs'
-import { BROWSER_REFERENCE_MANIFEST_FILE, createBrowserReferenceManifest } from './manifest.mjs'
+import {
+  BROWSER_REFERENCE_MANIFEST_FILE,
+  createBrowserReferenceFixtures,
+  createBrowserReferenceManifest,
+} from './manifest.mjs'
 
 const fixturesEl = document.getElementById('fixtures')
 const statusEl = document.getElementById('status')
@@ -21,7 +25,7 @@ RectAreaLightUniformsLib.init()
 const downloadLinks = []
 
 try {
-  const fixtures = createSceneCorpus()
+  const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
   const manifest = createBrowserReferenceManifest(fixtures)
   setupManifestDownload(manifest)
 

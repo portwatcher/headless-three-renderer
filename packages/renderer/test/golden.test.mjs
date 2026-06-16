@@ -5,7 +5,11 @@ import path from 'node:path'
 import native from '../native.js'
 import pkg from '../dist/index.js'
 import { createSceneCorpus } from './corpus.mjs'
-import { BROWSER_REFERENCE_MANIFEST_FILE, createBrowserReferenceManifest } from './browser-reference/manifest.mjs'
+import {
+  BROWSER_REFERENCE_MANIFEST_FILE,
+  createBrowserReferenceFixtures,
+  createBrowserReferenceManifest,
+} from './browser-reference/manifest.mjs'
 
 const { Renderer } = pkg
 
@@ -19,7 +23,7 @@ test('generated corpus matches browser WebGLRenderer golden references', {
 }, async (t) => {
   assert.ok(Number.isFinite(maxMeanDiff) && maxMeanDiff >= 0, 'HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number')
 
-  const fixtures = createSceneCorpus()
+  const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
   const manifest = await readReferenceManifest(referenceDir)
   validateReferenceManifest(manifest, createBrowserReferenceManifest(fixtures))
 
