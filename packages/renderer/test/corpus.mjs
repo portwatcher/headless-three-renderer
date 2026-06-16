@@ -16,10 +16,13 @@ export function createSceneCorpus() {
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
     meshDepthMaterialCorpus(),
+    meshDepthMaterialWireframeCorpus(),
     meshDistanceMaterialCorpus(),
+    meshDistanceMaterialWireframeCorpus(),
     meshNormalMaterialCorpus(),
     meshMatcapMaterialCorpus(),
     meshToonMaterialCorpus(),
+    meshToonAlphaMapCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
     nestedClippingGroupCorpus(),
@@ -700,6 +703,31 @@ function meshDepthMaterialCorpus() {
   }
 }
 
+function meshDepthMaterialWireframeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.58, 0.58, 4, 4),
+    new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking, wireframe: true }),
+  )
+  mesh.position.z = 2.25
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 4)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'mesh-depth-material-wireframe',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.004,
+  }
+}
+
 function meshDistanceMaterialCorpus() {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -727,6 +755,32 @@ function meshDistanceMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    browserReference: false,
+  }
+}
+
+function meshDistanceMaterialWireframeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const material = new THREE.MeshDistanceMaterial()
+  material.wireframe = true
+  material.referencePosition = new THREE.Vector3(0, 0, 3)
+  material.nearDistance = 0
+  material.farDistance = 4
+
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7, 4, 4),
+    material,
+  ))
+
+  return {
+    name: 'mesh-distance-material-wireframe',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.004,
     browserReference: false,
   }
 }
@@ -806,6 +860,41 @@ function meshToonMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [8, 6, 9],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function meshToonAlphaMapCorpus() {
+  const alphaMap = new THREE.DataTexture(new Uint8Array([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.16)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.2))
+  const key = new THREE.DirectionalLight(0xffffff, 2.2)
+  key.position.set(0, 0, 3)
+  scene.add(key)
+
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 1.5),
+    new THREE.MeshToonMaterial({
+      color: 0xff4422,
+      alphaMap,
+      alphaTest: 0.5,
+    }),
+  ))
+
+  return {
+    name: 'mesh-toon-alpha-map-cutout',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 41],
+    minNonBackgroundRatio: 0.04,
   }
 }
 
