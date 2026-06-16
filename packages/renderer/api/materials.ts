@@ -813,9 +813,11 @@ export function extractPbrProperties(
     const hintBag = materialRendererHints(material.userData)
     const hints = hintBag?.value ?? {}
     const hintsLabel = hintBag?.label ?? 'material.userData.headlessThreeRenderer'
-    const referencePosition = vector3LikeToArray(
-      material.referencePosition ?? hints.referencePosition ?? hints.distanceReferencePosition,
-    )
+    const referencePosition = firstOptionalVector3LikeToArray([
+      [material.referencePosition, 'material.referencePosition'],
+      [hints.referencePosition, `${hintsLabel}.referencePosition`],
+      [hints.distanceReferencePosition, `${hintsLabel}.distanceReferencePosition`],
+    ])
     if (referencePosition) {
       props.distanceReferencePosition = referencePosition
     }
@@ -1326,6 +1328,13 @@ function firstOptionalFiniteNumber(entries: Array<[unknown, string]>): number | 
   return undefined
 }
 
+function firstOptionalVector3LikeToArray(entries: Array<[unknown, string]>): number[] | undefined {
+  for (const [value, label] of entries) {
+    if (value != null) return requiredFiniteVector3LikeToArray(value, label)
+  }
+  return undefined
+}
+
 function optionalFiniteNumber(value: unknown, label: string): number | undefined {
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -1389,6 +1398,32 @@ function vector3LikeToArray(value: unknown): number[] | undefined {
   }
 
   return undefined
+}
+
+function requiredFiniteVector3LikeToArray(value: unknown, label: string): number[] {
+  if (!value || typeof value !== 'object') {
+    throw new TypeError(`${label} must be a finite Vector3-like value.`)
+  }
+
+  const arrayLike = value as ArrayLike<unknown>
+  if (typeof arrayLike.length === 'number' && arrayLike.length >= 3) {
+    return [
+      requiredFiniteNumber(arrayLike[0], `${label}[0]`),
+      requiredFiniteNumber(arrayLike[1], `${label}[1]`),
+      requiredFiniteNumber(arrayLike[2], `${label}[2]`),
+    ]
+  }
+
+  const vector = value as { x?: unknown; y?: unknown; z?: unknown }
+  if ('x' in vector || 'y' in vector || 'z' in vector) {
+    return [
+      requiredFiniteNumber(vector.x, `${label}.x`),
+      requiredFiniteNumber(vector.y, `${label}.y`),
+      requiredFiniteNumber(vector.z, `${label}.z`),
+    ]
+  }
+
+  throw new TypeError(`${label} must be a finite Vector3-like value.`)
 }
 
 function materialEnvMapRotation(material: ThreeMaterialLike): ThreeMaterialLike['envMapRotation'] | undefined {

@@ -3683,8 +3683,11 @@ test('MeshDistanceMaterial honors referencePosition and distance range', () => {
   )
 })
 
-test('invalid MeshDistanceMaterial range values fail clearly', () => {
+test('invalid MeshDistanceMaterial range and reference values fail clearly', () => {
   const cases = [
+    ['referencePosition', (material) => {
+      material.referencePosition = [0, Number.NaN, 0]
+    }, /material\.referencePosition\[1\] must be a finite number/i],
     ['nearDistance', (material) => {
       material.nearDistance = 'near'
     }, /material\.nearDistance must be a finite number/i],
@@ -3697,6 +3700,9 @@ test('invalid MeshDistanceMaterial range values fail clearly', () => {
     ['hint distanceFar', (material) => {
       material.userData.headlessThreeRenderer = { distanceFar: Number.POSITIVE_INFINITY }
     }, /material\.userData\.headlessThreeRenderer\.distanceFar must be a finite number/i],
+    ['hint distanceReferencePosition', (material) => {
+      material.userData.headlessThreeRenderer = { distanceReferencePosition: { x: 0, y: 'near', z: 0 } }
+    }, /material\.userData\.headlessThreeRenderer\.distanceReferencePosition\.y must be a finite number/i],
     ['modern hint container', (material) => {
       material.userData.headlessThreeRenderer = 'distance'
     }, /material\.userData\.headlessThreeRenderer must be an object/i],
