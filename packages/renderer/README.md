@@ -77,7 +77,7 @@ It also exports Node loader helpers:
 - `createNodeGltfLoader(rootDir, options)`: creates a configured `GLTFLoader` bundle for advanced flows, including plugin registration through `options.configureLoader`; malformed helper boolean options, callback hooks, and custom managers fail clearly.
 - `createEncodedImageTextureLoader(rootDir)` / `EncodedImageTextureLoader`: a `LoadingManager` image handler for local PNG/JPEG/WebP files, PNG/JPEG/WebP data URIs, and PNG/JPEG/WebP Blob URLs that exposes encoded buffers directly to renderer-supported texture slots; malformed helper paths and callbacks fail clearly.
 - `installLocalFileFetch()`: a small `file://` fetch bridge for Three.js `FileLoader` when loading local external glTF buffers.
-- `resolveLocalAssetPath(url, rootDir)`: shared path resolution for local loader helpers.
+- `resolveLocalAssetPath(url, rootDir)`: shared path resolution for local loader helpers, covering relative paths, POSIX/Windows absolute paths, and `file://` URLs while rejecting remote asset URLs.
 
 ## Supported Three.js Surface
 

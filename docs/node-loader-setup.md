@@ -65,6 +65,13 @@ For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
 configured `{ loader, manager, encodedImages }` bundle so callers can add more
 handlers or reuse the loader directly.
 
+Local helper paths are normalized through `resolveLocalAssetPath(url, rootDir)`.
+Relative paths resolve under `rootDir`, POSIX absolute paths and Windows
+drive-letter paths are preserved as local files, and `file://` URLs are decoded
+with Node's `fileURLToPath()`. Data URI images are handled by the encoded image
+loader, Blob URLs are handled by the Blob URL image path, and remote HTTP(S)
+asset URLs are rejected by the local helpers.
+
 The repository includes the same pattern as a runnable script:
 
 ```bash
