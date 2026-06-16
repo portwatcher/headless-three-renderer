@@ -682,6 +682,17 @@ function spriteMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 6, 8],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width, height }) {
+      const colors = {
+        red: countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 150 && r > g + 40 && r > b + 40),
+        green: countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 40 && g > b + 20),
+        blue: countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > 150 && b > r + 40 && b > g + 40),
+        yellow: countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 150 && g > 120 && r > b + 40 && g > b + 40),
+      }
+      if (colors.red < 100 || colors.green < 100 || colors.blue < 100 || colors.yellow < 100) {
+        throw new Error(`mapped sprite corpus should render all texture quadrants, got ${JSON.stringify(colors)}`)
+      }
+    },
   }
 }
 
