@@ -270,7 +270,10 @@ function appendMesh(
     const baseColor = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
-    const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
+    const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, material)
+    if (uvStreams.alphaMapUsesUv2 !== undefined) {
+      pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
+    }
     const textureInfo = extractTextureData(material)
     const castShadow = objectCastsShadow && !usesCustomShadowMaterial ? true : undefined
     const receiveShadow = objectReceivesShadow ? true : undefined
@@ -295,11 +298,11 @@ function appendMesh(
       const expandedNormals = normals
         ? expandVec3ValuesForInstances(normals, 0, position.count, instancedGeometryCount)
         : undefined
-      const expandedUvs = uvs
-        ? expandVec2ValuesForInstances(uvs, 0, position.count, instancedGeometryCount)
+      const expandedUvs = uvStreams.uvs
+        ? expandVec2ValuesForInstances(uvStreams.uvs, 0, position.count, instancedGeometryCount)
         : undefined
-      const expandedSecondaryUvs = secondaryUvs
-        ? expandVec2ValuesForInstances(secondaryUvs, 0, position.count, instancedGeometryCount)
+      const expandedSecondaryUvs = uvStreams.uvs2
+        ? expandVec2ValuesForInstances(uvStreams.uvs2, 0, position.count, instancedGeometryCount)
         : undefined
 
       for (const instance of instances) {
@@ -325,7 +328,7 @@ function appendMesh(
           textureAnisotropy: textureInfo?.anisotropy,
           textureTransform: textureInfo?.transform,
           textureColorSpace: textureInfo?.colorSpace,
-          textureUsesUv2: textureInfo?.usesUv2,
+          textureUsesUv2: uvStreams.textureUsesUv2 ?? textureInfo?.usesUv2,
           transform: instance.transform,
           topology: wireframe ? 'lines' : undefined,
           castShadow,
@@ -351,11 +354,11 @@ function appendMesh(
       const expandedGroupNormals = normals
         ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
         : undefined
-      const expandedGroupUvs = uvs
-        ? expandVec2ValuesForInstances(uvs, group.start, group.count, instancedGeometryCount)
+      const expandedGroupUvs = uvStreams.uvs
+        ? expandVec2ValuesForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
         : undefined
-      const expandedGroupSecondaryUvs = secondaryUvs
-        ? expandVec2ValuesForInstances(secondaryUvs, group.start, group.count, instancedGeometryCount)
+      const expandedGroupSecondaryUvs = uvStreams.uvs2
+        ? expandVec2ValuesForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupIndices = wireframe
         ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
@@ -383,7 +386,7 @@ function appendMesh(
           textureAnisotropy: textureInfo?.anisotropy,
           textureTransform: textureInfo?.transform,
           textureColorSpace: textureInfo?.colorSpace,
-          textureUsesUv2: textureInfo?.usesUv2,
+          textureUsesUv2: uvStreams.textureUsesUv2 ?? textureInfo?.usesUv2,
           transform: instance.transform,
           topology: wireframe ? 'lines' : undefined,
           castShadow,
@@ -449,7 +452,10 @@ function appendShadowOnlyMeshGroup(
   const baseColor = materialColor(material)
   const useVertexColors = vertexColors && material.vertexColors !== false
   const pbrProps = shadowPbrProperties(material, sourceMaterial, materialContext)
-  const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
+  const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, material)
+  if (uvStreams.alphaMapUsesUv2 !== undefined) {
+    pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
+  }
   const textureInfo = extractTextureData(material)
   const clipping = clippingState(clippingContext, material, localClippingEnabled)
   const wireframe = isDepthDistanceWireframeMaterial(material)
@@ -472,11 +478,11 @@ function appendShadowOnlyMeshGroup(
     const expandedNormals = normals
       ? expandVec3ValuesForInstances(normals, 0, vertexCount, instancedGeometryCount)
       : undefined
-    const expandedUvs = uvs
-      ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount)
+    const expandedUvs = uvStreams.uvs
+      ? expandVec2ValuesForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
       : undefined
-    const expandedSecondaryUvs = secondaryUvs
-      ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount)
+    const expandedSecondaryUvs = uvStreams.uvs2
+      ? expandVec2ValuesForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount)
       : undefined
 
     for (const instance of instances) {
@@ -502,7 +508,7 @@ function appendShadowOnlyMeshGroup(
         textureAnisotropy: textureInfo?.anisotropy,
         textureTransform: textureInfo?.transform,
         textureColorSpace: textureInfo?.colorSpace,
-        textureUsesUv2: textureInfo?.usesUv2,
+        textureUsesUv2: uvStreams.textureUsesUv2 ?? textureInfo?.usesUv2,
         transform: instance.transform,
         topology: wireframe ? 'lines' : undefined,
         castShadow: true,
@@ -531,11 +537,11 @@ function appendShadowOnlyMeshGroup(
   const expandedGroupNormals = normals
     ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
     : undefined
-  const expandedGroupUvs = uvs
-    ? expandVec2ValuesForInstances(uvs, group.start, group.count, instancedGeometryCount)
+  const expandedGroupUvs = uvStreams.uvs
+    ? expandVec2ValuesForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
     : undefined
-  const expandedGroupSecondaryUvs = secondaryUvs
-    ? expandVec2ValuesForInstances(secondaryUvs, group.start, group.count, instancedGeometryCount)
+  const expandedGroupSecondaryUvs = uvStreams.uvs2
+    ? expandVec2ValuesForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupIndices = wireframe
     ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
@@ -564,7 +570,7 @@ function appendShadowOnlyMeshGroup(
       textureAnisotropy: textureInfo?.anisotropy,
       textureTransform: textureInfo?.transform,
       textureColorSpace: textureInfo?.colorSpace,
-      textureUsesUv2: textureInfo?.usesUv2,
+      textureUsesUv2: uvStreams.textureUsesUv2 ?? textureInfo?.usesUv2,
       transform: instance.transform,
       topology: wireframe ? 'lines' : undefined,
       castShadow: true,
@@ -1992,6 +1998,55 @@ function textureUvStreamsForMapAlphaMaterial(
     textureUsesUv2: mapChannel !== undefined ? mapChannel !== primaryChannel : undefined,
     alphaMapUsesUv2: alphaChannel !== undefined ? alphaChannel !== primaryChannel : undefined,
   }
+}
+
+function textureUvStreamsForMeshMaterial(
+  channels: Array<number[] | null>,
+  material: ThreeMaterialLike | undefined,
+): TextureUvStreams {
+  if (canUseDistinctMeshMapAlphaUvStreams(material)) {
+    return textureUvStreamsForMapAlphaMaterial(channels, material)
+  }
+
+  return {
+    uvs: channels[0],
+    uvs2: secondaryUvsForMaterial(channels, material),
+  }
+}
+
+function canUseDistinctMeshMapAlphaUvStreams(material: ThreeMaterialLike | undefined): boolean {
+  if (!material) return false
+  const mapChannel = material.map ? textureUvChannel(material.map) : undefined
+  const alphaChannel = material.alphaMap ? textureUvChannel(material.alphaMap) : undefined
+  if (mapChannel === undefined || alphaChannel === undefined) return false
+  if (mapChannel === alphaChannel || mapChannel === 0 || alphaChannel === 0) return false
+  return !meshUvTextureSlotsBeyondMapAlpha(material).some((texture) => texture != null)
+}
+
+function meshUvTextureSlotsBeyondMapAlpha(material: ThreeMaterialLike): Array<{ channel?: number } | null | undefined> {
+  return [
+    material.clearcoatMap,
+    material.clearcoatRoughnessMap,
+    material.clearcoatNormalMap,
+    material.sheenColorMap,
+    material.sheenRoughnessMap,
+    material.anisotropyMap,
+    material.iridescenceMap,
+    material.iridescenceThicknessMap,
+    material.normalMap,
+    material.bumpMap,
+    material.transmissionMap,
+    material.thicknessMap,
+    material.specularColorMap,
+    material.specularIntensityMap,
+    material.displacementMap,
+    material.metalnessMap,
+    material.roughnessMap,
+    material.emissiveMap,
+    material.lightMap,
+    material.aoMap,
+    material.specularMap,
+  ]
 }
 
 function secondaryUvsForMaterial(

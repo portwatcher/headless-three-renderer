@@ -7505,22 +7505,75 @@ test('unsupported texture channel indices fail clearly', () => {
   )
 })
 
+test('MeshBasicMaterial map and alphaMap can sample distinct non-primary UV channels', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.channel = 2
+
+  const geometry = constantUvPlane(0.25, 0.5)
+  setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+  setConstantUvAttribute(geometry, 'uv2', 0.75, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({
+      alphaMap,
+      alphaTest: 0.5,
+      color: 0xffffff,
+      map,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 40, 40, 56, 56)
+  assert.ok(
+    mean.g > mean.r + 60,
+    `map channel=1 and alphaMap channel=2 should render green from uv1 while uv2 keeps it opaque (${mean.g} vs ${mean.r})`,
+  )
+})
+
 test('mixed non-primary texture channels fail clearly', () => {
   const map = solidTexture(255, 255, 255)
   map.channel = 1
   const alphaMap = solidTexture(255, 255, 255)
   alphaMap.channel = 2
+  const metalnessMap = solidTexture(0, 0, 255)
+  metalnessMap.channel = 3
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
   scene.add(new THREE.Mesh(
     new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ map, alphaMap, alphaTest: 0.5 }),
+    new THREE.MeshStandardMaterial({
+      alphaMap,
+      alphaTest: 0.5,
+      map,
+      metalnessMap,
+      metalness: 1,
+      roughness: 0.5,
+    }),
   ))
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /multiple non-primary texture\.channel values.*1.*2.*one secondary UV attribute/i,
+    /multiple non-primary texture\.channel values.*1.*3.*one secondary UV attribute/i,
   )
 })
 
