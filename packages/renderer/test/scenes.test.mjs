@@ -408,6 +408,36 @@ test('invalid geometry attribute count values fail clearly', () => {
   )
 })
 
+test('invalid geometry attribute layout values fail clearly', () => {
+  const camera = makeCamera()
+  const values = new Float32Array([
+    -0.75, -0.5, 0,
+    0.75, -0.5, 0,
+    0, 0.75, 0,
+  ])
+  const makeScene = (positionAttribute) => {
+    const scene = new THREE.Scene()
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', positionAttribute)
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+    return scene
+  }
+
+  const cases = [
+    ['itemSize', { count: 3, itemSize: '3', array: values }, /geometry\.attributes\.position\.itemSize must be a positive integer/i],
+    ['stride', { count: 3, itemSize: 3, data: { array: values, stride: '3' } }, /geometry\.attributes\.position\.data\.stride must be a positive integer/i],
+    ['offset', { count: 3, itemSize: 3, array: values, offset: -1 }, /geometry\.attributes\.position\.offset must be a non-negative integer/i],
+  ]
+
+  for (const [name, positionAttribute, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(positionAttribute), camera, { width: 32, height: 32 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('invalid geometry index values fail clearly', () => {
   const camera = makeCamera()
   const makeScene = (indexAttribute) => {

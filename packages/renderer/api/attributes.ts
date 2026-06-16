@@ -33,7 +33,7 @@ export function readVec2Attribute(attribute: ThreeBufferAttributeLike, label = '
 
 export function readColorAttribute(attribute: ThreeBufferAttributeLike, materialColor: Color4, label = 'THREE.BufferAttribute'): number[] {
   const count = attributeCount(attribute, label)
-  const itemSize = attribute.itemSize ?? 3
+  const itemSize = attributeItemSize(attribute, label) ?? 3
   const values = new Array<number>(count * 4)
   for (let i = 0; i < count; i += 1) {
     values[i * 4] = clamp01(attributeComponent(attribute, i, 0, label) * materialColor[0])
@@ -75,7 +75,8 @@ export function attributeComponent(
   component: number,
   label = 'THREE.BufferAttribute',
 ): number {
-  if (component >= (attribute.itemSize ?? 1)) return 0
+  const itemSize = attributeItemSize(attribute, label) ?? 1
+  if (component >= itemSize) return 0
 
   let value: number | undefined
   if (component === 0 && typeof attribute.getX === 'function') value = attribute.getX(index)
@@ -84,8 +85,8 @@ export function attributeComponent(
   else if (component === 3 && typeof attribute.getW === 'function') value = attribute.getW(index)
   else {
     const array = attribute.array ?? attribute.data?.array
-    const stride = attribute.data?.stride ?? attribute.itemSize ?? 1
-    const offset = attribute.offset ?? 0
+    const stride = attributeStride(attribute, label) ?? itemSize
+    const offset = attributeOffset(attribute, label)
     value = array?.[index * stride + offset + component]
   }
 
@@ -94,6 +95,25 @@ export function attributeComponent(
   }
 
   return attribute.normalized ? normalizeAttributeValue(value!, attribute.array ?? attribute.data?.array) : value!
+}
+
+function attributeItemSize(attribute: ThreeBufferAttributeLike, label: string): number | undefined {
+  if (attribute.itemSize == null) return undefined
+  if (Number.isInteger(attribute.itemSize) && attribute.itemSize > 0) return attribute.itemSize
+  throw new TypeError(`${label}.itemSize must be a positive integer.`)
+}
+
+function attributeStride(attribute: ThreeBufferAttributeLike, label: string): number | undefined {
+  const stride = attribute.data?.stride
+  if (stride == null) return undefined
+  if (Number.isInteger(stride) && stride > 0) return stride
+  throw new TypeError(`${label}.data.stride must be a positive integer.`)
+}
+
+function attributeOffset(attribute: ThreeBufferAttributeLike, label: string): number {
+  if (attribute.offset == null) return 0
+  if (Number.isInteger(attribute.offset) && attribute.offset >= 0) return attribute.offset
+  throw new TypeError(`${label}.offset must be a non-negative integer.`)
 }
 
 function normalizeAttributeValue(value: number, array: ArrayLike<number> | undefined): number {
