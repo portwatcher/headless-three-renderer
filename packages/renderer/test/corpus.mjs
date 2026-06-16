@@ -53,6 +53,7 @@ export function createSceneCorpus() {
     batchedMeshCullingCorpus(),
     batchedMeshCustomSortCorpus(),
     lodAndGroupsCorpus(),
+    lodZoomCorpus(),
     pathologicalGeometryCorpus(),
   ]
 }
@@ -1863,6 +1864,45 @@ function lodAndGroupsCorpus() {
     camera: makeCamera([1.4, 1.2, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 20],
+  }
+}
+
+function lodZoomCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const lod = new THREE.LOD()
+  lod.addLevel(
+    new THREE.Mesh(new THREE.SphereGeometry(0.48, 24, 16), new THREE.MeshBasicMaterial({ color: 0xff0000 })),
+    0,
+  )
+  lod.addLevel(
+    new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.75, 0.75), new THREE.MeshBasicMaterial({ color: 0x0000ff })),
+    4,
+  )
+  scene.add(lod)
+
+  const camera = makeCamera([0, 0, 6])
+  camera.zoom = 2
+  camera.updateProjectionMatrix()
+
+  return {
+    name: 'lod-zoom-selection',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.02,
+    validate(rgba, { width, height }) {
+      const x = Math.floor(width / 2)
+      const y = Math.floor(height / 2)
+      const offset = (y * width + x) * 4
+      const r = rgba[offset]
+      const b = rgba[offset + 2]
+      if (r <= b + 80) {
+        throw new Error(`zoomed LOD corpus should render the red near level, got red=${r} blue=${b}`)
+      }
+    },
   }
 }
 
