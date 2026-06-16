@@ -452,6 +452,28 @@ test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   assert.ok(uncullable.r > 200, `perObjectFrustumCulled=false should render the oversized batch draw (${uncullable.r})`)
 })
 
+test('invalid BatchedMesh perObjectFrustumCulled values fail clearly', () => {
+  const camera = makeCamera()
+  const source = new THREE.PlaneGeometry(1, 1)
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+  batched.perObjectFrustumCulled = 'yes'
+
+  const scene = new THREE.Scene()
+  scene.add(batched)
+
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /THREE\.BatchedMesh\.perObjectFrustumCulled must be a boolean/i,
+  )
+})
+
 test('BatchedMesh transparent sorting uses each geometry range center', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
