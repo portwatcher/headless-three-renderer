@@ -315,6 +315,13 @@ function stencilRenderStateCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const masked = meanRegion(rgba, width, 16, 24, 44, 72)
+      const unmasked = meanRegion(rgba, width, 52, 24, 80, 72)
+      if (!(masked.b > masked.g + 180 && masked.b > masked.r + 200 && unmasked.r < 2 && unmasked.g < 2 && unmasked.b < 2)) {
+        throw new Error(`stencil corpus should render only the masked blue side, got masked=${JSON.stringify(masked)} unmasked=${JSON.stringify(unmasked)}`)
+      }
+    },
   }
 }
 
@@ -353,6 +360,12 @@ function customBlendingCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.r < 4 && center.g > 180 && center.b > 180)) {
+        throw new Error(`reverse-subtract blending corpus should render cyan in the overlap, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -376,6 +389,13 @@ function backgroundOverrideCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.06,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      const corner = meanRegion(rgba, width, 4, 4, 20, 20)
+      if (!(center.g > center.r + 120 && center.g > center.b + 80 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
+        throw new Error(`background override corpus should render green mesh on black option background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
