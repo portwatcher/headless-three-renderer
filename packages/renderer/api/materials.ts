@@ -1551,9 +1551,13 @@ function extractCustomFragmentShader(material: ThreeMaterialLike | undefined): s
 }
 
 function materialRendererHints(userData: Record<string, any> | undefined): { value: Record<string, unknown>; label: string } | undefined {
-  const value = userData?.headlessThreeRenderer ?? userData?.headlessRenderer
+  if (userData == null) return undefined
+  if (typeof userData !== 'object' || Array.isArray(userData)) {
+    throw new TypeError('material.userData must be an object.')
+  }
+  const value = userData.headlessThreeRenderer ?? userData.headlessRenderer
   if (value == null) return undefined
-  const label = userData?.headlessThreeRenderer != null
+  const label = userData.headlessThreeRenderer != null
     ? 'material.userData.headlessThreeRenderer'
     : 'material.userData.headlessRenderer'
   if (typeof value !== 'object' || Array.isArray(value)) {

@@ -3749,6 +3749,9 @@ test('invalid MeshDistanceMaterial range and reference values fail clearly', () 
     ['hint distanceReferencePosition', (material) => {
       material.userData.headlessThreeRenderer = { distanceReferencePosition: { x: 0, y: 'near', z: 0 } }
     }, /material\.userData\.headlessThreeRenderer\.distanceReferencePosition\.y must be a finite number/i],
+    ['userData container', (material) => {
+      material.userData = 'distance'
+    }, /material\.userData must be an object/i],
     ['modern hint container', (material) => {
       material.userData.headlessThreeRenderer = 'distance'
     }, /material\.userData\.headlessThreeRenderer must be an object/i],
@@ -11882,6 +11885,9 @@ test('custom WGSL fragment override values fail clearly', () => {
     ['legacy fragmentWgsl', (material) => {
       material.userData.headlessRenderer = { fragmentWgsl: false }
     }, /material\.userData\.headlessRenderer\.fragmentWgsl must be a string/i],
+    ['material userData container', (material) => {
+      material.userData = 'fragment'
+    }, /material\.userData must be an object/i],
     ['modern hint container', (material) => {
       material.userData.headlessThreeRenderer = 1
     }, /material\.userData\.headlessThreeRenderer must be an object/i],
