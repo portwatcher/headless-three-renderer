@@ -26,6 +26,7 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    shadowMaterialReceiverCorpus(),
     dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
     lodAndGroupsCorpus(),
@@ -815,6 +816,50 @@ function physicalIblShadowCorpus() {
     camera: makeCamera([2.2, 1.4, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [10, 10, 13],
+  }
+}
+
+function shadowMaterialReceiverCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 1, 1)
+
+  const receiver = new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.ShadowMaterial({ color: 0x204080, opacity: 0.75 }),
+  )
+  receiver.rotation.x = -Math.PI / 2
+  receiver.position.y = -0.6
+  receiver.receiveShadow = true
+  scene.add(receiver)
+
+  const caster = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.8, 0.8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  caster.position.y = 0.05
+  caster.castShadow = true
+  scene.add(caster)
+
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(3, 4, 2)
+  light.target.position.set(0, -0.4, 0)
+  light.castShadow = true
+  light.shadow.mapSize.set(256, 256)
+  light.shadow.camera.left = -3
+  light.shadow.camera.right = 3
+  light.shadow.camera.top = 3
+  light.shadow.camera.bottom = -3
+  light.shadow.camera.near = 0.1
+  light.shadow.camera.far = 10
+  scene.add(light, light.target)
+
+  return {
+    name: 'shadow-material-receiver',
+    scene,
+    camera: makeCamera([0.8, 1.5, 3.0], [0, -0.35, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.01,
   }
 }
 
