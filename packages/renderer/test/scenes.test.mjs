@@ -9085,6 +9085,15 @@ test('unsupported texture colorSpace and encoding values fail clearly', () => {
     /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
     'background colorSpace',
   )
+  const encodedBackground = solidTexture(255, 255, 255)
+  encodedBackground.encoding = 999
+  const encodedBackgroundScene = new THREE.Scene()
+  encodedBackgroundScene.background = encodedBackground
+  assert.throws(
+    () => renderRgba(encodedBackgroundScene, makeCamera(), { width: 32, height: 32 }),
+    /texture\.encoding 999.*not supported.*sRGBEncoding.*LinearEncoding.*texture\.colorSpace/i,
+    'background encoding',
+  )
 
   const environment = solidTexture(255, 255, 255)
   environment.colorSpace = 'display-p3'
@@ -9095,6 +9104,16 @@ test('unsupported texture colorSpace and encoding values fail clearly', () => {
     () => renderRgba(environmentScene, makeCamera(), { width: 32, height: 32 }),
     /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
     'environment colorSpace',
+  )
+  const encodedEnvironment = solidTexture(255, 255, 255)
+  encodedEnvironment.encoding = 999
+  encodedEnvironment.mapping = THREE.EquirectangularReflectionMapping
+  const encodedEnvironmentScene = new THREE.Scene()
+  encodedEnvironmentScene.environment = encodedEnvironment
+  assert.throws(
+    () => renderRgba(encodedEnvironmentScene, makeCamera(), { width: 32, height: 32 }),
+    /texture\.encoding 999.*not supported.*sRGBEncoding.*LinearEncoding.*texture\.colorSpace/i,
+    'environment encoding',
   )
 
   const reflectionProbe = cubeTexture([
@@ -9112,6 +9131,22 @@ test('unsupported texture colorSpace and encoding values fail clearly', () => {
     () => renderRgba(reflectionProbeScene, makeCamera(), { width: 32, height: 32 }),
     /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
     'reflection probe colorSpace',
+  )
+  const encodedReflectionProbe = cubeTexture([
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+  ])
+  encodedReflectionProbe.encoding = 999
+  const encodedReflectionProbeScene = new THREE.Scene()
+  encodedReflectionProbeScene.userData.headlessThreeRenderer = { reflectionProbe: { texture: encodedReflectionProbe } }
+  assert.throws(
+    () => renderRgba(encodedReflectionProbeScene, makeCamera(), { width: 32, height: 32 }),
+    /texture\.encoding 999.*not supported.*sRGBEncoding.*LinearEncoding.*texture\.colorSpace/i,
+    'reflection probe encoding',
   )
 })
 
