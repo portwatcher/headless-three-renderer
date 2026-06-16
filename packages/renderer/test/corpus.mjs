@@ -49,6 +49,7 @@ export function createSceneCorpus() {
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
+    instancedTextureUvCorpus(),
     batchedMeshCorpus(),
     batchedMeshInactiveGeometryCorpus(),
     batchedMeshCullingCorpus(),
@@ -127,6 +128,23 @@ function spriteMapTexture() {
   texture.minFilter = THREE.NearestFilter
   texture.needsUpdate = true
   return texture
+}
+
+function meanRegion(rgba, width, x0, y0, x1, y1) {
+  let r = 0
+  let g = 0
+  let b = 0
+  let count = 0
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const offset = (y * width + x) * 4
+      r += rgba[offset]
+      g += rgba[offset + 1]
+      b += rgba[offset + 2]
+      count += 1
+    }
+  }
+  return { r: r / count, g: g / count, b: b / count }
 }
 
 function transparentLayerCorpus() {
@@ -1682,6 +1700,108 @@ function instancedLinesPointsCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
+  }
+}
+
+function instancedTextureUvCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const map = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+  map.needsUpdate = true
+
+  const base = new THREE.PlaneGeometry(0.34, 0.34)
+  const meshGeometry = new THREE.InstancedBufferGeometry()
+  meshGeometry.index = base.index
+  meshGeometry.setAttribute('position', base.getAttribute('position'))
+  meshGeometry.setAttribute('uv', base.getAttribute('uv'))
+  meshGeometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.52, 0.35, 0,
+    0.52, 0.35, 0,
+  ]), 3))
+  meshGeometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  scene.add(new THREE.Mesh(
+    meshGeometry,
+    new THREE.MeshBasicMaterial({ color: 0xffffff, map }),
+  ))
+
+  const lineGeometry = new THREE.InstancedBufferGeometry()
+  lineGeometry.instanceCount = 2
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.18, -0.08, 0,
+    0.18, -0.08, 0,
+  ]), 3))
+  lineGeometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.52, 0, 0,
+    0.52, 0, 0,
+  ]), 3))
+  lineGeometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  scene.add(new THREE.LineSegments(
+    lineGeometry,
+    new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 8, map }),
+  ))
+
+  const pointGeometry = new THREE.InstancedBufferGeometry()
+  pointGeometry.instanceCount = 2
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, -0.48, 0]), 3))
+  pointGeometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.5, 0.5]), 2))
+  pointGeometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.52, 0, 0,
+    0.52, 0, 0,
+  ]), 3))
+  pointGeometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  scene.add(new THREE.Points(pointGeometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 18,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'instanced-texture-uv-streams',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const samples = [
+        ['left mesh', meanRegion(rgba, width, 20, 28, 30, 38), 'red'],
+        ['right mesh', meanRegion(rgba, width, 66, 28, 76, 38), 'green'],
+        ['left line', meanRegion(rgba, width, 17, 48, 31, 57), 'red'],
+        ['right line', meanRegion(rgba, width, 65, 48, 79, 57), 'green'],
+        ['left point', meanRegion(rgba, width, 18, 64, 32, 78), 'red'],
+        ['right point', meanRegion(rgba, width, 66, 64, 80, 78), 'green'],
+      ]
+      for (const [label, color, expected] of samples) {
+        if (expected === 'red' && color.r <= color.g + 45) {
+          throw new Error(`${label} should sample the red instanced UV texel, got rgb(${color.r}, ${color.g}, ${color.b})`)
+        }
+        if (expected === 'green' && color.g <= color.r + 45) {
+          throw new Error(`${label} should sample the green instanced UV texel, got rgb(${color.r}, ${color.g}, ${color.b})`)
+        }
+      }
+    },
   }
 }
 
