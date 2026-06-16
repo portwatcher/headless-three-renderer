@@ -12528,6 +12528,21 @@ test('over native direct light budget fails clearly', () => {
   )
 })
 
+test('camera-layer-filtered lights do not count toward the direct light budget', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  camera.layers.set(1)
+
+  for (let i = 0; i < 65; i += 1) {
+    const light = new THREE.PointLight(0xffffff, 1)
+    light.position.set((i % 8) - 3.5, 2, Math.floor(i / 8) - 2)
+    light.layers.set(i < 64 ? 1 : 0)
+    scene.add(light)
+  }
+
+  assert.equal(extractLights(scene, camera)?.length, 64)
+})
+
 test('ShaderMaterial without headless WGSL override fails clearly', () => {
   const cases = [
     ['ShaderMaterial', new THREE.ShaderMaterial({
