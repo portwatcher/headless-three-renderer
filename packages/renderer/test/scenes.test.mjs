@@ -10280,6 +10280,11 @@ test('invalid light numeric values fail clearly', () => {
       light.target.matrixWorld.elements[14] = Number.NaN
       return light
     }, /DirectionalLight\.target\.matrixWorld\.elements\[14\] must be a finite number/i],
+    ['directional transform matrix', () => {
+      const light = new THREE.DirectionalLight(0xffffff, 1)
+      light.matrixWorld.elements[12] = Number.NaN
+      return light
+    }, /DirectionalLight\.matrixWorld\.elements\[12\] must be a finite number/i],
     ['directional target container', () => {
       const light = new THREE.DirectionalLight(0xffffff, 1)
       light.target = 'target'
