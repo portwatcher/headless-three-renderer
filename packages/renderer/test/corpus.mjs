@@ -929,6 +929,12 @@ function materialEnvMapCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [10, 10, 13],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 60 && center.g > center.b + 25)) {
+        throw new Error(`Phong material envMap corpus should render green reflected IBL, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -978,6 +984,18 @@ function materialEnvMapBasicLambertCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [6, 6, 8],
     minNonBackgroundRatio: 0.06,
+    validate(rgba, { width }) {
+      const basic = meanRegion(rgba, width, 20, 30, 40, 66)
+      const lambert = meanRegion(rgba, width, 56, 30, 76, 66)
+      for (const [label, mean] of [
+        ['basic', basic],
+        ['lambert', lambert],
+      ]) {
+        if (!(mean.g > mean.r + 45 && mean.g > mean.b + 20)) {
+          throw new Error(`shared material envMap corpus should render green ${label} IBL, got ${JSON.stringify(mean)}`)
+        }
+      }
+    },
   }
 }
 
