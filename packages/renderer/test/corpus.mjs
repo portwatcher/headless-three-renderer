@@ -48,6 +48,7 @@ export function createSceneCorpus() {
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
+    batchedMeshCorpus(),
     lodAndGroupsCorpus(),
     pathologicalGeometryCorpus(),
   ]
@@ -1658,6 +1659,44 @@ function instancedLinesPointsCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
+  }
+}
+
+function batchedMeshCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.42, 0.42)
+  const batch = new THREE.BatchedMesh(
+    3,
+    source.getAttribute('position').count,
+    source.index.count,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  const geometryId = batch.addGeometry(source)
+  const left = batch.addInstance(geometryId)
+  const right = batch.addInstance(geometryId)
+  const hidden = batch.addInstance(geometryId)
+  batch.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.52, 0, 0))
+  batch.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.52, 0, 0))
+  batch.setMatrixAt(hidden, new THREE.Matrix4().makeTranslation(0, 0, 0))
+  batch.setColorAt(left, new THREE.Color(1, 0.15, 0.05))
+  batch.setColorAt(right, new THREE.Color(0.05, 0.9, 0.25))
+  batch.setColorAt(hidden, new THREE.Color(0.1, 0.2, 1))
+  batch.setVisibleAt(hidden, false)
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-instance-colors',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.03,
   }
 }
 

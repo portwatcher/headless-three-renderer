@@ -54,6 +54,11 @@ interface MeshInstance {
   color?: Color4
 }
 
+interface BatchedMeshDraw {
+  range: { start: number; count: number }
+  instance: MeshInstance
+}
+
 export type ShadowMaterialMode = 'depth' | 'distance'
 
 interface LineSegmentDistance {
@@ -141,13 +146,9 @@ function visitObject(
   if (visibleToCamera) {
     updateLodObject(object, camera)
 
-    if (object.isBatchedMesh === true) {
-      throw new Error(
-        'THREE.BatchedMesh is not supported by @headless-three/renderer yet. Expand it to ordinary Mesh or InstancedMesh objects before rendering.',
-      )
-    }
-
-    if (object.isMesh === true && object.geometry) {
+    if (object.isBatchedMesh === true && object.geometry) {
+      appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+    } else if (object.isMesh === true && object.geometry) {
       appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext)
@@ -164,6 +165,42 @@ function visitObject(
   }
 }
 
+function appendBatchedMesh(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  meshes: FlattenedMesh[],
+  groupOrder: number,
+  clippingContext: ClippingContext,
+  localClippingEnabled: boolean,
+  shadowMaterialMode: ShadowMaterialMode | undefined,
+  materialContext: MaterialExtractionContext,
+): void {
+  const geometry = object.geometry!
+  const draws = batchedMeshDraws(object)
+  if (draws.length === 0) return
+
+  for (const draw of draws) {
+    const geometryView = batchedGeometryView(geometry, draw.range)
+    const objectView = Object.create(object) as ThreeObject3DLike
+    objectView.geometry = geometryView
+    objectView.isInstancedMesh = false
+    objectView.instanceMatrix = undefined
+    objectView.instanceColor = undefined
+    objectView.count = undefined
+    appendMesh(
+      objectView,
+      camera,
+      meshes,
+      groupOrder,
+      clippingContext,
+      localClippingEnabled,
+      shadowMaterialMode,
+      materialContext,
+      [draw.instance],
+    )
+  }
+}
+
 function appendMesh(
   object: ThreeObject3DLike,
   camera: ThreeCameraLike | undefined,
@@ -173,6 +210,7 @@ function appendMesh(
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
+  instanceOverride?: MeshInstance[],
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -206,10 +244,12 @@ function appendMesh(
 
   // For skinned meshes, positions are already in world space after CPU skinning.
   const isSkinned = object.isSkinnedMesh === true && object.skeleton
-  const meshTransform = isSkinned
+  const meshTransform = instanceOverride
     ? IDENTITY_4X4.slice()
-    : matrixElements(object.matrixWorld!, 'mesh.matrixWorld')
-  const instances = meshInstances(object, meshTransform)
+    : isSkinned
+      ? IDENTITY_4X4.slice()
+      : matrixElements(object.matrixWorld!, 'mesh.matrixWorld')
+  const instances = instanceOverride ?? meshInstances(object, meshTransform)
   if (instances.length === 0) return
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
@@ -2150,6 +2190,128 @@ function appendDashedLineExpansion(out: DashedLineExpansion, value: DashedLineEx
   if (out.uvs && value.uvs) appendNumberArray(out.uvs, value.uvs)
   if (out.uvs2 && value.uvs2) appendNumberArray(out.uvs2, value.uvs2)
   if (out.colors && value.colors) appendNumberArray(out.colors, value.colors)
+}
+
+function batchedMeshDraws(object: ThreeObject3DLike): BatchedMeshDraw[] {
+  const instanceInfo = object._instanceInfo
+  if (!Array.isArray(instanceInfo)) {
+    throw new Error(
+      'THREE.BatchedMesh instance table is not readable. Use a real THREE.BatchedMesh or expand the batch to ordinary Mesh or InstancedMesh objects before rendering.',
+    )
+  }
+
+  const baseTransform = matrixElements(object.matrixWorld!, 'batchedMesh.matrixWorld')
+  const draws: BatchedMeshDraw[] = []
+  for (let instanceId = 0; instanceId < instanceInfo.length; instanceId += 1) {
+    const info = instanceInfo[instanceId]
+    if (!info || typeof info !== 'object') {
+      throw new TypeError(`THREE.BatchedMesh._instanceInfo[${instanceId}] must be an object.`)
+    }
+
+    if (!batchedOptionalBoolean(info.active, `THREE.BatchedMesh._instanceInfo[${instanceId}].active`, true)) continue
+    if (!batchedOptionalBoolean(info.visible, `THREE.BatchedMesh._instanceInfo[${instanceId}].visible`, true)) continue
+
+    const geometryId = batchedNonNegativeInteger(
+      info.geometryIndex,
+      `THREE.BatchedMesh._instanceInfo[${instanceId}].geometryIndex`,
+    )
+    const range = batchedGeometryRange(object, geometryId)
+    if (range.count === 0) continue
+
+    draws.push({
+      range,
+      instance: {
+        transform: multiplyMat4(baseTransform, batchedInstanceMatrix(object, instanceId)),
+        color: batchedInstanceColor(object, instanceId),
+      },
+    })
+  }
+  return draws
+}
+
+function batchedGeometryRange(object: ThreeObject3DLike, geometryId: number): { start: number; count: number } {
+  const range = typeof object.getGeometryRangeAt === 'function'
+    ? object.getGeometryRangeAt(geometryId, {})
+    : object._geometryInfo?.[geometryId] ?? null
+
+  if (!range || typeof range !== 'object') {
+    throw new Error(
+      `THREE.BatchedMesh geometry range ${geometryId} is not readable. Use a real THREE.BatchedMesh or expand the batch before rendering.`,
+    )
+  }
+
+  const rawActive = (range as { active?: unknown }).active
+  if (rawActive != null && !batchedOptionalBoolean(rawActive, `THREE.BatchedMesh._geometryInfo[${geometryId}].active`, true)) {
+    return { start: 0, count: 0 }
+  }
+
+  return {
+    start: batchedNonNegativeInteger((range as { start?: unknown }).start, `THREE.BatchedMesh._geometryInfo[${geometryId}].start`),
+    count: batchedNonNegativeInteger((range as { count?: unknown }).count, `THREE.BatchedMesh._geometryInfo[${geometryId}].count`),
+  }
+}
+
+function batchedGeometryView(
+  geometry: ThreeBufferGeometryLike,
+  range: { start: number; count: number },
+): ThreeBufferGeometryLike {
+  const view = Object.create(geometry) as ThreeBufferGeometryLike
+  view.drawRange = { start: range.start, count: range.count }
+  return view
+}
+
+function batchedInstanceMatrix(object: ThreeObject3DLike, instanceId: number): number[] {
+  const data = object._matricesTexture?.image?.data
+  const offset = instanceId * 16
+  if (!data || typeof data.length !== 'number' || data.length < offset + 16) {
+    throw new Error(
+      `THREE.BatchedMesh matrix texture is not readable for instance ${instanceId}. Use a real THREE.BatchedMesh or expand the batch before rendering.`,
+    )
+  }
+
+  const matrix = new Array<number>(16)
+  for (let component = 0; component < 16; component += 1) {
+    matrix[component] = finiteArrayValue(data, offset + component, 'THREE.BatchedMesh._matricesTexture.image.data')
+  }
+  return matrix
+}
+
+function batchedInstanceColor(object: ThreeObject3DLike, instanceId: number): Color4 | undefined {
+  const data = object._colorsTexture?.image?.data
+  if (!data) return undefined
+
+  const offset = instanceId * 4
+  if (typeof data.length !== 'number' || data.length < offset + 4) {
+    throw new Error(
+      `THREE.BatchedMesh color texture is not readable for instance ${instanceId}. Use a real THREE.BatchedMesh or expand the batch before rendering.`,
+    )
+  }
+
+  return [
+    finiteArrayValue(data, offset, 'THREE.BatchedMesh._colorsTexture.image.data'),
+    finiteArrayValue(data, offset + 1, 'THREE.BatchedMesh._colorsTexture.image.data'),
+    finiteArrayValue(data, offset + 2, 'THREE.BatchedMesh._colorsTexture.image.data'),
+    finiteArrayValue(data, offset + 3, 'THREE.BatchedMesh._colorsTexture.image.data'),
+  ]
+}
+
+function batchedOptionalBoolean(value: unknown, label: string, fallback: boolean): boolean {
+  if (value == null) return fallback
+  if (typeof value === 'boolean') return value
+  throw new TypeError(`${label} must be a boolean.`)
+}
+
+function batchedNonNegativeInteger(value: unknown, label: string): number {
+  if (typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0) {
+    return value
+  }
+  throw new TypeError(`${label} must be a non-negative integer.`)
+}
+
+function finiteArrayValue(values: ArrayLike<number>, index: number, label: string): number {
+  const value = values[index]
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  throw new TypeError(`${label}[${index}] must be a finite number.`)
 }
 
 function appendNumberArray(out: number[], values: number[]): void {

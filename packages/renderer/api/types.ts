@@ -330,8 +330,37 @@ export interface ThreeObject3DLike {
   customDistanceMaterial?: ThreeMaterialLike
   center?: { x?: number; y?: number }
   count?: number
+  instanceCount?: number
+  maxInstanceCount?: number
   instanceMatrix?: ThreeBufferAttributeLike
   instanceColor?: ThreeBufferAttributeLike | null
+  _instanceInfo?: Array<{
+    visible?: boolean
+    active?: boolean
+    geometryIndex?: number
+  }>
+  _geometryInfo?: Array<{
+    active?: boolean
+    start?: number
+    count?: number
+    vertexStart?: number
+    vertexCount?: number
+    reservedVertexCount?: number
+    indexStart?: number
+    indexCount?: number
+    reservedIndexCount?: number
+  }>
+  _matricesTexture?: {
+    image?: {
+      data?: ArrayLike<number>
+    }
+  } | null
+  _colorsTexture?: {
+    image?: {
+      data?: ArrayLike<number>
+    }
+  } | null
+  getGeometryRangeAt?(geometryId: number, target?: Record<string, unknown>): Record<string, unknown> | null
   matrixWorld?: ThreeMatrix4Like
   autoUpdate?: boolean
   levels?: Array<{ object: ThreeObject3DLike; distance?: number; hysteresis?: number }>

@@ -369,7 +369,7 @@ test('invalid geometry attribute values fail clearly', () => {
   )
 })
 
-test('unsupported BatchedMesh inputs fail clearly', () => {
+test('malformed BatchedMesh inputs fail clearly', () => {
   const camera = makeCamera()
   const scene = new THREE.Scene()
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }))
@@ -378,8 +378,47 @@ test('unsupported BatchedMesh inputs fail clearly', () => {
 
   assert.throws(
     () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
-    /THREE\.BatchedMesh is not supported.*ordinary Mesh or InstancedMesh/i,
+    /THREE\.BatchedMesh instance table is not readable.*ordinary Mesh or InstancedMesh/i,
   )
+})
+
+test('BatchedMesh renders visible instance transforms and colors', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.45, 0.45)
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  const batched = new THREE.BatchedMesh(
+    3,
+    source.getAttribute('position').count,
+    source.index.count,
+    material,
+  )
+  const geometryId = batched.addGeometry(source)
+  const left = batched.addInstance(geometryId)
+  const right = batched.addInstance(geometryId)
+  const hidden = batched.addInstance(geometryId)
+  batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
+  batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
+  batched.setMatrixAt(hidden, new THREE.Matrix4().makeTranslation(0, 0, 0))
+  batched.setColorAt(left, new THREE.Color(1, 0, 0))
+  batched.setColorAt(right, new THREE.Color(0, 1, 0))
+  batched.setColorAt(hidden, new THREE.Color(0, 0, 1))
+  batched.setVisibleAt(hidden, false)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
+  const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
+  const centerMean = meanRegion(rgba, 96, 64, 44, 28, 52, 36)
+
+  assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `left BatchedMesh instance should render red (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+  assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right BatchedMesh instance should render green (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+  assert.ok(centerMean.b < 5 && centerMean.r < 5 && centerMean.g < 5, `hidden BatchedMesh instance should not render at center (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
 })
 
 test('invalid output dimensions fail clearly', () => {
