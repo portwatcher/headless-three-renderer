@@ -7,6 +7,7 @@ export function createSceneCorpus() {
     transparentLayerCorpus(),
     alphaToCoverageCorpus(),
     stencilRenderStateCorpus(),
+    customBlendingCorpus(),
     backgroundOverrideCorpus(),
     equirectangularBackgroundCorpus(),
     arrayCameraViewportCorpus(),
@@ -196,6 +197,44 @@ function stencilRenderStateCorpus() {
 
   return {
     name: 'stencil-masked-render-state',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+  }
+}
+
+function customBlendingCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const back = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  back.position.z = -0.1
+  scene.add(back)
+
+  const front = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7),
+    new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.ReverseSubtractEquation,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneFactor,
+      blendEquationAlpha: THREE.AddEquation,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: THREE.ZeroFactor,
+    }),
+  )
+  front.position.z = 0.1
+  scene.add(front)
+
+  return {
+    name: 'custom-blending-reverse-subtract',
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
