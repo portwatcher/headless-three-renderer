@@ -9085,6 +9085,34 @@ test('unsupported texture colorSpace and encoding values fail clearly', () => {
     /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
     'background colorSpace',
   )
+
+  const environment = solidTexture(255, 255, 255)
+  environment.colorSpace = 'display-p3'
+  environment.mapping = THREE.EquirectangularReflectionMapping
+  const environmentScene = new THREE.Scene()
+  environmentScene.environment = environment
+  assert.throws(
+    () => renderRgba(environmentScene, makeCamera(), { width: 32, height: 32 }),
+    /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
+    'environment colorSpace',
+  )
+
+  const reflectionProbe = cubeTexture([
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+    [255, 255, 255],
+  ])
+  reflectionProbe.colorSpace = 'display-p3'
+  const reflectionProbeScene = new THREE.Scene()
+  reflectionProbeScene.userData.headlessThreeRenderer = { reflectionProbe: { texture: reflectionProbe } }
+  assert.throws(
+    () => renderRgba(reflectionProbeScene, makeCamera(), { width: 32, height: 32 }),
+    /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
+    'reflection probe colorSpace',
+  )
 })
 
 test('base color maps decode sRGB colorSpace before shading', () => {
