@@ -10486,6 +10486,61 @@ test('LOD selects object level from active camera distance', () => {
   assert.ok(far.b > far.r + 5, `far LOD should render the blue level (${far.b} vs ${far.r})`)
 })
 
+test('LOD selection accounts for camera zoom', () => {
+  function makeScene() {
+    const lod = new THREE.LOD()
+    lod.addLevel(
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 })),
+      0,
+    )
+    lod.addLevel(
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x0000ff })),
+      4,
+    )
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(lod)
+    return scene
+  }
+
+  const farCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  farCamera.position.set(0, 0, 6)
+  farCamera.lookAt(0, 0, 0)
+
+  const zoomedCamera = farCamera.clone()
+  zoomedCamera.zoom = 2
+
+  const far = meanRgba(renderRgba(makeScene(), farCamera, { width: 64, height: 64 }))
+  const zoomed = meanRgba(renderRgba(makeScene(), zoomedCamera, { width: 64, height: 64 }))
+
+  assert.ok(far.b > far.r + 5, `unzoomed far LOD should render the blue level (${far.b} vs ${far.r})`)
+  assert.ok(zoomed.r > zoomed.b + 10, `zoomed LOD distance should render the red level (${zoomed.r} vs ${zoomed.b})`)
+})
+
+test('LOD autoUpdate=false preserves manual level visibility', () => {
+  const redNear = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+  const blueFar = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x0000ff }))
+  redNear.visible = false
+  blueFar.visible = true
+
+  const lod = new THREE.LOD()
+  lod.addLevel(redNear, 0)
+  lod.addLevel(blueFar, 4)
+  lod.autoUpdate = false
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(lod)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.b > mean.r + 5, `manual blue LOD level should remain visible when autoUpdate=false (${mean.b} vs ${mean.r})`)
+})
+
 test('invalid LOD level values fail clearly', () => {
   function makeLodScene(mutator) {
     const lod = new THREE.LOD()
