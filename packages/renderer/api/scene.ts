@@ -2600,9 +2600,17 @@ function batchedGeometryRange(
   geometry: ThreeBufferGeometryLike,
   geometryId: number,
 ): { start: number; count: number } {
+  const cachedRange = object._geometryInfo?.[geometryId]
+  const cachedActive = cachedRange && typeof cachedRange === 'object' && !Array.isArray(cachedRange)
+    ? (cachedRange as { active?: unknown }).active
+    : null
+  if (cachedActive != null && !batchedOptionalBoolean(cachedActive, `THREE.BatchedMesh._geometryInfo[${geometryId}].active`, true)) {
+    return { start: 0, count: 0 }
+  }
+
   const range = typeof object.getGeometryRangeAt === 'function'
     ? object.getGeometryRangeAt(geometryId, {})
-    : object._geometryInfo?.[geometryId] ?? null
+    : cachedRange ?? null
 
   if (!range || typeof range !== 'object') {
     throw new Error(

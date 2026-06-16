@@ -670,6 +670,40 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   assert.ok(centerMean.b < 5 && centerMean.r < 5 && centerMean.g < 5, `hidden BatchedMesh instance should not render at center (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
 })
 
+test('BatchedMesh skips inactive geometry ranges', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.45, 0.45)
+  const batched = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count * 2,
+    source.index.count * 2,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  const activeGeometryId = batched.addGeometry(source)
+  const inactiveGeometryId = batched.addGeometry(source.clone())
+  const left = batched.addInstance(activeGeometryId)
+  const right = batched.addInstance(inactiveGeometryId)
+  batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
+  batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
+  batched.setColorAt(left, new THREE.Color(1, 0, 0))
+  batched.setColorAt(right, new THREE.Color(0, 1, 0))
+  batched._geometryInfo[inactiveGeometryId].active = false
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
+  const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
+
+  assert.ok(leftMean.r > leftMean.g + 80, `active BatchedMesh geometry should render red (${leftMean.r} vs ${leftMean.g})`)
+  assert.ok(rightMean.r < 5 && rightMean.g < 5 && rightMean.b < 5, `inactive BatchedMesh geometry should skip its visible instance (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+})
+
 test('BatchedMesh material arrays honor packed geometry groups', () => {
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 3)
