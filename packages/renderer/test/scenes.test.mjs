@@ -17064,7 +17064,7 @@ test('render option color backgrounds override scene texture backgrounds', () =>
   assert.ok(mean.g < 30, `options.background color should suppress scene texture background (${mean.g})`)
 })
 
-test('render option null background clears scene color backgrounds', () => {
+test('render option null background clears scene backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
   const camera = makeCamera()
@@ -17077,6 +17077,19 @@ test('render option null background clears scene color backgrounds', () => {
   assert.ok(sceneBackground.r > 200, `scene color background should render red (${sceneBackground.r})`)
   assert.ok(cleared.r < sceneBackground.r - 120, `options.background null should clear scene color background (${cleared.r} vs ${sceneBackground.r})`)
   assert.ok(cleared.g > 5 && cleared.b > 5, `cleared background should use renderer default color (${cleared.g}, ${cleared.b})`)
+
+  const textureScene = new THREE.Scene()
+  textureScene.background = solidTexture(0, 255, 0)
+  const textureBackground = meanRgba(renderRgba(textureScene, camera, { width: 64, height: 64 }))
+  textureScene.backgroundIntensity = 'ignored'
+  textureScene.backgroundBlurriness = 'ignored'
+  const textureCleared = meanRgba(renderRgba(textureScene, camera, { width: 64, height: 64, background: null }))
+
+  assert.ok(textureBackground.g > 180, `scene texture background should render green (${textureBackground.g})`)
+  assert.ok(
+    textureCleared.g < textureBackground.g - 120,
+    `options.background null should clear scene texture background (${textureCleared.g} vs ${textureBackground.g})`,
+  )
 })
 
 test('render options viewport confines draws to an output rectangle', () => {
