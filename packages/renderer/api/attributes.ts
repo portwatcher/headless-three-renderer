@@ -11,11 +11,9 @@ export function getAttribute(geometry: ThreeBufferGeometryLike, name: string): T
 }
 
 export function readVec3Attribute(attribute: ThreeBufferAttributeLike, label = 'THREE.BufferAttribute'): number[] {
-  if (attribute.count == null) {
-    throw new TypeError(`${label} must have count.`)
-  }
-  const values = new Array<number>(attribute.count * 3)
-  for (let i = 0; i < attribute.count; i += 1) {
+  const count = attributeCount(attribute, label)
+  const values = new Array<number>(count * 3)
+  for (let i = 0; i < count; i += 1) {
     values[i * 3] = attributeComponent(attribute, i, 0, label)
     values[i * 3 + 1] = attributeComponent(attribute, i, 1, label)
     values[i * 3 + 2] = attributeComponent(attribute, i, 2, label)
@@ -24,11 +22,9 @@ export function readVec3Attribute(attribute: ThreeBufferAttributeLike, label = '
 }
 
 export function readVec2Attribute(attribute: ThreeBufferAttributeLike, label = 'THREE.BufferAttribute'): number[] {
-  if (attribute.count == null) {
-    throw new TypeError(`${label} must have count.`)
-  }
-  const values = new Array<number>(attribute.count * 2)
-  for (let i = 0; i < attribute.count; i += 1) {
+  const count = attributeCount(attribute, label)
+  const values = new Array<number>(count * 2)
+  for (let i = 0; i < count; i += 1) {
     values[i * 2] = attributeComponent(attribute, i, 0, label)
     values[i * 2 + 1] = attributeComponent(attribute, i, 1, label)
   }
@@ -36,9 +32,10 @@ export function readVec2Attribute(attribute: ThreeBufferAttributeLike, label = '
 }
 
 export function readColorAttribute(attribute: ThreeBufferAttributeLike, materialColor: Color4, label = 'THREE.BufferAttribute'): number[] {
+  const count = attributeCount(attribute, label)
   const itemSize = attribute.itemSize ?? 3
-  const values = new Array<number>(attribute.count * 4)
-  for (let i = 0; i < attribute.count; i += 1) {
+  const values = new Array<number>(count * 4)
+  for (let i = 0; i < count; i += 1) {
     values[i * 4] = clamp01(attributeComponent(attribute, i, 0, label) * materialColor[0])
     values[i * 4 + 1] = clamp01(attributeComponent(attribute, i, 1, label) * materialColor[1])
     values[i * 4 + 2] = clamp01(attributeComponent(attribute, i, 2, label) * materialColor[2])
@@ -52,8 +49,9 @@ export function readIndexAttribute(
   label = 'THREE.BufferAttribute',
   vertexCount?: number,
 ): number[] {
-  const values = new Array<number>(attribute.count)
-  for (let i = 0; i < attribute.count; i += 1) {
+  const count = attributeCount(attribute, label)
+  const values = new Array<number>(count)
+  for (let i = 0; i < count; i += 1) {
     const value = attributeComponent(attribute, i, 0, label)
     if (!Number.isInteger(value) || value < 0) {
       throw new TypeError(`${label}[${i}].x must be a non-negative integer.`)
@@ -64,6 +62,11 @@ export function readIndexAttribute(
     values[i] = value
   }
   return values
+}
+
+function attributeCount(attribute: ThreeBufferAttributeLike, label: string): number {
+  if (Number.isInteger(attribute.count) && attribute.count >= 0) return attribute.count
+  throw new TypeError(`${label}.count must be a non-negative integer.`)
 }
 
 export function attributeComponent(

@@ -369,6 +369,45 @@ test('invalid geometry attribute values fail clearly', () => {
   )
 })
 
+test('invalid geometry attribute count values fail clearly', () => {
+  const camera = makeCamera()
+
+  const positionScene = new THREE.Scene()
+  const positionGeometry = new THREE.BufferGeometry()
+  positionGeometry.setAttribute('position', {
+    count: '3',
+    itemSize: 3,
+    array: new Float32Array([
+      -0.75, -0.5, 0,
+      0.75, -0.5, 0,
+      0, 0.75, 0,
+    ]),
+  })
+  positionScene.add(new THREE.Mesh(positionGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  assert.throws(
+    () => renderRgba(positionScene, camera, { width: 32, height: 32 }),
+    /geometry\.attributes\.position\.count must be a non-negative integer/i,
+  )
+
+  const indexScene = new THREE.Scene()
+  const indexGeometry = new THREE.BufferGeometry()
+  indexGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.75, -0.5, 0,
+    0.75, -0.5, 0,
+    0, 0.75, 0,
+  ]), 3))
+  indexGeometry.index = {
+    count: Number.NaN,
+    itemSize: 1,
+    array: new Uint16Array([0, 1, 2]),
+  }
+  indexScene.add(new THREE.Mesh(indexGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  assert.throws(
+    () => renderRgba(indexScene, camera, { width: 32, height: 32 }),
+    /geometry\.index\.count must be a non-negative integer/i,
+  )
+})
+
 test('invalid geometry index values fail clearly', () => {
   const camera = makeCamera()
   const makeScene = (indexAttribute) => {
