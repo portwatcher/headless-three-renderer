@@ -1658,6 +1658,11 @@ test('invalid material color values fail clearly', () => {
       material.color = { isColor: true, r: 1, g: 'green', b: 0 }
       return material
     }, /material\.color\.g must be a finite number/i],
+    ['base color container', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      material.color = 'red'
+      return material
+    }, /material\.color must be a color-like object or \[r, g, b\]/i],
     ['emissive', () => {
       const material = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xff0000 })
       material.emissive = { isColor: true, r: 1, g: 0, b: Number.NaN }
@@ -9590,6 +9595,15 @@ test('invalid light color values fail clearly', () => {
   assert.throws(
     () => extractLights(hemisphereScene),
     /HemisphereLight\.groundColor\.b must be a finite number/i,
+  )
+
+  const primitiveColorScene = new THREE.Scene()
+  const primitiveColor = new THREE.PointLight(0xffffff, 1)
+  primitiveColor.color = 'white'
+  primitiveColorScene.add(primitiveColor)
+  assert.throws(
+    () => extractLights(primitiveColorScene),
+    /light\.color must be a color-like object or \[r, g, b\]/i,
   )
 
   const ambientScene = new THREE.Scene()

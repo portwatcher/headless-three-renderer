@@ -23,7 +23,7 @@ import type {
 const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
-import { resolveBackground, strictColorLikeToArray } from './color'
+import { resolveBackground, validatedColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
@@ -1095,7 +1095,7 @@ function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene>
   if (typeof fog !== 'object') {
     throw new TypeError('scene.fog must be a THREE.Fog or THREE.FogExp2 object.')
   }
-  const color = strictColorLikeToArray(fog.color, 'scene.fog.color')
+  const color = validatedColorLikeToArray(fog.color, 'scene.fog.color')
   if (fog.isFogExp2) {
     return {
       fogType: 'exp2',

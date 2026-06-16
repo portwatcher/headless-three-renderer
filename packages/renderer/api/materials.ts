@@ -1,6 +1,6 @@
 import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneRootLike, ThreeObject3DLike } from './types'
 import { clamp01 } from './math'
-import { strictColorLikeToArray } from './color'
+import { strictColorLikeToArray, validatedColorLikeToArray } from './color'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const native = require('../native.js') as {
@@ -459,7 +459,7 @@ export function assertMaterialLike(value: unknown, label: string): asserts value
 }
 
 export function materialColor(material: ThreeMaterialLike | undefined): Color4 {
-  const color = strictColorLikeToArray(material?.color, 'material.color') ?? [1, 1, 1, 1] as Color4
+  const color = validatedColorLikeToArray(material?.color, 'material.color') ?? [1, 1, 1, 1] as Color4
   color[3] = clamp01(optionalFiniteNumber(material?.opacity, 'material.opacity') ?? color[3] ?? 1)
   return color
 }
@@ -557,7 +557,7 @@ export function extractPbrProperties(
     ]
   }
 
-  const sheenColor = strictColorLikeToArray(material.sheenColor, 'material.sheenColor')
+  const sheenColor = validatedColorLikeToArray(material.sheenColor, 'material.sheenColor')
   const sheen = clamp01(optionalFiniteNumber(material.sheen, 'material.sheen') ?? 0)
   if (sheenColor && sheen > 0) {
     props.sheenColor = [
@@ -713,11 +713,11 @@ export function extractPbrProperties(
   if (attenuationDistance !== undefined) {
     props.attenuationDistance = Math.max(0, attenuationDistance)
   }
-  const attenuationColor = strictColorLikeToArray(material.attenuationColor, 'material.attenuationColor')
+  const attenuationColor = validatedColorLikeToArray(material.attenuationColor, 'material.attenuationColor')
   if (attenuationColor) {
     props.attenuationColor = [attenuationColor[0], attenuationColor[1], attenuationColor[2]]
   }
-  const physicalSpecularColor = strictColorLikeToArray(material.specularColor, 'material.specularColor')
+  const physicalSpecularColor = validatedColorLikeToArray(material.specularColor, 'material.specularColor')
   if (physicalSpecularColor) {
     props.physicalSpecularColor = [
       physicalSpecularColor[0],
@@ -757,7 +757,7 @@ export function extractPbrProperties(
     props.specularIntensityMapUsesUv2 = textureUvChannel(material.specularIntensityMap) > 0
   }
 
-  const specularColor = strictColorLikeToArray(material.specular, 'material.specular')
+  const specularColor = validatedColorLikeToArray(material.specular, 'material.specular')
   if (specularColor || material.isMeshPhongMaterial) {
     const color = specularColor ?? [17 / 255, 17 / 255, 17 / 255, 1]
     props.specularColor = [color[0], color[1], color[2]]
@@ -769,7 +769,7 @@ export function extractPbrProperties(
     props.shininess = Math.max(0.0001, shininess)
   }
 
-  const emissive = strictColorLikeToArray(material.emissive, 'material.emissive')
+  const emissive = validatedColorLikeToArray(material.emissive, 'material.emissive')
   if (emissive) {
     props.emissive = [emissive[0], emissive[1], emissive[2]]
     props.emissiveIntensity = finiteNumberOrDefault(material.emissiveIntensity, 'material.emissiveIntensity', 1)
@@ -1018,7 +1018,7 @@ export function extractPbrProperties(
       if (material.blendDstAlpha != null) {
         props.blendDstAlpha = materialBlendFactor(material.blendDstAlpha, 'material.blendDstAlpha')
       }
-      const blendColor = strictColorLikeToArray(material.blendColor, 'material.blendColor')
+      const blendColor = validatedColorLikeToArray(material.blendColor, 'material.blendColor')
       if (blendColor) {
         props.blendColor = [blendColor[0], blendColor[1], blendColor[2]]
       }

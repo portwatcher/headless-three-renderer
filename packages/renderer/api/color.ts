@@ -29,6 +29,26 @@ export function strictColorLikeToArray(value: unknown, label: string): Color4 | 
   ]
 }
 
+export function validatedColorLikeToArray(value: unknown, label: string): Color4 | null {
+  if (value == null) return null
+  if (Array.isArray(value)) return normalizeColorArray(value, label)
+  if (typeof value !== 'object') {
+    throw new TypeError(`${label} must be a color-like object or [r, g, b].`)
+  }
+
+  const color = value as ColorLikeWithAlpha
+  if (!isColorShaped(color)) {
+    throw new TypeError(`${label} must be a color-like object or [r, g, b].`)
+  }
+
+  return [
+    clamp01(assertFiniteColorComponent(color.r, `${label}.r`)),
+    clamp01(assertFiniteColorComponent(color.g, `${label}.g`)),
+    clamp01(assertFiniteColorComponent(color.b, `${label}.b`)),
+    clamp01(color.a === undefined ? 1 : assertFiniteColorComponent(color.a, `${label}.a`)),
+  ]
+}
+
 export function normalizeColorArray(values: number[], label?: string): Color4 {
   if (values.length !== 3 && values.length !== 4) {
     throw new TypeError(label ? `${label} must be [r, g, b] or [r, g, b, a]` : 'Color arrays must be [r, g, b] or [r, g, b, a]')
