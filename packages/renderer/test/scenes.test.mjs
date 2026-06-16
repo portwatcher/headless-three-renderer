@@ -11385,6 +11385,44 @@ test('MeshPhysicalMaterial specular intensity and color affect direct specular',
   assert.ok(green.g > green.r + 0.1, `green specularColor should tint the highlight green (${green.g} vs ${green.r})`)
 })
 
+test('MeshPhysicalMaterial scalar clearcoat and roughness affect IBL specular', () => {
+  function renderClearcoat(clearcoat, clearcoatRoughness) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat,
+        clearcoatRoughness,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const disabled = renderClearcoat(0, 0.04)
+  const glossy = renderClearcoat(1, 0.04)
+  const rough = renderClearcoat(1, 1)
+  const luminance = (mean) => 0.2126 * mean.r + 0.7152 * mean.g + 0.0722 * mean.b
+
+  assert.ok(
+    luminance(glossy) > luminance(disabled) + 80,
+    `clearcoat should add environment specular (${luminance(glossy).toFixed(1)} vs ${luminance(disabled).toFixed(1)})`,
+  )
+  assert.ok(
+    luminance(glossy) > luminance(rough) + 60,
+    `lower clearcoatRoughness should keep a stronger environment highlight (${luminance(glossy).toFixed(1)} vs ${luminance(rough).toFixed(1)})`,
+  )
+})
+
 test('MeshPhysicalMaterial transmission volume attenuation honors color and distance', () => {
   function renderAttenuated(attenuationColor, attenuationDistance) {
     const scene = new THREE.Scene()
