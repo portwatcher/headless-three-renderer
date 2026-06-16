@@ -94,7 +94,8 @@ export function attributeComponent(
   else if (component === 2 && typeof attribute.getZ === 'function') value = attribute.getZ(index)
   else if (component === 3 && typeof attribute.getW === 'function') value = attribute.getW(index)
   else {
-    const array = attribute.array ?? attribute.data?.array
+    const data = attributeData(attribute, label)
+    const array = attribute.array ?? data?.array
     const stride = attributeStride(attribute, label) ?? itemSize
     const offset = attributeOffset(attribute, label)
     value = array?.[index * stride + offset + component]
@@ -104,7 +105,7 @@ export function attributeComponent(
     throw new TypeError(`${label}[${index}].${COMPONENT_LABELS[component] ?? component} must be a finite number.`)
   }
 
-  return attributeNormalized(attribute, label) ? normalizeAttributeValue(value!, attribute.array ?? attribute.data?.array) : value!
+  return attributeNormalized(attribute, label) ? normalizeAttributeValue(value!, attribute.array ?? attributeData(attribute, label)?.array) : value!
 }
 
 function attributeItemSize(attribute: ThreeBufferAttributeLike, label: string): number | undefined {
@@ -114,10 +115,19 @@ function attributeItemSize(attribute: ThreeBufferAttributeLike, label: string): 
 }
 
 function attributeStride(attribute: ThreeBufferAttributeLike, label: string): number | undefined {
-  const stride = attribute.data?.stride
+  const stride = attributeData(attribute, label)?.stride
   if (stride == null) return undefined
   if (Number.isInteger(stride) && stride > 0) return stride
   throw new TypeError(`${label}.data.stride must be a positive integer.`)
+}
+
+function attributeData(attribute: ThreeBufferAttributeLike, label: string): ThreeBufferAttributeLike['data'] | undefined {
+  const data = attribute.data
+  if (data == null) return undefined
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    throw new TypeError(`${label}.data must be an object.`)
+  }
+  return data
 }
 
 function attributeOffset(attribute: ThreeBufferAttributeLike, label: string): number {
