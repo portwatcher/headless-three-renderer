@@ -130,7 +130,9 @@ export class EncodedImageTextureLoader {
       texture.source.data = buffer
       texture.needsUpdate = true
       loadCallback?.(texture)
-    }, errorCallback)
+    }, (error) => {
+      errorCallback?.(error)
+    })
 
     return texture
   }

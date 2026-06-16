@@ -70,6 +70,26 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
       URL.revokeObjectURL(blobUrl)
     }
 
+    await new Promise((resolve, reject) => {
+      loader.load('missing.png', () => reject(new Error('missing image should not load')), undefined, (error) => {
+        assert.match(String(error?.message ?? error), /ENOENT|no such file/i)
+        resolve()
+      })
+    })
+
+    const unhandledRejections = []
+    const onUnhandledRejection = (reason) => {
+      unhandledRejections.push(reason)
+    }
+    process.on('unhandledRejection', onUnhandledRejection)
+    try {
+      loader.load('missing-without-error-callback.png')
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      assert.deepEqual(unhandledRejections, [])
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection)
+    }
+
     installLocalFileFetch()
     const response = await fetch(pathToFileURL(imagePath).href)
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), imageBytes)
