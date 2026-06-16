@@ -513,6 +513,38 @@ test('invalid BatchedMesh perObjectFrustumCulled values fail clearly', () => {
   )
 })
 
+test('malformed BatchedMesh culling bounds fail clearly', () => {
+  const camera = makeCamera()
+  const source = new THREE.PlaneGeometry(1, 1)
+
+  const cases = [
+    ['container', 'sphere', /THREE\.BatchedMesh\._geometryInfo\[0\]\.boundingSphere must be a THREE\.Sphere-like object/i],
+    ['center', { center: { x: Number.NaN, y: 0, z: 0 }, radius: 1 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.boundingSphere\.center must be a finite Vector3-like value/i],
+    ['radius', { center: new THREE.Vector3(0, 0, 0), radius: -1 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.boundingSphere\.radius must be non-negative/i],
+  ]
+
+  for (const [label, boundingSphere, pattern] of cases) {
+    const batched = new THREE.BatchedMesh(
+      1,
+      source.getAttribute('position').count,
+      source.index.count,
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    const geometryId = batched.addGeometry(source)
+    batched.addInstance(geometryId)
+    batched._geometryInfo[geometryId].boundingSphere = boundingSphere
+
+    const scene = new THREE.Scene()
+    scene.add(batched)
+
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      pattern,
+      label,
+    )
+  }
+})
+
 test('invalid BatchedMesh sort controls fail clearly', () => {
   const camera = makeCamera()
   const source = new THREE.PlaneGeometry(1, 1)
