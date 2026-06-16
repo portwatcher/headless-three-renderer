@@ -5978,6 +5978,54 @@ test('InstancedBufferGeometry expands instanced mesh texture UV attributes', () 
   assert.ok(right.g > right.r + 60, `right instanced mesh uv should sample green (${right.g} vs ${right.r})`)
 })
 
+test('InstancedBufferGeometry honors meshPerAttribute for instanced texture UV attributes', () => {
+  const base = new THREE.PlaneGeometry(0.25, 0.5)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.instanceCount = 4
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([
+      -0.6, 0, 0,
+      -0.2, 0, 0,
+      0.2, 0, 0,
+      0.6, 0, 0,
+    ]),
+    3,
+  ))
+  const uvs = new THREE.InstancedBufferAttribute(
+    new Float32Array([0.25, 0.5, 0.75, 0.5]),
+    2,
+  )
+  uvs.meshPerAttribute = 2
+  geometry.setAttribute('uv', uvs)
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, map })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 128, height: 64 })
+  const first = meanRegion(rgba, 128, 64, 20, 28, 28, 36)
+  const second = meanRegion(rgba, 128, 64, 45, 28, 53, 36)
+  const third = meanRegion(rgba, 128, 64, 75, 28, 83, 36)
+  const fourth = meanRegion(rgba, 128, 64, 100, 28, 108, 36)
+  assert.ok(first.r > first.g + 50, `first repeated uv should sample red (${first.r} vs ${first.g})`)
+  assert.ok(second.r > second.g + 50, `second repeated uv should sample red (${second.r} vs ${second.g})`)
+  assert.ok(third.g > third.r + 50, `third repeated uv should sample green (${third.g} vs ${third.r})`)
+  assert.ok(fourth.g > fourth.r + 50, `fourth repeated uv should sample green (${fourth.g} vs ${fourth.r})`)
+})
+
 test('invalid instance counts fail clearly', () => {
   const camera = makeCamera()
 
