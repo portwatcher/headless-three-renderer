@@ -64,7 +64,7 @@ export function readIndexAttribute(
   return values
 }
 
-function attributeCount(attribute: ThreeBufferAttributeLike, label: string): number {
+export function attributeCount(attribute: ThreeBufferAttributeLike, label: string): number {
   if (Number.isInteger(attribute.count) && attribute.count >= 0) return attribute.count
   throw new TypeError(`${label}.count must be a non-negative integer.`)
 }

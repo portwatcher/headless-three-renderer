@@ -5593,6 +5593,83 @@ test('invalid instance counts fail clearly', () => {
   )
 })
 
+test('invalid instanced attributes fail clearly', () => {
+  const camera = makeCamera()
+  const box = new THREE.BoxGeometry(0.5, 0.5, 0.5)
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+
+  const matrixCountScene = new THREE.Scene()
+  const matrixCountMesh = new THREE.InstancedMesh(box, material, 1)
+  matrixCountMesh.instanceMatrix.count = 'many'
+  matrixCountScene.add(matrixCountMesh)
+  assert.throws(
+    () => renderRgba(matrixCountScene, camera, { width: 64, height: 64 }),
+    /InstancedMesh\.instanceMatrix\.count must be a non-negative integer/i,
+  )
+
+  const matrixValueScene = new THREE.Scene()
+  const matrixValueMesh = new THREE.InstancedMesh(box, material, 1)
+  matrixValueMesh.instanceMatrix.array[0] = Number.NaN
+  matrixValueScene.add(matrixValueMesh)
+  assert.throws(
+    () => renderRgba(matrixValueScene, camera, { width: 64, height: 64 }),
+    /InstancedMesh\.instanceMatrix\[0\]\.x must be a finite number/i,
+  )
+
+  const instanceColorScene = new THREE.Scene()
+  const instanceColorMesh = new THREE.InstancedMesh(box, material, 1)
+  instanceColorMesh.setColorAt(0, new THREE.Color(1, 1, 1))
+  instanceColorMesh.instanceColor.count = 'many'
+  instanceColorScene.add(instanceColorMesh)
+  assert.throws(
+    () => renderRgba(instanceColorScene, camera, { width: 64, height: 64 }),
+    /InstancedMesh\.instanceColor\.count must be a non-negative integer/i,
+  )
+
+  const base = new THREE.PlaneGeometry(0.85, 0.85)
+  const offsetGeometry = new THREE.InstancedBufferGeometry()
+  offsetGeometry.index = base.index
+  offsetGeometry.setAttribute('position', base.getAttribute('position'))
+  offsetGeometry.setAttribute('uv', base.getAttribute('uv'))
+  offsetGeometry.instanceCount = 1
+  const instanceOffset = new THREE.InstancedBufferAttribute(new Float32Array([Number.NaN, 0, 0]), 3)
+  offsetGeometry.setAttribute('instanceOffset', instanceOffset)
+  const offsetScene = new THREE.Scene()
+  offsetScene.add(new THREE.Mesh(offsetGeometry, material))
+  assert.throws(
+    () => renderRgba(offsetScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.instanceOffset\[0\]\.x must be a finite number/i,
+  )
+
+  const colorCountGeometry = new THREE.InstancedBufferGeometry()
+  colorCountGeometry.index = base.index
+  colorCountGeometry.setAttribute('position', base.getAttribute('position'))
+  colorCountGeometry.setAttribute('uv', base.getAttribute('uv'))
+  colorCountGeometry.instanceCount = 1
+  const instanceColor = new THREE.InstancedBufferAttribute(new Float32Array([1, 0, 0]), 3)
+  instanceColor.count = 'many'
+  colorCountGeometry.setAttribute('color', instanceColor)
+  const colorCountScene = new THREE.Scene()
+  colorCountScene.add(new THREE.Mesh(colorCountGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true })))
+  assert.throws(
+    () => renderRgba(colorCountScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.color\.count must be a non-negative integer/i,
+  )
+
+  const colorValueGeometry = new THREE.InstancedBufferGeometry()
+  colorValueGeometry.index = base.index
+  colorValueGeometry.setAttribute('position', base.getAttribute('position'))
+  colorValueGeometry.setAttribute('uv', base.getAttribute('uv'))
+  colorValueGeometry.instanceCount = 1
+  colorValueGeometry.setAttribute('color', new THREE.InstancedBufferAttribute(new Float32Array([Number.NaN, 0, 0]), 3))
+  const colorValueScene = new THREE.Scene()
+  colorValueScene.add(new THREE.Mesh(colorValueGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true })))
+  assert.throws(
+    () => renderRgba(colorValueScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.color\[0\]\.x must be a finite number/i,
+  )
+})
+
 test('invalid morph target influence values fail clearly', () => {
   function sceneWithInfluence(influence) {
     const geometry = new THREE.BufferGeometry()

@@ -14,6 +14,7 @@ import type {
 import { IDENTITY_4X4, matrixElements, clampInteger, clamp01 } from './math'
 import {
   attributeComponent,
+  attributeCount,
   getAttribute,
   readVec3Attribute,
   readVec2Attribute,
@@ -76,6 +77,11 @@ interface DashedLineExpansion {
   uvs?: number[]
   uvs2?: number[]
   colors?: number[]
+}
+
+interface InstancedAttributeRef {
+  attribute: ThreeBufferAttributeLike
+  label: string
 }
 
 interface ThickLineExpansion {
@@ -464,7 +470,7 @@ function appendShadowOnlyMeshGroup(
   vertexCount: number,
   index: number[] | null,
   instancedGeometryCount: number,
-  instancedPositionOffset: ThreeBufferAttributeLike | null,
+  instancedPositionOffset: InstancedAttributeRef | null,
   instances: MeshInstance[],
 ): void {
   const baseColor = materialColor(material)
@@ -810,12 +816,14 @@ function appendPoints(
     const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
 
     for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
-      const offsetIndex = instancedPositionOffset ? instancedAttributeIndex(instancedPositionOffset, instance) : 0
+      const offsetIndex = instancedPositionOffset
+        ? instancedAttributeIndex(instancedPositionOffset.attribute, instance, instancedPositionOffset.label)
+        : 0
       const offset = instancedPositionOffset
         ? [
-          attributeComponent(instancedPositionOffset, offsetIndex, 0),
-          attributeComponent(instancedPositionOffset, offsetIndex, 1),
-          attributeComponent(instancedPositionOffset, offsetIndex, 2),
+          attributeComponent(instancedPositionOffset.attribute, offsetIndex, 0, instancedPositionOffset.label),
+          attributeComponent(instancedPositionOffset.attribute, offsetIndex, 1, instancedPositionOffset.label),
+          attributeComponent(instancedPositionOffset.attribute, offsetIndex, 2, instancedPositionOffset.label),
         ]
         : [0, 0, 0]
 
@@ -1002,15 +1010,16 @@ function pointVertexColor(
   materialColor: Color4,
   pointIndex: number,
   instanceIndex: number,
+  label = 'geometry.attributes.color',
 ): Color4 {
   const sourceIndex = isInstancedAttribute(attribute)
-    ? instancedAttributeIndex(attribute, instanceIndex)
+    ? instancedAttributeIndex(attribute, instanceIndex, label)
     : pointIndex
   return [
-    clamp01(attributeComponent(attribute, sourceIndex, 0) * materialColor[0]),
-    clamp01(attributeComponent(attribute, sourceIndex, 1) * materialColor[1]),
-    clamp01(attributeComponent(attribute, sourceIndex, 2) * materialColor[2]),
-    clamp01((attribute.itemSize && attribute.itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3) : 1) * materialColor[3]),
+    clamp01(attributeComponent(attribute, sourceIndex, 0, label) * materialColor[0]),
+    clamp01(attributeComponent(attribute, sourceIndex, 1, label) * materialColor[1]),
+    clamp01(attributeComponent(attribute, sourceIndex, 2, label) * materialColor[2]),
+    clamp01((attribute.itemSize && attribute.itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3, label) : 1) * materialColor[3]),
   ]
 }
 
@@ -1841,7 +1850,8 @@ function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number
 
   let maxCount = Infinity
   for (const [name, attribute] of instancedAttributes) {
-    maxCount = Math.min(maxCount, attribute.count * meshPerAttribute(attribute, `geometry.attributes.${name}.meshPerAttribute`))
+    const label = `geometry.attributes.${name}`
+    maxCount = Math.min(maxCount, attributeCount(attribute, label) * meshPerAttribute(attribute, `${label}.meshPerAttribute`))
   }
 
   const requested = integerCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity)
@@ -1869,15 +1879,22 @@ function meshPerAttribute(attribute: ThreeBufferAttributeLike, label = 'Instance
   throw new TypeError(`${label} must be a positive finite number.`)
 }
 
-function instancedAttributeIndex(attribute: ThreeBufferAttributeLike, instanceIndex: number): number {
-  return Math.min(attribute.count - 1, Math.floor(instanceIndex / meshPerAttribute(attribute)))
+function instancedAttributeIndex(
+  attribute: ThreeBufferAttributeLike,
+  instanceIndex: number,
+  label = 'InstancedBufferAttribute',
+): number {
+  return Math.min(
+    attributeCount(attribute, label) - 1,
+    Math.floor(instanceIndex / meshPerAttribute(attribute, `${label}.meshPerAttribute`)),
+  )
 }
 
-function instancedOffsetAttribute(geometry: ThreeBufferGeometryLike): ThreeBufferAttributeLike | null {
+function instancedOffsetAttribute(geometry: ThreeBufferGeometryLike): InstancedAttributeRef | null {
   const names = ['instanceOffset', 'instancePosition', 'offset', 'translate', 'translation']
   for (const name of names) {
     const attribute = getAttribute(geometry, name)
-    if (isInstancedAttribute(attribute)) return attribute
+    if (isInstancedAttribute(attribute)) return { attribute, label: `geometry.attributes.${name}` }
   }
   return null
 }
@@ -1887,7 +1904,7 @@ function expandVec3ValuesForInstances(
   start: number,
   count: number,
   instanceCount: number,
-  offsetAttribute?: ThreeBufferAttributeLike | null,
+  offsetAttribute?: InstancedAttributeRef | null,
 ): number[] {
   if (instanceCount <= 1 && !offsetAttribute) {
     return values.slice(start * 3, (start + count) * 3)
@@ -1895,10 +1912,12 @@ function expandVec3ValuesForInstances(
   const out = new Array<number>(count * instanceCount * 3)
   let dst = 0
   for (let instance = 0; instance < instanceCount; instance += 1) {
-    const offsetIndex = offsetAttribute ? instancedAttributeIndex(offsetAttribute, instance) : 0
-    const ox = offsetAttribute ? attributeComponent(offsetAttribute, offsetIndex, 0) : 0
-    const oy = offsetAttribute ? attributeComponent(offsetAttribute, offsetIndex, 1) : 0
-    const oz = offsetAttribute ? attributeComponent(offsetAttribute, offsetIndex, 2) : 0
+    const offsetIndex = offsetAttribute
+      ? instancedAttributeIndex(offsetAttribute.attribute, instance, offsetAttribute.label)
+      : 0
+    const ox = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 0, offsetAttribute.label) : 0
+    const oy = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 1, offsetAttribute.label) : 0
+    const oz = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 2, offsetAttribute.label) : 0
     for (let vertex = start; vertex < start + count; vertex += 1) {
       out[dst++] = values[vertex * 3] + ox
       out[dst++] = values[vertex * 3 + 1] + oy
@@ -1927,9 +1946,10 @@ function expandColorAttributeForInstances(
   start: number,
   count: number,
   instanceCount: number,
+  label = 'geometry.attributes.color',
 ): number[] {
   if (!isInstancedAttribute(attribute)) {
-    const colors = readColorAttribute(attribute, materialColor, 'geometry.attributes.color')
+    const colors = readColorAttribute(attribute, materialColor, label)
     if (instanceCount <= 1) return colors.slice(start * 4, (start + count) * 4)
     const out = new Array<number>(count * instanceCount * 4)
     let dst = 0
@@ -1948,11 +1968,11 @@ function expandColorAttributeForInstances(
   const out = new Array<number>(count * instanceCount * 4)
   let dst = 0
   for (let instance = 0; instance < instanceCount; instance += 1) {
-    const sourceIndex = instancedAttributeIndex(attribute, instance)
-    const r = clamp01(attributeComponent(attribute, sourceIndex, 0) * materialColor[0])
-    const g = clamp01(attributeComponent(attribute, sourceIndex, 1) * materialColor[1])
-    const b = clamp01(attributeComponent(attribute, sourceIndex, 2) * materialColor[2])
-    const a = clamp01((itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3) : 1) * materialColor[3])
+    const sourceIndex = instancedAttributeIndex(attribute, instance, label)
+    const r = clamp01(attributeComponent(attribute, sourceIndex, 0, label) * materialColor[0])
+    const g = clamp01(attributeComponent(attribute, sourceIndex, 1, label) * materialColor[1])
+    const b = clamp01(attributeComponent(attribute, sourceIndex, 2, label) * materialColor[2])
+    const a = clamp01((itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3, label) : 1) * materialColor[3])
     for (let vertex = 0; vertex < count; vertex += 1) {
       out[dst++] = r
       out[dst++] = g
@@ -2301,7 +2321,7 @@ function dashedLineAttributesForInstances(
   lineDistance: ThreeBufferAttributeLike | undefined,
   material: { dashSize?: number; gapSize?: number; scale?: number },
   instanceCount: number,
-  offsetAttribute: ThreeBufferAttributeLike | null,
+  offsetAttribute: InstancedAttributeRef | null,
 ): DashedLineExpansion {
   const out: DashedLineExpansion = {
     positions: [],
@@ -2339,13 +2359,13 @@ function dashedLineAttributesForInstances(
 
 function offsetVec3ValuesForInstance(
   values: number[],
-  offsetAttribute: ThreeBufferAttributeLike,
+  offsetAttribute: InstancedAttributeRef,
   instance: number,
 ): number[] {
-  const offsetIndex = instancedAttributeIndex(offsetAttribute, instance)
-  const ox = attributeComponent(offsetAttribute, offsetIndex, 0)
-  const oy = attributeComponent(offsetAttribute, offsetIndex, 1)
-  const oz = attributeComponent(offsetAttribute, offsetIndex, 2)
+  const offsetIndex = instancedAttributeIndex(offsetAttribute.attribute, instance, offsetAttribute.label)
+  const ox = attributeComponent(offsetAttribute.attribute, offsetIndex, 0, offsetAttribute.label)
+  const oy = attributeComponent(offsetAttribute.attribute, offsetIndex, 1, offsetAttribute.label)
+  const oz = attributeComponent(offsetAttribute.attribute, offsetIndex, 2, offsetAttribute.label)
   const out = new Array<number>(values.length)
   for (let i = 0; i < values.length; i += 3) {
     out[i] = values[i] + ox
@@ -2360,14 +2380,15 @@ function repeatedInstancedColorValues(
   materialColor: Color4,
   vertexCount: number,
   instance: number,
+  label = 'geometry.attributes.color',
 ): number[] {
-  const sourceIndex = instancedAttributeIndex(attribute, instance)
+  const sourceIndex = instancedAttributeIndex(attribute, instance, label)
   const itemSize = attribute.itemSize ?? 3
   const color = [
-    clamp01(attributeComponent(attribute, sourceIndex, 0) * materialColor[0]),
-    clamp01(attributeComponent(attribute, sourceIndex, 1) * materialColor[1]),
-    clamp01(attributeComponent(attribute, sourceIndex, 2) * materialColor[2]),
-    clamp01((itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3) : 1) * materialColor[3]),
+    clamp01(attributeComponent(attribute, sourceIndex, 0, label) * materialColor[0]),
+    clamp01(attributeComponent(attribute, sourceIndex, 1, label) * materialColor[1]),
+    clamp01(attributeComponent(attribute, sourceIndex, 2, label) * materialColor[2]),
+    clamp01((itemSize >= 4 ? attributeComponent(attribute, sourceIndex, 3, label) : 1) * materialColor[3]),
   ]
   const out = new Array<number>(vertexCount * 4)
   let dst = 0
@@ -2909,11 +2930,12 @@ function meshInstances(object: ThreeObject3DLike, baseTransform: number[]): Mesh
 
   const instanceMatrix = object.instanceMatrix
   if (!instanceMatrix || instanceMatrix.count == null) return []
+  const instanceMatrixCount = attributeCount(instanceMatrix, 'InstancedMesh.instanceMatrix')
 
   const count = clampInteger(
-    integerCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrix.count),
+    integerCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrixCount),
     0,
-    instanceMatrix.count,
+    instanceMatrixCount,
   )
   const instances = new Array<MeshInstance>(count)
   for (let i = 0; i < count; i += 1) {
@@ -2929,18 +2951,18 @@ function readMat4Attribute(attribute: ThreeObject3DLike['instanceMatrix'], index
   if (!attribute) return IDENTITY_4X4.slice()
   const matrix = new Array<number>(16)
   for (let component = 0; component < 16; component += 1) {
-    matrix[component] = attributeComponent(attribute, index, component)
+    matrix[component] = attributeComponent(attribute, index, component, 'InstancedMesh.instanceMatrix')
   }
   return matrix
 }
 
 function readInstanceColor(attribute: ThreeObject3DLike['instanceColor'], index: number): Color4 | undefined {
-  if (!attribute || index >= attribute.count) return undefined
+  if (!attribute || index >= attributeCount(attribute, 'InstancedMesh.instanceColor')) return undefined
   return [
-    attributeComponent(attribute, index, 0),
-    attributeComponent(attribute, index, 1),
-    attributeComponent(attribute, index, 2),
-    attribute.itemSize && attribute.itemSize >= 4 ? attributeComponent(attribute, index, 3) : 1,
+    attributeComponent(attribute, index, 0, 'InstancedMesh.instanceColor'),
+    attributeComponent(attribute, index, 1, 'InstancedMesh.instanceColor'),
+    attributeComponent(attribute, index, 2, 'InstancedMesh.instanceColor'),
+    attribute.itemSize && attribute.itemSize >= 4 ? attributeComponent(attribute, index, 3, 'InstancedMesh.instanceColor') : 1,
   ]
 }
 
