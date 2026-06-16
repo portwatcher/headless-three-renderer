@@ -50,6 +50,7 @@ export function createSceneCorpus() {
     dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
     batchedMeshCorpus(),
+    batchedMeshCullingCorpus(),
     lodAndGroupsCorpus(),
     pathologicalGeometryCorpus(),
   ]
@@ -1716,6 +1717,54 @@ function batchedMeshCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.03,
+  }
+}
+
+function batchedMeshCullingCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const visibleSource = new THREE.PlaneGeometry(0.6, 0.6)
+  const culledSource = new THREE.PlaneGeometry(2.2, 2.2)
+  culledSource.boundingSphere = new THREE.Sphere(new THREE.Vector3(5, 0, 0), 0.05)
+
+  const batch = new THREE.BatchedMesh(
+    2,
+    visibleSource.getAttribute('position').count + culledSource.getAttribute('position').count,
+    visibleSource.index.count + culledSource.index.count,
+    new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
+  )
+  const visibleGeometryId = batch.addGeometry(visibleSource)
+  const culledGeometryId = batch.addGeometry(culledSource)
+  const visible = batch.addInstance(visibleGeometryId)
+  const culled = batch.addInstance(culledGeometryId)
+  batch.setColorAt(visible, new THREE.Color(0.05, 0.95, 0.1))
+  batch.setColorAt(culled, new THREE.Color(1, 0, 0))
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-per-object-culling',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.03,
+    browserReference: false,
+    validate(rgba, { width, height }) {
+      const x = Math.floor(width / 2)
+      const y = Math.floor(height / 2)
+      const offset = (y * width + x) * 4
+      const r = rgba[offset]
+      const g = rgba[offset + 1]
+      const b = rgba[offset + 2]
+      if (g <= r + 80 || g <= b + 80) {
+        throw new Error(`batched culling should leave the center green, got rgb(${r}, ${g}, ${b})`)
+      }
+    },
   }
 }
 

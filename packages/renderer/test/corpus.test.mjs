@@ -24,6 +24,10 @@ test('representative scene corpus renders without crashes', async (t) => {
       const mean = meanRgba(rgba)
       const minMeanAlpha = fixture.minMeanAlpha ?? 240
       assert.ok(mean.a > minMeanAlpha, `${fixture.name} should produce expected output alpha (${mean.a})`)
+
+      if (typeof fixture.validate === 'function') {
+        fixture.validate(rgba, { width, height })
+      }
     })
   }
 })
