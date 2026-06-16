@@ -427,6 +427,7 @@ test('invalid geometry attribute layout values fail clearly', () => {
     ['itemSize', { count: 3, itemSize: '3', array: values }, /geometry\.attributes\.position\.itemSize must be a positive integer/i],
     ['stride', { count: 3, itemSize: 3, data: { array: values, stride: '3' } }, /geometry\.attributes\.position\.data\.stride must be a positive integer/i],
     ['offset', { count: 3, itemSize: 3, array: values, offset: -1 }, /geometry\.attributes\.position\.offset must be a non-negative integer/i],
+    ['normalized', { count: 3, itemSize: 3, array: values, normalized: 'yes' }, /geometry\.attributes\.position\.normalized must be a boolean/i],
   ]
 
   for (const [name, positionAttribute, pattern] of cases) {

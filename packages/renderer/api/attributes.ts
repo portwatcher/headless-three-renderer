@@ -94,7 +94,7 @@ export function attributeComponent(
     throw new TypeError(`${label}[${index}].${COMPONENT_LABELS[component] ?? component} must be a finite number.`)
   }
 
-  return attribute.normalized ? normalizeAttributeValue(value!, attribute.array ?? attribute.data?.array) : value!
+  return attributeNormalized(attribute, label) ? normalizeAttributeValue(value!, attribute.array ?? attribute.data?.array) : value!
 }
 
 function attributeItemSize(attribute: ThreeBufferAttributeLike, label: string): number | undefined {
@@ -114,6 +114,12 @@ function attributeOffset(attribute: ThreeBufferAttributeLike, label: string): nu
   if (attribute.offset == null) return 0
   if (Number.isInteger(attribute.offset) && attribute.offset >= 0) return attribute.offset
   throw new TypeError(`${label}.offset must be a non-negative integer.`)
+}
+
+function attributeNormalized(attribute: ThreeBufferAttributeLike, label: string): boolean {
+  if (attribute.normalized == null) return false
+  if (typeof attribute.normalized === 'boolean') return attribute.normalized
+  throw new TypeError(`${label}.normalized must be a boolean.`)
 }
 
 function normalizeAttributeValue(value: number, array: ArrayLike<number> | undefined): number {
