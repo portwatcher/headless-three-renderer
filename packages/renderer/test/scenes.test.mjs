@@ -5449,7 +5449,6 @@ test('InstancedBufferGeometry expands per-instance offsets and colors', () => {
   geometry.index = base.index
   geometry.setAttribute('position', base.getAttribute('position'))
   geometry.setAttribute('uv', base.getAttribute('uv'))
-  geometry.instanceCount = 2
   geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
     new Float32Array([-0.55, 0, 0, 0.55, 0, 0]),
     3,

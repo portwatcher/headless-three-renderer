@@ -1821,14 +1821,15 @@ function cameraZoomOrDefault(value: unknown): number {
   return value
 }
 
-function finiteCountOrDefault(value: unknown, label: string, fallback: number): number {
+function finiteCountOrDefault(value: unknown, label: string, fallback: number, allowInfinity = false): number {
   if (value == null) return fallback
+  if (allowInfinity && value === Infinity) return value
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
 }
 
-function integerCountOrDefault(value: unknown, label: string, fallback: number): number {
-  const number = finiteCountOrDefault(value, label, fallback)
+function integerCountOrDefault(value: unknown, label: string, fallback: number, allowInfinity = false): number {
+  const number = finiteCountOrDefault(value, label, fallback, allowInfinity)
   if (number === Infinity) return number
   if (!Number.isInteger(number)) {
     throw new TypeError(`${label} must be an integer.`)
@@ -1854,7 +1855,7 @@ function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number
     maxCount = Math.min(maxCount, attributeCount(attribute, label) * meshPerAttribute(attribute, `${label}.meshPerAttribute`))
   }
 
-  const requested = integerCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity)
+  const requested = integerCountOrDefault(geometry.instanceCount, 'geometry.instanceCount', Infinity, true)
   const effectiveCount = Math.min(requested, maxCount)
   if (effectiveCount === Infinity) return 1
   return clampInteger(effectiveCount, 0, Math.max(0, Math.floor(maxCount)))
