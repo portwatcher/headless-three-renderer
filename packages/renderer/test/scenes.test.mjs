@@ -3095,6 +3095,53 @@ test('unsupported material envMap inputs fail clearly', () => {
     mapping: THREE.EquirectangularRefractionMapping,
   })
 
+  function assertMaterialEnvMapFailure(materialEnvMap, pattern, label) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, envMap: materialEnvMap }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      label,
+    )
+  }
+
+  assertMaterialEnvMapFailure(
+    {
+      isTexture: true,
+      isCompressedTexture: true,
+      mapping: THREE.EquirectangularReflectionMapping,
+      image: { width: 4, height: 4 },
+      mipmaps: [{ data: new Uint8Array(16), width: 4, height: 4 }],
+    },
+    /material\.envMap uses a compressed texture.*pre-decode/i,
+    'material envMap compressed texture',
+  )
+
+  assertMaterialEnvMapFailure(
+    Object.assign(new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1), {
+      mapping: THREE.EquirectangularReflectionMapping,
+    }),
+    /material\.envMap uses an array or 3D texture/i,
+    'material envMap array texture',
+  )
+
+  {
+    const mipmappedEnvMap = Object.assign(solidTexture(255, 255, 255), {
+      mapping: THREE.EquirectangularReflectionMapping,
+    })
+    mipmappedEnvMap.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
+    assertMaterialEnvMapFailure(
+      mipmappedEnvMap,
+      /material\.envMap provides explicit texture mipmaps.*not uploaded/i,
+      'material envMap explicit mipmaps',
+    )
+  }
+
   {
     const invalidColorSpace = Object.assign(solidTexture(255, 255, 255), {
       mapping: THREE.EquirectangularReflectionMapping,
