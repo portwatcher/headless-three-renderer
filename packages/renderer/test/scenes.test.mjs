@@ -11747,6 +11747,37 @@ test('unsupported base Material without headless WGSL override fails clearly', (
   )
 })
 
+test('malformed material containers fail clearly', () => {
+  const cases = [
+    ['direct material', 'material', /material must be a material-like object/i],
+    ['material array entry', [
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      'material',
+    ], /material\[1\] must be a material-like object/i],
+  ]
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  for (const [name, material, pattern] of cases) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    if (Array.isArray(material)) {
+      geometry.clearGroups()
+      geometry.addGroup(0, geometry.index.count, 1)
+    }
+    scene.add(new THREE.Mesh(geometry, material))
+
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 64, height: 64 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('ShaderMaterial, RawShaderMaterial, NodeMaterial, and base Material can opt into custom WGSL fragment output', () => {
   function renderCustom(material) {
     const scene = new THREE.Scene()

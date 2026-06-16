@@ -113,7 +113,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.BatchedMesh` common packed-geometry batches are CPU-expanded with per-instance matrices, colors, visibility flags, packed geometry groups/material arrays when present, common per-object sphere frustum culling, range-local internal sorting, `sortObjects=false`, and `customSort` callback context/camera/list handling; malformed batch internals, cached culling bounds, culling controls, and sort controls fail clearly, while exact culling/source-group preservation edge cases and native batched drawing remain planned
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates, with invalid attribute values failing clearly
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar and size-attenuation values fail clearly
-- geometry groups with material arrays
+- geometry groups with material arrays, with malformed material containers failing clearly
 - mesh world transforms, object visibility flags, and object/camera layer masks, with invalid transform matrix, visibility, or layer values failing clearly
 - `THREE.LOD` camera-distance/zoom level selection, with invalid auto-update flags, camera zoom, or level distance/hysteresis values failing clearly
 - vertex colors, with invalid `material.vertexColors` values failing clearly

@@ -241,7 +241,18 @@ function objectMaterials(
   material: ThreeMaterialLike | ThreeMaterialLike[] | undefined,
 ): ThreeMaterialLike[] {
   if (!material) return []
-  return Array.isArray(material) ? material.filter(Boolean) : [material]
+  if (!Array.isArray(material)) {
+    assertMaterialLike(material, 'material')
+    return [material]
+  }
+  const materials: ThreeMaterialLike[] = []
+  for (let index = 0; index < material.length; index += 1) {
+    const entry = material[index]
+    if (!entry) continue
+    assertMaterialLike(entry, `material[${index}]`)
+    materials.push(entry)
+  }
+  return materials
 }
 
 function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): boolean {
@@ -431,9 +442,20 @@ export function materialForGroup(
   materialIndex: number,
 ): ThreeMaterialLike | undefined {
   if (Array.isArray(material)) {
-    return material[materialIndex] ?? material[0]
+    const index = material[materialIndex] != null ? materialIndex : 0
+    const resolved = material[index]
+    assertMaterialLike(resolved, `material[${index}]`)
+    return resolved
   }
+  assertMaterialLike(material, 'material')
   return material
+}
+
+function assertMaterialLike(value: unknown, label: string): asserts value is ThreeMaterialLike | undefined {
+  if (value == null) return
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a material-like object.`)
+  }
 }
 
 export function materialColor(material: ThreeMaterialLike | undefined): Color4 {
