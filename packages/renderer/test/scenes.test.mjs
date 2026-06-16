@@ -4683,6 +4683,15 @@ test('invalid layer containers and masks fail clearly', () => {
     /object\.layers\.mask must be a finite number/i,
   )
 
+  const ambientScene = new THREE.Scene()
+  const ambient = new THREE.AmbientLight(0xffffff, 1)
+  ambient.layers.mask = 'ambient'
+  ambientScene.add(ambient)
+  assert.throws(
+    () => extractAmbientLight(ambientScene, camera),
+    /object\.layers\.mask must be a finite number/i,
+  )
+
   const probeScene = new THREE.Scene()
   const probe = new THREE.LightProbe(undefined, 1)
   probe.layers.mask = Number.NaN
