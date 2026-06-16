@@ -2439,7 +2439,7 @@ function batchedMeshDraws(
       info.geometryIndex,
       `THREE.BatchedMesh._instanceInfo[${instanceId}].geometryIndex`,
     )
-    const range = batchedGeometryRange(object, geometryId)
+    const range = batchedGeometryRange(object, geometry, geometryId)
     if (range.count === 0) continue
     const transform = multiplyMat4(baseTransform, batchedInstanceMatrix(object, instanceId))
     if (cullPerObject && batchedDrawOutsideFrustum(object, geometry, geometryId, range, transform, camera!)) {
@@ -2576,7 +2576,11 @@ function batchedDrawOutsideFrustum(
   return !cameraFrustumIntersectsSphere(camera, center, radius)
 }
 
-function batchedGeometryRange(object: ThreeObject3DLike, geometryId: number): { start: number; count: number } {
+function batchedGeometryRange(
+  object: ThreeObject3DLike,
+  geometry: ThreeBufferGeometryLike,
+  geometryId: number,
+): { start: number; count: number } {
   const range = typeof object.getGeometryRangeAt === 'function'
     ? object.getGeometryRangeAt(geometryId, {})
     : object._geometryInfo?.[geometryId] ?? null
@@ -2592,10 +2596,24 @@ function batchedGeometryRange(object: ThreeObject3DLike, geometryId: number): { 
     return { start: 0, count: 0 }
   }
 
-  return {
-    start: batchedNonNegativeInteger((range as { start?: unknown }).start, `THREE.BatchedMesh._geometryInfo[${geometryId}].start`),
-    count: batchedNonNegativeInteger((range as { count?: unknown }).count, `THREE.BatchedMesh._geometryInfo[${geometryId}].count`),
+  const startLabel = `THREE.BatchedMesh._geometryInfo[${geometryId}].start`
+  const countLabel = `THREE.BatchedMesh._geometryInfo[${geometryId}].count`
+  const start = batchedNonNegativeInteger((range as { start?: unknown }).start, startLabel)
+  const count = batchedNonNegativeInteger((range as { count?: unknown }).count, countLabel)
+  const limit = batchedGeometryRangeLimit(geometry)
+  if (start > limit) {
+    throw new RangeError(`${startLabel} must be less than or equal to packed geometry count (${limit}).`)
   }
+  if (count > limit - start) {
+    throw new RangeError(`${countLabel} must fit within packed geometry count (${limit}) from start ${start}.`)
+  }
+  return { start, count }
+}
+
+function batchedGeometryRangeLimit(geometry: ThreeBufferGeometryLike): number {
+  if (geometry.index) return attributeCount(geometry.index, 'geometry.index')
+  const position = getAttribute(geometry, 'position')
+  return position ? attributeCount(position, 'geometry.attributes.position') : 0
 }
 
 function batchedGeometryBoundingSphere(

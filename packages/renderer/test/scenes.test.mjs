@@ -726,6 +726,8 @@ test('malformed BatchedMesh geometry ranges fail clearly', () => {
     ['active flag', { start: 0, count: 6, active: 'yes' }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.active must be a boolean/i],
     ['negative start', { start: -1, count: 6 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.start must be a non-negative integer/i],
     ['non-integer count', { start: 0, count: 1.5 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.count must be a non-negative integer/i],
+    ['start past packed geometry', { start: 7, count: 0 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.start must be less than or equal to packed geometry count \(6\)/i],
+    ['count past packed geometry', { start: 4, count: 3 }, /THREE\.BatchedMesh\._geometryInfo\[0\]\.count must fit within packed geometry count \(6\) from start 4/i],
   ]
 
   for (const [label, range, pattern] of cases) {
