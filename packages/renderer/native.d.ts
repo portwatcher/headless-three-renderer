@@ -82,7 +82,7 @@ export interface RenderScene {
   backgroundTextureBlurriness?: number
   /** Output format. Supported values are `"png"` (default) and `"rgba"`. */
   format?: string
-  /** Output color space. Supported values are `"srgb"` (default) and `"srgb-linear"`. */
+  /** Output color space. Supported values are `"srgb"` (default), `"srgb-linear"`, `"linear-srgb"`, `"linearsrgb"`, and `"linear"`. */
   outputColorSpace?: string
   /** MSAA sample count. Supports `4`; omitted, `0`, or `1` use the single-sample path. */
   sampleCount?: number
