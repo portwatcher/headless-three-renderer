@@ -908,6 +908,13 @@ function globalClippingPlaneCorpus() {
     },
     background: [0, 0, 31],
     minNonBackgroundRatio: 0.05,
+    validate(rgba, { width }) {
+      const clipped = meanRegion(rgba, width, 16, 32, 40, 64)
+      const visible = meanRegion(rgba, width, 56, 32, 80, 64)
+      if (!(clipped.r < 5 && clipped.g < 5 && clipped.b > 25 && visible.r > visible.g + 180 && visible.r > visible.b + 180)) {
+        throw new Error(`global clipping corpus should keep only the red right half, got clipped=${JSON.stringify(clipped)} visible=${JSON.stringify(visible)}`)
+      }
+    },
   }
 }
 
@@ -934,6 +941,13 @@ function materialLocalClippingCorpus() {
     },
     background: [5, 5, 20],
     minNonBackgroundRatio: 0.05,
+    validate(rgba, { width }) {
+      const visible = meanRegion(rgba, width, 32, 16, 64, 40)
+      const clipped = meanRegion(rgba, width, 32, 56, 64, 80)
+      if (!(visible.b > visible.r + 120 && visible.g > visible.r + 80 && clipped.r < 10 && clipped.g < 10 && clipped.b < 25)) {
+        throw new Error(`local clipping corpus should keep only the cyan top half, got visible=${JSON.stringify(visible)} clipped=${JSON.stringify(clipped)}`)
+      }
+    },
   }
 }
 
@@ -968,6 +982,14 @@ function nestedClippingGroupCorpus() {
     background: [0, 0, 31],
     minNonBackgroundRatio: 0.04,
     browserReference: false,
+    validate(rgba, { width }) {
+      const visible = pixelAt(rgba, width, 64, 32)
+      const clippedLeft = pixelAt(rgba, width, 32, 32)
+      const clippedBottom = pixelAt(rgba, width, 64, 64)
+      if (!(visible.r > visible.g + 180 && visible.r > visible.b + 180 && clippedLeft.r < 5 && clippedLeft.g < 5 && clippedLeft.b > 25 && clippedBottom.r < 5 && clippedBottom.g < 5 && clippedBottom.b > 25)) {
+        throw new Error(`nested clipping corpus should keep only the red upper-right quadrant, got visible=${JSON.stringify(visible)} clippedLeft=${JSON.stringify(clippedLeft)} clippedBottom=${JSON.stringify(clippedBottom)}`)
+      }
+    },
   }
 }
 
@@ -1415,6 +1437,14 @@ function viewportScissorCorpus() {
       scissor: { x: 36, y: 28, width: 24, height: 24 },
     },
     background: [0, 0, 31],
+    validate(rgba, { width }) {
+      const filled = pixelAt(rgba, width, 48, 40)
+      const outsideScissor = pixelAt(rgba, width, 32, 32)
+      const outsideViewport = pixelAt(rgba, width, 8, 8)
+      if (!(filled.r > 200 && filled.g > 120 && filled.b < 90 && outsideScissor.r < 5 && outsideScissor.g < 5 && outsideScissor.b > 25 && outsideViewport.r < 5 && outsideViewport.g < 5 && outsideViewport.b > 25)) {
+        throw new Error(`viewport/scissor corpus should fill only the yellow clipped rectangle, got filled=${JSON.stringify(filled)} outsideScissor=${JSON.stringify(outsideScissor)} outsideViewport=${JSON.stringify(outsideViewport)}`)
+      }
+    },
   }
 }
 
@@ -1456,6 +1486,13 @@ function arrayCameraViewportCorpus() {
     camera: new THREE.ArrayCamera([leftCamera, rightCamera]),
     options: { width, height, format: 'rgba' },
     background: [0, 0, 20],
+    validate(rgba, { width }) {
+      const left = meanRegion(rgba, width, 16, 32, 40, 64)
+      const right = meanRegion(rgba, width, 56, 32, 80, 64)
+      if (!(left.r > left.g + 180 && left.r > left.b + 180 && right.g > right.r + 70 && right.g > right.b + 100)) {
+        throw new Error(`ArrayCamera corpus should render red left and green right viewports, got left=${JSON.stringify(left)} right=${JSON.stringify(right)}`)
+      }
+    },
   }
 }
 
