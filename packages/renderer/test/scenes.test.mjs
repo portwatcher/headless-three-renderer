@@ -8383,6 +8383,12 @@ test('malformed environment and reflection probe texture values fail clearly', (
     ['malformed legacy reflection probe list', (scene) => {
       scene.userData.headlessRenderer = { probes: {} }
     }, /scene\.userData\.headlessRenderer\.probes must be an array/i],
+    ['modern reflection hint container', (scene) => {
+      scene.userData.headlessThreeRenderer = 'probes'
+    }, /scene\.userData\.headlessThreeRenderer must be an object/i],
+    ['legacy reflection hint container', (scene) => {
+      scene.userData.headlessRenderer = []
+    }, /scene\.userData\.headlessRenderer must be an object/i],
     ['malformed reflection probe map', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbes: [{ map: {} }] }
     }, /reflectionProbe\.map must be a Three\.js texture or null/i],
