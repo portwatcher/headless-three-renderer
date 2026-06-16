@@ -317,9 +317,13 @@ function shadowMapSizeComponent(
 }
 
 function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {
-  const hints = light.userData?.headlessThreeRenderer ?? light.userData?.headlessRenderer ?? {}
-  const cascades = hints.shadowCascades ?? hints.cascades ?? (light.shadow as any)?.cascades
-  if (!Array.isArray(cascades) || cascades.length < 2) return
+  const cascadeHints = shadowCascadeHints(light)
+  if (!cascadeHints) return
+  const { value: cascades, label } = cascadeHints
+  if (!Array.isArray(cascades)) {
+    throw new TypeError(`${label} must be an array of shadow cascade hint objects.`)
+  }
+  if (cascades.length < 2) return
 
   const splits: number[] = []
   const bounds: number[] = []
@@ -352,6 +356,41 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
     out.shadowCascadeBounds = bounds
     out.shadowCascadeSplits = splits.slice(0, count - 1)
   }
+}
+
+function shadowCascadeHints(light: ThreeObject3DLike): { value: unknown; label: string } | null {
+  const modernHints = light.userData?.headlessThreeRenderer
+  if (modernHints?.shadowCascades != null) {
+    return {
+      value: modernHints.shadowCascades,
+      label: 'light.userData.headlessThreeRenderer.shadowCascades',
+    }
+  }
+  if (modernHints?.cascades != null) {
+    return {
+      value: modernHints.cascades,
+      label: 'light.userData.headlessThreeRenderer.cascades',
+    }
+  }
+
+  const legacyHints = light.userData?.headlessRenderer
+  if (legacyHints?.shadowCascades != null) {
+    return {
+      value: legacyHints.shadowCascades,
+      label: 'light.userData.headlessRenderer.shadowCascades',
+    }
+  }
+  if (legacyHints?.cascades != null) {
+    return {
+      value: legacyHints.cascades,
+      label: 'light.userData.headlessRenderer.cascades',
+    }
+  }
+
+  const shadowCascades = (light.shadow as any)?.cascades
+  return shadowCascades != null
+    ? { value: shadowCascades, label: 'light.shadow.cascades' }
+    : null
 }
 
 function shadowCascadeSplit(cascade: Record<string, unknown>, label: string): number | undefined {

@@ -13331,6 +13331,32 @@ test('invalid directional shadow cascade hints fail clearly', () => {
     far: 12 + index,
     split: 2 + index,
   })
+
+  const containerCases = [
+    ['modern shadowCascades', (light) => {
+      light.userData.headlessThreeRenderer = { shadowCascades: 'cascades' }
+    }, /light\.userData\.headlessThreeRenderer\.shadowCascades must be an array/i],
+    ['legacy cascades', (light) => {
+      light.userData.headlessRenderer = { cascades: 'cascades' }
+    }, /light\.userData\.headlessRenderer\.cascades must be an array/i],
+    ['shadow cascades', (light) => {
+      light.shadow.cascades = 'cascades'
+    }, /light\.shadow\.cascades must be an array/i],
+  ]
+  for (const [name, setup, pattern] of containerCases) {
+    const scene = new THREE.Scene()
+    const light = new THREE.DirectionalLight(0xffffff, 1)
+    light.castShadow = true
+    setup(light)
+    scene.add(light)
+
+    assert.throws(
+      () => extractLights(scene),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+
   const cases = [
     ['non-object cascade', [validCascade(), null], /shadowCascades\[1\] must be an object/i],
     ['missing far bound', [{ ...validCascade(), far: undefined }, validCascade(1)], /shadowCascades\[0\]\.far must be a finite number/i],
