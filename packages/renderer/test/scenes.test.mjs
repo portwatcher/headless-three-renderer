@@ -4712,6 +4712,43 @@ test('InstancedBufferGeometry expands per-instance offsets and colors', () => {
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `instance colors should avoid blue contribution (${mean.b})`)
 })
 
+test('InstancedBufferGeometry honors meshPerAttribute repeat values for offsets and colors', () => {
+  const base = new THREE.PlaneGeometry(0.35, 0.5)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.instanceCount = 4
+
+  const offsets = new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.45, 0, 0, 0.45, 0, 0]),
+    3,
+  )
+  offsets.meshPerAttribute = 2
+  geometry.setAttribute('instanceOffset', offsets)
+
+  const colors = new THREE.InstancedBufferAttribute(
+    new Float32Array([1, 0, 0, 0, 1, 0]),
+    3,
+  )
+  colors.meshPerAttribute = 2
+  geometry.setAttribute('color', colors)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const left = meanRegion(rgba, 96, 64, 26, 28, 36, 36)
+  const right = meanRegion(rgba, 96, 64, 60, 28, 70, 36)
+  assert.ok(left.r > left.g + 40, `repeated first instanced attributes should draw red on the left (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 40, `repeated second instanced attributes should draw green on the right (${right.g} vs ${right.r})`)
+})
+
 test('invalid instance counts fail clearly', () => {
   const camera = makeCamera()
 
