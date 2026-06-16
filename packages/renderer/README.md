@@ -85,7 +85,7 @@ See the versioned [compatibility matrix](https://github.com/portwatcher/headless
 
 The public API accepts only Three.js-like objects:
 
-- `scene`: a `THREE.Scene` or `THREE.Object3D` root; malformed scene containers and visibility flags fail clearly.
+- `scene`: a `THREE.Scene` or `THREE.Object3D` root; malformed scene/children containers and visibility flags fail clearly.
 - `camera`: a `THREE.Camera`, including perspective and orthographic cameras. Malformed camera/userData containers, invalid aspect-derived dimensions, clipping distances, and matrix containers or values fail clearly. `THREE.ArrayCamera` composes sub-camera viewports for PNG, raw RGBA, and target output. `THREE.CubeCamera` renders six RGBA faces plus optional depth faces into `WebGLCubeRenderTarget.texture.image`/`source.data`, nonzero `activeMipmapLevel` writes the active mip entry, and captured color textures can be reused as cube background/environment inputs; exact WebGL face semantics remain limited.
 - `options`: an options object; malformed option containers fail clearly.
 - `options.width` and `options.height`: output pixel size. Defaults to `512 x 512`; invalid explicit dimensions fail clearly.

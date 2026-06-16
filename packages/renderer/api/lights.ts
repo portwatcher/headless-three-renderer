@@ -2,6 +2,7 @@ import type { ThreeCameraLike, ThreeObject3DLike, NativeSceneLight } from './typ
 import { validatedColorLikeToArray } from './color'
 import { objectLayersMatchCamera } from './layers'
 import { matrixElements } from './math'
+import { objectChildren } from './objects'
 
 type ShadowMapSizeLike = { x?: number; y?: number; width?: number; height?: number } | undefined
 type ShadowCameraLike = NonNullable<NonNullable<ThreeObject3DLike['shadow']>['camera']>
@@ -25,8 +26,7 @@ function visitLights(object: ThreeObject3DLike, camera: ThreeCameraLike | undefi
     if (light) lights.push(light)
   }
 
-  const children = Array.isArray(object.children) ? object.children : []
-  for (const child of children) {
+  for (const child of objectChildren(object)) {
     visitLights(child, camera, lights)
   }
 }
@@ -557,8 +557,7 @@ function visitForLightProbe(
   if (!object) return
   if (optionalBoolean(object.visible, 'object.visible') === false) return
   if (object.isLightProbe === true && objectLayersMatchCamera(object, camera)) callback(object)
-  const children = Array.isArray(object.children) ? object.children : []
-  for (const child of children) {
+  for (const child of objectChildren(object)) {
     visitForLightProbe(child, camera, callback)
   }
 }
@@ -607,8 +606,7 @@ function visitForAmbient(
   if (!object) return
   if (optionalBoolean(object.visible, 'object.visible') === false) return
   if (object.isAmbientLight === true && objectLayersMatchCamera(object, camera)) callback(object)
-  const children = Array.isArray(object.children) ? object.children : []
-  for (const child of children) {
+  for (const child of objectChildren(object)) {
     visitForAmbient(child, camera, callback)
   }
 }

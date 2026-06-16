@@ -527,6 +527,22 @@ test('invalid geometry drawRange values fail clearly', () => {
   }
 })
 
+test('malformed object children containers fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.children = 'children'
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /object\.children must be an array/i,
+  )
+
+  const childEntryScene = new THREE.Scene()
+  childEntryScene.children = [null]
+  assert.throws(
+    () => renderRgba(childEntryScene, makeCamera(), { width: 32, height: 32 }),
+    /object\.children\[0\] must be an object/i,
+  )
+})
+
 test('malformed BatchedMesh inputs fail clearly', () => {
   const camera = makeCamera()
   const scene = new THREE.Scene()

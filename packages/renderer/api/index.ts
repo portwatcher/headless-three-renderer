@@ -28,6 +28,7 @@ import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
+import { validateObjectChildrenTree } from './objects'
 
 export {
   applyVrmAnimation,
@@ -291,6 +292,7 @@ function toNativeInput(
   validateThreeSceneRoot(scene)
   validateThreeCamera(camera)
   validateUnsupportedRenderOptions(options)
+  validateObjectChildrenTree(scene)
   const renderMode = normalizedRenderMode(options.renderMode)
   const colorMode = renderMode === 'color'
 

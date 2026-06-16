@@ -1,6 +1,7 @@
 import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextureLike, ThreeSceneRootLike, ThreeObject3DLike } from './types'
 import { clamp01 } from './math'
 import { strictColorLikeToArray, validatedColorLikeToArray } from './color'
+import { objectChildren } from './objects'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const native = require('../native.js') as {
@@ -225,7 +226,7 @@ function extractMaterialEnvironmentMap(
       materials.add(material)
     }
 
-    for (const child of object.children ?? []) {
+    for (const child of objectChildren(object)) {
       visit(child)
     }
   }

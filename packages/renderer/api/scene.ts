@@ -34,6 +34,7 @@ import {
 import { applyCpuSkinning } from './skinning'
 import { applyMorphTargets } from './morphs'
 import { objectLayersMatchCamera } from './layers'
+import { objectChildren } from './objects'
 import {
   MAX_CLIPPING_PLANES,
   type NativeClippingPlane,
@@ -178,8 +179,7 @@ function visitObject(
     }
   }
 
-  const children = Array.isArray(object.children) ? object.children : []
-  for (const child of children) {
+  for (const child of objectChildren(object)) {
     visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
   }
 }
