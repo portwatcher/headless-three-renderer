@@ -14343,6 +14343,27 @@ test('multiple shadow-casting lights fail clearly', () => {
   )
 })
 
+test('camera-layer-filtered shadow lights do not count toward the shadow light limit', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  camera.layers.set(1)
+
+  const filtered = new THREE.DirectionalLight(0xff0000, 1)
+  filtered.castShadow = true
+  filtered.layers.set(0)
+  scene.add(filtered)
+
+  const visible = new THREE.DirectionalLight(0x00ff00, 1)
+  visible.castShadow = true
+  visible.layers.set(1)
+  scene.add(visible)
+
+  const lights = extractLights(scene, camera)
+  assert.equal(lights?.length, 1)
+  assert.equal(lights?.[0]?.castShadow, true)
+  assert.deepEqual(lights?.[0]?.color, [0, 1, 0])
+})
+
 test('shadow bias options are extracted for native shadow lights', () => {
   const makeLightCases = [
     ['directional', () => {
