@@ -9107,6 +9107,31 @@ test('base color maps decode sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 10, `linear texture should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('texture colorSpace string aliases match LinearSRGBColorSpace', () => {
+  function renderTextureColorSpace(colorSpace) {
+    const map = solidTexture(128, 128, 128)
+    map.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, {
+      width: 32,
+      height: 32,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const linear = renderTextureColorSpace(THREE.LinearSRGBColorSpace)
+  for (const alias of ['srgb-linear', 'linear-srgb', 'linearsrgb', 'linear']) {
+    assert.deepEqual(renderTextureColorSpace(alias), linear, `${alias} should match THREE.LinearSRGBColorSpace`)
+  }
+})
+
 test('color-space decoding composes with explicit texture matrices', () => {
   function transformedGrayTexture(colorSpace) {
     const texture = rgbaTexture([
