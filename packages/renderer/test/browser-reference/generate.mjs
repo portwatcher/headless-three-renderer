@@ -190,18 +190,55 @@ function applyFixtureRendererOptions(fixture) {
 }
 
 function applyFixtureSceneOptions(fixture) {
-  if (Object.prototype.hasOwnProperty.call(fixture.options, 'background') !== true) {
+  const optionKeys = [
+    'background',
+    'backgroundIntensity',
+    'backgroundBlurriness',
+    'backgroundRotation',
+    'environmentIntensity',
+    'environmentRotation',
+  ]
+  if (!optionKeys.some((key) => Object.prototype.hasOwnProperty.call(fixture.options, key))) {
     return () => {}
   }
   if (fixture.scene?.isScene !== true) {
-    throw new Error('Browser reference background options require a THREE.Scene fixture.')
+    throw new Error('Browser reference scene-level options require a THREE.Scene fixture.')
   }
 
-  const previousBackground = fixture.scene.background
-  fixture.scene.background = fixture.options.background
+  const previous = {
+    background: fixture.scene.background,
+    backgroundIntensity: fixture.scene.backgroundIntensity,
+    backgroundBlurriness: fixture.scene.backgroundBlurriness,
+    backgroundRotation: fixture.scene.backgroundRotation,
+    environmentIntensity: fixture.scene.environmentIntensity,
+    environmentRotation: fixture.scene.environmentRotation,
+  }
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'background')) {
+    fixture.scene.background = fixture.options.background
+  }
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'backgroundIntensity')) {
+    fixture.scene.backgroundIntensity = fixture.options.backgroundIntensity
+  }
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'backgroundBlurriness')) {
+    fixture.scene.backgroundBlurriness = fixture.options.backgroundBlurriness
+  }
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'backgroundRotation')) {
+    fixture.scene.backgroundRotation = fixture.options.backgroundRotation
+  }
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'environmentIntensity')) {
+    fixture.scene.environmentIntensity = fixture.options.environmentIntensity
+  }
+  if (Object.prototype.hasOwnProperty.call(fixture.options, 'environmentRotation')) {
+    fixture.scene.environmentRotation = fixture.options.environmentRotation
+  }
 
   return () => {
-    fixture.scene.background = previousBackground
+    fixture.scene.background = previous.background
+    fixture.scene.backgroundIntensity = previous.backgroundIntensity
+    fixture.scene.backgroundBlurriness = previous.backgroundBlurriness
+    fixture.scene.backgroundRotation = previous.backgroundRotation
+    fixture.scene.environmentIntensity = previous.environmentIntensity
+    fixture.scene.environmentRotation = previous.environmentRotation
   }
 }
 
