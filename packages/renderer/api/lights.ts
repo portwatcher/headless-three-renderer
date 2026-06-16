@@ -37,7 +37,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
   if (light.isDirectionalLight === true) {
     const pos = positionFromMatrix(light.matrixWorld, 'DirectionalLight.matrixWorld', [0, 10, 0])
-    const targetPos = positionFromMatrix(light.target?.matrixWorld, 'DirectionalLight.target.matrixWorld', [0, 0, 0])
+    const targetPos = positionFromMatrix(lightTargetMatrix(light, 'DirectionalLight.target'), 'DirectionalLight.target.matrixWorld', [0, 0, 0])
     const direction = [
       targetPos[0] - pos[0],
       targetPos[1] - pos[1],
@@ -82,7 +82,7 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
   if (light.isSpotLight === true) {
     const pos = positionFromMatrix(light.matrixWorld, 'SpotLight.matrixWorld', [0, 0, 0])
-    const targetPos = positionFromMatrix(light.target?.matrixWorld, 'SpotLight.target.matrixWorld', [0, 0, 0])
+    const targetPos = positionFromMatrix(lightTargetMatrix(light, 'SpotLight.target'), 'SpotLight.target.matrixWorld', [0, 0, 0])
     const direction = [
       targetPos[0] - pos[0],
       targetPos[1] - pos[1],
@@ -174,6 +174,15 @@ function matrixElementsOrUndefined(
   label: string,
 ) {
   return matrix ? matrixElements(matrix, label) : undefined
+}
+
+function lightTargetMatrix(light: ThreeObject3DLike, label: string): ThreeObject3DLike['matrixWorld'] | undefined {
+  const target = light.target
+  if (target == null) return undefined
+  if (typeof target !== 'object' || Array.isArray(target)) {
+    throw new TypeError(`${label} must be an object.`)
+  }
+  return target.matrixWorld
 }
 
 function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): void {

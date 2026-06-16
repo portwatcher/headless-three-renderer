@@ -182,7 +182,7 @@ Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-proces
 - `THREE.RectAreaLight` — one-sided finite-area direct-light approximation
 - `THREE.LightProbe` — diffuse spherical-harmonics indirect lighting, with invalid coefficient values failing clearly
 
-Lights are automatically extracted from the scene, with malformed light color containers, invalid light color, numeric controls, transform matrix values, shadow flags, and shadow option containers failing clearly. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 64 direct lights per scene are supported. One visible directional, spot, or point light may cast shadows; additional shadow-casting lights fail clearly until native multi-shadow-map rendering lands. When no lights are present, meshes render with a hemispherical ambient fallback.
+Lights are automatically extracted from the scene, with malformed light color/target containers, invalid light color, numeric controls, transform matrix values, shadow flags, and shadow option containers failing clearly. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 64 direct lights per scene are supported. One visible directional, spot, or point light may cast shadows; additional shadow-casting lights fail clearly until native multi-shadow-map rendering lands. When no lights are present, meshes render with a hemispherical ambient fallback.
 
 ### Image-Based Lighting (IBL)
 
