@@ -57,7 +57,9 @@ interface MeshInstance {
 
 interface BatchedMeshDraw {
   range: { start: number; count: number }
+  instanceId: number
   instance: MeshInstance
+  z: number
 }
 
 export type ShadowMaterialMode = 'depth' | 'distance'
@@ -108,6 +110,8 @@ interface MeshSortInfo {
   keys: Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey' | 'materialVariant'>
   item: RenderSortItem
 }
+
+type SortKeyOverride = Partial<MeshSortInfo['keys']>
 
 export function flattenScene(
   scene: ThreeObject3DLike,
@@ -186,8 +190,11 @@ function appendBatchedMesh(
   const geometry = object.geometry!
   const draws = batchedMeshDraws(object, camera, geometry)
   if (draws.length === 0) return
+  const objectSortZ = camera ? projectedObjectZ(object, camera) : 0
+  const sortIndexBase = unsignedSortKey(object.id, meshes.length)
 
-  for (const draw of draws) {
+  for (let drawOrder = 0; drawOrder < draws.length; drawOrder += 1) {
+    const draw = draws[drawOrder]
     const geometryView = batchedGeometryView(geometry, draw.range)
     const objectView = Object.create(object) as ThreeObject3DLike
     objectView.geometry = geometryView
@@ -195,6 +202,10 @@ function appendBatchedMesh(
     objectView.instanceMatrix = undefined
     objectView.instanceColor = undefined
     objectView.count = undefined
+    const sortKeyOverride: SortKeyOverride = {
+      sortZ: objectSortZ,
+      sortIndex: batchedDrawSortIndex(sortIndexBase, drawOrder),
+    }
     appendMesh(
       objectView,
       camera,
@@ -205,6 +216,7 @@ function appendBatchedMesh(
       shadowMaterialMode,
       materialContext,
       [draw.instance],
+      sortKeyOverride,
     )
   }
 }
@@ -219,6 +231,7 @@ function appendMesh(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
   instanceOverride?: MeshInstance[],
+  sortKeyOverride?: SortKeyOverride,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -309,6 +322,7 @@ function appendMesh(
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
         const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group)
+        const sortKeys = mergeSortKeys(sortInfo.keys, sortKeyOverride)
         pushMesh(meshes, {
           positions: expandedPositions,
           indices: expandedIndices,
@@ -336,7 +350,7 @@ function appendMesh(
           receiveShadow,
           clipShadows: clipShadowsForMaterial(material, clippingContext),
           ...clipping,
-          ...sortInfo.keys,
+          ...sortKeys,
           ...pbrProps,
         }, sortInfo.item)
       }
@@ -367,6 +381,7 @@ function appendMesh(
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
         const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group)
+        const sortKeys = mergeSortKeys(sortInfo.keys, sortKeyOverride)
         pushMesh(meshes, {
           positions: expandedGroupPositions,
           indices: expandedGroupIndices,
@@ -394,7 +409,7 @@ function appendMesh(
           receiveShadow,
           clipShadows: clipShadowsForMaterial(material, clippingContext),
           ...clipping,
-          ...sortInfo.keys,
+          ...sortKeys,
           ...pbrProps,
         }, sortInfo.item)
       }
@@ -1465,6 +1480,10 @@ function sortInfoForObject(
   }
 }
 
+function mergeSortKeys(keys: MeshSortInfo['keys'], override: SortKeyOverride | undefined): MeshSortInfo['keys'] {
+  return override ? { ...keys, ...override } : keys
+}
+
 function sortFlattenedMeshes(meshes: FlattenedMesh[], options: SceneSortOptions): FlattenedMesh[] {
   const sortObjects = options.sortObjects !== false
   const buckets = partitionFlattenedMeshes(meshes)
@@ -2324,6 +2343,8 @@ function batchedMeshDraws(
 
   const baseTransform = matrixElements(object.matrixWorld!, 'batchedMesh.matrixWorld')
   const cullPerObject = batchedPerObjectFrustumCulled(object, camera)
+  const sortObjects = batchedSortObjects(object)
+  const customSort = batchedCustomSort(object)
   const draws: BatchedMeshDraw[] = []
   for (let instanceId = 0; instanceId < instanceInfo.length; instanceId += 1) {
     const info = instanceInfo[instanceId]
@@ -2347,13 +2368,23 @@ function batchedMeshDraws(
 
     draws.push({
       range,
+      instanceId,
       instance: {
         transform,
         color: batchedInstanceColor(object, instanceId),
       },
+      z: sortObjects ? batchedDrawDistanceZ(object, geometry, geometryId, range, transform, camera) : 0,
     })
   }
+
+  if (!sortObjects || draws.length < 2) return draws
+  if (customSort) {
+    return customSortedBatchedMeshDraws(object, draws, customSort, camera)
+  }
+
   return draws
+    .slice()
+    .sort(batchedMeshUsesTransparentSort(object) ? compareBatchedDrawsTransparent : compareBatchedDrawsOpaque)
 }
 
 function batchedPerObjectFrustumCulled(
@@ -2362,6 +2393,80 @@ function batchedPerObjectFrustumCulled(
 ): boolean {
   if (!camera || camera.isArrayCamera === true) return false
   return batchedOptionalBoolean(object.perObjectFrustumCulled, 'THREE.BatchedMesh.perObjectFrustumCulled', true)
+}
+
+function batchedSortObjects(object: ThreeObject3DLike): boolean {
+  return batchedOptionalBoolean(object.sortObjects, 'THREE.BatchedMesh.sortObjects', true)
+}
+
+function batchedCustomSort(object: ThreeObject3DLike): ThreeObject3DLike['customSort'] {
+  if (object.customSort == null) return null
+  if (typeof object.customSort === 'function') return object.customSort
+  throw new TypeError('THREE.BatchedMesh.customSort must be a function or null.')
+}
+
+function customSortedBatchedMeshDraws(
+  object: ThreeObject3DLike,
+  draws: BatchedMeshDraw[],
+  customSort: NonNullable<ThreeObject3DLike['customSort']>,
+  camera: ThreeCameraLike | undefined,
+): BatchedMeshDraw[] {
+  const drawByInstance = new Map(draws.map((draw) => [draw.instanceId, draw]))
+  const list = draws.map((draw) => ({
+    start: draw.range.start,
+    count: draw.range.count,
+    z: draw.z,
+    index: draw.instanceId,
+  }))
+
+  customSort.call(object, list, camera)
+
+  return list.map((item, itemIndex) => {
+    if (!item || typeof item !== 'object') {
+      throw new TypeError(`THREE.BatchedMesh.customSort list[${itemIndex}] must be an object.`)
+    }
+    const instanceId = batchedNonNegativeInteger(item.index, `THREE.BatchedMesh.customSort list[${itemIndex}].index`)
+    const draw = drawByInstance.get(instanceId)
+    if (!draw) {
+      throw new Error(`THREE.BatchedMesh.customSort returned unknown instance index ${instanceId}.`)
+    }
+    return draw
+  })
+}
+
+function compareBatchedDrawsOpaque(a: BatchedMeshDraw, b: BatchedMeshDraw): number {
+  return a.z - b.z || a.instanceId - b.instanceId
+}
+
+function compareBatchedDrawsTransparent(a: BatchedMeshDraw, b: BatchedMeshDraw): number {
+  return b.z - a.z || a.instanceId - b.instanceId
+}
+
+function batchedMeshUsesTransparentSort(object: ThreeObject3DLike): boolean {
+  const material = Array.isArray(object.material)
+    ? object.material.find(Boolean)
+    : object.material
+  return material?.transparent === true
+}
+
+function batchedDrawDistanceZ(
+  object: ThreeObject3DLike,
+  geometry: ThreeBufferGeometryLike,
+  geometryId: number,
+  range: { start: number; count: number },
+  transform: ArrayLike<number>,
+  camera: ThreeCameraLike | undefined,
+): number {
+  if (!camera) return 0
+  const sphere = batchedGeometryBoundingSphere(object, geometry, geometryId, range)
+  if (!sphere) return 0
+  const center = transformPoint(transform, sphere.center)
+  const viewZ = viewSpaceZ(center, camera)
+  return Number.isFinite(viewZ) ? -viewZ : 0
+}
+
+function batchedDrawSortIndex(base: number, drawOrder: number): number {
+  return Math.max(0, Math.min(0xffffffff, base + drawOrder))
 }
 
 function batchedDrawOutsideFrustum(

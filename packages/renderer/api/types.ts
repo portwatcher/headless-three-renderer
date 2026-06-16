@@ -332,6 +332,8 @@ export interface ThreeObject3DLike {
   count?: number
   instanceCount?: number
   perObjectFrustumCulled?: boolean
+  sortObjects?: boolean
+  customSort?: ((items: Array<{ start: number; count: number; z: number; index: number }>, camera?: ThreeCameraLike) => void) | null
   maxInstanceCount?: number
   instanceMatrix?: ThreeBufferAttributeLike
   instanceColor?: ThreeBufferAttributeLike | null
