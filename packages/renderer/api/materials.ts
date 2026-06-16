@@ -292,7 +292,8 @@ function extractEnvironmentMapFromTexture(
     return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex) }
   }
 
-  const image = (envTex as any).image ?? (envTex as any).source?.data
+  const sourceData = textureSourceData(envTex, label)
+  const image = (envTex as any).image ?? sourceData
   if (!image) throw unsupportedTextureImageError(label, 'environment map rendering')
 
   // DataTexture: { data, width, height }
@@ -1814,7 +1815,8 @@ function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { d
 }
 
 function cubeFaceImages(map: ThreeTextureLike): TextureImageInput[] | null {
-  const image = (map as any).image ?? (map as any).source?.data
+  const sourceData = textureSourceData(map, 'texture')
+  const image = (map as any).image ?? sourceData
   if (Array.isArray(image) && image.length >= 6) return image.slice(0, 6) as TextureImageInput[]
   return null
 }
@@ -1906,6 +1908,20 @@ function textureLike(value: unknown): ThreeTextureLike | null {
   return null
 }
 
+function textureSourceData(texture: ThreeTextureLike, label: string): unknown {
+  const source = (texture as { source?: unknown }).source
+  if (source == null) return undefined
+  if (typeof source !== 'object' || Array.isArray(source)) {
+    throw new TypeError(`${label}.source must be a source-like object.`)
+  }
+  const data = (source as { data?: unknown }).data
+  if (data == null) return undefined
+  if (typeof data !== 'object') {
+    throw new TypeError(`${label}.source.data must be an image-like object.`)
+  }
+  return data
+}
+
 function requiredEnvironmentTexture(value: unknown, label: string): ThreeTextureLike {
   const texture = textureLike(value)
   if (texture) return texture
@@ -1965,7 +1981,8 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   assertSupportedTextureInput(map, label, { allowMipmaps: true })
   assertSupportedTwoDimensionalTextureSlot(map, label)
 
-  const image = (map as any).image ?? (map as any).source?.data
+  const sourceData = textureSourceData(map, label)
+  const image = (map as any).image ?? sourceData
   if (!image) return null
 
   // DataTexture style: { data: TypedArray, width, height }

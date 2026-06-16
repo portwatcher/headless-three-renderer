@@ -8686,6 +8686,11 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
     texture.needsUpdate = true
     return texture
   }
+  function sourcedTexture(source) {
+    const texture = new THREE.Texture()
+    texture.source = source
+    return texture
+  }
 
   const cases = [
     ['material map', (scene) => {
@@ -8706,6 +8711,23 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
         reflectionProbe: { texture: browserLikeTexture() },
       }
     }, /reflectionProbe\.texture.*texture image object.*not readable.*environment map rendering/i],
+    ['material map source container', (scene) => {
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: sourcedTexture('source') }),
+      ))
+    }, /material\.map\.source must be a source-like object/i],
+    ['background source data container', (scene) => {
+      scene.background = sourcedTexture({ data: 'source' })
+    }, /scene\.background\.source\.data must be an image-like object/i],
+    ['environment source container', (scene) => {
+      scene.environment = sourcedTexture('source')
+    }, /scene\.environment\.source must be a source-like object/i],
+    ['reflection probe source data container', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture: sourcedTexture({ data: 'source' }) },
+      }
+    }, /reflectionProbe\.texture\.source\.data must be an image-like object/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
