@@ -758,8 +758,8 @@ function appendPoints(
   for (const group of groups) {
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
-    const pointUvs = primaryPointUvs && (material?.map || material?.alphaMap)
-      ? secondaryUvsForMaterial(pointUvChannels, {
+    const pointUvStreams = primaryPointUvs && (material?.map || material?.alphaMap)
+      ? textureUvStreamsForMapAlphaMaterial(pointUvChannels, {
         map: material.map,
         alphaMap: material.alphaMap,
       })
@@ -773,6 +773,7 @@ function appendPoints(
 
     const outputPositions: number[] = []
     const outputUvs: number[] = []
+    const outputUvs2: number[] | undefined = pointUvStreams?.uvs2 ? [] : undefined
     const outputColors: number[] | undefined = useVertexColors ? [] : undefined
     const outputIndices: number[] = []
     const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
@@ -813,8 +814,11 @@ function appendPoints(
             center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
             center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
           )
-          if (pointUvs) {
-            outputUvs.push(pointUvs[pointIndex * 2], pointUvs[pointIndex * 2 + 1])
+          if (pointUvStreams?.uvs) {
+            outputUvs.push(pointUvStreams.uvs[pointIndex * 2], pointUvStreams.uvs[pointIndex * 2 + 1])
+            if (outputUvs2 && pointUvStreams.uvs2) {
+              outputUvs2.push(pointUvStreams.uvs2[pointIndex * 2], pointUvStreams.uvs2[pointIndex * 2 + 1])
+            }
           } else {
             outputUvs.push(u, v)
           }
@@ -831,7 +835,7 @@ function appendPoints(
     const textureInfo = extractTextureData(material)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
     const pbrProps = extractPbrProperties(material, materialContext)
-    pbrProps.alphaMapUsesUv2 = false
+    pbrProps.alphaMapUsesUv2 = pointUvStreams?.alphaMapUsesUv2 ?? false
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
     const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
@@ -840,6 +844,7 @@ function appendPoints(
       positions: outputPositions,
       indices: outputIndices,
       uvs: outputUvs,
+      uvs2: outputUvs2,
       color: baseColor,
       colors: outputColors,
       texture: textureInfo?.data,
@@ -852,7 +857,7 @@ function appendPoints(
       textureAnisotropy: textureInfo?.anisotropy,
       textureTransform: textureInfo?.transform,
       textureColorSpace: textureInfo?.colorSpace,
-      textureUsesUv2: false,
+      textureUsesUv2: pointUvStreams?.textureUsesUv2 ?? false,
       transform: IDENTITY_4X4.slice(),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       topology: 'triangles',
@@ -1045,7 +1050,7 @@ function appendLineOrPoints(
     if (material?.visible === false) continue
 
     const uvStreams = topology === 'lines'
-      ? textureUvStreamsForLineMaterial(uvChannels, material)
+      ? textureUvStreamsForMapAlphaMaterial(uvChannels, material)
       : { uvs, uvs2: secondaryUvsForMaterial(uvChannels, material) }
     let indices: number[] | null = null
     let outputPositions = positions
@@ -1953,7 +1958,7 @@ function readOptionalUvAttribute(geometry: ThreeBufferGeometryLike, name: string
   return attribute ? readVec2Attribute(attribute, `geometry.attributes.${name}`) : null
 }
 
-function textureUvStreamsForLineMaterial(
+function textureUvStreamsForMapAlphaMaterial(
   channels: Array<number[] | null>,
   material: {
     map?: { channel?: number } | null

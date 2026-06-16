@@ -14173,6 +14173,48 @@ test('PointsMaterial maps honor selected geometry UV channels', () => {
   assert.ok(mean.g > mean.r + 60, `selected point uv1 should sample green instead of primary red (${mean.g} vs ${mean.r})`)
 })
 
+test('PointsMaterial map and alphaMap can sample distinct geometry UV channels', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.25, 0.5]), 2))
+  geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
+  geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const alphaMap = rgbaTexture([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.channel = 2
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    alphaMap,
+    alphaTest: 0.5,
+    color: 0xffffff,
+    map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 40, 40, 56, 56)
+  assert.ok(mean.g > mean.r + 60, `point map channel=1 and alphaMap channel=2 should render green from uv1 while uv2 keeps it opaque (${mean.g} vs ${mean.r})`)
+})
+
 test('PointsMaterial maps use point-sprite UVs when geometry UVs are absent', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
