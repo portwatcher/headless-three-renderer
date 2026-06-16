@@ -246,7 +246,7 @@ export async function applyVrmAnimation(
   const helperOptions = objectOptions(options, 'options') as ApplyVrmAnimationOptions
   const model = objectOptions(vrm, 'vrm') as { scene?: unknown; update?: unknown }
   objectOptions(vrmAnimation, 'vrmAnimation')
-  if (model.scene == null || typeof model.scene !== 'object') {
+  if (model.scene == null || typeof model.scene !== 'object' || Array.isArray(model.scene)) {
     throw new TypeError('vrm.scene must be an object.')
   }
 

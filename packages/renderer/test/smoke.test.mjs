@@ -229,6 +229,13 @@ test('Node loader helper path and option containers fail clearly', async () => {
     /vrm must be an object/i,
   )
   await assert.rejects(
+    () => applyVrmAnimation({ scene: [] }, {}, {
+      AnimationMixer: class FakeAnimationMixer {},
+      createVRMAnimationClip() {},
+    }),
+    /vrm\.scene must be an object/i,
+  )
+  await assert.rejects(
     () => applyVrmAnimation({ scene: {} }, {}, {
       AnimationMixer: class FakeAnimationMixer {},
       createVRMAnimationClip() {},
