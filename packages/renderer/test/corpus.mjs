@@ -19,6 +19,7 @@ export function createSceneCorpus() {
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
+    materialEnvMapPbrCorpus(),
     meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
     meshDepthMaterialWireframeCorpus(),
@@ -875,6 +876,66 @@ function materialEnvMapBasicLambertCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [6, 6, 8],
     minNonBackgroundRatio: 0.06,
+  }
+}
+
+function materialEnvMapPbrCorpus() {
+  const envMap = new THREE.DataTexture(new Uint8Array([
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  envMap.mapping = THREE.EquirectangularReflectionMapping
+  envMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.025)
+
+  const standard = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 1.1),
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      metalness: 1,
+      roughness: 0.12,
+      envMap,
+      envMapIntensity: 2,
+    }),
+  )
+  standard.position.x = -0.48
+  scene.add(standard)
+
+  const physical = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 1.1),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      metalness: 1,
+      roughness: 0.16,
+      clearcoat: 0.45,
+      envMap,
+      envMapIntensity: 2,
+    }),
+  )
+  physical.position.x = 0.48
+  scene.add(physical)
+
+  return {
+    name: 'material-env-map-pbr',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 5, 6],
+    minNonBackgroundRatio: 0.06,
+    validate(rgba, { width }) {
+      const standardMean = meanRegion(rgba, width, 20, 30, 40, 66)
+      const physicalMean = meanRegion(rgba, width, 56, 30, 76, 66)
+      for (const [label, mean] of [
+        ['standard', standardMean],
+        ['physical', physicalMean],
+      ]) {
+        if (!(mean.g > mean.r + 20 && mean.g > mean.b + 8)) {
+          throw new Error(`PBR material envMap should render green ${label} IBL (${mean.r}, ${mean.g}, ${mean.b})`)
+        }
+      }
+    },
   }
 }
 
