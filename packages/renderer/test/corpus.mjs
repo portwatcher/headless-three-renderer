@@ -433,6 +433,12 @@ function lightProbeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [8, 8, 10],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 40, 40, 56, 56)
+      if (!(center.r > 180 && center.g > 160 && center.r > center.b + 40 && center.g > center.b + 20)) {
+        throw new Error(`LightProbe diffuse corpus should render a warm lit sphere, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -553,6 +559,13 @@ function textureMatrixColorSpaceCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 5, 6],
     minNonBackgroundRatio: 0.1,
+    validate(rgba, { width }) {
+      const transformedBright = pixelAt(rgba, width, 48, 48)
+      const transformedDark = pixelAt(rgba, width, 30, 37)
+      if (!(transformedBright.r > 180 && transformedBright.g > 180 && transformedBright.b > 180 && transformedDark.r < 80 && transformedDark.g < 80 && transformedDark.b < 80)) {
+        throw new Error(`texture matrix corpus should sample distinct sRGB bright/dark texels, got bright=${JSON.stringify(transformedBright)} dark=${JSON.stringify(transformedDark)}`)
+      }
+    },
   }
 }
 
@@ -576,6 +589,13 @@ function linearOutputColorSpaceCorpus() {
     },
     background: [46, 46, 46],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > 60 && center.r < 90 && center.g < 20 && center.b < 10 && corner.r > 40 && corner.r < 55 && corner.g > 40 && corner.g < 55 && corner.b > 40 && corner.b < 55)) {
+        throw new Error(`linear output corpus should preserve linear RGB values, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -1991,6 +2011,21 @@ function dashedLineMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.001,
+    validate(rgba, { width, height }) {
+      const yellowPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => r > 120 && g > 120 && b < 100,
+      )
+      const gap = pixelAt(rgba, width, 48, 48)
+      if (!(yellowPixels > 30 && yellowPixels < 90 && gap.r < 5 && gap.g < 5 && gap.b < 5)) {
+        throw new Error(`dashed-line corpus should render sparse yellow dashes with visible gaps, got yellow=${yellowPixels} gap=${JSON.stringify(gap)}`)
+      }
+    },
   }
 }
 
@@ -2187,6 +2222,16 @@ function instancedLinesPointsCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
+    validate(rgba, { width, height }) {
+      const redPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && r > g + 60 && r > b + 60)
+      const greenPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 60 && g > b + 60)
+      const bluePixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > 120 && b > r + 35 && b > g + 35)
+      const yellowPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && g > 120 && b < 120)
+      const cyanPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => g > 120 && b > 120 && r < 120)
+      if (!(redPixels > 250 && greenPixels > 250 && bluePixels > 250 && yellowPixels > 250 && cyanPixels > 250)) {
+        throw new Error(`instanced line/point corpus should render all per-instance colors, got red=${redPixels} green=${greenPixels} blue=${bluePixels} yellow=${yellowPixels} cyan=${cyanPixels}`)
+      }
+    },
   }
 }
 
@@ -2327,6 +2372,15 @@ function batchedMeshCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.03,
+    validate(rgba, { width, height }) {
+      const redPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
+      const greenPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
+      const bluePixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > 120 && b > r + 50 && b > g + 50)
+      const hidden = pixelAt(rgba, width, 48, 48)
+      if (!(redPixels > 200 && greenPixels > 200 && bluePixels < 5 && hidden.r < 5 && hidden.g < 5 && hidden.b < 5)) {
+        throw new Error(`BatchedMesh corpus should render red/green visible instances and hide the blue instance, got red=${redPixels} green=${greenPixels} blue=${bluePixels} hidden=${JSON.stringify(hidden)}`)
+      }
+    },
   }
 }
 
@@ -2524,6 +2578,13 @@ function lodAndGroupsCorpus() {
     camera: makeCamera([1.4, 1.2, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 20],
+    validate(rgba, { width }) {
+      const group = meanRegion(rgba, width, 16, 36, 36, 60)
+      const lod = meanRegion(rgba, width, 60, 36, 80, 60)
+      if (!(group.r > 80 && group.b > 80 && group.g < 30 && lod.b > lod.r + 100 && lod.g > lod.r + 40)) {
+        throw new Error(`LOD/groups corpus should render the material-array group and near LOD sphere, got group=${JSON.stringify(group)} lod=${JSON.stringify(lod)}`)
+      }
+    },
   }
 }
 
