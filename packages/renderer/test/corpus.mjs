@@ -164,6 +164,16 @@ function countRegionPixels(rgba, width, x0, y0, x1, y1, predicate) {
   return count
 }
 
+function pixelAt(rgba, width, x, y) {
+  const offset = (y * width + x) * 4
+  return {
+    r: rgba[offset],
+    g: rgba[offset + 1],
+    b: rgba[offset + 2],
+    a: rgba[offset + 3],
+  }
+}
+
 function transparentLayerCorpus() {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.08, 0.08, 0.1)
@@ -589,6 +599,13 @@ function maskRenderModeCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      const corner = meanRegion(rgba, width, 4, 4, 20, 20)
+      if (!(center.r > 245 && center.g > 245 && center.b > 245 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
+        throw new Error(`mask render corpus should render white geometry on black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -628,6 +645,17 @@ function objectIdRenderModeCorpus() {
     backgroundTolerance: 0,
     minNonBackgroundRatio: 0.08,
     browserReference: false,
+    validate(rgba, { width }) {
+      const leftId = pixelAt(rgba, width, 30, 48)
+      const rightId = pixelAt(rgba, width, 66, 48)
+      const background = pixelAt(rgba, width, 8, 8)
+      const leftCode = (leftId.r << 16) | (leftId.g << 8) | leftId.b
+      const rightCode = (rightId.r << 16) | (rightId.g << 8) | rightId.b
+      const backgroundCode = (background.r << 16) | (background.g << 8) | background.b
+      if (!(leftCode > 0 && rightCode > 0 && leftCode !== rightCode && backgroundCode === 0)) {
+        throw new Error(`object-id corpus should encode two distinct objects on zero background, got left=${leftCode} right=${rightCode} background=${backgroundCode}`)
+      }
+    },
   }
 }
 
@@ -654,6 +682,13 @@ function normalRenderModeCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      const corner = meanRegion(rgba, width, 4, 4, 20, 20)
+      if (!(center.r > center.g + 60 && center.b > center.g + 40 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
+        throw new Error(`normal render corpus should render tilted view-normal colors on black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
