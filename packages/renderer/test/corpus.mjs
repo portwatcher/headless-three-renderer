@@ -6,6 +6,7 @@ export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
     alphaToCoverageCorpus(),
+    stencilRenderStateCorpus(),
     backgroundOverrideCorpus(),
     equirectangularBackgroundCorpus(),
     arrayCameraViewportCorpus(),
@@ -154,6 +155,52 @@ function alphaToCoverageCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
     minMeanAlpha: 220,
+  }
+}
+
+function stencilRenderStateCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const mask = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      colorWrite: false,
+      depthWrite: false,
+      stencilWrite: true,
+      stencilFunc: THREE.AlwaysStencilFunc,
+      stencilRef: 1,
+      stencilZPass: THREE.ReplaceStencilOp,
+    }),
+  )
+  mask.position.x = -0.5
+  mask.renderOrder = 0
+  scene.add(mask)
+
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({
+      color: 0x2255ff,
+      stencilWrite: true,
+      stencilFunc: THREE.EqualStencilFunc,
+      stencilRef: 1,
+      stencilFail: THREE.KeepStencilOp,
+      stencilZFail: THREE.KeepStencilOp,
+      stencilZPass: THREE.KeepStencilOp,
+      stencilWriteMask: 0,
+    }),
+  )
+  fill.renderOrder = 1
+  scene.add(fill)
+
+  return {
+    name: 'stencil-masked-render-state',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
   }
 }
 

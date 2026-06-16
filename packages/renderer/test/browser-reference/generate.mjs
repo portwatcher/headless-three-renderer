@@ -16,6 +16,7 @@ const renderer = new THREE.WebGLRenderer({
   alpha: true,
   antialias: true,
   preserveDrawingBuffer: true,
+  stencil: true,
 })
 renderer.setPixelRatio(1)
 renderer.shadowMap.enabled = true
