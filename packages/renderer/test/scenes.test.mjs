@@ -565,11 +565,33 @@ test('invalid BatchedMesh sort controls fail clearly', () => {
   {
     const { batched, scene } = makeScene(2)
     batched.setCustomSort((list) => {
+      list.pop()
+    })
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      /THREE\.BatchedMesh\.customSort must keep 2 draw items; received 1/i,
+    )
+  }
+
+  {
+    const { batched, scene } = makeScene(2)
+    batched.setCustomSort((list) => {
       list[0].index = 99
     })
     assert.throws(
       () => renderRgba(scene, camera, { width: 32, height: 32 }),
       /THREE\.BatchedMesh\.customSort returned unknown instance index 99/i,
+    )
+  }
+
+  {
+    const { batched, scene } = makeScene(2)
+    batched.setCustomSort((list) => {
+      list[1].index = list[0].index
+    })
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      /THREE\.BatchedMesh\.customSort returned duplicate instance index/i,
     )
   }
 })

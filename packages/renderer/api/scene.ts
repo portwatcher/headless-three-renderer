@@ -2424,11 +2424,20 @@ function customSortedBatchedMeshDraws(
 
   customSort.call(object, list, camera)
 
+  if (list.length !== draws.length) {
+    throw new Error(`THREE.BatchedMesh.customSort must keep ${draws.length} draw items; received ${list.length}.`)
+  }
+
+  const seenInstances = new Set<number>()
   return list.map((item, itemIndex) => {
     if (!item || typeof item !== 'object') {
       throw new TypeError(`THREE.BatchedMesh.customSort list[${itemIndex}] must be an object.`)
     }
     const instanceId = batchedNonNegativeInteger(item.index, `THREE.BatchedMesh.customSort list[${itemIndex}].index`)
+    if (seenInstances.has(instanceId)) {
+      throw new Error(`THREE.BatchedMesh.customSort returned duplicate instance index ${instanceId}.`)
+    }
+    seenInstances.add(instanceId)
     const draw = drawByInstance.get(instanceId)
     if (!draw) {
       throw new Error(`THREE.BatchedMesh.customSort returned unknown instance index ${instanceId}.`)
