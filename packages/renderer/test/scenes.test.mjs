@@ -2941,6 +2941,7 @@ test('material envMap colorSpace controls LDR IBL decode', () => {
   const srgb = renderColorSpace(THREE.SRGBColorSpace)
   const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
   assert.ok(linear.r > srgb.r + 20, `linear material envMap should render brighter than decoded sRGB (${linear.r} vs ${srgb.r})`)
+  assert.deepEqual(renderColorSpace('linear-srgb'), linear, 'linear alias should match THREE.LinearSRGBColorSpace for material envMap IBL')
 })
 
 test('scene environment does not affect MeshBasicMaterial without material envMap', () => {
@@ -3093,6 +3094,44 @@ test('unsupported material envMap inputs fail clearly', () => {
   const refractionEnvMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularRefractionMapping,
   })
+
+  {
+    const invalidColorSpace = Object.assign(solidTexture(255, 255, 255), {
+      mapping: THREE.EquirectangularReflectionMapping,
+    })
+    invalidColorSpace.colorSpace = 'display-p3'
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, envMap: invalidColorSpace }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
+      'material envMap colorSpace',
+    )
+  }
+
+  {
+    const invalidEncoding = Object.assign(solidTexture(255, 255, 255), {
+      mapping: THREE.EquirectangularReflectionMapping,
+    })
+    invalidEncoding.encoding = 999
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, envMap: invalidEncoding }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /texture\.encoding 999.*not supported.*sRGBEncoding.*LinearEncoding.*texture\.colorSpace/i,
+      'material envMap encoding',
+    )
+  }
 
   {
     const scene = new THREE.Scene()
