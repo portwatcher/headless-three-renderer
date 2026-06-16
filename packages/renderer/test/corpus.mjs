@@ -403,13 +403,14 @@ function lightProbeMaterialModelsCorpus() {
 
   const materials = [
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+    new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
     new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 20 }),
     new THREE.MeshToonMaterial({ color: 0xffffff }),
   ]
 
   for (const [index, material] of materials.entries()) {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.2), material)
-    mesh.position.x = (index - 1) * 0.65
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 1.2), material)
+    mesh.position.x = (index - 1.5) * 0.5
     scene.add(mesh)
   }
 
@@ -424,6 +425,19 @@ function lightProbeMaterialModelsCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const regions = [
+        ['standard', meanRegion(rgba, width, 14, 30, 22, 66)],
+        ['physical', meanRegion(rgba, width, 34, 30, 42, 66)],
+        ['phong', meanRegion(rgba, width, 54, 30, 62, 66)],
+        ['toon', meanRegion(rgba, width, 74, 30, 82, 66)],
+      ]
+      for (const [label, mean] of regions) {
+        if (!(mean.r > mean.g + 20 && mean.r > mean.b + 20)) {
+          throw new Error(`LightProbe should tint ${label} corpus material red (${mean.r}, ${mean.g}, ${mean.b})`)
+        }
+      }
+    },
   }
 }
 
