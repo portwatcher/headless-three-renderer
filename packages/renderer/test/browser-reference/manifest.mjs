@@ -25,6 +25,9 @@ export function createBrowserReferenceManifest(fixtures = createSceneCorpus()) {
 }
 
 export function normalizeBrowserReferenceOutputColorSpace(value) {
+  if (value == null || value === THREE.SRGBColorSpace || value === 'srgb') {
+    return THREE.SRGBColorSpace
+  }
   if (
     value === THREE.LinearSRGBColorSpace ||
     value === 'srgb-linear' ||
@@ -34,5 +37,7 @@ export function normalizeBrowserReferenceOutputColorSpace(value) {
   ) {
     return THREE.LinearSRGBColorSpace
   }
-  return THREE.SRGBColorSpace
+  throw new Error(
+    `Browser reference fixture outputColorSpace ${String(value)} is not supported. Use THREE.SRGBColorSpace or THREE.LinearSRGBColorSpace.`,
+  )
 }

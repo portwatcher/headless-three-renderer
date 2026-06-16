@@ -40,6 +40,10 @@ test('browser reference manifest normalizes outputColorSpace aliases', () => {
     ],
   )
   assert.equal(normalizeBrowserReferenceOutputColorSpace('srgb'), THREE.SRGBColorSpace)
+  assert.throws(
+    () => normalizeBrowserReferenceOutputColorSpace('display-p3'),
+    /Browser reference fixture outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+  )
 })
 
 test('generated corpus matches browser WebGLRenderer golden references', {
