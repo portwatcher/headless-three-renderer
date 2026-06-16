@@ -831,6 +831,78 @@ test('BatchedMesh renderer sort callbacks receive the source object', () => {
   assert.ok(calls > 0, 'transparentSort should compare BatchedMesh-expanded draw items')
 })
 
+test('BatchedMesh sort callbacks receive packed geometry group render items', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+    -1, -1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+
+  const materials = [
+    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, depthTest: false, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, depthTest: false, depthWrite: false }),
+  ]
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    materials,
+  )
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+
+  const range = batched.getGeometryRangeAt(geometryId, {})
+  batched.geometry.clearGroups()
+  batched.geometry.addGroup(range.start, 6, 0)
+  batched.geometry.addGroup(range.start + 6, 6, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const seenGroups = new Set()
+  const seenMaterials = new Set()
+  let calls = 0
+  const rgba = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    transparentSort: (a, b) => {
+      calls += 1
+      assert.equal(a.object, batched)
+      assert.equal(b.object, batched)
+      assert.ok(a.group)
+      assert.ok(b.group)
+      seenGroups.add(a.group.materialIndex)
+      seenGroups.add(b.group.materialIndex)
+      seenMaterials.add(a.material)
+      seenMaterials.add(b.material)
+      return b.group.materialIndex - a.group.materialIndex
+    },
+  })
+
+  assert.ok(calls > 0, 'transparentSort should compare BatchedMesh packed group items')
+  assert.deepEqual([...seenGroups].sort(), [0, 1])
+  assert.deepEqual([...seenMaterials].sort((a, b) => materials.indexOf(a) - materials.indexOf(b)), materials)
+  const mean = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 160, `custom group-aware BatchedMesh sort should draw red after blue (${mean.r} vs ${mean.b})`)
+})
+
 test('invalid output dimensions fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
