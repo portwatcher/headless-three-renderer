@@ -2311,13 +2311,13 @@ function textureTransform(map: ThreeTextureLike | null | undefined, label: strin
     return composeTextureTransformWithFlipY([e[0], e[3], e[6], e[1], e[4], e[7]], flipY)
   }
 
-  const tx = finiteTextureTransformNumber(map.offset?.x, `${label}.offset.x`, 0)
-  const ty = finiteTextureTransformNumber(map.offset?.y, `${label}.offset.y`, 0)
-  const sx = finiteTextureTransformNumber(map.repeat?.x, `${label}.repeat.x`, 1)
-  const sy = finiteTextureTransformNumber(map.repeat?.y, `${label}.repeat.y`, 1)
+  const tx = textureVector2Component(map.offset, `${label}.offset`, 'x', 0)
+  const ty = textureVector2Component(map.offset, `${label}.offset`, 'y', 0)
+  const sx = textureVector2Component(map.repeat, `${label}.repeat`, 'x', 1)
+  const sy = textureVector2Component(map.repeat, `${label}.repeat`, 'y', 1)
   const rotation = finiteTextureTransformNumber(map.rotation, `${label}.rotation`, 0)
-  const cx = finiteTextureTransformNumber(map.center?.x, `${label}.center.x`, 0)
-  const cy = finiteTextureTransformNumber(map.center?.y, `${label}.center.y`, 0)
+  const cx = textureVector2Component(map.center, `${label}.center`, 'x', 0)
+  const cy = textureVector2Component(map.center, `${label}.center`, 'y', 0)
   if (tx === 0 && ty === 0 && sx === 1 && sy === 1 && rotation === 0 && cx === 0 && cy === 0) {
     return flipTransform
   }
@@ -2344,6 +2344,14 @@ function optionalTextureBoolean(value: unknown, label: string): boolean | undefi
   if (value == null) return undefined
   if (typeof value === 'boolean') return value
   throw new TypeError(`${label} must be a boolean.`)
+}
+
+function textureVector2Component(value: unknown, label: string, component: 'x' | 'y', fallback: number): number {
+  if (value == null) return fallback
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a vector-like object.`)
+  }
+  return finiteTextureTransformNumber((value as { x?: unknown; y?: unknown })[component], `${label}.${component}`, fallback)
 }
 
 function textureColorSpace(map: ThreeTextureLike | null | undefined): string | undefined {

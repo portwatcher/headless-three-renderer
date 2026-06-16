@@ -7821,6 +7821,13 @@ test('invalid texture transform values fail clearly', () => {
       scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
       return scene
     }, /material\.map\.offset\.x must be a finite number/i],
+    ['material map offset container', () => {
+      const map = solidTexture(255, 255, 255)
+      map.offset = 'left'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.offset must be a vector-like object/i],
     ['normalMap matrix', () => {
       const normalMap = solidTexture(128, 128, 255)
       normalMap.matrixAutoUpdate = false
