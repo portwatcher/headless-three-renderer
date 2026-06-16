@@ -9705,6 +9705,9 @@ test('invalid physical material scalar values fail clearly', () => {
       material.clearcoatNormalScale = new THREE.Vector2(1, 1)
       material.clearcoatNormalScale.x = 'wide'
     }, /material\.clearcoatNormalScale\.x must be a finite number/i],
+    ['clearcoatNormalScale container', (material) => {
+      material.clearcoatNormalScale = 'wide'
+    }, /material\.clearcoatNormalScale must be a Vector2-like object/i],
     ['sheen', (material) => {
       material.sheen = 'soft'
     }, /material\.sheen must be a finite number/i],

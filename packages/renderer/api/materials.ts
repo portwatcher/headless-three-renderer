@@ -506,7 +506,10 @@ export function extractPbrProperties(
     props.clearcoatNormalMapTransform = textureTransform(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
     props.clearcoatNormalMapUsesUv2 = textureUvChannel(material.clearcoatNormalMap) > 0
   }
-  if (material.clearcoatNormalScale) {
+  if (material.clearcoatNormalScale != null) {
+    if (typeof material.clearcoatNormalScale !== 'object') {
+      throw new TypeError('material.clearcoatNormalScale must be a Vector2-like object.')
+    }
     props.clearcoatNormalScale = [
       finiteNumberOrDefault(material.clearcoatNormalScale.x, 'material.clearcoatNormalScale.x', 1),
       finiteNumberOrDefault(material.clearcoatNormalScale.y, 'material.clearcoatNormalScale.y', 1),
