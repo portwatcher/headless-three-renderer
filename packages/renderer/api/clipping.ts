@@ -9,7 +9,11 @@ export function extractClippingPlanes(
   label = 'clippingPlanes',
   maxPlanes = MAX_CLIPPING_PLANES,
 ): NativeClippingPlane[] {
-  if (!Array.isArray(input) || input.length === 0) return []
+  if (input == null) return []
+  if (!Array.isArray(input)) {
+    throw new TypeError(`${label} must be an array of clipping planes.`)
+  }
+  if (input.length === 0) return []
 
   const planes: NativeClippingPlane[] = []
   for (let i = 0; i < input.length; i += 1) {

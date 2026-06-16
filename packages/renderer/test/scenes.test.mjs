@@ -6446,6 +6446,11 @@ test('invalid clippingPlane values fail clearly', () => {
   camera.lookAt(0, 0, 0)
 
   const cases = [
+    ['options container', () => {
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      return () => renderRgba(scene, camera, { width: 64, height: 64, clippingPlanes: 'planes' })
+    }, /options\.clippingPlanes must be an array of clipping planes/i],
     ['options constant', () => {
       const scene = new THREE.Scene()
       scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
@@ -6462,6 +6467,22 @@ test('invalid clippingPlane values fail clearly', () => {
       scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
       return () => renderRgba(scene, camera, { width: 64, height: 64 })
     }, /material\.clippingPlanes\[0\]\.normal\.x must be a finite number/i],
+    ['material container', () => {
+      const scene = new THREE.Scene()
+      const material = new THREE.MeshBasicMaterial()
+      material.clippingPlanes = 'planes'
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+      return () => renderRgba(scene, camera, { width: 64, height: 64 })
+    }, /material\.clippingPlanes must be an array of clipping planes/i],
+    ['group container', () => {
+      const scene = new THREE.Scene()
+      const group = new THREE.Group()
+      group.isClippingGroup = true
+      group.clippingPlanes = 'planes'
+      group.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+      scene.add(group)
+      return () => renderRgba(scene, camera, { width: 64, height: 64 })
+    }, /ClippingGroup\.clippingPlanes must be an array of clipping planes/i],
     ['group zero normal', () => {
       const scene = new THREE.Scene()
       const group = new THREE.Group()
