@@ -8194,6 +8194,24 @@ test('malformed explicit texture mipmaps fail clearly', () => {
     () => renderRgba(scene, camera, { width: 64, height: 64 }),
     /mipmaps\[0\].*2x2/i,
   )
+
+  const malformedMap = rgbaTexture(new Uint8Array(4 * 4 * 4).fill(255), 4, 4)
+  malformedMap.mipmaps = 'mips'
+  const malformedScene = new THREE.Scene()
+  malformedScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: malformedMap })))
+  assert.throws(
+    () => renderRgba(malformedScene, camera, { width: 64, height: 64 }),
+    /material\.map\.mipmaps must be an array of image-like mip levels/i,
+  )
+
+  const malformedBackground = rgbaTexture(new Uint8Array(4 * 4 * 4).fill(255), 4, 4)
+  malformedBackground.mipmaps = {}
+  const backgroundScene = new THREE.Scene()
+  backgroundScene.background = malformedBackground
+  assert.throws(
+    () => renderRgba(backgroundScene, camera, { width: 64, height: 64 }),
+    /background\.mipmaps must be an array of image-like mip levels/i,
+  )
 })
 
 test('packed physical extension maps reject explicit texture mipmaps clearly', () => {

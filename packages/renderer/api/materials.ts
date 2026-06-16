@@ -1923,12 +1923,17 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   throw unsupportedTextureImageError(label, 'texture rendering')
 }
 
-function hasExplicitMipmaps(texture: ThreeTextureLike | null | undefined): boolean {
-  return Array.isArray(texture?.mipmaps) && texture.mipmaps.length > 0
+function hasExplicitMipmaps(texture: ThreeTextureLike | null | undefined, label = 'texture'): boolean {
+  const mipmaps = texture?.mipmaps
+  if (mipmaps == null) return false
+  if (!Array.isArray(mipmaps)) {
+    throw new TypeError(`${label}.mipmaps must be an array of image-like mip levels.`)
+  }
+  return mipmaps.length > 0
 }
 
 function assertNoEncodedExplicitMipmaps(map: ThreeTextureLike, label: string): void {
-  if (!hasExplicitMipmaps(map)) return
+  if (!hasExplicitMipmaps(map, label)) return
   throw new Error(
     `${label} provides explicit texture mipmaps with an encoded base image. Explicit mipmap upload requires raw DataTexture-style base image data with raw mipmap levels.`,
   )
@@ -1941,7 +1946,7 @@ function textureBytesWithExplicitMipmaps(
   width: number,
   height: number,
 ): Uint8Array | Uint8ClampedArray {
-  if (!hasExplicitMipmaps(map)) return baseRgba
+  if (!hasExplicitMipmaps(map, label)) return baseRgba
   if (width <= 1 && height <= 1) {
     throw new Error(
       `${label} provides explicit texture mipmaps for a ${width}x${height} base image, but no additional mip levels are valid after the 1x1 level.`,
@@ -2135,7 +2140,7 @@ function assertSupportedTextureInput(
       `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer yet. Provide a 2D texture image for this slot or render each layer separately.`,
     )
   }
-  if (!options.allowMipmaps && hasExplicitMipmaps(map)) {
+  if (!options.allowMipmaps && hasExplicitMipmaps(map, label)) {
     throw new Error(
       `${label} provides explicit texture mipmaps, which are not uploaded by @headless-three/renderer yet. Provide only the base image level or prefilter/downsample the texture before rendering.`,
     )
@@ -2181,7 +2186,7 @@ function assertCompatiblePackedPhysicalMapSamplers(material: ThreeMaterialLike):
 
 function assertNoPackedPhysicalMapMipmaps(groupLabel: string, slots: Array<[string, ThreeTextureLike | null | undefined]>): void {
   for (const [label, texture] of slots) {
-    if (!texture || !hasExplicitMipmaps(texture)) continue
+    if (!texture || !hasExplicitMipmaps(texture, `material.${label}`)) continue
     throw new Error(
       `${groupLabel} are packed into one native texture, and explicit mipmaps for ${label} are not supported by @headless-three/renderer yet. Remove texture.mipmaps from packed physical-extension maps or rely on generated mipmaps from the packed base level.`,
     )
