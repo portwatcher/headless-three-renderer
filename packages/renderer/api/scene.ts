@@ -1703,7 +1703,12 @@ function objectSortCenter(object: ThreeObject3DLike): [number, number, number] {
     }
   }
 
-  return vec3Like(geometry.boundingSphere?.center) ?? [0, 0, 0]
+  const sphere = geometry.boundingSphere
+  if (sphere == null) return [0, 0, 0]
+  if (!sphere || typeof sphere !== 'object') {
+    throw new TypeError('geometry.boundingSphere must be a THREE.Sphere-like object.')
+  }
+  return requiredVec3Like((sphere as { center?: { x?: number; y?: number; z?: number } | ArrayLike<number> }).center, 'geometry.boundingSphere.center')
 }
 
 function vec3Like(value: { x?: number; y?: number; z?: number } | ArrayLike<number> | undefined): [number, number, number] | null {
@@ -1717,6 +1722,12 @@ function vec3Like(value: { x?: number; y?: number; z?: number } | ArrayLike<numb
     && typeof z === 'number' && Number.isFinite(z)
     ? [x, y, z]
     : null
+}
+
+function requiredVec3Like(value: { x?: number; y?: number; z?: number } | ArrayLike<number> | undefined, label: string): [number, number, number] {
+  const vector = vec3Like(value)
+  if (vector) return vector
+  throw new TypeError(`${label} must be a finite Vector3-like value.`)
 }
 
 function columnLength3(matrix: ArrayLike<number>, start: number): number {

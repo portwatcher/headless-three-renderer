@@ -417,6 +417,27 @@ test('invalid geometry attribute count values fail clearly', () => {
   )
 })
 
+test('malformed geometry bounding spheres fail clearly', () => {
+  const camera = makeCamera()
+  const cases = [
+    ['container', 'sphere', /geometry\.boundingSphere must be a THREE\.Sphere-like object/i],
+    ['center', { center: { x: Number.NaN, y: 0, z: 0 }, radius: 1 }, /geometry\.boundingSphere\.center must be a finite Vector3-like value/i],
+  ]
+
+  for (const [name, boundingSphere, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const geometry = new THREE.PlaneGeometry(1, 1)
+    geometry.boundingSphere = boundingSphere
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('invalid geometry attribute layout values fail clearly', () => {
   const camera = makeCamera()
   const values = new Float32Array([
