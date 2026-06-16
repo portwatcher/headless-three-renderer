@@ -13546,6 +13546,51 @@ test('LineBasicMaterial map decodes sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 5, `linear line map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('LineDashedMaterial map decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const map = solidTexture(128, 128, 128)
+    map.colorSpace = colorSpace
+
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.5, 0.5,
+      0.5, 0.5,
+    ]), 2))
+
+    const line = new THREE.Line(
+      geom,
+      new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        dashSize: 4,
+        gapSize: 0,
+        map,
+        scale: 1,
+      }),
+    )
+    line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 0, 46, 96, 50)
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear.r > srgb.r + 5, `linear dashed-line map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
+})
+
 test('LineBasicMaterial map samples the selected secondary UV channel', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
