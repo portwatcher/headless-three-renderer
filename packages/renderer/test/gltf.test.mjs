@@ -131,6 +131,14 @@ test('loadGltfFromFile rejects malformed glTF image metadata clearly', async () 
   await assertRejectsMutatedGltfSource((source) => {
     source.images[0] = 'image'
   }, /glTF\.images\[0\] must be an object/i)
+
+  await assertRejectsMutatedGltfSource((source) => {
+    source.images[0] = { bufferView: 0 }
+  }, /glTF bufferView image is missing mimeType/i)
+
+  await assertRejectsMutatedGltfSource((source) => {
+    source.images[0] = { bufferView: 0, mimeType: 'image/ktx2' }
+  }, /glTF bufferView image.*compressed texture.*KTX2.*Basis.*pre-decode/i)
 })
 
 test('committed vertex-color glTF fixture renders COLOR_0 attributes', async () => {

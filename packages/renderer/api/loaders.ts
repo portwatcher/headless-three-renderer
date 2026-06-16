@@ -471,7 +471,10 @@ function validateGltfTextImageReferences(data: Buffer | string): void {
 
   for (const image of gltfImages(json, 'glTF')) {
     validateGltfImageUri(image)
-    if (image && Number.isInteger(image.bufferView) && typeof image.mimeType === 'string') {
+    if (image && Number.isInteger(image.bufferView)) {
+      if (typeof image.mimeType !== 'string') {
+        throw new Error('glTF bufferView image is missing mimeType. Embedded glTF images must declare PNG, JPEG, or WebP mimeType values.')
+      }
       validateSupportedEmbeddedImageType('glTF bufferView image', image.mimeType)
     }
   }
