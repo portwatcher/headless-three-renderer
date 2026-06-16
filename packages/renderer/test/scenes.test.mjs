@@ -8287,6 +8287,49 @@ test('HalfFloatType raw DataTexture maps decode for material and background text
   }
 })
 
+test('FloatType raw DataTexture maps decode for material and background textures', () => {
+  function floatRgbaTexture() {
+    const texture = new THREE.DataTexture(
+      new Float32Array([0.5, 0.25, 1, 1]),
+      1,
+      1,
+      THREE.RGBAFormat,
+      THREE.FloatType,
+    )
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderTexture(kind) {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    if (kind === 'material') {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: floatRgbaTexture() })))
+    } else {
+      scene.background = floatRgbaTexture()
+    }
+    return meanRegion(
+      renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+  }
+
+  for (const kind of ['material', 'background']) {
+    const mean = renderTexture(kind)
+    assert.ok(mean.r > 105 && mean.r < 150, `${kind} float red should decode near 0.5 (${mean.r})`)
+    assert.ok(mean.g > 45 && mean.g < 100, `${kind} float green should decode near 0.25 (${mean.g})`)
+    assert.ok(mean.b > 180, `${kind} float blue should decode near 1.0 (${mean.b})`)
+  }
+})
+
 test('normalized unsigned integer raw DataTexture maps decode for material and background textures', () => {
   const cases = [
     [
