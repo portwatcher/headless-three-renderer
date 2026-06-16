@@ -11,10 +11,11 @@ export function resolveSize(camera: ThreeCameraLike, options: RenderOptions): { 
   let heightLabel = options.height != null ? 'options.height' : options.target?.height != null ? 'target.height' : 'output height'
 
   if (width == null && height == null) {
-    width = optionalDimension(camera.userData?.width, 'camera.userData.width') ?? DEFAULT_WIDTH
-    height = optionalDimension(camera.userData?.height, 'camera.userData.height')
-    widthLabel = camera.userData?.width != null ? 'camera.userData.width' : 'output width'
-    heightLabel = camera.userData?.height != null ? 'camera.userData.height' : 'output height'
+    const userData = cameraUserData(camera)
+    width = optionalDimension(userData?.width, 'camera.userData.width') ?? DEFAULT_WIDTH
+    height = optionalDimension(userData?.height, 'camera.userData.height')
+    widthLabel = userData?.width != null ? 'camera.userData.width' : 'output width'
+    heightLabel = userData?.height != null ? 'camera.userData.height' : 'output height'
   }
   if (height == null && width != null && camera.aspect != null) {
     const aspect = requiredPositiveFiniteNumber(camera.aspect, 'camera.aspect')
@@ -38,6 +39,15 @@ export function resolveSize(camera: ThreeCameraLike, options: RenderOptions): { 
   }
 
   return { width, height }
+}
+
+function cameraUserData(camera: ThreeCameraLike): ThreeCameraLike['userData'] | undefined {
+  const userData = camera.userData
+  if (userData == null) return undefined
+  if (typeof userData !== 'object' || Array.isArray(userData)) {
+    throw new TypeError('camera.userData must be an object.')
+  }
+  return userData
 }
 
 function optionalDimension(value: unknown, label: string): number | undefined {

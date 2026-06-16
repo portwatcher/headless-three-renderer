@@ -1088,6 +1088,13 @@ test('invalid output dimensions fail clearly', () => {
     /camera\.userData\.width must be a positive integer/i,
   )
 
+  const userDataContainerCamera = makeCamera()
+  userDataContainerCamera.userData = 'size'
+  assert.throws(
+    () => new Renderer().render(scene, userDataContainerCamera, { format: 'rgba' }),
+    /camera\.userData must be an object/i,
+  )
+
   const invalidAspectCamera = makeCamera()
   invalidAspectCamera.aspect = Number.NaN
   assert.throws(
