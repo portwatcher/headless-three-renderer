@@ -451,7 +451,7 @@ export function materialForGroup(
   return material
 }
 
-function assertMaterialLike(value: unknown, label: string): asserts value is ThreeMaterialLike | undefined {
+export function assertMaterialLike(value: unknown, label: string): asserts value is ThreeMaterialLike | undefined {
   if (value == null) return
   if (typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a material-like object.`)

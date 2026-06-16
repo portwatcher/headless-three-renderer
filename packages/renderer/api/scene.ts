@@ -28,6 +28,7 @@ import {
   extractTextureData,
   materialShadowSide,
   textureUvChannel,
+  assertMaterialLike,
   type MaterialExtractionContext,
 } from './materials'
 import { applyCpuSkinning } from './skinning'
@@ -612,8 +613,14 @@ function customShadowMaterialForMode(
   object: ThreeObject3DLike,
   mode: ShadowMaterialMode | undefined,
 ): ThreeMaterialLike | undefined {
-  if (mode === 'depth') return object.customDepthMaterial
-  if (mode === 'distance') return object.customDistanceMaterial
+  if (mode === 'depth') {
+    assertMaterialLike(object.customDepthMaterial, 'Object3D.customDepthMaterial')
+    return object.customDepthMaterial
+  }
+  if (mode === 'distance') {
+    assertMaterialLike(object.customDistanceMaterial, 'Object3D.customDistanceMaterial')
+    return object.customDistanceMaterial
+  }
   return undefined
 }
 

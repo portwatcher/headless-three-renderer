@@ -144,7 +144,7 @@ The public API accepts only Three.js-like objects:
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing, with clear failures for unsupported depth-packing constants
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, with invalid range/reference values and malformed renderer hint containers failing clearly, plus alpha-map cutouts and CPU-baked displacement
 - main-pass `material.wireframe` output for supported mesh materials, including direct coverage for `MeshBasicMaterial`, `MeshDepthMaterial`, and `MeshDistanceMaterial`
-- `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
+- `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts; malformed or wireframe custom shadow materials fail clearly
 - emissive color, intensity, and emissive map, with primary/secondary `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings; invalid color/intensity values fail clearly
 - light maps with `lightMapIntensity`, primary/secondary `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings; invalid intensity values fail clearly
 - occlusion map (`material.aoMap`) applied to indirect lighting, with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings; invalid intensity values fail clearly
