@@ -34,6 +34,7 @@ export function createSceneCorpus() {
     maskRenderModeCorpus(),
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
+    twoDimensionalBackgroundTextureCorpus(),
     spriteMaterialCorpus(),
     pointSpotLightCorpus(),
     rectAreaLightCorpus(),
@@ -507,6 +508,36 @@ function normalRenderModeCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+  }
+}
+
+function twoDimensionalBackgroundTextureCorpus() {
+  const background = new THREE.DataTexture(new Uint8Array([
+    255, 48, 32, 255,
+    32, 200, 96, 255,
+    48, 80, 255, 255,
+    255, 225, 72, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  background.colorSpace = THREE.SRGBColorSpace
+  background.wrapS = THREE.RepeatWrapping
+  background.wrapT = THREE.RepeatWrapping
+  background.repeat.set(2, 1)
+  background.offset.set(0.25, 0)
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+  background.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = background
+  scene.backgroundIntensity = 0.85
+
+  return {
+    name: 'two-dimensional-background-texture-transform',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
   }
 }
 
