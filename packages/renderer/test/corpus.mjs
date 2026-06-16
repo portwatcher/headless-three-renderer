@@ -199,6 +199,13 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > center.g + 40 && center.b > center.g + 50 && corner.r === 20 && corner.g === 20 && corner.b === 26)) {
+        throw new Error(`transparent layer corpus should blend the blue front over the orange back, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -229,6 +236,13 @@ function alphaToCoverageCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
     minMeanAlpha: 220,
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > 35 && center.r < 70 && center.g > 35 && center.g < 70 && center.b > 35 && center.b < 70 && center.a < 240 && corner.r === 0 && corner.g === 0 && corner.b === 0 && corner.a === 255)) {
+        throw new Error(`alpha-to-coverage corpus should resolve a partial gray plane over black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -279,6 +293,15 @@ function signedRawTextureCorpus() {
     background: [0, 96, 255],
     minNonBackgroundRatio: 0.08,
     browserReference: false,
+    validate(rgba, { width }) {
+      const background = pixelAt(rgba, width, 4, 4)
+      const yellow = pixelAt(rgba, width, 48, 28)
+      const magenta = pixelAt(rgba, width, 28, 48)
+      const cyan = pixelAt(rgba, width, 68, 48)
+      if (!(background.r === 0 && background.g === 96 && background.b === 255 && yellow.r > 140 && yellow.g > 160 && yellow.b < 120 && magenta.r > 150 && magenta.b > 150 && magenta.g < 90 && cyan.g > 140 && cyan.b > 160 && cyan.r < 120)) {
+        throw new Error(`signed raw texture corpus should render normalized signed material texels and background, got background=${JSON.stringify(background)} yellow=${JSON.stringify(yellow)} magenta=${JSON.stringify(magenta)} cyan=${JSON.stringify(cyan)}`)
+      }
+    },
   }
 }
 
@@ -1191,6 +1214,13 @@ function meshBasicMaterialWireframeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.004,
+    validate(rgba, { width, height }) {
+      const yellowPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && g > 100 && b < 120)
+      const center = pixelAt(rgba, width, 48, 48)
+      if (!(yellowPixels > 700 && yellowPixels < 1200 && center.r < 5 && center.g < 5 && center.b < 5)) {
+        throw new Error(`basic wireframe corpus should render sparse yellow grid lines, got yellow=${yellowPixels} center=${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -1213,6 +1243,13 @@ function meshDepthMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > 18 && center.r < 35 && Math.abs(center.r - center.g) <= 1 && Math.abs(center.r - center.b) <= 1 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
+        throw new Error(`depth material corpus should render a low grayscale depth sphere, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -1238,6 +1275,13 @@ function meshDepthMaterialWireframeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.004,
+    validate(rgba, { width, height }) {
+      const grayPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 2 && Math.abs(r - g) <= 1 && Math.abs(r - b) <= 1)
+      const center = pixelAt(rgba, width, 48, 48)
+      if (!(grayPixels > 900 && grayPixels < 1600 && center.r === 0 && center.g === 0 && center.b === 0)) {
+        throw new Error(`depth wireframe corpus should render sparse grayscale depth lines, got gray=${grayPixels} center=${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -1269,6 +1313,13 @@ function meshDistanceMaterialCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
     browserReference: false,
+    validate(rgba, { width }) {
+      const near = meanRegion(rgba, width, 16, 36, 36, 60)
+      const far = meanRegion(rgba, width, 60, 36, 80, 60)
+      if (!(near.r < 30 && near.g < 5 && near.b < 5 && far.r > 180 && far.g < 5 && far.b < 5)) {
+        throw new Error(`distance material corpus should render the far plane bright red and near plane dark, got near=${JSON.stringify(near)} far=${JSON.stringify(far)}`)
+      }
+    },
   }
 }
 
@@ -1295,6 +1346,13 @@ function meshDistanceMaterialWireframeCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.004,
     browserReference: false,
+    validate(rgba, { width, height }) {
+      const redPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && g < 5 && b < 5)
+      const center = pixelAt(rgba, width, 48, 48)
+      if (!(redPixels > 700 && redPixels < 1200 && center.r === 0 && center.g === 0 && center.b === 0)) {
+        throw new Error(`distance wireframe corpus should render sparse red distance lines, got red=${redPixels} center=${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -1546,6 +1604,13 @@ function cubeCameraCaptureCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
     browserReference: false,
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > center.g + 180 && center.r > center.b + 180 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
+        throw new Error(`cube camera corpus should capture the red +X face into output, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -1705,6 +1770,13 @@ function skinnedMorphCorpus() {
     camera: makeCamera([0.2, 0.1, 2.5]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [13, 15, 20],
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.b > center.g + 50 && center.g > 80 && center.r < 20 && corner.r === 13 && corner.g === 15 && corner.b === 20)) {
+        throw new Error(`skinned morph corpus should render the deformed cyan plane over background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -1815,6 +1887,14 @@ function avatarLikeCorpus() {
     background: [15, 18, 26],
     backgroundTolerance: 8,
     minNonBackgroundRatio: 0.035,
+    validate(rgba, { width }) {
+      const head = pixelAt(rgba, width, 48, 28)
+      const body = pixelAt(rgba, width, 48, 54)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(head.r > head.b + 50 && head.g > head.b + 20 && body.b > body.r + 80 && body.g > body.r + 40 && corner.r < 25 && corner.g < 30 && corner.b < 40)) {
+        throw new Error(`avatar corpus should render warm head and blue toon body, got head=${JSON.stringify(head)} body=${JSON.stringify(body)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
