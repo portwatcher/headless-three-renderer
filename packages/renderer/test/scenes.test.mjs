@@ -10240,6 +10240,70 @@ test('physical extension maps honor nearest texture filters', () => {
     return renderRgba(scene, camera, { width: 64, height: 64 })
   }
 
+  function renderIridescence(filter) {
+    const iridescenceMap = filteredTexture([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceMap,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      }),
+    ))
+
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function renderIridescenceThickness(filter) {
+    const iridescenceThicknessMap = filteredTexture([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [120, 760],
+        iridescenceThicknessMap,
+      }),
+    ))
+
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
   const nearestClearcoat = renderClearcoat(THREE.NearestFilter)
   const linearClearcoat = renderClearcoat(THREE.LinearFilter)
   assert.ok(linearClearcoat > nearestClearcoat + 25, `LinearFilter should blend in the clearcoat texel (${linearClearcoat} vs ${nearestClearcoat})`)
@@ -10260,6 +10324,16 @@ test('physical extension maps honor nearest texture filters', () => {
   const linearNormal = renderClearcoatNormal(THREE.LinearFilter)
   const normalDiff = meanAbsDiff(nearestNormal, linearNormal)
   assert.ok(normalDiff > 2, `LinearFilter should blend clearcoat normals differently than NearestFilter, diff=${normalDiff.toFixed(2)}`)
+
+  const nearestIridescence = renderIridescence(THREE.NearestFilter)
+  const linearIridescence = renderIridescence(THREE.LinearFilter)
+  const iridescenceDiff = meanAbsDiff(nearestIridescence, linearIridescence)
+  assert.ok(iridescenceDiff > 0.5, `LinearFilter should blend in iridescence factor, diff=${iridescenceDiff.toFixed(2)}`)
+
+  const nearestThickness = renderIridescenceThickness(THREE.NearestFilter)
+  const linearThickness = renderIridescenceThickness(THREE.LinearFilter)
+  const thicknessDiff = meanAbsDiff(nearestThickness, linearThickness)
+  assert.ok(thicknessDiff > 0.5, `LinearFilter should blend iridescence thickness differently than NearestFilter, diff=${thicknessDiff.toFixed(2)}`)
 })
 
 test('conflicting packed physical texture samplers fail clearly', () => {
