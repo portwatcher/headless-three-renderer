@@ -869,29 +869,47 @@ test('renderMode object-id target includes reverse lookup metadata', () => {
   assert.equal(target.objectIdMap, undefined)
 })
 
-test('renderMode mask preserves alphaMap cutouts', () => {
-  const scene = new THREE.Scene()
-  const discarded = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.75, 0.8),
-    new THREE.MeshBasicMaterial({ alphaMap: solidTexture(255, 0, 255), alphaTest: 0.5 }),
-  )
-  const visible = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.75, 0.8),
-    new THREE.MeshBasicMaterial({ alphaMap: solidTexture(0, 255, 0), alphaTest: 0.5 }),
-  )
-  discarded.position.x = -0.5
-  visible.position.x = 0.5
-  scene.add(discarded, visible)
-
+test('renderMode auxiliary passes preserve texture alpha cutouts', () => {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  const rgba = renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'mask' })
-  const leftMean = meanRegion(rgba, 64, 64, 16, 28, 23, 36)
-  const rightMean = meanRegion(rgba, 64, 64, 41, 28, 48, 36)
-  assert.ok(leftMean.r < 2 && leftMean.g < 2 && leftMean.b < 2, `alphaMap green=0 should discard mask pixels (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
-  assert.ok(rightMean.r > 250 && rightMean.g > 250 && rightMean.b > 250, `alphaMap green=255 should keep mask pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+  const makeBaseAlphaMaterial = (alpha) => new THREE.MeshBasicMaterial({
+    map: solidTexture(255, 255, 255, alpha),
+    alphaTest: 0.5,
+  })
+  const makeAlphaMapMaterial = (green) => new THREE.MeshBasicMaterial({
+    alphaMap: solidTexture(255, green, 255),
+    alphaTest: 0.5,
+  })
+  const cases = [
+    ['base texture alpha', () => makeBaseAlphaMaterial(0), () => makeBaseAlphaMaterial(255)],
+    ['alphaMap green channel', () => makeAlphaMapMaterial(0), () => makeAlphaMapMaterial(255)],
+  ]
+
+  for (const [label, makeDiscardedMaterial, makeVisibleMaterial] of cases) {
+    for (const renderMode of ['mask', 'object-id', 'normal']) {
+      const scene = new THREE.Scene()
+      const discarded = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), makeDiscardedMaterial())
+      const visible = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), makeVisibleMaterial())
+      discarded.position.x = -0.5
+      visible.position.x = 0.5
+      scene.add(discarded, visible)
+
+      const rgba = renderRgba(scene, camera, { width: 64, height: 64, renderMode })
+      const leftMean = meanRegion(rgba, 64, 64, 16, 28, 23, 36)
+      const rightMean = meanRegion(rgba, 64, 64, 41, 28, 48, 36)
+      assert.ok(leftMean.r < 2 && leftMean.g < 2 && leftMean.b < 2, `${renderMode} should discard ${label} pixels (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+
+      if (renderMode === 'mask') {
+        assert.ok(rightMean.r > 250 && rightMean.g > 250 && rightMean.b > 250, `mask should keep opaque ${label} pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+      } else if (renderMode === 'object-id') {
+        assertRgbClose(rightMean, objectIdBytes(visible.id + 1), `object-id should keep opaque ${label} pixels`)
+      } else {
+        assert.ok(rightMean.r > 120 && rightMean.g > 120 && rightMean.b > 250, `normal should keep opaque ${label} pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+      }
+    }
+  }
 })
 
 test('invalid renderMode values fail clearly', () => {
