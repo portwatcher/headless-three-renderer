@@ -1655,9 +1655,16 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     )
   }
   const type = texture.type
-  if (type != null && type !== UnsignedByteType && type !== FloatType && type !== HalfFloatType) {
+  if (
+    type != null &&
+    type !== UnsignedByteType &&
+    type !== UnsignedShortType &&
+    type !== UnsignedIntType &&
+    type !== FloatType &&
+    type !== HalfFloatType
+  ) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, UnsignedShortType, UnsignedIntType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -1809,6 +1816,20 @@ function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNu
     const color = new Float32Array(rgba.length)
     for (let i = 0; i < rgba.length; i += 1) {
       color[i] = rgba[i] / 255
+    }
+    return color
+  }
+  if (texture.type === UnsignedShortType) {
+    const color = new Uint16Array(rgba.length)
+    for (let i = 0; i < rgba.length; i += 1) {
+      color[i] = Math.round((rgba[i] / 255) * 0xffff)
+    }
+    return color
+  }
+  if (texture.type === UnsignedIntType) {
+    const color = new Uint32Array(rgba.length)
+    for (let i = 0; i < rgba.length; i += 1) {
+      color[i] = Math.round((rgba[i] / 255) * 0xffffffff)
     }
     return color
   }
