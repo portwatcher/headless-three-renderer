@@ -50,6 +50,7 @@ export function createSceneCorpus() {
     shadowMaterialReceiverCorpus(),
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
+    dashedLineMaterialTextureCorpus(),
     instancedLinesPointsCorpus(),
     instancedTextureUvCorpus(),
     batchedMeshCorpus(),
@@ -147,6 +148,19 @@ function meanRegion(rgba, width, x0, y0, x1, y1) {
     }
   }
   return { r: r / count, g: g / count, b: b / count }
+}
+
+function countRegionPixels(rgba, width, x0, y0, x1, y1, predicate) {
+  let count = 0
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const offset = (y * width + x) * 4
+      if (predicate(rgba[offset], rgba[offset + 1], rgba[offset + 2], rgba[offset + 3])) {
+        count += 1
+      }
+    }
+  }
+  return count
 }
 
 function transparentLayerCorpus() {
@@ -1783,6 +1797,84 @@ function dashedLineMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.001,
+  }
+}
+
+function dashedLineMaterialTextureCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const map = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 0,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  map.colorSpace = THREE.SRGBColorSpace
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.needsUpdate = true
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.85, -0.25, 0,
+    -0.3, 0.3, 0,
+    0.32, -0.15, 0,
+    0.85, 0.3, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0, 0.5,
+    0.35, 0.5,
+    0.65, 0.5,
+    1, 0.5,
+  ]), 2))
+  geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    0,
+    0.78,
+    1.55,
+    2.25,
+  ]), 1))
+
+  scene.add(new THREE.Line(
+    geometry,
+    new THREE.LineDashedMaterial({
+      alphaTest: 0.5,
+      color: 0xffffff,
+      dashSize: 0.2,
+      gapSize: 0.1,
+      map,
+      scale: 1,
+    }),
+  ))
+
+  return {
+    name: 'line-dashed-material-textured-alpha',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.0004,
+    validate(rgba, { width, height }) {
+      const greenPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => g > 120 && g > r + 50 && g > b + 50,
+      )
+      const redPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => r > 120 && r > g + 50 && r > b + 50,
+      )
+      if (greenPixels < 3 || redPixels > 1) {
+        throw new Error(`textured dashed-line corpus should render green alpha-tested dashes, got green=${greenPixels} red=${redPixels}`)
+      }
+    },
   }
 }
 
