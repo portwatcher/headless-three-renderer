@@ -253,7 +253,7 @@ const imageBuffer = render(vrm.scene, camera, {
 
 ### Morph Targets / Blend Shapes
 
-Morph targets are applied on the CPU before rendering. Both **relative** (glTF default) and **absolute** (legacy Three.js) modes are supported. Position and normal morphs are applied based on `mesh.morphTargetInfluences`, with invalid influence values and malformed `geometry.morphTargetsRelative` values failing clearly. This is compatible with:
+Morph targets are applied on the CPU before rendering. Both **relative** (glTF default) and **absolute** (legacy Three.js) modes are supported. Position and normal morphs are applied based on `mesh.morphTargetInfluences`, with malformed morph attribute containers, invalid influence values, and malformed `geometry.morphTargetsRelative` values failing clearly. This is compatible with:
 
 - glTF morph targets via `GLTFLoader`
 - VRM blend shapes / expressions from `@pixiv/three-vrm`

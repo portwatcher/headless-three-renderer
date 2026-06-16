@@ -1,5 +1,5 @@
 import type { ThreeObject3DLike, ThreeBufferAttributeLike } from './types'
-import { attributeComponent } from './attributes'
+import { attributeComponent, attributeCount } from './attributes'
 
 /**
  * CPU-side morph target (blend shape / shape key) application.
@@ -31,8 +31,12 @@ export function applyMorphTargets(
   const morphAttributes = geometry.morphAttributes
   if (!morphAttributes) return { positions, normals }
 
-  const morphPositions: ThreeBufferAttributeLike[] | undefined = morphAttributes.position as any
-  const morphNormals: ThreeBufferAttributeLike[] | undefined = morphAttributes.normal as any
+  if (typeof morphAttributes !== 'object' || Array.isArray(morphAttributes)) {
+    throw new TypeError('geometry.morphAttributes must be an object.')
+  }
+
+  const morphPositions = morphAttributeArray(morphAttributes.position, 'geometry.morphAttributes.position')
+  const morphNormals = morphAttributeArray(morphAttributes.normal, 'geometry.morphAttributes.normal')
 
   if (!morphPositions || morphPositions.length === 0) return { positions, normals }
 
@@ -60,9 +64,13 @@ export function applyMorphTargets(
 
     const morphPosAttr = morphPositions[t]
     if (!morphPosAttr) continue
+    assertMorphAttributeLike(morphPosAttr, `geometry.morphAttributes.position[${t}]`)
 
     const morphNormAttr = morphNormals?.[t]
-    const count = Math.min(vertexCount, morphPosAttr.count ?? 0)
+    if (morphNormAttr) {
+      assertMorphAttributeLike(morphNormAttr, `geometry.morphAttributes.normal[${t}]`)
+    }
+    const count = Math.min(vertexCount, attributeCount(morphPosAttr, `geometry.morphAttributes.position[${t}]`))
 
     for (let vi = 0; vi < count; vi++) {
       const mx = attributeComponent(morphPosAttr, vi, 0, `geometry.morphAttributes.position[${t}]`)
@@ -115,6 +123,20 @@ export function applyMorphTargets(
   }
 
   return { positions: morphedPositions, normals: morphedNormals }
+}
+
+function morphAttributeArray(value: unknown, label: string): ThreeBufferAttributeLike[] | undefined {
+  if (value == null) return undefined
+  if (!Array.isArray(value)) {
+    throw new TypeError(`${label} must be an array.`)
+  }
+  return value as ThreeBufferAttributeLike[]
+}
+
+function assertMorphAttributeLike(value: unknown, label: string): asserts value is ThreeBufferAttributeLike {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an attribute-like object.`)
+  }
 }
 
 function morphTargetInfluence(value: unknown, label: string): number {

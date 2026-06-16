@@ -5810,6 +5810,27 @@ test('invalid morph target influence values fail clearly', () => {
     () => renderRgba(invalidRelative, camera, { width: 64, height: 64 }),
     /geometry\.morphTargetsRelative must be a boolean/i,
   )
+
+  const invalidAttributes = sceneWithInfluence(1)
+  invalidAttributes.children[0].geometry.morphAttributes = 'morphs'
+  assert.throws(
+    () => renderRgba(invalidAttributes, camera, { width: 64, height: 64 }),
+    /geometry\.morphAttributes must be an object/i,
+  )
+
+  const invalidPositionArray = sceneWithInfluence(1)
+  invalidPositionArray.children[0].geometry.morphAttributes.position = 'positions'
+  assert.throws(
+    () => renderRgba(invalidPositionArray, camera, { width: 64, height: 64 }),
+    /geometry\.morphAttributes\.position must be an array/i,
+  )
+
+  const invalidPositionEntry = sceneWithInfluence(1)
+  invalidPositionEntry.children[0].geometry.morphAttributes.position = ['position']
+  assert.throws(
+    () => renderRgba(invalidPositionEntry, camera, { width: 64, height: 64 }),
+    /geometry\.morphAttributes\.position\[0\] must be an attribute-like object/i,
+  )
 })
 
 test('invalid skinning matrix values fail clearly', () => {
