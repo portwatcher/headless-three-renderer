@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { createSceneCorpus } from '../corpus.mjs'
 import { BROWSER_REFERENCE_MANIFEST_FILE, createBrowserReferenceManifest } from './manifest.mjs'
 
@@ -15,6 +16,7 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(1)
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFShadowMap
+RectAreaLightUniformsLib.init()
 
 const downloadLinks = []
 

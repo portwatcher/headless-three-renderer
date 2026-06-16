@@ -25,6 +25,7 @@ export function createSceneCorpus() {
     normalRenderModeCorpus(),
     spriteMaterialCorpus(),
     pointSpotLightCorpus(),
+    rectAreaLightCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -362,6 +363,29 @@ function pointSpotLightCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 6, 8],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function rectAreaLightCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.75, 1.75),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+  ))
+
+  const light = new THREE.RectAreaLight(0xffddaa, 18, 2.8, 1.4)
+  light.position.set(0, 0, 2)
+  light.lookAt(0, 0, 0)
+  scene.add(light)
+
+  return {
+    name: 'rect-area-light-plane',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.18,
   }
 }
 
