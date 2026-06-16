@@ -1685,6 +1685,12 @@ function shadowMaterialReceiverCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.01,
+    validate(rgba, { width }) {
+      const shadow = meanRegion(rgba, width, 24, 42, 30, 54)
+      if (!(shadow.b > shadow.g + 18 && shadow.g > shadow.r + 1)) {
+        throw new Error(`ShadowMaterial corpus should tint received shadows blue-purple (${shadow.r}, ${shadow.g}, ${shadow.b})`)
+      }
+    },
   }
 }
 
