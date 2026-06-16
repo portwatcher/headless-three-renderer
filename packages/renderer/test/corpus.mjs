@@ -24,6 +24,7 @@ export function createSceneCorpus() {
     maskRenderModeCorpus(),
     normalRenderModeCorpus(),
     spriteMaterialCorpus(),
+    pointSpotLightCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -325,6 +326,39 @@ function spriteMaterialCorpus() {
     name: 'sprite-material-map-billboard',
     scene,
     camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 6, 8],
+    minNonBackgroundRatio: 0.02,
+  }
+}
+
+function pointSpotLightCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.025, 0.03)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.08))
+
+  const material = new THREE.MeshLambertMaterial({ color: 0xffffff })
+  const left = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 16), material)
+  left.position.x = -0.45
+  scene.add(left)
+
+  const right = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 16), material.clone())
+  right.position.x = 0.45
+  scene.add(right)
+
+  const point = new THREE.PointLight(0xff5533, 6, 4, 2)
+  point.position.set(-1.2, 0.75, 1.5)
+  scene.add(point)
+
+  const spot = new THREE.SpotLight(0x44aaff, 7, 4, Math.PI / 5, 0.25, 2)
+  spot.position.set(1.1, 1.1, 1.8)
+  spot.target.position.set(0.35, 0, 0)
+  scene.add(spot, spot.target)
+
+  return {
+    name: 'point-spot-light-materials',
+    scene,
+    camera: makeCamera([0, 0.2, 3.1], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 6, 8],
     minNonBackgroundRatio: 0.02,
