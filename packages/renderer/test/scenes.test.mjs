@@ -10764,6 +10764,14 @@ test('renderToTarget color textures honor typed readback requests', () => {
   const center = ((32 * 64) + 32) * 4
   const options = { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }
 
+  const redTarget = { texture: { format: THREE.RedFormat } }
+  renderToTarget(scene, camera, redTarget, options)
+  const redData = redTarget.texture.image.data
+  const redCenter = (32 * 64) + 32
+  assert.ok(redData instanceof Uint8Array, 'RedFormat color target should receive Uint8Array data')
+  assert.equal(redData.length, 64 * 64, 'RedFormat color target should receive one channel per pixel')
+  assert.ok(redData[redCenter] > 128, `RedFormat red channel should keep the source red (${redData[redCenter]})`)
+
   const floatTarget = { texture: { type: THREE.FloatType } }
   renderToTarget(scene, camera, floatTarget, options)
   const floatData = floatTarget.texture.image.data
@@ -10773,6 +10781,15 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(floatData[center + 1] < 0.05, `FloatType green channel should stay near zero (${floatData[center + 1]})`)
   assert.ok(floatData[center + 3] > 0.99, `FloatType alpha channel should stay opaque (${floatData[center + 3]})`)
 
+  const rgFloatTarget = { texture: { format: THREE.RGFormat, type: THREE.FloatType } }
+  renderToTarget(scene, camera, rgFloatTarget, options)
+  const rgFloatData = rgFloatTarget.texture.image.data
+  const rgCenter = ((32 * 64) + 32) * 2
+  assert.ok(rgFloatData instanceof Float32Array, 'RGFormat FloatType color target should receive Float32Array data')
+  assert.equal(rgFloatData.length, 64 * 64 * 2, 'RGFormat color target should receive two channels per pixel')
+  assert.ok(rgFloatData[rgCenter] > 0.5, `RGFormat FloatType red channel should be normalized (${rgFloatData[rgCenter]})`)
+  assert.ok(rgFloatData[rgCenter + 1] < 0.05, `RGFormat FloatType green channel should stay near zero (${rgFloatData[rgCenter + 1]})`)
+
   const ushortTarget = { texture: { type: THREE.UnsignedShortType } }
   renderToTarget(scene, camera, ushortTarget, options)
   const ushortData = ushortTarget.texture.image.data
@@ -10780,6 +10797,16 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(ushortData[center] > 0x8000, `UnsignedShortType red channel should be normalized (${ushortData[center]})`)
   assert.ok(ushortData[center + 1] < 0x1000, `UnsignedShortType green channel should stay near zero (${ushortData[center + 1]})`)
   assert.ok(ushortData[center + 3] > 0xff00, `UnsignedShortType alpha channel should stay opaque (${ushortData[center + 3]})`)
+
+  const rgbUshortTarget = { texture: { format: THREE.RGBFormat, type: THREE.UnsignedShortType } }
+  renderToTarget(scene, camera, rgbUshortTarget, options)
+  const rgbUshortData = rgbUshortTarget.texture.image.data
+  const rgbCenter = ((32 * 64) + 32) * 3
+  assert.ok(rgbUshortData instanceof Uint16Array, 'RGBFormat UnsignedShortType color target should receive Uint16Array data')
+  assert.equal(rgbUshortData.length, 64 * 64 * 3, 'RGBFormat color target should receive three channels per pixel')
+  assert.ok(rgbUshortData[rgbCenter] > 0x8000, `RGBFormat red channel should be normalized (${rgbUshortData[rgbCenter]})`)
+  assert.ok(rgbUshortData[rgbCenter + 1] < 0x1000, `RGBFormat green channel should stay near zero (${rgbUshortData[rgbCenter + 1]})`)
+  assert.ok(rgbUshortData[rgbCenter + 2] < 0x1000, `RGBFormat blue channel should stay near zero (${rgbUshortData[rgbCenter + 2]})`)
 
   const uintTarget = { texture: { type: THREE.UnsignedIntType } }
   renderToTarget(scene, camera, uintTarget, options)
@@ -10893,7 +10920,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ depthTexture: { isCubeTexture: true } }, /target\.depthTexture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube depth texture'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
-    [{ texture: { format: THREE.RedFormat } }, /target color texture format .*not supported.*RGBAFormat/i, 'color texture format'],
+    [{ texture: { format: THREE.AlphaFormat } }, /target color texture format .*not supported.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'color texture format'],
     [{ texture: { type: THREE.ByteType } }, /target color texture type .*not supported.*UnsignedByteType.*UnsignedShortType.*UnsignedIntType.*HalfFloatType.*FloatType/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],

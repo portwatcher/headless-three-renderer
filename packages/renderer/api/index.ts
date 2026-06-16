@@ -610,9 +610,12 @@ const UnsignedIntType = 1014
 const FloatType = 1015
 const HalfFloatType = 1016
 const UnsignedInt248Type = 1020
+const RGBFormat = 1022
 const RGBAFormat = 1023
 const DepthFormat = 1026
 const DepthStencilFormat = 1027
+const RedFormat = 1028
+const RGFormat = 1030
 
 function renderCubeCamera(
   scene: ThreeSceneRootLike,
@@ -1649,9 +1652,15 @@ function assertNormalizedNumberOption(value: unknown, label: string): void {
 function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {
   if (!texture) return
   const format = texture.format
-  if (format != null && format !== RGBAFormat) {
+  if (
+    format != null &&
+    format !== RedFormat &&
+    format !== RGFormat &&
+    format !== RGBFormat &&
+    format !== RGBAFormat
+  ) {
     throw new Error(
-      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use RGBAFormat or omit format for RGBA8 readback.`,
+      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use RedFormat, RGFormat, RGBFormat, RGBAFormat, or omit format for RGBA8 readback.`,
     )
   }
   const type = texture.type
@@ -1812,35 +1821,61 @@ function writeRenderTargetTexture(
 }
 
 function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNullable<RenderTargetImageLike['data']> {
+  const channels = colorTextureChannelCount(texture.format)
+  const values = channels === 4 ? rgba : narrowedColorTextureBytes(rgba, channels)
   if (texture.type === FloatType) {
-    const color = new Float32Array(rgba.length)
-    for (let i = 0; i < rgba.length; i += 1) {
-      color[i] = rgba[i] / 255
+    const color = new Float32Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = values[i] / 255
     }
     return color
   }
   if (texture.type === UnsignedShortType) {
-    const color = new Uint16Array(rgba.length)
-    for (let i = 0; i < rgba.length; i += 1) {
-      color[i] = Math.round((rgba[i] / 255) * 0xffff)
+    const color = new Uint16Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = Math.round((values[i] / 255) * 0xffff)
     }
     return color
   }
   if (texture.type === UnsignedIntType) {
-    const color = new Uint32Array(rgba.length)
-    for (let i = 0; i < rgba.length; i += 1) {
-      color[i] = Math.round((rgba[i] / 255) * 0xffffffff)
+    const color = new Uint32Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = Math.round((values[i] / 255) * 0xffffffff)
     }
     return color
   }
   if (texture.type === HalfFloatType) {
-    const color = new Uint16Array(rgba.length)
-    for (let i = 0; i < rgba.length; i += 1) {
-      color[i] = normalizedFloatToHalf(rgba[i] / 255)
+    const color = new Uint16Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = normalizedFloatToHalf(values[i] / 255)
     }
     return color
   }
-  return rgba
+  return values
+}
+
+function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
+  switch (format) {
+    case RedFormat:
+      return 1
+    case RGFormat:
+      return 2
+    case RGBFormat:
+      return 3
+    default:
+      return 4
+  }
+}
+
+function narrowedColorTextureBytes(rgba: Buffer, channels: 1 | 2 | 3): Uint8Array {
+  const pixels = rgba.length / 4
+  const out = new Uint8Array(pixels * channels)
+  for (let i = 0, p = 0; i < rgba.length; i += 4, p += channels) {
+    out[p] = rgba[i]
+    if (channels > 1) out[p + 1] = rgba[i + 1]
+    if (channels > 2) out[p + 2] = rgba[i + 2]
+  }
+  return out
 }
 
 function depthTextureData(texture: RenderTargetTextureLike, rgbaDepth: Buffer): NonNullable<RenderTargetImageLike['data']> {

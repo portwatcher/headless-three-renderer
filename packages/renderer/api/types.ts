@@ -497,7 +497,7 @@ export interface RenderTargetTextureLike {
   isArrayTexture?: boolean
   is3DTexture?: boolean
   format?: number
-  /** Color targets support UnsignedByteType RGBA8 buffers plus normalized FloatType and HalfFloatType readback arrays. */
+  /** Color targets support Red/RG/RGB/RGBA readback with byte, unsigned integer, FloatType, and HalfFloatType arrays. */
   type?: number
   needsUpdate?: boolean
   needsPMREMUpdate?: boolean
