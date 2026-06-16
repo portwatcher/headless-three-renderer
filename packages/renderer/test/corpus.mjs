@@ -5,6 +5,7 @@ export const CORPUS_RENDER_SIZE = 96
 export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
+    alphaToCoverageCorpus(),
     backgroundOverrideCorpus(),
     equirectangularBackgroundCorpus(),
     arrayCameraViewportCorpus(),
@@ -123,6 +124,36 @@ function transparentLayerCorpus() {
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [20, 20, 26],
+  }
+}
+
+function alphaToCoverageCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      opacity: 0.5,
+      transparent: false,
+      alphaToCoverage: true,
+    }),
+  ))
+
+  return {
+    name: 'alpha-to-coverage-msaa-plane',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      sampleCount: 4,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    minMeanAlpha: 220,
   }
 }
 

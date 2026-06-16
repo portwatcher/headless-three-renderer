@@ -22,7 +22,8 @@ test('representative scene corpus renders without crashes', async (t) => {
       assert.ok(ratio > (fixture.minNonBackgroundRatio ?? 0.002), `${fixture.name} should render visible non-background pixels (${ratio})`)
 
       const mean = meanRgba(rgba)
-      assert.ok(mean.a > 240, `${fixture.name} should produce opaque output alpha (${mean.a})`)
+      const minMeanAlpha = fixture.minMeanAlpha ?? 240
+      assert.ok(mean.a > minMeanAlpha, `${fixture.name} should produce expected output alpha (${mean.a})`)
     })
   }
 })
