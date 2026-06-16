@@ -8419,17 +8419,21 @@ test('normalized unsigned integer raw environment textures decode for IBL', () =
   function renderEnvironment(kind, texture) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 })
     if (kind === 'scene') {
       scene.environment = texture
       scene.environmentIntensity = 2.5
-    } else {
+    } else if (kind === 'reflectionProbe') {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture, intensity: 2.5 },
       }
+    } else {
+      material.envMap = texture
+      material.envMapIntensity = 2.5
     }
     scene.add(new THREE.Mesh(
       new THREE.SphereGeometry(1, 32, 16),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 }),
+      material,
     ))
     return renderRgba(scene, makeCamera(), {
       width: 64,
@@ -8438,7 +8442,7 @@ test('normalized unsigned integer raw environment textures decode for IBL', () =
     })
   }
 
-  for (const kind of ['scene', 'reflectionProbe']) {
+  for (const kind of ['scene', 'reflectionProbe', 'materialEnvMap']) {
     const byteRender = renderEnvironment(kind, byteEnvironmentTexture())
     const unsignedRender = renderEnvironment(kind, unsignedShortEnvironmentTexture())
     const diff = meanAbsDiff(byteRender, unsignedRender)
@@ -8469,17 +8473,21 @@ test('normalized signed integer raw environment textures decode for IBL', () => 
   function renderEnvironment(kind, texture) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 })
     if (kind === 'scene') {
       scene.environment = texture
       scene.environmentIntensity = 2.5
-    } else {
+    } else if (kind === 'reflectionProbe') {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture, intensity: 2.5 },
       }
+    } else {
+      material.envMap = texture
+      material.envMapIntensity = 2.5
     }
     scene.add(new THREE.Mesh(
       new THREE.SphereGeometry(1, 32, 16),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 }),
+      material,
     ))
     return renderRgba(scene, makeCamera(), {
       width: 64,
@@ -8488,7 +8496,7 @@ test('normalized signed integer raw environment textures decode for IBL', () => 
     })
   }
 
-  for (const kind of ['scene', 'reflectionProbe']) {
+  for (const kind of ['scene', 'reflectionProbe', 'materialEnvMap']) {
     const byteRender = renderEnvironment(kind, byteEnvironmentTexture())
     const signedRender = renderEnvironment(kind, signedShortEnvironmentTexture())
     const diff = meanAbsDiff(byteRender, signedRender)
