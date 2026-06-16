@@ -6026,6 +6026,44 @@ test('InstancedBufferGeometry honors meshPerAttribute for instanced texture UV a
   assert.ok(fourth.g > fourth.r + 50, `fourth repeated uv should sample green (${fourth.g} vs ${fourth.r})`)
 })
 
+test('InstancedBufferGeometry expands selected instanced texture UV channels', () => {
+  const base = new THREE.PlaneGeometry(0.45, 0.45)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.45, 0, 0, 0.45, 0, 0]),
+    3,
+  ))
+  geometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(
+    new Float32Array([0.25, 0.5, 0.75, 0.5]),
+    2,
+  ))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, map })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const left = meanRegion(rgba, 96, 64, 20, 28, 32, 36)
+  const right = meanRegion(rgba, 96, 64, 64, 28, 76, 36)
+  assert.ok(left.r > left.g + 60, `left selected instanced uv1 should sample red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 60, `right selected instanced uv1 should sample green (${right.g} vs ${right.r})`)
+})
+
 test('invalid instance counts fail clearly', () => {
   const camera = makeCamera()
 
