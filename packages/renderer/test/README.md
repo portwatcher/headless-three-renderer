@@ -29,12 +29,12 @@ On Linux CI runners without a GPU, `mesa-vulkan-drivers` provides `lavapipe` (so
 
 ## Browser Reference Corpus
 
-`test/browser-reference/index.html` renders the generated corpus with `THREE.WebGLRenderer` in a real browser and offers one PNG download per fixture plus `manifest.json`. Serve the package directory with any static server, open the page, and save the downloaded files into a local reference directory:
+`test/browser-reference/index.html` renders the generated corpus with `THREE.WebGLRenderer` in a real browser and offers one PNG download per fixture plus `manifest.json`. Serve the repository root with any static server, open the page, and save the downloaded files into a local reference directory:
 
 ```bash
-cd packages/renderer
+# from the repository root
 python3 -m http.server 4173
-# open http://localhost:4173/test/browser-reference/
+# open http://localhost:4173/packages/renderer/test/browser-reference/
 ```
 
 Compare those browser PNGs against the headless renderer with:
