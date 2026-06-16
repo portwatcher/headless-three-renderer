@@ -12958,29 +12958,65 @@ test('LineBasicMaterial alphaMap samples the selected secondary UV channel', () 
   assert.ok(primary < secondary * 0.3, `line alphaMap channel=0 should sample the transparent primary UV texel (${primary} vs ${secondary})`)
 })
 
-test('LineBasicMaterial mixed non-primary texture channels fail clearly', () => {
-  const map = solidTexture(255, 255, 255)
+test('LineBasicMaterial map and alphaMap can sample distinct non-primary UV channels', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
   map.channel = 1
-  const alphaMap = solidTexture(255, 255, 255)
+  const alphaMap = rgbaTexture([
+    255, 255, 255, 255,
+    255, 0, 255, 255,
+  ], 2, 1)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
   alphaMap.channel = 2
 
   const geometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-1, 0, 0),
-    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
   ])
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
-  const material = new THREE.LineBasicMaterial({ color: 0xffffff, map, alphaTest: 0.5 })
+  const material = new THREE.LineBasicMaterial({
+    alphaTest: 0.5,
+    color: 0xffffff,
+    linewidth: 4,
+    map,
+  })
   material.alphaMap = alphaMap
   scene.add(new THREE.Line(
     geometry,
     material,
   ))
 
-  assert.throws(
-    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /multiple non-primary texture\.channel values.*1.*2.*one secondary UV attribute/i,
+  const rgba = renderRgba(scene, makeCamera(), { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    8,
+    42,
+    88,
+    54,
+    (r, g, b) => g > 80 && g > r + 40 && g > b + 40,
   )
+  assert.ok(greenPixels > 8, `line map channel=1 should render green while alphaMap channel=2 keeps it visible (${greenPixels})`)
 })
 
 test('LineBasicMaterial map RGB multiplies line color from UVs', () => {

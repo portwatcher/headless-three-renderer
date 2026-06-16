@@ -84,6 +84,13 @@ interface ThickLineExpansion {
   uvs2?: number[]
 }
 
+interface TextureUvStreams {
+  uvs: number[] | null
+  uvs2: number[] | null
+  textureUsesUv2?: boolean
+  alphaMapUsesUv2?: boolean
+}
+
 interface ClippingContext {
   unionPlanes: readonly NativeClippingPlane[]
   intersectionPlanes: readonly NativeClippingPlane[]
@@ -1037,16 +1044,21 @@ function appendLineOrPoints(
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
 
-    const secondaryUvs = secondaryUvsForMaterial(uvChannels, material)
+    const uvStreams = topology === 'lines'
+      ? textureUvStreamsForLineMaterial(uvChannels, material)
+      : { uvs, uvs2: secondaryUvsForMaterial(uvChannels, material) }
     let indices: number[] | null = null
     let outputPositions = positions
-    let outputUvs: number[] | undefined = topology === 'lines' ? uvs ?? undefined : undefined
-    let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? secondaryUvs ?? undefined : undefined
+    let outputUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs ?? undefined : undefined
+    let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs2 ?? undefined : undefined
     let outputColors: number[] | undefined
     let thickCenter: [number, number, number] | undefined
     const color = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
+    if (topology === 'lines') {
+      pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
+    }
     const textureInfo = extractTextureData(material)
     const drawStart = group.start
     const drawEnd = group.start + group.count
@@ -1059,8 +1071,8 @@ function appendLineOrPoints(
         const dashed = instancedGeometryCount > 1 || instancedPositionOffset
           ? dashedLineAttributesForInstances(
             positions,
-            uvs,
-            secondaryUvs,
+            uvStreams.uvs,
+            uvStreams.uvs2,
             useVertexColors ? vertexColors! : undefined,
             color,
             source,
@@ -1074,8 +1086,8 @@ function appendLineOrPoints(
           )
           : dashedLineAttributes(
             positions,
-            uvs,
-            secondaryUvs,
+            uvStreams.uvs,
+            uvStreams.uvs2,
             useVertexColors ? readColorAttribute(vertexColors!, color, 'geometry.attributes.color') : undefined,
             source,
             drawStart,
@@ -1118,8 +1130,8 @@ function appendLineOrPoints(
         if (indices.length < 2) continue
         if (instancedGeometryCount > 1 || instancedPositionOffset) {
           outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
-          outputUvs = uvs ? expandVec2ValuesForInstances(uvs, 0, vertexCount, instancedGeometryCount) : undefined
-          outputSecondaryUvs = secondaryUvs ? expandVec2ValuesForInstances(secondaryUvs, 0, vertexCount, instancedGeometryCount) : undefined
+          outputUvs = uvStreams.uvs ? expandVec2ValuesForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
+          outputSecondaryUvs = uvStreams.uvs2 ? expandVec2ValuesForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
           indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
         }
         if (thickLine) {
@@ -1176,7 +1188,7 @@ function appendLineOrPoints(
       textureAnisotropy: textureInfo?.anisotropy,
       textureTransform: textureInfo?.transform,
       textureColorSpace: textureInfo?.colorSpace,
-      textureUsesUv2: textureInfo?.usesUv2,
+      textureUsesUv2: topology === 'lines' ? uvStreams.textureUsesUv2 : textureInfo?.usesUv2,
       transform: thickLine ? IDENTITY_4X4.slice() : matrixElements(object.matrixWorld!, 'object.matrixWorld'),
       transparent: material?.transparent === true || (material?.opacity != null && material.opacity < 1),
       alphaTest: material && Number.isFinite(material.alphaTest) && material.alphaTest! > 0 ? material.alphaTest : undefined,
@@ -1939,6 +1951,42 @@ function readUvChannels(geometry: ThreeBufferGeometryLike, primaryUvs: number[] 
 function readOptionalUvAttribute(geometry: ThreeBufferGeometryLike, name: string): number[] | null {
   const attribute = getAttribute(geometry, name)
   return attribute ? readVec2Attribute(attribute, `geometry.attributes.${name}`) : null
+}
+
+function textureUvStreamsForLineMaterial(
+  channels: Array<number[] | null>,
+  material: {
+    map?: { channel?: number } | null
+    alphaMap?: { channel?: number } | null
+  } | undefined,
+): TextureUvStreams {
+  const mapChannel = material?.map ? textureUvChannel(material.map) : undefined
+  const alphaChannel = material?.alphaMap ? textureUvChannel(material.alphaMap) : undefined
+  const requestedChannels = [mapChannel, alphaChannel]
+    .filter((channel): channel is number => channel !== undefined)
+  const distinctChannels = [...new Set(requestedChannels)]
+
+  let primaryChannel = 0
+  let secondaryChannel: number | undefined
+  if (mapChannel !== undefined
+    && alphaChannel !== undefined
+    && mapChannel !== alphaChannel
+    && mapChannel > 0
+    && alphaChannel > 0) {
+    primaryChannel = mapChannel
+    secondaryChannel = alphaChannel
+  } else {
+    secondaryChannel = distinctChannels.find((channel) => channel > 0)
+  }
+
+  return {
+    uvs: channels[primaryChannel] ?? channels[0],
+    uvs2: secondaryChannel !== undefined
+      ? channels[secondaryChannel] ?? channels[0]
+      : null,
+    textureUsesUv2: mapChannel !== undefined ? mapChannel !== primaryChannel : undefined,
+    alphaMapUsesUv2: alphaChannel !== undefined ? alphaChannel !== primaryChannel : undefined,
+  }
 }
 
 function secondaryUvsForMaterial(
