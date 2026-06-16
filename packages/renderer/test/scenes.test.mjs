@@ -9318,6 +9318,34 @@ test('outputColorSpace controls material and texture background output conversio
   )
 })
 
+test('outputColorSpace string aliases match Three.js constants', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.04, 0.08, 0.12)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 1.5),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.28, 0.12) }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderColorSpace = (outputColorSpace) => renderRgba(scene, camera, {
+    width: 32,
+    height: 32,
+    outputColorSpace,
+  })
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  for (const alias of ['srgb-linear', 'linear-srgb', 'linearsrgb', 'linear']) {
+    assert.deepEqual(renderColorSpace(alias), linear, `${alias} should match THREE.LinearSRGBColorSpace`)
+  }
+  assert.deepEqual(
+    renderColorSpace('srgb'),
+    renderColorSpace(THREE.SRGBColorSpace),
+    'srgb should match THREE.SRGBColorSpace',
+  )
+})
+
 test('unsupported outputColorSpace values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
