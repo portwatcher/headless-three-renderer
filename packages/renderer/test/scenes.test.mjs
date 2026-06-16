@@ -10901,6 +10901,19 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(((packed5551 >> 1) & 0x1f) < 2, `UnsignedShort5551Type blue channel should stay near zero (${packed5551.toString(16)})`)
   assert.equal(packed5551 & 0x1, 1, `UnsignedShort5551Type alpha channel should stay opaque (${packed5551.toString(16)})`)
 
+  const rgb9e5Target = { texture: { type: THREE.UnsignedInt5999Type } }
+  renderToTarget(scene, camera, rgb9e5Target, options)
+  const rgb9e5Data = rgb9e5Target.texture.image.data
+  const rgb9e5 = rgb9e5Data[redCenter]
+  const rgb9e5Scale = 2 ** (((rgb9e5 >>> 27) & 0x1f) - 24)
+  const rgb9e5Red = (rgb9e5 & 0x1ff) * rgb9e5Scale
+  const rgb9e5Green = ((rgb9e5 >>> 9) & 0x1ff) * rgb9e5Scale
+  const rgb9e5Blue = ((rgb9e5 >>> 18) & 0x1ff) * rgb9e5Scale
+  assert.ok(rgb9e5Data instanceof Uint32Array, 'UnsignedInt5999Type color target should receive Uint32Array data')
+  assert.ok(rgb9e5Red > 0.5, `UnsignedInt5999Type red channel should be packed (${rgb9e5Red})`)
+  assert.ok(rgb9e5Green < 0.05, `UnsignedInt5999Type green channel should stay near zero (${rgb9e5Green})`)
+  assert.ok(rgb9e5Blue < 0.05, `UnsignedInt5999Type blue channel should stay near zero (${rgb9e5Blue})`)
+
   const uintTarget = { texture: { type: THREE.UnsignedIntType } }
   renderToTarget(scene, camera, uintTarget, options)
   const uintData = uintTarget.texture.image.data
@@ -11022,7 +11035,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'color texture format'],
-    [{ texture: { type: THREE.UnsignedInt5999Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type/i, 'color texture type'],
+    [{ texture: { type: THREE.UnsignedInt248Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type.*UnsignedInt5999Type/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'depth-stencil format with scalar type'],

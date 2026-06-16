@@ -622,6 +622,7 @@ const DepthFormat = 1026
 const DepthStencilFormat = 1027
 const RedFormat = 1028
 const RGFormat = 1030
+const UnsignedInt5999Type = 35902
 
 function renderCubeCamera(
   scene: ThreeSceneRootLike,
@@ -1682,10 +1683,11 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     type !== FloatType &&
     type !== HalfFloatType &&
     type !== UnsignedShort4444Type &&
-    type !== UnsignedShort5551Type
+    type !== UnsignedShort5551Type &&
+    type !== UnsignedInt5999Type
   ) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, or omit type for RGBA8 readback.`,
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt5999Type, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -1890,6 +1892,9 @@ function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNu
   if (texture.type === UnsignedShort5551Type) {
     return packedUnsignedShort5551ColorTextureData(values, channels)
   }
+  if (texture.type === UnsignedInt5999Type) {
+    return packedUnsignedInt5999ColorTextureData(values, channels)
+  }
   return values
 }
 
@@ -1923,6 +1928,43 @@ function packedUnsignedShort5551ColorTextureData(values: Uint8Array, channels: 1
     out[pixel] = (r << 11) | (g << 6) | (b << 1) | a
   }
   return out
+}
+
+function packedUnsignedInt5999ColorTextureData(values: Uint8Array, channels: 1 | 2 | 3 | 4): Uint32Array {
+  const out = new Uint32Array(values.length / channels)
+  for (let src = 0, pixel = 0; src < values.length; src += channels, pixel += 1) {
+    const r = values[src] / 255
+    const g = channels > 1 ? values[src + 1] / 255 : 0
+    const b = channels > 2 ? values[src + 2] / 255 : 0
+    out[pixel] = packRgb9E5(r, g, b)
+  }
+  return out
+}
+
+function packRgb9E5(r: number, g: number, b: number): number {
+  const maxChannel = Math.max(r, g, b)
+  if (maxChannel <= 0) return 0
+
+  let exponent = Math.max(0, Math.min(31, Math.floor(Math.log2(maxChannel)) + 16))
+  let scale = 2 ** (24 - exponent)
+  let rm = Math.round(r * scale)
+  let gm = Math.round(g * scale)
+  let bm = Math.round(b * scale)
+
+  if (rm > 0x1ff || gm > 0x1ff || bm > 0x1ff) {
+    exponent = Math.min(31, exponent + 1)
+    scale = 2 ** (24 - exponent)
+    rm = Math.round(r * scale)
+    gm = Math.round(g * scale)
+    bm = Math.round(b * scale)
+  }
+
+  return (
+    (exponent << 27) |
+    ((Math.min(0x1ff, bm) & 0x1ff) << 18) |
+    ((Math.min(0x1ff, gm) & 0x1ff) << 9) |
+    (Math.min(0x1ff, rm) & 0x1ff)
+  ) >>> 0
 }
 
 function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
