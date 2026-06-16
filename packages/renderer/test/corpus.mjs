@@ -36,6 +36,7 @@ export function createSceneCorpus() {
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
     shadowMaterialReceiverCorpus(),
+    shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     instancedLinesPointsCorpus(),
     lodAndGroupsCorpus(),
@@ -1189,6 +1190,60 @@ function shadowMaterialReceiverCorpus() {
     name: 'shadow-material-receiver',
     scene,
     camera: makeCamera([0.8, 1.5, 3.0], [0, -0.35, 0]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.01,
+  }
+}
+
+function shadowMaterialFogOptOutCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 1, 1)
+  scene.fog = new THREE.Fog(0x3366ff, 1.2, 3.0)
+
+  const fogged = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 3.2),
+    new THREE.ShadowMaterial({ color: 0x204080, opacity: 0.85 }),
+  )
+  fogged.rotation.x = -Math.PI / 2
+  fogged.position.set(-0.85, -0.6, 0)
+  fogged.receiveShadow = true
+  scene.add(fogged)
+
+  const unfogged = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 3.2),
+    new THREE.ShadowMaterial({ color: 0x204080, opacity: 0.85, fog: false }),
+  )
+  unfogged.rotation.x = -Math.PI / 2
+  unfogged.position.set(0.85, -0.6, 0)
+  unfogged.receiveShadow = true
+  scene.add(unfogged)
+
+  const caster = new THREE.Mesh(
+    new THREE.BoxGeometry(1.8, 0.8, 0.8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  caster.position.y = 0.05
+  caster.castShadow = true
+  scene.add(caster)
+
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(2.5, 4, 2)
+  light.target.position.set(0, -0.4, 0)
+  light.castShadow = true
+  light.shadow.mapSize.set(256, 256)
+  light.shadow.camera.left = -3
+  light.shadow.camera.right = 3
+  light.shadow.camera.top = 3
+  light.shadow.camera.bottom = -3
+  light.shadow.camera.near = 0.1
+  light.shadow.camera.far = 10
+  scene.add(light, light.target)
+
+  return {
+    name: 'shadow-material-fog-opt-out',
+    scene,
+    camera: makeCamera([0.7, 1.5, 3.2], [0, -0.35, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.01,
