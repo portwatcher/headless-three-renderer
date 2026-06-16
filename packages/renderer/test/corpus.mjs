@@ -51,6 +51,7 @@ export function createSceneCorpus() {
     instancedLinesPointsCorpus(),
     batchedMeshCorpus(),
     batchedMeshCullingCorpus(),
+    batchedMeshCustomSortCorpus(),
     lodAndGroupsCorpus(),
     pathologicalGeometryCorpus(),
   ]
@@ -1763,6 +1764,61 @@ function batchedMeshCullingCorpus() {
       const b = rgba[offset + 2]
       if (g <= r + 80 || g <= b + 80) {
         throw new Error(`batched culling should leave the center green, got rgb(${r}, ${g}, ${b})`)
+      }
+    },
+  }
+}
+
+function batchedMeshCustomSortCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const nearGeometry = new THREE.PlaneGeometry(1.5, 1.5)
+  nearGeometry.translate(0, 0, 0.35)
+  const farGeometry = new THREE.PlaneGeometry(1.5, 1.5)
+  farGeometry.translate(0, 0, -0.35)
+
+  const batch = new THREE.BatchedMesh(
+    2,
+    nearGeometry.getAttribute('position').count + farGeometry.getAttribute('position').count,
+    nearGeometry.index.count + farGeometry.index.count,
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthWrite: false,
+      transparent: true,
+    }),
+  )
+  const nearGeometryId = batch.addGeometry(nearGeometry)
+  const farGeometryId = batch.addGeometry(farGeometry)
+  const near = batch.addInstance(nearGeometryId)
+  const far = batch.addInstance(farGeometryId)
+  batch.setColorAt(near, new THREE.Color(1, 0, 0))
+  batch.setColorAt(far, new THREE.Color(0, 0, 1))
+  batch.setCustomSort((list) => {
+    list.sort((a, b) => a.index - b.index)
+  })
+  scene.add(batch)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-custom-sort',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.1,
+    validate(rgba, { width, height }) {
+      const x = Math.floor(width / 2)
+      const y = Math.floor(height / 2)
+      const offset = (y * width + x) * 4
+      const r = rgba[offset]
+      const g = rgba[offset + 1]
+      const b = rgba[offset + 2]
+      if (b <= r + 80 || b <= g + 80) {
+        throw new Error(`batched customSort should draw the blue instance last, got rgb(${r}, ${g}, ${b})`)
       }
     },
   }
