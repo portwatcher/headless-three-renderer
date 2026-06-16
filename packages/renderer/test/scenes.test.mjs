@@ -10502,6 +10502,7 @@ test('LightProbe contributes diffuse lighting across lit material models', () =>
 
   const cases = [
     ['Lambert', new THREE.MeshLambertMaterial({ color: 0xffffff })],
+    ['Physical', new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })],
     ['Phong', new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 20 })],
     ['Toon', new THREE.MeshToonMaterial({ color: 0xffffff })],
   ]
