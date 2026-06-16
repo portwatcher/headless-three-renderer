@@ -369,8 +369,14 @@ function extractEnvironmentMapFromTexture(
 }
 
 function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeTextureLike; intensity?: unknown; label: string } | null {
-  const hints = scene.userData?.headlessThreeRenderer ?? scene.userData?.headlessRenderer ?? {}
+  const hintBag = sceneRendererHints(scene)
+  const hints = hintBag?.value ?? {}
+  const probesKey = hints.reflectionProbes != null ? 'reflectionProbes' : 'probes'
   const probes = hints.reflectionProbes ?? hints.probes
+  if (probes != null && !Array.isArray(probes)) {
+    const label = hintBag ? `${hintBag.label}.${probesKey}` : `scene.userData.${probesKey}`
+    throw new TypeError(`${label} must be an array.`)
+  }
   const probe = hints.reflectionProbe ?? (Array.isArray(probes) ? probes[0] : undefined)
   if (probe == null) return null
 
@@ -405,6 +411,15 @@ function extractReflectionProbe(scene: ThreeSceneRootLike): { texture: ThreeText
     intensity: probeObject.intensity,
     label: 'reflectionProbe',
   }
+}
+
+function sceneRendererHints(scene: ThreeSceneRootLike): { value: Record<string, unknown>; label: string } | undefined {
+  const value = scene.userData?.headlessThreeRenderer ?? scene.userData?.headlessRenderer
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const label = scene.userData?.headlessThreeRenderer != null
+    ? 'scene.userData.headlessThreeRenderer'
+    : 'scene.userData.headlessRenderer'
+  return { value: value as Record<string, unknown>, label }
 }
 
 export function materialForGroup(
