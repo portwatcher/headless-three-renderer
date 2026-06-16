@@ -8849,13 +8849,21 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
         new THREE.PlaneGeometry(2, 2),
         new THREE.MeshBasicMaterial({ map: invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1])) }),
       ))
-    }, /texture raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*texture rendering.*mismatched/i],
+    }, /material\.map raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*texture rendering.*mismatched/i],
     ['background', (scene) => {
       scene.background = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
     }, /background.*raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*texture rendering.*mismatched/i],
     ['environment', (scene) => {
       scene.environment = invalidRawTexture(new Uint8Array([255, 0]))
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['material envMap', (scene) => {
+      const envMap = invalidRawTexture(new Uint8Array([255, 0]))
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering/i],
     ['reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: invalidRawTexture(new Uint8Array([255, 0])) },
@@ -8864,6 +8872,14 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
     ['FloatType environment', (scene) => {
       scene.environment = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['FloatType material envMap', (scene) => {
+      const envMap = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering/i],
     ['FloatType reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType) },
@@ -8890,6 +8906,14 @@ test('unsupported packed-depth raw DataTexture type constants fail clearly', () 
   }
 
   const cases = [
+    ['material envMap packed depth type', (scene) => {
+      const envMap = rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type)
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap raw texture type UnsignedInt248Type.*not supported/i],
     ['reflection probe packed depth type', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type) },
