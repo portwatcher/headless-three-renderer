@@ -1597,6 +1597,13 @@ function customSortGroupCorpus() {
       opaqueSort: (a, b) => b.group.materialIndex - a.group.materialIndex,
     },
     background: [0, 0, 0],
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > center.b + 180 && center.r > center.g + 180 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
+        throw new Error(`custom sort corpus should draw the red group last on black background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
