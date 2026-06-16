@@ -329,6 +329,7 @@ export interface ThreeObject3DLike {
   customDepthMaterial?: ThreeMaterialLike
   customDistanceMaterial?: ThreeMaterialLike
   center?: { x?: number; y?: number }
+  scale?: { x?: number; y?: number; z?: number }
   count?: number
   instanceCount?: number
   perObjectFrustumCulled?: boolean

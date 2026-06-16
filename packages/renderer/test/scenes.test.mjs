@@ -4047,6 +4047,12 @@ test('invalid billboard and line scalar values fail clearly', () => {
     ['sprite center', () => spriteScene((sprite) => {
       sprite.center.x = 'left'
     }), /Sprite\.center\.x must be a finite number/i],
+    ['sprite scale x', () => spriteScene((sprite) => {
+      sprite.scale.x = 'wide'
+    }), /Sprite\.scale\.x must be a finite number/i],
+    ['sprite scale z', () => spriteScene((sprite) => {
+      sprite.scale.z = Number.NaN
+    }), /Sprite\.scale\.z must be a finite number/i],
     ['sprite rotation', () => spriteScene((_sprite, material) => {
       material.rotation = Number.NaN
     }), /material\.rotation must be a finite number/i],

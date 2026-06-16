@@ -652,6 +652,7 @@ function appendSprite(
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
 
+  validateSpriteScale(object)
   const matrix = matrixElements(object.matrixWorld!, 'sprite.matrixWorld')
   const center = [
     finiteMaterialOrObjectNumber(object.center?.x, 'Sprite.center.x', 0.5),
@@ -747,6 +748,12 @@ function appendSprite(
       uvs,
     )
   }
+}
+
+function validateSpriteScale(object: ThreeObject3DLike): void {
+  finiteMaterialOrObjectNumber(object.scale?.x, 'Sprite.scale.x', 1)
+  finiteMaterialOrObjectNumber(object.scale?.y, 'Sprite.scale.y', 1)
+  finiteMaterialOrObjectNumber(object.scale?.z, 'Sprite.scale.z', 1)
 }
 
 function appendPoints(
