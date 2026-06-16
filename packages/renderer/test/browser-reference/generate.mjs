@@ -69,7 +69,6 @@ function renderFixture(fixture) {
   }
 
   renderer.setSize(width, height, false)
-  applyFixtureRenderRectangles(fixture, width, height)
   renderer.outputColorSpace = outputColorSpace(fixture.options.outputColorSpace)
 
   let restoreRendererOptions = () => {}
@@ -80,6 +79,8 @@ function renderFixture(fixture) {
     restoreRendererOptions = applyFixtureRendererOptions(fixture)
     restoreSceneOptions = applyFixtureSceneOptions(fixture)
     restoreRenderMode = applyFixtureRenderMode(fixture)
+    clearFullCanvas(fixture.scene, width, height)
+    applyFixtureRenderRectangles(fixture, width, height)
     fixture.scene.updateMatrixWorld(true)
     fixture.camera.updateMatrixWorld(true)
     renderer.render(fixture.scene, fixture.camera)
@@ -106,6 +107,25 @@ function renderFixture(fixture) {
   element.append(image, title, link)
 
   return { element, link }
+}
+
+function clearFullCanvas(scene, width, height) {
+  const previousClearColor = renderer.getClearColor(new THREE.Color())
+  const previousClearAlpha = renderer.getClearAlpha()
+  const background = scene?.background
+  const colorBackground = background?.isColor === true ? background : null
+  const backgroundIntensity = typeof scene?.backgroundIntensity === 'number' && Number.isFinite(scene.backgroundIntensity)
+    ? scene.backgroundIntensity
+    : 1
+
+  renderer.setScissorTest(false)
+  renderer.setViewport(0, 0, width, height)
+  renderer.setClearColor(
+    colorBackground ? background.clone().multiplyScalar(backgroundIntensity) : new THREE.Color(0, 0, 0),
+    colorBackground ? 1 : 0,
+  )
+  renderer.clear(true, true, true)
+  renderer.setClearColor(previousClearColor, previousClearAlpha)
 }
 
 function applyFixtureRenderRectangles(fixture, width, height) {

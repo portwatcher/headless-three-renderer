@@ -29,7 +29,7 @@ On Linux CI runners without a GPU, `mesa-vulkan-drivers` provides `lavapipe` (so
 
 ## Browser Reference Corpus
 
-`test/browser-reference/index.html` renders the WebGL-compatible subset of the generated corpus with `THREE.WebGLRenderer` in a real browser and offers one PNG download per fixture plus `manifest.json`. Renderer-only corpus fixtures, such as Three.js features that WebGLRenderer cannot reference, still run through `test:corpus`. Serve the repository root with any static server, open the page, and save the downloaded files into a local reference directory:
+`test/browser-reference/index.html` renders the WebGL-compatible subset of the generated corpus with `THREE.WebGLRenderer` in a real browser and offers one PNG download per fixture plus `manifest.json`. Each fixture pre-clears the full canvas before applying viewport/scissor settings so saved PNGs do not retain pixels from earlier fixtures. Renderer-only corpus fixtures, such as Three.js features that WebGLRenderer cannot reference, still run through `test:corpus`. Serve the repository root with any static server, open the page, and save the downloaded files into a local reference directory:
 
 ```bash
 # from the repository root
