@@ -8579,6 +8579,63 @@ test('float raw environment textures decode for IBL', () => {
   }
 })
 
+test('packed raw environment textures unpack for IBL', () => {
+  const cases = [
+    ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, 0x84ff, [136, 68, 255]],
+    ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, 0x823f, [132, 66, 255]],
+  ]
+
+  function byteEnvironmentTexture([r, g, b]) {
+    const texture = solidTexture(r, g, b)
+    texture.colorSpace = THREE.LinearSRGBColorSpace
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  function packedEnvironmentTexture(type, value) {
+    const texture = new THREE.DataTexture(new Uint16Array([value]), 1, 1, THREE.RGBAFormat, type)
+    texture.colorSpace = THREE.LinearSRGBColorSpace
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderEnvironment(kind, texture) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 })
+    if (kind === 'scene') {
+      scene.environment = texture
+      scene.environmentIntensity = 2.5
+    } else if (kind === 'reflectionProbe') {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture, intensity: 2.5 },
+      }
+    } else {
+      material.envMap = texture
+      material.envMapIntensity = 2.5
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 16),
+      material,
+    ))
+    return renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  for (const [label, type, value, equivalentByteColor] of cases) {
+    for (const kind of ['scene', 'reflectionProbe', 'materialEnvMap']) {
+      const byteRender = renderEnvironment(kind, byteEnvironmentTexture(equivalentByteColor))
+      const packedRender = renderEnvironment(kind, packedEnvironmentTexture(type, value))
+      const diff = meanAbsDiff(byteRender, packedRender)
+      assert.ok(diff < 3, `${kind} ${label} environment should match equivalent linear RGBA8 IBL (diff=${diff.toFixed(3)})`)
+    }
+  }
+})
+
 test('packed unsigned short raw DataTexture maps unpack RGBA channels', () => {
   const cases = [
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, 0x842f, 'red-dominant'],
