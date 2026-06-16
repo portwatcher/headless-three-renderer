@@ -4,6 +4,7 @@ import type {
   ThreeBufferGeometryLike,
   ThreeCameraLike,
   ThreeMaterialLike,
+  ThreeSphereLike,
   NativeSceneMesh,
   GeometryGroup,
   Color4,
@@ -183,7 +184,7 @@ function appendBatchedMesh(
   materialContext: MaterialExtractionContext,
 ): void {
   const geometry = object.geometry!
-  const draws = batchedMeshDraws(object)
+  const draws = batchedMeshDraws(object, camera, geometry)
   if (draws.length === 0) return
 
   for (const draw of draws) {
@@ -2309,7 +2310,11 @@ function appendDashedLineExpansion(out: DashedLineExpansion, value: DashedLineEx
   if (out.colors && value.colors) appendNumberArray(out.colors, value.colors)
 }
 
-function batchedMeshDraws(object: ThreeObject3DLike): BatchedMeshDraw[] {
+function batchedMeshDraws(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  geometry: ThreeBufferGeometryLike,
+): BatchedMeshDraw[] {
   const instanceInfo = object._instanceInfo
   if (!Array.isArray(instanceInfo)) {
     throw new Error(
@@ -2318,6 +2323,7 @@ function batchedMeshDraws(object: ThreeObject3DLike): BatchedMeshDraw[] {
   }
 
   const baseTransform = matrixElements(object.matrixWorld!, 'batchedMesh.matrixWorld')
+  const cullPerObject = batchedPerObjectFrustumCulled(object, camera)
   const draws: BatchedMeshDraw[] = []
   for (let instanceId = 0; instanceId < instanceInfo.length; instanceId += 1) {
     const info = instanceInfo[instanceId]
@@ -2334,16 +2340,46 @@ function batchedMeshDraws(object: ThreeObject3DLike): BatchedMeshDraw[] {
     )
     const range = batchedGeometryRange(object, geometryId)
     if (range.count === 0) continue
+    const transform = multiplyMat4(baseTransform, batchedInstanceMatrix(object, instanceId))
+    if (cullPerObject && batchedDrawOutsideFrustum(object, geometry, geometryId, range, transform, camera!)) {
+      continue
+    }
 
     draws.push({
       range,
       instance: {
-        transform: multiplyMat4(baseTransform, batchedInstanceMatrix(object, instanceId)),
+        transform,
         color: batchedInstanceColor(object, instanceId),
       },
     })
   }
   return draws
+}
+
+function batchedPerObjectFrustumCulled(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+): boolean {
+  if (!camera || camera.isArrayCamera === true) return false
+  return batchedOptionalBoolean(object.perObjectFrustumCulled, 'THREE.BatchedMesh.perObjectFrustumCulled', true)
+}
+
+function batchedDrawOutsideFrustum(
+  object: ThreeObject3DLike,
+  geometry: ThreeBufferGeometryLike,
+  geometryId: number,
+  range: { start: number; count: number },
+  transform: ArrayLike<number>,
+  camera: ThreeCameraLike,
+): boolean {
+  const sphere = batchedGeometryBoundingSphere(object, geometry, geometryId, range)
+  if (!sphere) return false
+
+  const center = transformPoint(transform, sphere.center)
+  const scale = Math.max(columnLength3(transform, 0), columnLength3(transform, 4), columnLength3(transform, 8))
+  const radius = sphere.radius * scale
+  if (!Number.isFinite(radius) || radius < 0) return false
+  return !cameraFrustumIntersectsSphere(camera, center, radius)
 }
 
 function batchedGeometryRange(object: ThreeObject3DLike, geometryId: number): { start: number; count: number } {
@@ -2366,6 +2402,36 @@ function batchedGeometryRange(object: ThreeObject3DLike, geometryId: number): { 
     start: batchedNonNegativeInteger((range as { start?: unknown }).start, `THREE.BatchedMesh._geometryInfo[${geometryId}].start`),
     count: batchedNonNegativeInteger((range as { count?: unknown }).count, `THREE.BatchedMesh._geometryInfo[${geometryId}].count`),
   }
+}
+
+function batchedGeometryBoundingSphere(
+  object: ThreeObject3DLike,
+  geometry: ThreeBufferGeometryLike,
+  geometryId: number,
+  range: { start: number; count: number },
+): { center: [number, number, number]; radius: number } | null {
+  const cached = object._geometryInfo?.[geometryId]?.boundingSphere
+  if (cached != null) {
+    return batchedSphereLike(cached, `THREE.BatchedMesh._geometryInfo[${geometryId}].boundingSphere`)
+  }
+
+  const computed = batchedGeometryRangeBoundingSphere(geometry, range)
+  return computed ? batchedSphereLike(computed, `THREE.BatchedMesh._geometryInfo[${geometryId}].computedBoundingSphere`) : null
+}
+
+function batchedSphereLike(
+  sphere: ThreeSphereLike,
+  label: string,
+): { center: [number, number, number]; radius: number } {
+  if (!sphere || typeof sphere !== 'object') {
+    throw new TypeError(`${label} must be a THREE.Sphere-like object.`)
+  }
+  const center = vec3Like(sphere.center)
+  if (!center) {
+    throw new TypeError(`${label}.center must be a finite Vector3-like value.`)
+  }
+  const radius = nonNegativeMaterialOrObjectNumber(sphere.radius, `${label}.radius`, 0)
+  return { center, radius }
 }
 
 function batchedGeometryView(
@@ -2498,6 +2564,35 @@ function createDashedLineExpansion(
     uvs2: uvs2 ? [] : undefined,
     colors: colors ? [] : undefined,
   }
+}
+
+function cameraFrustumIntersectsSphere(
+  camera: ThreeCameraLike,
+  center: [number, number, number],
+  radius: number,
+): boolean {
+  const view = camera.matrixWorldInverse?.elements
+  const projection = camera.projectionMatrix?.elements
+  if (!view || view.length < 16 || !projection || projection.length < 16) return true
+  const viewProjection = multiplyMat4(projection, view)
+
+  const planes: Array<[number, number, number, number]> = [
+    [viewProjection[3] + viewProjection[0], viewProjection[7] + viewProjection[4], viewProjection[11] + viewProjection[8], viewProjection[15] + viewProjection[12]],
+    [viewProjection[3] - viewProjection[0], viewProjection[7] - viewProjection[4], viewProjection[11] - viewProjection[8], viewProjection[15] - viewProjection[12]],
+    [viewProjection[3] + viewProjection[1], viewProjection[7] + viewProjection[5], viewProjection[11] + viewProjection[9], viewProjection[15] + viewProjection[13]],
+    [viewProjection[3] - viewProjection[1], viewProjection[7] - viewProjection[5], viewProjection[11] - viewProjection[9], viewProjection[15] - viewProjection[13]],
+    [viewProjection[3] + viewProjection[2], viewProjection[7] + viewProjection[6], viewProjection[11] + viewProjection[10], viewProjection[15] + viewProjection[14]],
+    [viewProjection[3] - viewProjection[2], viewProjection[7] - viewProjection[6], viewProjection[11] - viewProjection[10], viewProjection[15] - viewProjection[14]],
+  ]
+
+  for (const [a, b, c, d] of planes) {
+    const length = Math.hypot(a, b, c)
+    if (!Number.isFinite(length) || length <= 1e-8) continue
+    const distance = (a * center[0] + b * center[1] + c * center[2] + d) / length
+    if (distance < -radius) return false
+  }
+
+  return true
 }
 
 function lineSegmentsWithDistances(

@@ -331,6 +331,7 @@ export interface ThreeObject3DLike {
   center?: { x?: number; y?: number }
   count?: number
   instanceCount?: number
+  perObjectFrustumCulled?: boolean
   maxInstanceCount?: number
   instanceMatrix?: ThreeBufferAttributeLike
   instanceColor?: ThreeBufferAttributeLike | null
@@ -349,6 +350,7 @@ export interface ThreeObject3DLike {
     indexStart?: number
     indexCount?: number
     reservedIndexCount?: number
+    boundingSphere?: ThreeSphereLike | null
   }>
   _matricesTexture?: {
     image?: {

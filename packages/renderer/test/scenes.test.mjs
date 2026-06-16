@@ -421,6 +421,37 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   assert.ok(centerMean.b < 5 && centerMean.r < 5 && centerMean.g < 5, `hidden BatchedMesh instance should not render at center (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
 })
 
+test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderCulling(perObjectFrustumCulled) {
+    const source = new THREE.PlaneGeometry(2, 2)
+    source.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+    const batched = new THREE.BatchedMesh(
+      1,
+      source.getAttribute('position').count,
+      source.index.count,
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    const geometryId = batched.addGeometry(source)
+    const instanceId = batched.addInstance(geometryId)
+    batched.setMatrixAt(instanceId, new THREE.Matrix4())
+    batched.perObjectFrustumCulled = perObjectFrustumCulled
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(batched)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const culled = renderCulling(true)
+  const uncullable = renderCulling(false)
+  assert.ok(culled.r < 5 && culled.g < 5 && culled.b < 5, `cached out-of-frustum BatchedMesh bounds should cull the draw (${culled.r}, ${culled.g}, ${culled.b})`)
+  assert.ok(uncullable.r > 200, `perObjectFrustumCulled=false should render the oversized batch draw (${uncullable.r})`)
+})
+
 test('BatchedMesh transparent sorting uses each geometry range center', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
