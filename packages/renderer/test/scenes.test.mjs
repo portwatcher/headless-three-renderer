@@ -10360,6 +10360,11 @@ test('invalid light numeric values fail clearly', () => {
       light.penumbra = 1.5
       return light
     }, /SpotLight\.penumbra must be between 0 and 1/i],
+    ['hemisphere transform matrix', () => {
+      const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1)
+      light.matrixWorld.elements[5] = Number.NaN
+      return light
+    }, /HemisphereLight\.matrixWorld\.elements\[5\] must be a finite number/i],
     ['rect width', () => {
       const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
       light.width = 'wide'
