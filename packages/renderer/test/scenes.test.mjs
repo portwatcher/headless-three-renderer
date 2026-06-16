@@ -516,15 +516,18 @@ test('invalid BatchedMesh perObjectFrustumCulled values fail clearly', () => {
 test('invalid BatchedMesh sort controls fail clearly', () => {
   const camera = makeCamera()
   const source = new THREE.PlaneGeometry(1, 1)
-  const makeScene = () => {
+  const makeScene = (instanceCount = 1) => {
     const batched = new THREE.BatchedMesh(
-      1,
-      source.getAttribute('position').count,
-      source.index.count,
+      instanceCount,
+      source.getAttribute('position').count * instanceCount,
+      source.index.count * instanceCount,
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
     )
     const geometryId = batched.addGeometry(source)
-    batched.addInstance(geometryId)
+    for (let i = 0; i < instanceCount; i += 1) {
+      const instanceId = batched.addInstance(geometryId)
+      batched.setMatrixAt(instanceId, new THREE.Matrix4().makeTranslation(i * 0.01, 0, 0))
+    }
     const scene = new THREE.Scene()
     scene.add(batched)
     return { batched, scene }
@@ -545,6 +548,28 @@ test('invalid BatchedMesh sort controls fail clearly', () => {
     assert.throws(
       () => renderRgba(scene, camera, { width: 32, height: 32 }),
       /THREE\.BatchedMesh\.customSort must be a function or null/i,
+    )
+  }
+
+  {
+    const { batched, scene } = makeScene(2)
+    batched.setCustomSort((list) => {
+      list[0] = null
+    })
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      /THREE\.BatchedMesh\.customSort list\[0\] must be an object/i,
+    )
+  }
+
+  {
+    const { batched, scene } = makeScene(2)
+    batched.setCustomSort((list) => {
+      list[0].index = 99
+    })
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      /THREE\.BatchedMesh\.customSort returned unknown instance index 99/i,
     )
   }
 })
@@ -653,7 +678,13 @@ test('BatchedMesh customSort controls instance draw order', () => {
   batched.setMatrixAt(far, new THREE.Matrix4())
   batched.setColorAt(near, new THREE.Color(1, 0, 0))
   batched.setColorAt(far, new THREE.Color(0, 0, 1))
-  batched.setCustomSort((list) => {
+  let callbackThis = null
+  let callbackCamera = null
+  let callbackList = null
+  batched.setCustomSort(function (list, sortCamera) {
+    callbackThis = this
+    callbackCamera = sortCamera
+    callbackList = list.map((item) => ({ ...item }))
     list.sort((a, b) => a.index - b.index)
   })
 
@@ -662,6 +693,10 @@ test('BatchedMesh customSort controls instance draw order', () => {
   scene.add(batched)
 
   const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.equal(callbackThis, batched)
+  assert.equal(callbackCamera, camera)
+  assert.deepEqual(callbackList.map((item) => item.index).sort(), [near, far].sort())
+  assert.ok(callbackList.every((item) => item.count > 0 && item.start >= 0 && Number.isFinite(item.z)))
   assert.ok(mean.b > mean.r + 80, `BatchedMesh customSort should draw custom-ordered blue instance last (${mean.b} vs ${mean.r})`)
 })
 
