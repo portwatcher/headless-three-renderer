@@ -47,10 +47,21 @@ export function readColorAttribute(attribute: ThreeBufferAttributeLike, material
   return values
 }
 
-export function readIndexAttribute(attribute: ThreeBufferAttributeLike, label = 'THREE.BufferAttribute'): number[] {
+export function readIndexAttribute(
+  attribute: ThreeBufferAttributeLike,
+  label = 'THREE.BufferAttribute',
+  vertexCount?: number,
+): number[] {
   const values = new Array<number>(attribute.count)
   for (let i = 0; i < attribute.count; i += 1) {
-    values[i] = attributeComponent(attribute, i, 0, label)
+    const value = attributeComponent(attribute, i, 0, label)
+    if (!Number.isInteger(value) || value < 0) {
+      throw new TypeError(`${label}[${i}].x must be a non-negative integer.`)
+    }
+    if (vertexCount !== undefined && value >= vertexCount) {
+      throw new RangeError(`${label}[${i}].x must reference a vertex below geometry.attributes.position.count (${vertexCount}).`)
+    }
+    values[i] = value
   }
   return values
 }

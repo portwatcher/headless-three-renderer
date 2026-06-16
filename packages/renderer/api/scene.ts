@@ -246,7 +246,7 @@ function appendMesh(
   const normalAttribute = getAttribute(geometry, 'normal')
   let normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
   const vertexColors = getAttribute(geometry, 'color')
-  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
@@ -772,7 +772,7 @@ function appendPoints(
   const pointUvAttribute = getAttribute(geometry, 'uv')
   const primaryPointUvs = pointUvAttribute ? readVec2Attribute(pointUvAttribute, 'geometry.attributes.uv') : null
   const pointUvChannels = readUvChannels(geometry, primaryPointUvs)
-  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
@@ -1099,8 +1099,8 @@ function appendLineOrPoints(
   const uvs = uvAttribute ? readVec2Attribute(uvAttribute, 'geometry.attributes.uv') : null
   const uvChannels = readUvChannels(geometry, uvs)
   const vertexColors = getAttribute(geometry, 'color')
-  const indexAttr = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
   const vertexCount = position.count
+  const indexAttr = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', vertexCount) : null
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
   const groups = effectiveGroups(geometry, indexAttr, vertexCount)
@@ -2604,7 +2604,7 @@ function batchedGeometryRangeBoundingSphere(
   const position = getAttribute(geometry, 'position')
   if (!position || range.count <= 0) return undefined
 
-  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
   const start = Math.max(0, range.start)
   const end = Math.max(start, range.start + range.count)
   let minX = Number.POSITIVE_INFINITY

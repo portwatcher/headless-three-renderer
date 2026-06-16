@@ -369,6 +369,37 @@ test('invalid geometry attribute values fail clearly', () => {
   )
 })
 
+test('invalid geometry index values fail clearly', () => {
+  const camera = makeCamera()
+  const makeScene = (indexAttribute) => {
+    const scene = new THREE.Scene()
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -0.75, -0.5, 0,
+      0.75, -0.5, 0,
+      0, 0.75, 0,
+    ]), 3))
+    geometry.index = indexAttribute
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+    return scene
+  }
+
+  const cases = [
+    ['finite', new THREE.BufferAttribute(new Float32Array([0, Number.NaN, 2]), 1), /geometry\.index\[1\]\.x must be a finite number/i],
+    ['negative', new THREE.BufferAttribute(new Float32Array([0, -1, 2]), 1), /geometry\.index\[1\]\.x must be a non-negative integer/i],
+    ['fractional', new THREE.BufferAttribute(new Float32Array([0, 1.5, 2]), 1), /geometry\.index\[1\]\.x must be a non-negative integer/i],
+    ['out of range', new THREE.BufferAttribute(new Uint16Array([0, 1, 3]), 1), /geometry\.index\[2\]\.x must reference a vertex below geometry\.attributes\.position\.count \(3\)/i],
+  ]
+
+  for (const [name, indexAttribute, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(indexAttribute), camera, { width: 32, height: 32 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('invalid geometry group values fail clearly', () => {
   const camera = makeCamera()
   const makeScene = (groups) => {
