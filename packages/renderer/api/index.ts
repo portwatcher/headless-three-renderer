@@ -691,6 +691,18 @@ function validateCubeCamera(camera: ThreeCubeCameraLike, options: RenderOptions)
 }
 
 function cubeSubCameras(camera: ThreeCubeCameraLike): ThreeCameraLike[] {
+  const children = camera.children
+  if (!Array.isArray(children)) {
+    throw new TypeError('THREE.CubeCamera.children must be an array of internal perspective cameras.')
+  }
+  if (children.length < CUBE_FACE_COUNT) {
+    throw new Error('THREE.CubeCamera requires six internal perspective cameras.')
+  }
+  const subCameras = children.slice(0, CUBE_FACE_COUNT)
+  for (let index = 0; index < subCameras.length; index += 1) {
+    validateThreeCamera(subCameras[index], `THREE.CubeCamera.children[${index}]`)
+  }
+
   if (typeof camera.updateCoordinateSystem === 'function' && camera.coordinateSystem !== WEBGL_COORDINATE_SYSTEM) {
     camera.coordinateSystem = WEBGL_COORDINATE_SYSTEM
     camera.updateCoordinateSystem()
@@ -698,14 +710,7 @@ function cubeSubCameras(camera: ThreeCubeCameraLike): ThreeCameraLike[] {
   if (typeof camera.updateMatrixWorld === 'function') {
     camera.updateMatrixWorld(true)
   }
-
-  const children = camera.children
-  if (!Array.isArray(children) || children.length < CUBE_FACE_COUNT) {
-    throw new Error('THREE.CubeCamera requires six internal perspective cameras.')
-  }
-  const subCameras = children.slice(0, CUBE_FACE_COUNT)
   for (const subCamera of subCameras) {
-    validateThreeCamera(subCamera)
     if (typeof subCamera.updateMatrixWorld === 'function') {
       subCamera.updateMatrixWorld(true)
     }
@@ -946,11 +951,14 @@ function validateArrayCameraOutput(camera: ThreeCameraLike, options: RenderOptio
 
 function arraySubCameras(camera: ThreeCameraLike): ThreeCameraLike[] {
   const cameras = (camera as any).cameras
-  if (!Array.isArray(cameras) || cameras.length === 0) {
+  if (!Array.isArray(cameras)) {
+    throw new TypeError('THREE.ArrayCamera.cameras must be an array.')
+  }
+  if (cameras.length === 0) {
     throw new Error('THREE.ArrayCamera requires at least one sub-camera in camera.cameras.')
   }
-  for (const subCamera of cameras) {
-    validateThreeCamera(subCamera)
+  for (let index = 0; index < cameras.length; index += 1) {
+    validateThreeCamera(cameras[index], `THREE.ArrayCamera.cameras[${index}]`)
   }
   return cameras
 }
@@ -2120,22 +2128,27 @@ function isCubeCamera(camera: unknown): camera is ThreeCubeCameraLike {
   return cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera'
 }
 
-function validateThreeCamera(camera: unknown): asserts camera is ThreeCameraLike {
+function validateThreeCamera(camera: unknown, label = 'render(scene, camera)'): asserts camera is ThreeCameraLike {
+  const defaultLabel = label === 'render(scene, camera)'
   const cameraLike = camera as any
   if (cameraLike?.isCubeCamera === true || cameraLike?.type === 'CubeCamera') {
     throw new Error(
-      'THREE.CubeCamera cannot be used where a regular THREE.Camera is required. Pass the CubeCamera as the top-level camera with a cube render target.',
+      defaultLabel
+        ? 'THREE.CubeCamera cannot be used where a regular THREE.Camera is required. Pass the CubeCamera as the top-level camera with a cube render target.'
+        : `${label} cannot be a THREE.CubeCamera. Pass the CubeCamera as the top-level camera with a cube render target.`,
     )
   }
-  if (!camera || cameraLike.isCamera !== true) {
-    throw new TypeError('render(scene, camera) expects camera to be a THREE.Camera')
+  if (!camera || typeof camera !== 'object' || Array.isArray(camera) || cameraLike.isCamera !== true) {
+    throw new TypeError(defaultLabel ? 'render(scene, camera) expects camera to be a THREE.Camera' : `${label} must be a THREE.Camera.`)
   }
   if (cameraLike.isArrayCamera === true || Array.isArray(cameraLike.cameras)) {
     throw new Error(
-      'THREE.ArrayCamera cannot be used where a regular THREE.Camera is required. Pass the ArrayCamera as the top-level camera.',
+      defaultLabel
+        ? 'THREE.ArrayCamera cannot be used where a regular THREE.Camera is required. Pass the ArrayCamera as the top-level camera.'
+        : `${label} cannot be a THREE.ArrayCamera. Pass the ArrayCamera as the top-level camera.`,
     )
   }
   if (!cameraLike.projectionMatrix || !cameraLike.matrixWorldInverse) {
-    throw new TypeError('THREE.Camera must have projectionMatrix and matrixWorldInverse')
+    throw new TypeError(defaultLabel ? 'THREE.Camera must have projectionMatrix and matrixWorldInverse' : `${label} must have projectionMatrix and matrixWorldInverse.`)
   }
 }

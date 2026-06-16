@@ -1341,6 +1341,35 @@ test('ArrayCamera supports PNG output', () => {
   assertValidPng(new Renderer().render(scene, arrayCamera, { width: 64, height: 64 }), { width: 64, height: 64 })
 })
 
+test('malformed ArrayCamera sub-camera containers fail clearly', () => {
+  const scene = makeLayeredSplitScene()
+  const arrayCamera = makeLayeredArrayCamera()
+
+  arrayCamera.cameras = 'bad'
+  assert.throws(
+    () => renderRgba(scene, arrayCamera, { width: 64, height: 64 }),
+    /THREE\.ArrayCamera\.cameras must be an array/i,
+  )
+
+  arrayCamera.cameras = []
+  assert.throws(
+    () => renderRgba(scene, arrayCamera, { width: 64, height: 64 }),
+    /THREE\.ArrayCamera requires at least one sub-camera/i,
+  )
+
+  arrayCamera.cameras = [null]
+  assert.throws(
+    () => renderRgba(scene, arrayCamera, { width: 64, height: 64 }),
+    /THREE\.ArrayCamera\.cameras\[0\] must be a THREE\.Camera/i,
+  )
+
+  arrayCamera.cameras = [new THREE.ArrayCamera([])]
+  assert.throws(
+    () => renderRgba(scene, arrayCamera, { width: 64, height: 64 }),
+    /THREE\.ArrayCamera\.cameras\[0\] cannot be a THREE\.ArrayCamera/i,
+  )
+})
+
 test('CubeCamera renders cube target faces', () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
@@ -1483,6 +1512,42 @@ test('CubeCamera malformed render targets fail clearly', () => {
   assert.throws(
     () => renderToTarget(scene, depthMipCamera, depthMipTarget),
     /target\.depthTexture\.mipmaps must be an array of image-like objects/i,
+  )
+})
+
+test('malformed CubeCamera child camera containers fail clearly', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(32))
+
+  cubeCamera.children = 'bad'
+  assert.throws(
+    () => renderRgba(scene, cubeCamera, { width: 32, height: 32 }),
+    /THREE\.CubeCamera\.children must be an array/i,
+  )
+
+  cubeCamera.children = []
+  assert.throws(
+    () => renderRgba(scene, cubeCamera, { width: 32, height: 32 }),
+    /THREE\.CubeCamera requires six internal perspective cameras/i,
+  )
+
+  cubeCamera.children = [null, null, null, null, null, null]
+  assert.throws(
+    () => renderRgba(scene, cubeCamera, { width: 32, height: 32 }),
+    /THREE\.CubeCamera\.children\[0\] must be a THREE\.Camera/i,
+  )
+
+  cubeCamera.children = [
+    new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(16)),
+    null,
+    null,
+    null,
+    null,
+    null,
+  ]
+  assert.throws(
+    () => renderRgba(scene, cubeCamera, { width: 32, height: 32 }),
+    /THREE\.CubeCamera\.children\[0\] cannot be a THREE\.CubeCamera/i,
   )
 })
 
