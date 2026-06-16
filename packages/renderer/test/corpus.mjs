@@ -842,6 +842,13 @@ function pointSpotLightCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 6, 8],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width }) {
+      const pointLit = meanRegion(rgba, width, 20, 28, 42, 62)
+      const spotLit = meanRegion(rgba, width, 54, 28, 76, 62)
+      if (!(pointLit.r > pointLit.g + 25 && spotLit.b > spotLit.r + 8 && spotLit.b > spotLit.g + 15)) {
+        throw new Error(`point/spot corpus should tint the two spheres red and blue, got point=${JSON.stringify(pointLit)} spot=${JSON.stringify(spotLit)}`)
+      }
+    },
   }
 }
 
@@ -865,6 +872,12 @@ function rectAreaLightCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.18,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.r > 220 && center.g > 210 && center.b > 190 && center.r > center.b + 10)) {
+        throw new Error(`RectAreaLight corpus should render a warm lit plane, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
