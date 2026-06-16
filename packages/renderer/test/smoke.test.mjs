@@ -52,6 +52,8 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     assert.deepEqual(Buffer.from(texture.image), imageBytes)
     assert.equal(texture.source.data, texture.image)
     assert.equal(resolveLocalAssetPath('tex.png', dir), imagePath)
+    assert.equal(resolveLocalAssetPath(imagePath, dir), imagePath)
+    assert.equal(resolveLocalAssetPath(pathToFileURL(imagePath).href, dir), imagePath)
 
     const dataUriTexture = await new Promise((resolve, reject) => {
       loader.load(`data:image/png;base64,${imageBytes.toString('base64')}`, resolve, undefined, reject)
@@ -196,6 +198,16 @@ test('Node loader helper path and option containers fail clearly', async () => {
     () => resolveLocalAssetPath('tex.png', 123),
     /rootDir must be a string/i,
   )
+  assert.throws(
+    () => resolveLocalAssetPath('data:image/png;base64,AAAA'),
+    /Data URI textures should be decoded/i,
+  )
+  assert.throws(
+    () => resolveLocalAssetPath('https://example.com/tex.png'),
+    /Remote texture URL is not a local file/i,
+  )
+  const windowsPath = String.raw`C:\assets\tex.png`
+  assert.equal(resolveLocalAssetPath(windowsPath, process.cwd()), path.normalize(windowsPath))
 
   await assert.rejects(
     () => createNodeGltfLoader(123),

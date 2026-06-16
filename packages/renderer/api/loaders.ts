@@ -326,11 +326,12 @@ export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd
   if (/^data:/i.test(assetUrl)) {
     throw new Error('Data URI textures should be decoded or written to files before loading in Node.')
   }
+  if (path.isAbsolute(assetUrl) || path.win32.isAbsolute(assetUrl)) return path.normalize(assetUrl)
   if (/^file:/i.test(assetUrl)) return fileURLToPath(assetUrl)
   if (/^[a-z][a-z0-9+.-]*:/i.test(assetUrl)) {
     throw new Error(`Remote texture URL is not a local file: ${assetUrl}`)
   }
-  return path.isAbsolute(assetUrl) ? path.normalize(assetUrl) : path.resolve(root, assetUrl)
+  return path.resolve(root, assetUrl)
 }
 
 export function installLocalFileFetch(): void {
