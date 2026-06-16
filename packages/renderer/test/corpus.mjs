@@ -1238,6 +1238,12 @@ function meshToonMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [8, 6, 9],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.b > center.g + 40 && center.g > center.r + 80)) {
+        throw new Error(`toon gradient corpus should sample the blue-green ramp, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -1273,6 +1279,13 @@ function meshToonAlphaMapCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 41],
     minNonBackgroundRatio: 0.04,
+    validate(rgba, { width }) {
+      const cutout = meanRegion(rgba, width, 12, 24, 40, 72)
+      const visible = meanRegion(rgba, width, 56, 24, 84, 72)
+      if (!(cutout.b > cutout.r + 30 && visible.r > visible.b + 60)) {
+        throw new Error(`toon alpha corpus should cut out the left side and keep the right side red, got cutout=${JSON.stringify(cutout)} visible=${JSON.stringify(visible)}`)
+      }
+    },
   }
 }
 
