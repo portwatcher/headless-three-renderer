@@ -97,10 +97,16 @@ interface ThickLineExpansion {
 }
 
 interface TextureUvStreams {
-  uvs: number[] | null
-  uvs2: number[] | null
+  uvs: UvChannel | null
+  uvs2: UvChannel | null
   textureUsesUv2?: boolean
   alphaMapUsesUv2?: boolean
+}
+
+interface UvChannel {
+  attribute: ThreeBufferAttributeLike
+  label: string
+  values: number[]
 }
 
 interface ClippingContext {
@@ -248,9 +254,8 @@ function appendMesh(
   if (!position) return
 
   let positions = readVec3Attribute(position, 'geometry.attributes.position')
-  const uvAttribute = getAttribute(geometry, 'uv')
-  const uvs = uvAttribute ? readVec2Attribute(uvAttribute, 'geometry.attributes.uv') : null
-  const uvChannels = readUvChannels(geometry, uvs)
+  const uvChannels = readUvChannels(geometry)
+  const uvs = uvChannels[0]?.values ?? null
   const normalAttribute = getAttribute(geometry, 'normal')
   let normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
   const vertexColors = getAttribute(geometry, 'color')
@@ -323,10 +328,10 @@ function appendMesh(
         ? expandVec3ValuesForInstances(normals, 0, position.count, instancedGeometryCount)
         : undefined
       const expandedUvs = uvStreams.uvs
-        ? expandVec2ValuesForInstances(uvStreams.uvs, 0, position.count, instancedGeometryCount)
+        ? expandUvChannelForInstances(uvStreams.uvs, 0, position.count, instancedGeometryCount)
         : undefined
       const expandedSecondaryUvs = uvStreams.uvs2
-        ? expandVec2ValuesForInstances(uvStreams.uvs2, 0, position.count, instancedGeometryCount)
+        ? expandUvChannelForInstances(uvStreams.uvs2, 0, position.count, instancedGeometryCount)
         : undefined
 
       for (const instance of instances) {
@@ -380,10 +385,10 @@ function appendMesh(
         ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupUvs = uvStreams.uvs
-        ? expandVec2ValuesForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
+        ? expandUvChannelForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupSecondaryUvs = uvStreams.uvs2
-        ? expandVec2ValuesForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
+        ? expandUvChannelForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupIndices = wireframe
         ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
@@ -467,7 +472,7 @@ function appendShadowOnlyMeshGroup(
   positions: number[],
   normals: number[] | null,
   uvs: number[] | null,
-  uvChannels: Array<number[] | null>,
+  uvChannels: Array<UvChannel | null>,
   vertexColors: ThreeBufferAttributeLike | undefined,
   vertexCount: number,
   index: number[] | null,
@@ -505,10 +510,10 @@ function appendShadowOnlyMeshGroup(
       ? expandVec3ValuesForInstances(normals, 0, vertexCount, instancedGeometryCount)
       : undefined
     const expandedUvs = uvStreams.uvs
-      ? expandVec2ValuesForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
+      ? expandUvChannelForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
       : undefined
     const expandedSecondaryUvs = uvStreams.uvs2
-      ? expandVec2ValuesForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount)
+      ? expandUvChannelForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount)
       : undefined
 
     for (const instance of instances) {
@@ -564,10 +569,10 @@ function appendShadowOnlyMeshGroup(
     ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupUvs = uvStreams.uvs
-    ? expandVec2ValuesForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
+    ? expandUvChannelForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupSecondaryUvs = uvStreams.uvs2
-    ? expandVec2ValuesForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
+    ? expandUvChannelForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupIndices = wireframe
     ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
@@ -790,9 +795,8 @@ function appendPoints(
 
   const positions = readVec3Attribute(position, 'geometry.attributes.position')
   const vertexColors = getAttribute(geometry, 'color')
-  const pointUvAttribute = getAttribute(geometry, 'uv')
-  const primaryPointUvs = pointUvAttribute ? readVec2Attribute(pointUvAttribute, 'geometry.attributes.uv') : null
-  const pointUvChannels = readUvChannels(geometry, primaryPointUvs)
+  const pointUvChannels = readUvChannels(geometry)
+  const primaryPointUvs = pointUvChannels[0]?.values ?? null
   const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
@@ -862,9 +866,9 @@ function appendPoints(
             center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
           )
           if (pointUvStreams?.uvs) {
-            outputUvs.push(pointUvStreams.uvs[pointIndex * 2], pointUvStreams.uvs[pointIndex * 2 + 1])
+            appendUvForVertex(outputUvs, pointUvStreams.uvs, pointIndex, instance)
             if (outputUvs2 && pointUvStreams.uvs2) {
-              outputUvs2.push(pointUvStreams.uvs2[pointIndex * 2], pointUvStreams.uvs2[pointIndex * 2 + 1])
+              appendUvForVertex(outputUvs2, pointUvStreams.uvs2, pointIndex, instance)
             }
           } else {
             outputUvs.push(u, v)
@@ -1119,9 +1123,8 @@ function appendLineOrPoints(
   if (!position) return
 
   const positions = readVec3Attribute(position, 'geometry.attributes.position')
-  const uvAttribute = getAttribute(geometry, 'uv')
-  const uvs = uvAttribute ? readVec2Attribute(uvAttribute, 'geometry.attributes.uv') : null
-  const uvChannels = readUvChannels(geometry, uvs)
+  const uvChannels = readUvChannels(geometry)
+  const uvs = uvChannels[0]?.values ?? null
   const vertexColors = getAttribute(geometry, 'color')
   const vertexCount = position.count
   const indexAttr = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', vertexCount) : null
@@ -1133,13 +1136,13 @@ function appendLineOrPoints(
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
 
-    const uvStreams = topology === 'lines'
+    const uvStreams: TextureUvStreams = topology === 'lines'
       ? textureUvStreamsForMapAlphaMaterial(uvChannels, material)
-      : { uvs, uvs2: secondaryUvsForMaterial(uvChannels, material) }
+      : { uvs: uvChannels[0], uvs2: secondaryUvsForMaterial(uvChannels, material) }
     let indices: number[] | null = null
     let outputPositions = positions
-    let outputUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs ?? undefined : undefined
-    let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs2 ?? undefined : undefined
+    let outputUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs?.values : undefined
+    let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs2?.values : undefined
     let outputColors: number[] | undefined
     let thickCenter: [number, number, number] | undefined
     const color = materialColor(material)
@@ -1175,8 +1178,8 @@ function appendLineOrPoints(
           )
           : dashedLineAttributes(
             positions,
-            uvStreams.uvs,
-            uvStreams.uvs2,
+            uvStreams.uvs?.values ?? null,
+            uvStreams.uvs2?.values ?? null,
             useVertexColors ? readColorAttribute(vertexColors!, color, 'geometry.attributes.color') : undefined,
             source,
             drawStart,
@@ -1219,8 +1222,8 @@ function appendLineOrPoints(
         if (indices.length < 2) continue
         if (instancedGeometryCount > 1 || instancedPositionOffset) {
           outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
-          outputUvs = uvStreams.uvs ? expandVec2ValuesForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
-          outputSecondaryUvs = uvStreams.uvs2 ? expandVec2ValuesForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
+          outputUvs = uvStreams.uvs ? expandUvChannelForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
+          outputSecondaryUvs = uvStreams.uvs2 ? expandUvChannelForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
           indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
         }
         if (thickLine) {
@@ -1960,6 +1963,60 @@ function expandVec2ValuesForInstances(values: number[], start: number, count: nu
   return out
 }
 
+function expandUvChannelForInstances(channel: UvChannel, start: number, count: number, instanceCount: number): number[] {
+  if (!isInstancedAttribute(channel.attribute)) {
+    return expandVec2ValuesForInstances(channel.values, start, count, instanceCount)
+  }
+
+  const out = new Array<number>(count * instanceCount * 2)
+  let dst = 0
+  for (let instance = 0; instance < instanceCount; instance += 1) {
+    const sourceIndex = instancedAttributeIndex(channel.attribute, instance, labelForMeshPerAttribute(channel))
+    const u = attributeComponent(channel.attribute, sourceIndex, 0, channel.label)
+    const v = attributeComponent(channel.attribute, sourceIndex, 1, channel.label)
+    for (let vertex = 0; vertex < count; vertex += 1) {
+      out[dst++] = u
+      out[dst++] = v
+    }
+  }
+  return out
+}
+
+function appendUvForVertex(
+  out: number[],
+  channel: UvChannel,
+  vertexIndex: number,
+  instanceIndex: number,
+): void {
+  const sourceIndex = isInstancedAttribute(channel.attribute)
+    ? instancedAttributeIndex(channel.attribute, instanceIndex, labelForMeshPerAttribute(channel))
+    : vertexIndex
+  out.push(
+    attributeComponent(channel.attribute, sourceIndex, 0, channel.label),
+    attributeComponent(channel.attribute, sourceIndex, 1, channel.label),
+  )
+}
+
+function uvValuesForInstance(channel: UvChannel | null, vertexCount: number, instanceIndex: number): number[] | null {
+  if (!channel) return null
+  if (!isInstancedAttribute(channel.attribute)) return channel.values
+
+  const out = new Array<number>(vertexCount * 2)
+  let dst = 0
+  const sourceIndex = instancedAttributeIndex(channel.attribute, instanceIndex, labelForMeshPerAttribute(channel))
+  const u = attributeComponent(channel.attribute, sourceIndex, 0, channel.label)
+  const v = attributeComponent(channel.attribute, sourceIndex, 1, channel.label)
+  for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+    out[dst++] = u
+    out[dst++] = v
+  }
+  return out
+}
+
+function labelForMeshPerAttribute(channel: UvChannel): string {
+  return `${channel.label}.meshPerAttribute`
+}
+
 function expandColorAttributeForInstances(
   attribute: ThreeBufferAttributeLike,
   materialColor: Color4,
@@ -2056,7 +2113,8 @@ function isMeshWireframeMaterial(material: ThreeMaterialLike | undefined): boole
   return material?.wireframe === true
 }
 
-function readUvChannels(geometry: ThreeBufferGeometryLike, primaryUvs: number[] | null): Array<number[] | null> {
+function readUvChannels(geometry: ThreeBufferGeometryLike): Array<UvChannel | null> {
+  const primaryUvs = readOptionalUvAttribute(geometry, 'uv')
   return [
     primaryUvs,
     readOptionalUvAttribute(geometry, 'uv1') ?? readOptionalUvAttribute(geometry, 'uv2') ?? primaryUvs,
@@ -2065,13 +2123,19 @@ function readUvChannels(geometry: ThreeBufferGeometryLike, primaryUvs: number[] 
   ]
 }
 
-function readOptionalUvAttribute(geometry: ThreeBufferGeometryLike, name: string): number[] | null {
+function readOptionalUvAttribute(geometry: ThreeBufferGeometryLike, name: string): UvChannel | null {
   const attribute = getAttribute(geometry, name)
-  return attribute ? readVec2Attribute(attribute, `geometry.attributes.${name}`) : null
+  if (!attribute) return null
+  const label = `geometry.attributes.${name}`
+  return {
+    attribute,
+    label,
+    values: readVec2Attribute(attribute, label),
+  }
 }
 
 function textureUvStreamsForMapAlphaMaterial(
-  channels: Array<number[] | null>,
+  channels: Array<UvChannel | null>,
   material: {
     map?: { channel?: number } | null
     alphaMap?: { channel?: number } | null
@@ -2107,7 +2171,7 @@ function textureUvStreamsForMapAlphaMaterial(
 }
 
 function textureUvStreamsForMeshMaterial(
-  channels: Array<number[] | null>,
+  channels: Array<UvChannel | null>,
   material: ThreeMaterialLike | undefined,
 ): TextureUvStreams {
   if (canUseDistinctMeshMapAlphaUvStreams(material)) {
@@ -2156,7 +2220,7 @@ function meshUvTextureSlotsBeyondMapAlpha(material: ThreeMaterialLike): Array<{ 
 }
 
 function secondaryUvsForMaterial(
-  channels: Array<number[] | null>,
+  channels: Array<UvChannel | null>,
   material: {
     map?: { channel?: number } | null
     clearcoatMap?: { channel?: number } | null
@@ -2182,7 +2246,7 @@ function secondaryUvsForMaterial(
     specularMap?: { channel?: number } | null
     alphaMap?: { channel?: number } | null
   } | undefined,
-): number[] | null {
+): UvChannel | null {
   const textures = [
     material?.clearcoatMap,
     material?.clearcoatRoughnessMap,
@@ -2330,8 +2394,8 @@ function dashedLineAttributes(
 
 function dashedLineAttributesForInstances(
   positions: number[],
-  uvs: number[] | null,
-  uvs2: number[] | null,
+  uvChannel: UvChannel | null,
+  uvChannel2: UvChannel | null,
   vertexColors: ThreeBufferAttributeLike | undefined,
   materialColor: Color4,
   source: number[],
@@ -2345,25 +2409,28 @@ function dashedLineAttributesForInstances(
 ): DashedLineExpansion {
   const out: DashedLineExpansion = {
     positions: [],
-    uvs: uvs ? [] : undefined,
-    uvs2: uvs2 ? [] : undefined,
+    uvs: uvChannel ? [] : undefined,
+    uvs2: uvChannel2 ? [] : undefined,
     colors: vertexColors ? [] : undefined,
   }
   const baseColors = vertexColors && !isInstancedAttribute(vertexColors)
     ? readColorAttribute(vertexColors, materialColor, 'geometry.attributes.color')
     : undefined
+  const vertexCount = positions.length / 3
 
   for (let instance = 0; instance < instanceCount; instance += 1) {
     const instancePositions = offsetAttribute
       ? offsetVec3ValuesForInstance(positions, offsetAttribute, instance)
       : positions
+    const instanceUvs = uvValuesForInstance(uvChannel, vertexCount, instance)
+    const instanceUvs2 = uvValuesForInstance(uvChannel2, vertexCount, instance)
     const instanceColors = vertexColors
       ? baseColors ?? repeatedInstancedColorValues(vertexColors, materialColor, positions.length / 3, instance)
       : undefined
     const dashed = dashedLineAttributes(
       instancePositions,
-      uvs,
-      uvs2,
+      instanceUvs,
+      instanceUvs2,
       instanceColors,
       source,
       start,

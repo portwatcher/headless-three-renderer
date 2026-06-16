@@ -5942,6 +5942,42 @@ test('InstancedBufferGeometry honors meshPerAttribute repeat values for offsets 
   assert.ok(right.g > right.r + 40, `repeated second instanced attributes should draw green on the right (${right.g} vs ${right.r})`)
 })
 
+test('InstancedBufferGeometry expands instanced mesh texture UV attributes', () => {
+  const base = new THREE.PlaneGeometry(0.45, 0.45)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.45, 0, 0, 0.45, 0, 0]),
+    3,
+  ))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(
+    new Float32Array([0.25, 0.5, 0.75, 0.5]),
+    2,
+  ))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, map })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const left = meanRegion(rgba, 96, 64, 20, 28, 32, 36)
+  const right = meanRegion(rgba, 96, 64, 64, 28, 76, 36)
+  assert.ok(left.r > left.g + 60, `left instanced mesh uv should sample red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 60, `right instanced mesh uv should sample green (${right.g} vs ${right.r})`)
+})
+
 test('invalid instance counts fail clearly', () => {
   const camera = makeCamera()
 
@@ -16487,6 +16523,48 @@ test('LineSegments with InstancedBufferGeometry expand offsets and colors', () =
   assert.ok(greenPixels > 2, `right instanced line should render green pixels (${greenPixels})`)
 })
 
+test('LineSegments with InstancedBufferGeometry expand instanced map UV attributes', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 2
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.25, 0, 0,
+    0.25, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    linewidth: 8,
+    map,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 12, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(redPixels > 4, `left instanced line uv should sample red (${redPixels})`)
+  assert.ok(greenPixels > 4, `right instanced line uv should sample green (${greenPixels})`)
+})
+
 test('LineDashedMaterial with InstancedBufferGeometry expands offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 2
@@ -17046,6 +17124,48 @@ test('Points with InstancedBufferGeometry expand offsets and colors', () => {
   const greenPixels = countRegionPixels(rgba, 96, 96, 52, 34, 76, 62, (r, g, b) => g > r + 40 && g > b + 40)
   assert.ok(redPixels > 20, `left instanced point should render red pixels (${redPixels})`)
   assert.ok(greenPixels > 20, `right instanced point should render green pixels (${greenPixels})`)
+})
+
+test('Points with InstancedBufferGeometry expand instanced map UV attributes', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 2
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.35, 0, 0,
+    0.35, 0, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 24,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const left = meanRegion(rgba, 96, 96, 24, 38, 42, 58)
+  const right = meanRegion(rgba, 96, 96, 54, 38, 72, 58)
+  assert.ok(left.r > left.g + 50, `left instanced point uv should sample red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 50, `right instanced point uv should sample green (${right.g} vs ${right.r})`)
 })
 
 test('Points receiveShadow is accepted as an unlit WebGL-compatible no-op', () => {
