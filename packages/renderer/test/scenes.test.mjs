@@ -6018,6 +6018,51 @@ test('Sprite customDepthMaterial alphaMap controls directional shadow casters', 
   assert.ok(cutoutLum > opaqueLum + 10, `sprite customDepthMaterial alphaMap should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
 })
 
+test('Sprite customDistanceMaterial alphaMap controls point-light shadow casters', () => {
+  function renderSpriteCustomDistanceShadow(alphaMapGreen) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+    sprite.position.set(0, 2.2, 1.8)
+    sprite.scale.set(4, 4, 1)
+    sprite.castShadow = true
+    sprite.customDistanceMaterial = new THREE.MeshDistanceMaterial({
+      alphaMap: solidTexture(255, alphaMapGreen, 255),
+      alphaTest: 0.5,
+    })
+    scene.add(sprite)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  const opaqueCaster = renderSpriteCustomDistanceShadow(255)
+  const cutoutCaster = renderSpriteCustomDistanceShadow(0)
+  const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
+  const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
+  assert.ok(cutoutLum > opaqueLum + 10, `sprite customDistanceMaterial alphaMap should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
+})
+
 test('Points customDistanceMaterial alphaMap controls point-light shadow casters', () => {
   function renderPointsCustomDistanceShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
