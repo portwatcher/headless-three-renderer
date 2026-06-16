@@ -10011,6 +10011,37 @@ test('lightMap honors nearest texture filters', () => {
   assert.ok(linear.g > nearest.g + 30, `LinearFilter should blend in the green light-map texel (${linear.g} vs ${nearest.g})`)
 })
 
+test('AmbientLight honors camera layer filtering', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const redFiltered = new THREE.AmbientLight(0xff0000, 4)
+  redFiltered.layers.set(0)
+  scene.add(redFiltered)
+
+  const greenVisible = new THREE.AmbientLight(0x00ff00, 1.5)
+  greenVisible.layers.set(1)
+  scene.add(greenVisible)
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+  )
+  mesh.layers.set(1)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.layers.set(1)
+
+  assert.deepEqual(extractAmbientLight(scene, camera), [0, 1, 0])
+  assert.equal(extractAmbientIntensity(scene, camera), 1.5)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 15, `camera layer should select green AmbientLight and ignore red (${mean.g} vs ${mean.r})`)
+})
+
 test('LightProbe spherical harmonics contribute diffuse lighting', () => {
   const probe = new THREE.LightProbe(undefined, 1.5)
   for (const coefficient of probe.sh.coefficients) {
