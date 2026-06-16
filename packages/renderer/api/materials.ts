@@ -1425,21 +1425,12 @@ function assertSupportedMaterialState(
   material: ThreeMaterialLike,
   context: MaterialExtractionContext,
 ): void {
-  const wireframe = optionalBoolean(material.wireframe, 'material.wireframe')
-  if (wireframe === true && !supportsMeshWireframe(material)) {
-    throw new Error(
-      'material.wireframe is only supported by @headless-three/renderer for MeshDepthMaterial and MeshDistanceMaterial. Use LineSegments or EdgesGeometry for visible mesh wireframes with other materials.',
-    )
-  }
+  optionalBoolean(material.wireframe, 'material.wireframe')
   if (material.envMap != null && context.materialEnvironmentMaps?.has(material) !== true) {
     throw new Error(
       'material.envMap is only supported for MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
     )
   }
-}
-
-function supportsMeshWireframe(material: ThreeMaterialLike): boolean {
-  return material.isMeshDepthMaterial === true || material.isMeshDistanceMaterial === true
 }
 
 function assertSupportedMaterialClass(

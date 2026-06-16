@@ -268,7 +268,7 @@ function appendMesh(
     const castShadow = objectCastsShadow && !usesCustomShadowMaterial ? true : undefined
     const receiveShadow = objectReceivesShadow ? true : undefined
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
-    const wireframe = isDepthDistanceWireframeMaterial(material)
+    const wireframe = isMeshWireframeMaterial(material)
 
     if (index) {
       const indices = index.slice(group.start, group.start + group.count)
@@ -1916,6 +1916,10 @@ function wireframeIndicesForUnindexedTriangles(vertexCount: number): number[] {
 function isDepthDistanceWireframeMaterial(material: ThreeMaterialLike | undefined): boolean {
   return material?.wireframe === true
     && (material.isMeshDepthMaterial === true || material.isMeshDistanceMaterial === true)
+}
+
+function isMeshWireframeMaterial(material: ThreeMaterialLike | undefined): boolean {
+  return material?.wireframe === true
 }
 
 function readUvChannels(geometry: ThreeBufferGeometryLike, primaryUvs: number[] | null): Array<number[] | null> {

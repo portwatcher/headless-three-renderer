@@ -2858,21 +2858,26 @@ test('MeshDistanceMaterial wireframe renders distance on triangle edges', () => 
   assert.ok(wireRatio < solidRatio * 0.35, `wireframe distance material should not fill faces (${wireRatio} vs ${solidRatio})`)
 })
 
-test('unsupported main-pass mesh wireframe materials fail clearly', () => {
-  const camera = makeCamera()
-  const cases = [
-    new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, wireframe: true }),
-  ]
-
-  for (const material of cases) {
+test('MeshBasicMaterial wireframe renders triangle edges without filling faces', () => {
+  function renderBasicWireframe(wireframe) {
     const scene = new THREE.Scene()
-    scene.add(new THREE.Mesh(new THREE.BoxGeometry(), material))
-    assert.throws(
-      () => renderRgba(scene, camera, { width: 64, height: 64 }),
-      /material\.wireframe.*only supported.*MeshDepthMaterial.*MeshDistanceMaterial/i,
-    )
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
   }
+
+  const solidRatio = nonBackgroundRatio(renderBasicWireframe(false), [0, 0, 0])
+  const wireRatio = nonBackgroundRatio(renderBasicWireframe(true), [0, 0, 0])
+  assert.ok(solidRatio > 0.4, `solid basic material should fill the plane (${solidRatio})`)
+  assert.ok(wireRatio > 0.005, `wireframe basic material should draw visible edges (${wireRatio})`)
+  assert.ok(wireRatio < solidRatio * 0.35, `wireframe basic material should not fill faces (${wireRatio} vs ${solidRatio})`)
 })
 
 test('MeshDistanceMaterial honors referencePosition and distance range', () => {

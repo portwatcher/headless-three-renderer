@@ -143,7 +143,7 @@ The public API accepts only Three.js-like objects:
 - `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode and wrap/filter sampler settings; direct conformance also covers toon base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing, with clear failures for unsupported depth-packing constants
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, with invalid range values failing clearly, plus alpha-map cutouts and CPU-baked displacement
-- `MeshDepthMaterial` and `MeshDistanceMaterial` wireframe output
+- main-pass `material.wireframe` output for supported mesh materials, including direct coverage for `MeshBasicMaterial`, `MeshDepthMaterial`, and `MeshDistanceMaterial`
 - `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
 - emissive color, intensity, and emissive map, with primary/secondary `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings; invalid color/intensity values fail clearly
 - light maps with `lightMapIntensity`, primary/secondary `texture.channel` UV selection, texture transforms, sRGB color-space decode, and wrap/filter sampler settings; invalid intensity values fail clearly

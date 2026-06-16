@@ -19,6 +19,7 @@ export function createSceneCorpus() {
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
+    meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
     meshDepthMaterialWireframeCorpus(),
     meshDistanceMaterialCorpus(),
@@ -852,6 +853,24 @@ function materialEnvMapBasicLambertCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [6, 6, 8],
     minNonBackgroundRatio: 0.06,
+  }
+}
+
+function meshBasicMaterialWireframeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7, 4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffdd66, wireframe: true }),
+  ))
+
+  return {
+    name: 'mesh-basic-material-wireframe',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.004,
   }
 }
 
