@@ -10042,6 +10042,39 @@ test('AmbientLight honors camera layer filtering', () => {
   assert.ok(mean.g > mean.r + 15, `camera layer should select green AmbientLight and ignore red (${mean.g} vs ${mean.r})`)
 })
 
+test('HemisphereLight honors camera layer filtering', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const redFiltered = new THREE.HemisphereLight(0xff0000, 0x000000, 4)
+  redFiltered.layers.set(0)
+  scene.add(redFiltered)
+
+  const greenVisible = new THREE.HemisphereLight(0x00ff00, 0x000000, 4)
+  greenVisible.layers.set(1)
+  scene.add(greenVisible)
+
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 32, 16),
+    new THREE.MeshLambertMaterial({ color: 0xffffff }),
+  )
+  mesh.layers.set(1)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.layers.set(1)
+
+  const [light] = extractLights(scene, camera) ?? []
+  assert.equal(light?.lightType, 'hemisphere')
+  assert.deepEqual(light?.color, [0, 1, 0])
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 20, `camera layer should select green HemisphereLight and ignore red (${mean.g} vs ${mean.r})`)
+  assert.ok(mean.g > mean.b + 35, `green HemisphereLight should tint the lit sphere (${mean.g} vs ${mean.b})`)
+})
+
 test('LightProbe spherical harmonics contribute diffuse lighting', () => {
   const probe = new THREE.LightProbe(undefined, 1.5)
   for (const coefficient of probe.sh.coefficients) {
