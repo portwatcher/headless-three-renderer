@@ -1916,7 +1916,10 @@ function assertSupportedRawTextureType(type: unknown, label: string, usage: stri
   if (
     type == null ||
     type === UnsignedByteType ||
+    type === ByteType ||
+    type === ShortType ||
     type === UnsignedShortType ||
+    type === IntType ||
     type === UnsignedIntType ||
     type === HalfFloatType ||
     type === FloatType ||
@@ -1926,7 +1929,7 @@ function assertSupportedRawTextureType(type: unknown, label: string, usage: stri
     return
   }
   throw new Error(
-    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, UnsignedShortType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, or UnsignedShort5551Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
+    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, or UnsignedShort5551Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
   )
 }
 
@@ -2227,9 +2230,21 @@ function toRgba8(
     if (!(data instanceof Uint16Array)) return null
     return halfFloatDataToRgba8(data, pixels, allowNarrowChannels)
   }
+  if (textureType === ByteType) {
+    if (!(data instanceof Int8Array)) return null
+    return normalizedSignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0x7f)
+  }
+  if (textureType === ShortType) {
+    if (!(data instanceof Int16Array)) return null
+    return normalizedSignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0x7fff)
+  }
   if (textureType === UnsignedShortType) {
     if (!(data instanceof Uint16Array)) return null
     return normalizedUnsignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0xffff)
+  }
+  if (textureType === IntType) {
+    if (!(data instanceof Int32Array)) return null
+    return normalizedSignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0x7fffffff)
   }
   if (textureType === UnsignedIntType) {
     if (!(data instanceof Uint32Array)) return null
@@ -2454,6 +2469,57 @@ function normalizedUnsignedIntegerDataToRgba8(
 
 function normalizedUnsignedIntegerToByte(value: number, maxValue: number): number {
   return Math.max(0, Math.min(255, Math.round((value / maxValue) * 255)))
+}
+
+function normalizedSignedIntegerDataToRgba8(
+  data: Int8Array | Int16Array | Int32Array,
+  pixels: number,
+  allowNarrowChannels: boolean,
+  maxValue: number,
+): Uint8Array | null {
+  if (data.length === pixels * 4) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels * 4; i++) {
+      out[i] = normalizedSignedIntegerToByte(data[i], maxValue)
+    }
+    return out
+  }
+  if (data.length === pixels * 3) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = normalizedSignedIntegerToByte(data[i * 3], maxValue)
+      out[i * 4 + 1] = normalizedSignedIntegerToByte(data[i * 3 + 1], maxValue)
+      out[i * 4 + 2] = normalizedSignedIntegerToByte(data[i * 3 + 2], maxValue)
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels * 2) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      out[i * 4] = normalizedSignedIntegerToByte(data[i * 2], maxValue)
+      out[i * 4 + 1] = normalizedSignedIntegerToByte(data[i * 2 + 1], maxValue)
+      out[i * 4 + 2] = 0
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  if (allowNarrowChannels && data.length === pixels) {
+    const out = new Uint8Array(pixels * 4)
+    for (let i = 0; i < pixels; i++) {
+      const value = normalizedSignedIntegerToByte(data[i], maxValue)
+      out[i * 4] = value
+      out[i * 4 + 1] = value
+      out[i * 4 + 2] = value
+      out[i * 4 + 3] = 255
+    }
+    return out
+  }
+  return null
+}
+
+function normalizedSignedIntegerToByte(value: number, maxValue: number): number {
+  return Math.max(0, Math.min(255, Math.round((Math.max(value, 0) / maxValue) * 255)))
 }
 
 function packedUnsignedShort4444ToRgba8(data: Uint16Array, pixels: number): Uint8Array | null {

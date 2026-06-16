@@ -124,7 +124,7 @@ The public API accepts only Three.js-like objects:
 ### Materials & Textures
 
 - material base color, opacity, and visibility, with invalid color/opacity/visible values failing clearly
-- `material.map` (base color texture) — PNG, JPEG, WebP, and raw one-channel, two-channel, RGB, or RGBA numeric DataTexture inputs, including byte, normalized unsigned integer, packed 16-bit color, float, and half-float typed data, with `texture.channel` UV selection and sRGB color-space decode
+- `material.map` (base color texture) — PNG, JPEG, WebP, and raw one-channel, two-channel, RGB, or RGBA numeric DataTexture inputs, including byte, signed/unsigned normalized integer, packed 16-bit color, float, and half-float typed data, with `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line, matcap, emissive, light, sheen color, and physical specular color maps decode `THREE.SRGBColorSpace`; unsupported texture color-space/encoding values fail clearly
 - base, 2D background, sprite/point color and alpha, line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots; invalid transform and transform-boolean values fail clearly
 - `texture.channel` supports channels 0-3 on supported map slots; channels 1-3 route one selected non-primary UV attribute through the native secondary UV stream, and mixed non-primary channels in one material draw fail clearly
@@ -167,7 +167,7 @@ The public API accepts only Three.js-like objects:
 
 Texture image data can be:
 
-- Raw one-channel, two-channel, RGB, or RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`), including `UnsignedByteType`, normalized `UnsignedShortType`/`UnsignedIntType`, packed `UnsignedShort4444Type`/`UnsignedShort5551Type`, normalized float arrays, and `HalfFloatType` `Uint16Array` binary16 data
+- Raw one-channel, two-channel, RGB, or RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`), including `UnsignedByteType`, normalized `ByteType`/`ShortType`/`UnsignedShortType`/`IntType`/`UnsignedIntType`, packed `UnsignedShort4444Type`/`UnsignedShort5551Type`, normalized float arrays, and `HalfFloatType` `Uint16Array` binary16 data
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
 
 Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Browser `Image`/`ImageBitmap`/canvas-like texture objects are not readable in Node and fail clearly until normalized to encoded bytes or raw pixel data. Mismatched-length raw texture payloads fail clearly.

@@ -6823,6 +6823,63 @@ test('normalized unsigned integer raw DataTexture maps decode for material and b
   }
 })
 
+test('normalized signed integer raw DataTexture maps decode for material and background textures', () => {
+  const cases = [
+    [
+      'ByteType',
+      THREE.ByteType,
+      () => new Int8Array([64, 32, 127, 127]),
+    ],
+    [
+      'ShortType',
+      THREE.ShortType,
+      () => new Int16Array([0x4000, 0x2000, 0x7fff, 0x7fff]),
+    ],
+    [
+      'IntType',
+      THREE.IntType,
+      () => new Int32Array([0x40000000, 0x20000000, 0x7fffffff, 0x7fffffff]),
+    ],
+  ]
+
+  function rgbaTexture(type, data) {
+    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, type)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderTexture(kind, type, data) {
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    if (kind === 'material') {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: rgbaTexture(type, data) })))
+    } else {
+      scene.background = rgbaTexture(type, data)
+    }
+    return meanRegion(
+      renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+  }
+
+  for (const [name, type, makeData] of cases) {
+    for (const kind of ['material', 'background']) {
+      const mean = renderTexture(kind, type, makeData())
+      assert.ok(mean.r > 105 && mean.r < 155, `${kind} ${name} red should normalize near 0.5 (${mean.r})`)
+      assert.ok(mean.g > 45 && mean.g < 100, `${kind} ${name} green should normalize near 0.25 (${mean.g})`)
+      assert.ok(mean.b > 180, `${kind} ${name} blue should normalize near 1.0 (${mean.b})`)
+    }
+  }
+})
+
 test('normalized unsigned integer raw environment textures decode for IBL', () => {
   function byteEnvironmentTexture() {
     const texture = solidTexture(128, 64, 255)
@@ -6870,6 +6927,56 @@ test('normalized unsigned integer raw environment textures decode for IBL', () =
     const unsignedRender = renderEnvironment(kind, unsignedShortEnvironmentTexture())
     const diff = meanAbsDiff(byteRender, unsignedRender)
     assert.ok(diff < 2, `${kind} unsigned integer environment should match equivalent RGBA8 IBL (diff=${diff.toFixed(3)})`)
+  }
+})
+
+test('normalized signed integer raw environment textures decode for IBL', () => {
+  function byteEnvironmentTexture() {
+    const texture = solidTexture(129, 64, 255)
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  function signedShortEnvironmentTexture() {
+    const texture = new THREE.DataTexture(
+      new Int16Array([0x4000, 0x2000, 0x7fff, 0x7fff]),
+      1,
+      1,
+      THREE.RGBAFormat,
+      THREE.ShortType,
+    )
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderEnvironment(kind, texture) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (kind === 'scene') {
+      scene.environment = texture
+      scene.environmentIntensity = 2.5
+    } else {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture, intensity: 2.5 },
+      }
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 16),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 }),
+    ))
+    return renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  for (const kind of ['scene', 'reflectionProbe']) {
+    const byteRender = renderEnvironment(kind, byteEnvironmentTexture())
+    const signedRender = renderEnvironment(kind, signedShortEnvironmentTexture())
+    const diff = meanAbsDiff(byteRender, signedRender)
+    assert.ok(diff < 2, `${kind} signed integer environment should match equivalent RGBA8 IBL (diff=${diff.toFixed(3)})`)
   }
 })
 
@@ -7228,7 +7335,7 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
   }
 })
 
-test('unsupported raw DataTexture type constants fail clearly', () => {
+test('unsupported packed-depth raw DataTexture type constants fail clearly', () => {
   function rawTexture(data, type) {
     const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, type)
     texture.needsUpdate = true
@@ -7236,18 +7343,6 @@ test('unsupported raw DataTexture type constants fail clearly', () => {
   }
 
   const cases = [
-    ['material ByteType', (scene) => {
-      scene.add(new THREE.Mesh(
-        new THREE.PlaneGeometry(2, 2),
-        new THREE.MeshBasicMaterial({ map: rawTexture(new Int8Array([-128, 0, 64, 127]), THREE.ByteType) }),
-      ))
-    }, /texture raw texture type ByteType.*not supported/i],
-    ['background ShortType', (scene) => {
-      scene.background = rawTexture(new Int16Array([-32768, 0, 16384, 32767]), THREE.ShortType)
-    }, /background raw texture type ShortType.*not supported/i],
-    ['environment IntType', (scene) => {
-      scene.environment = rawTexture(new Int32Array([-2147483648, 0, 1073741824, 2147483647]), THREE.IntType)
-    }, /scene\.environment raw texture type IntType.*not supported/i],
     ['reflection probe packed depth type', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type) },
