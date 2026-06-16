@@ -719,6 +719,13 @@ function twoDimensionalBackgroundTextureCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
+    validate(rgba, { width }) {
+      const top = meanRegion(rgba, width, 4, 4, 24, 24)
+      const bottom = meanRegion(rgba, width, 4, 72, 24, 92)
+      if (!(top.r > top.b + 20 && bottom.g > bottom.b + 40 && Math.abs(top.r - bottom.r) > 30)) {
+        throw new Error(`2D background corpus should show transformed repeated texture colors, got top=${JSON.stringify(top)} bottom=${JSON.stringify(bottom)}`)
+      }
+    },
   }
 }
 
@@ -1513,6 +1520,12 @@ function equirectangularBackgroundCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
+        throw new Error(`equirectangular background rotation corpus should sample the green half, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
@@ -1538,6 +1551,12 @@ function cubeBackgroundTextureCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
     browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
+        throw new Error(`cube background rotation corpus should sample the green face, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
