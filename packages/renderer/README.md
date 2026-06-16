@@ -110,7 +110,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.Mesh` and `THREE.SkinnedMesh`
 - `THREE.InstancedMesh` with `instanceMatrix` and `instanceColor`; invalid explicit instance counts fail clearly
 - `THREE.InstancedBufferGeometry` for mesh, point, line, and dashed-line geometry with common offset/color attributes and `meshPerAttribute` repeat values; invalid explicit instance counts or per-attribute repeat values fail clearly
-- `THREE.BatchedMesh` common packed-geometry batches are CPU-expanded with per-instance matrices, colors, visibility flags, and common per-object sphere frustum culling; malformed batch internals/culling flags fail clearly, while exact culling/sorting edge cases and native batched drawing remain planned
+- `THREE.BatchedMesh` common packed-geometry batches are CPU-expanded with per-instance matrices, colors, visibility flags, packed geometry groups/material arrays when present, and common per-object sphere frustum culling; malformed batch internals/culling flags fail clearly, while exact culling/sorting/source-group preservation edge cases and native batched drawing remain planned
 - `THREE.BufferGeometry` positions, indices, normals, and UV coordinates, with invalid attribute values failing clearly
 - `THREE.Sprite`/`SpriteMaterial` CPU billboards with center, scale, rotation, perspective size attenuation controls, opacity, texture maps, scene fog, layers, render ordering, main-pass clipping, directional/spot/point shadow casting, and alpha-tested custom depth/distance shadow material cutouts; invalid billboard scalar and size-attenuation values fail clearly
 - geometry groups with material arrays

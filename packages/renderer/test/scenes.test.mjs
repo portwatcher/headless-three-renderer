@@ -421,6 +421,45 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   assert.ok(centerMean.b < 5 && centerMean.r < 5 && centerMean.g < 5, `hidden BatchedMesh instance should not render at center (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
 })
 
+test('BatchedMesh material arrays honor packed geometry groups', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.45, 0.45)
+  const batched = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count * 2,
+    source.index.count * 2,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const leftGeometryId = batched.addGeometry(source)
+  const rightGeometryId = batched.addGeometry(source.clone())
+  const left = batched.addInstance(leftGeometryId)
+  const right = batched.addInstance(rightGeometryId)
+  batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
+  batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
+
+  const leftRange = batched.getGeometryRangeAt(leftGeometryId, {})
+  const rightRange = batched.getGeometryRangeAt(rightGeometryId, {})
+  batched.geometry.clearGroups()
+  batched.geometry.addGroup(leftRange.start, leftRange.count, 0)
+  batched.geometry.addGroup(rightRange.start, rightRange.count, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
+  const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
+  assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `left BatchedMesh geometry group should use the red material (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+  assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right BatchedMesh geometry group should use the green material (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+})
+
 test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)
