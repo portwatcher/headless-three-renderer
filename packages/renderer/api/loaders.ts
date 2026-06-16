@@ -115,6 +115,8 @@ export class EncodedImageTextureLoader {
   ): TextureLike {
     const texture = new Texture()
     const assetUrl = requiredString(url, 'url')
+    const loadCallback = optionalFunction(onLoad, 'onLoad')
+    const errorCallback = optionalFunction(onError, 'onError')
     const source = /^data:/i.test(assetUrl) ? assetUrl : (this.loaderPath ? `${this.loaderPath}${assetUrl}` : assetUrl)
     const encodedDataUri = encodedImageDataUriBuffer(source)
     const data = encodedDataUri
@@ -127,8 +129,8 @@ export class EncodedImageTextureLoader {
       texture.image = buffer
       texture.source.data = buffer
       texture.needsUpdate = true
-      onLoad?.(texture)
-    }, onError)
+      loadCallback?.(texture)
+    }, errorCallback)
 
     return texture
   }

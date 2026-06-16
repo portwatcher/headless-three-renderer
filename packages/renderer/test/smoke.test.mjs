@@ -161,6 +161,14 @@ test('Node loader helper path and option containers fail clearly', async () => {
     /url must be a string/i,
   )
   assert.throws(
+    () => imageLoader.load('tex.png', 'yes'),
+    /onLoad must be a function/i,
+  )
+  assert.throws(
+    () => imageLoader.load('tex.png', undefined, undefined, 'yes'),
+    /onError must be a function/i,
+  )
+  assert.throws(
     () => resolveLocalAssetPath(123),
     /url must be a string/i,
   )
