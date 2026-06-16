@@ -811,13 +811,13 @@ function writeCubeRenderTarget(
 
   const texture = ensureCubeTargetTexture(target)
   texture.isCubeTexture = true
-  writeCubeTextureFaces(texture, faces.map((face) => colorTextureData(texture, face)), faceWidth, faceHeight, activeMipmapLevel)
+  writeCubeTextureFaces(texture, faces.map((face) => colorTextureData(texture, face)), faceWidth, faceHeight, activeMipmapLevel, 'target.texture')
   texture.needsPMREMUpdate = true
   if (target.depthTexture && depthFaces) {
     if (depthFaces.length !== CUBE_FACE_COUNT) {
       throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered depth faces, received ${depthFaces.length}.`)
     }
-    writeCubeTextureFaces(target.depthTexture, depthFaces, faceWidth, faceHeight, activeMipmapLevel)
+    writeCubeTextureFaces(target.depthTexture, depthFaces, faceWidth, faceHeight, activeMipmapLevel, 'target.depthTexture')
   }
   return target
 }
@@ -828,6 +828,7 @@ function writeCubeTextureFaces(
   width: number,
   height: number,
   activeMipmapLevel: number,
+  label: string,
 ): void {
   const images = faces.map((data) => ({ data, width, height, depth: 1 }))
   if (activeMipmapLevel === 0) {
@@ -835,6 +836,9 @@ function writeCubeTextureFaces(
     texture.source ??= {}
     texture.source.data = images
   } else {
+    if (texture.mipmaps != null && !Array.isArray(texture.mipmaps)) {
+      throw new TypeError(`${label}.mipmaps must be an array of image-like objects.`)
+    }
     const mipmaps = texture.mipmaps ?? (texture.mipmaps = [])
     for (let level = 0; level <= activeMipmapLevel; level += 1) {
       mipmaps[level] ??= {}

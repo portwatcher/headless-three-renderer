@@ -1360,6 +1360,24 @@ test('CubeCamera malformed render targets fail clearly', () => {
     () => render(scene, cubeCamera, { width: 32, height: 32, target: 'bad' }),
     /options\.target must be a target-like object/i,
   )
+
+  const colorMipTarget = new THREE.WebGLCubeRenderTarget(32)
+  const colorMipCamera = new THREE.CubeCamera(0.01, 100, colorMipTarget)
+  colorMipCamera.activeMipmapLevel = 1
+  colorMipTarget.texture.mipmaps = 'bad'
+  assert.throws(
+    () => renderToTarget(scene, colorMipCamera, colorMipTarget),
+    /target\.texture\.mipmaps must be an array of image-like objects/i,
+  )
+
+  const depthMipTarget = new THREE.WebGLCubeRenderTarget(32)
+  const depthMipCamera = new THREE.CubeCamera(0.01, 100, depthMipTarget)
+  depthMipCamera.activeMipmapLevel = 1
+  depthMipTarget.depthTexture = { type: THREE.UnsignedShortType, mipmaps: 'bad' }
+  assert.throws(
+    () => renderToTarget(scene, depthMipCamera, depthMipTarget),
+    /target\.depthTexture\.mipmaps must be an array of image-like objects/i,
+  )
 })
 
 test('MeshBasicMaterial renders foreground pixels distinct from background', () => {
