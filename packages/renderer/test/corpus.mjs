@@ -1180,6 +1180,13 @@ function meshNormalMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [4, 4, 5],
     minNonBackgroundRatio: 0.04,
+    validate(rgba, { width, height }) {
+      const blueFaces = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > r + 40 && b > g + 40 && b > 100)
+      const greenFaces = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => g > r + 40 && g > b + 40 && g > 100)
+      if (blueFaces < 300 || greenFaces < 80) {
+        throw new Error(`normal material corpus should render distinct normal-color faces, got blue=${blueFaces} green=${greenFaces}`)
+      }
+    },
   }
 }
 
@@ -1212,6 +1219,12 @@ function meshMatcapMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 6, 8],
     minNonBackgroundRatio: 0.02,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.b > center.r + 20 && center.g > center.r + 10)) {
+        throw new Error(`matcap corpus should sample the blue-green matcap blend, got ${JSON.stringify(center)}`)
+      }
+    },
   }
 }
 
