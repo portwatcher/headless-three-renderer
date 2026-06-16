@@ -11,6 +11,7 @@ export function createSceneCorpus() {
     viewportScissorCorpus(),
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
+    materialEnvMapBasicLambertCorpus(),
     meshDepthMaterialCorpus(),
     meshNormalMaterialCorpus(),
     meshMatcapMaterialCorpus(),
@@ -471,6 +472,55 @@ function materialEnvMapCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [10, 10, 13],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function materialEnvMapBasicLambertCorpus() {
+  const envMap = new THREE.DataTexture(new Uint8Array([
+    40, 220, 120, 255,
+    40, 220, 120, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  envMap.mapping = THREE.EquirectangularReflectionMapping
+  envMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.025, 0.025, 0.03)
+
+  const basic = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 1.1),
+    new THREE.MeshBasicMaterial({
+      color: 0xaa3322,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 0.9,
+    }),
+  )
+  basic.position.x = -0.48
+  scene.add(basic)
+
+  const lambert = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 1.1),
+    new THREE.MeshLambertMaterial({
+      color: 0xaa3322,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 0.9,
+    }),
+  )
+  lambert.position.x = 0.48
+  scene.add(lambert)
+
+  const key = new THREE.DirectionalLight(0xffffff, 1.4)
+  key.position.set(0, 0, 3)
+  scene.add(key)
+
+  return {
+    name: 'material-env-map-basic-lambert',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [6, 6, 8],
+    minNonBackgroundRatio: 0.06,
   }
 }
 
