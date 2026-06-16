@@ -1949,6 +1949,14 @@ function physicalIblShadowCorpus() {
     camera: makeCamera([2.2, 1.4, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [10, 10, 13],
+    validate(rgba, { width }) {
+      const sphere = pixelAt(rgba, width, 48, 48)
+      const ground = meanRegion(rgba, width, 60, 42, 76, 58)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(sphere.r > 200 && sphere.g > 210 && sphere.b > 220 && ground.r > 80 && ground.g > 80 && ground.b > 90 && corner.r === 10 && corner.g === 10 && corner.b === 13)) {
+        throw new Error(`physical IBL shadow corpus should render a bright physical sphere and visible shadowed ground, got sphere=${JSON.stringify(sphere)} ground=${JSON.stringify(ground)} corner=${JSON.stringify(corner)}`)
+      }
+    },
   }
 }
 
@@ -2744,5 +2752,13 @@ function pathologicalGeometryCorpus() {
     camera: makeCamera([0, 0, 2.6]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [13, 13, 13],
+    validate(rgba, { width, height }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      const geometryPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > 150 && g > 140 && r > 100)
+      if (!(center.b > center.r + 40 && center.g > center.r + 20 && corner.r === 13 && corner.g === 13 && corner.b === 13 && geometryPixels > 2500)) {
+        throw new Error(`pathological geometry corpus should render the non-degenerate cyan triangles over background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)} geometry=${geometryPixels}`)
+      }
+    },
   }
 }
