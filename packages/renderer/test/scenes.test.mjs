@@ -9383,10 +9383,27 @@ test('invalid LOD level values fail clearly', () => {
   camera.position.set(0, 0, 6)
   camera.lookAt(0, 0, 0)
 
+  const malformedLevelsScene = new THREE.Scene()
+  const malformedLevelsLod = new THREE.Object3D()
+  malformedLevelsLod.isLOD = true
+  malformedLevelsLod.levels = 'levels'
+  malformedLevelsScene.add(malformedLevelsLod)
+  assert.throws(
+    () => renderRgba(malformedLevelsScene, camera, { width: 64, height: 64 }),
+    /LOD\.levels must be an array/i,
+    'levels container',
+  )
+
   const cases = [
     ['autoUpdate', (lod) => {
       lod.autoUpdate = 'yes'
     }, /LOD\.autoUpdate must be a boolean/i],
+    ['level entry', (lod) => {
+      lod.levels[1] = null
+    }, /LOD\.levels\[1\] must be an object/i],
+    ['level object', (lod) => {
+      lod.levels[1].object = null
+    }, /LOD\.levels\[1\]\.object must be a THREE\.Object3D-like object/i],
     ['distance', (lod) => {
       lod.levels[1].distance = 'far'
     }, /LOD\.levels\[1\]\.distance must be a finite number/i],

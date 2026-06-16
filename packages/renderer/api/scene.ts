@@ -2226,12 +2226,24 @@ function updateLodObject(object: ThreeObject3DLike, camera: ThreeCameraLike | un
 }
 
 function normalizeLodLevels(levels: unknown): Array<{ object: ThreeObject3DLike; distance: number; hysteresis: number }> {
-  if (!Array.isArray(levels)) return []
-  return levels.map((level, index) => ({
-    object: (level as { object?: ThreeObject3DLike }).object!,
-    distance: nonNegativeMaterialOrObjectNumber((level as { distance?: unknown }).distance, `LOD.levels[${index}].distance`, 0),
-    hysteresis: normalizedMaterialOrObjectNumber((level as { hysteresis?: unknown }).hysteresis, `LOD.levels[${index}].hysteresis`, 0),
-  }))
+  if (levels == null) return []
+  if (!Array.isArray(levels)) {
+    throw new TypeError('LOD.levels must be an array.')
+  }
+  return levels.map((level, index) => {
+    if (!level || typeof level !== 'object' || Array.isArray(level)) {
+      throw new TypeError(`LOD.levels[${index}] must be an object.`)
+    }
+    const object = (level as { object?: unknown }).object
+    if (!object || typeof object !== 'object' || Array.isArray(object)) {
+      throw new TypeError(`LOD.levels[${index}].object must be a THREE.Object3D-like object.`)
+    }
+    return {
+      object: object as ThreeObject3DLike,
+      distance: nonNegativeMaterialOrObjectNumber((level as { distance?: unknown }).distance, `LOD.levels[${index}].distance`, 0),
+      hysteresis: normalizedMaterialOrObjectNumber((level as { hysteresis?: unknown }).hysteresis, `LOD.levels[${index}].hysteresis`, 0),
+    }
+  })
 }
 
 function distanceBetweenMatrices(a: ThreeCameraLike['matrixWorld'], b: ThreeObject3DLike['matrixWorld']): number {
