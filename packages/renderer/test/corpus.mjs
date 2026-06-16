@@ -23,6 +23,7 @@ export function createSceneCorpus() {
     linearOutputColorSpaceCorpus(),
     maskRenderModeCorpus(),
     normalRenderModeCorpus(),
+    spriteMaterialCorpus(),
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
@@ -73,6 +74,20 @@ function gradientTexture() {
     88, 88, 120, 255,
     255, 226, 178, 255,
   ]), 2, 1, THREE.RGBAFormat)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.needsUpdate = true
+  return texture
+}
+
+function spriteMapTexture() {
+  const texture = new THREE.DataTexture(new Uint8Array([
+    255, 80, 60, 255,
+    40, 210, 120, 255,
+    55, 95, 240, 255,
+    250, 230, 80, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
   texture.magFilter = THREE.NearestFilter
   texture.minFilter = THREE.NearestFilter
   texture.needsUpdate = true
@@ -288,6 +303,31 @@ function normalRenderModeCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+  }
+}
+
+function spriteMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.025, 0.03)
+
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    color: 0xffffff,
+    map: spriteMapTexture(),
+    opacity: 0.85,
+    transparent: true,
+    rotation: 0.3,
+  }))
+  sprite.center.set(0.4, 0.55)
+  sprite.scale.set(1.25, 0.9, 1)
+  scene.add(sprite)
+
+  return {
+    name: 'sprite-material-map-billboard',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 6, 8],
+    minNonBackgroundRatio: 0.02,
   }
 }
 
