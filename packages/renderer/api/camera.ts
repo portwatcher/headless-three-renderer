@@ -79,7 +79,7 @@ export function cameraViewMatrix(camera: ThreeCameraLike): Mat4 {
 }
 
 export function cameraWorldPosition(camera: ThreeCameraLike): number[] {
-  if (camera.matrixWorld?.elements) {
+  if (camera.matrixWorld != null) {
     const e = matrixElements(camera.matrixWorld, 'camera.matrixWorld')
     return [e[12], e[13], e[14]]
   }

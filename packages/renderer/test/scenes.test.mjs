@@ -1162,6 +1162,14 @@ test('invalid camera clipping distances fail clearly', () => {
     () => new Renderer().render(scene, worldMatrixCamera, { width: 32, height: 32 }),
     /camera\.matrixWorld\.elements\[12\] must be a finite number/i,
   )
+
+  const matrixContainerCamera = makeCamera()
+  matrixContainerCamera.updateMatrixWorld = () => {}
+  matrixContainerCamera.matrixWorld = 'world'
+  assert.throws(
+    () => new Renderer().render(scene, matrixContainerCamera, { width: 32, height: 32 }),
+    /camera\.matrixWorld must be a THREE\.Matrix4/i,
+  )
 })
 
 function makeLayeredArrayCamera(width = 64, height = 64) {
