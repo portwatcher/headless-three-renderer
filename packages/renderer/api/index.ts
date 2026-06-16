@@ -612,6 +612,8 @@ const IntType = 1013
 const UnsignedIntType = 1014
 const FloatType = 1015
 const HalfFloatType = 1016
+const UnsignedShort4444Type = 1017
+const UnsignedShort5551Type = 1018
 const UnsignedInt248Type = 1020
 const RGBFormat = 1022
 const RGBAFormat = 1023
@@ -1676,10 +1678,12 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     type !== IntType &&
     type !== UnsignedIntType &&
     type !== FloatType &&
-    type !== HalfFloatType
+    type !== HalfFloatType &&
+    type !== UnsignedShort4444Type &&
+    type !== UnsignedShort5551Type
   ) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -1878,11 +1882,45 @@ function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNu
     }
     return color
   }
+  if (texture.type === UnsignedShort4444Type) {
+    return packedUnsignedShort4444ColorTextureData(values, channels)
+  }
+  if (texture.type === UnsignedShort5551Type) {
+    return packedUnsignedShort5551ColorTextureData(values, channels)
+  }
   return values
 }
 
 function normalizedByteToSignedInteger(value: number, max: number): number {
   return Math.round((value / 255) * max)
+}
+
+function normalizedByteToUnsignedInteger(value: number, max: number): number {
+  return Math.round((value / 255) * max)
+}
+
+function packedUnsignedShort4444ColorTextureData(values: Uint8Array, channels: 1 | 2 | 3 | 4): Uint16Array {
+  const out = new Uint16Array(values.length / channels)
+  for (let src = 0, pixel = 0; src < values.length; src += channels, pixel += 1) {
+    const r = normalizedByteToUnsignedInteger(values[src], 0xf)
+    const g = normalizedByteToUnsignedInteger(channels > 1 ? values[src + 1] : 0, 0xf)
+    const b = normalizedByteToUnsignedInteger(channels > 2 ? values[src + 2] : 0, 0xf)
+    const a = normalizedByteToUnsignedInteger(channels > 3 ? values[src + 3] : 255, 0xf)
+    out[pixel] = (r << 12) | (g << 8) | (b << 4) | a
+  }
+  return out
+}
+
+function packedUnsignedShort5551ColorTextureData(values: Uint8Array, channels: 1 | 2 | 3 | 4): Uint16Array {
+  const out = new Uint16Array(values.length / channels)
+  for (let src = 0, pixel = 0; src < values.length; src += channels, pixel += 1) {
+    const r = normalizedByteToUnsignedInteger(values[src], 0x1f)
+    const g = normalizedByteToUnsignedInteger(channels > 1 ? values[src + 1] : 0, 0x1f)
+    const b = normalizedByteToUnsignedInteger(channels > 2 ? values[src + 2] : 0, 0x1f)
+    const a = (channels > 3 ? values[src + 3] : 255) >= 128 ? 1 : 0
+    out[pixel] = (r << 11) | (g << 6) | (b << 1) | a
+  }
+  return out
 }
 
 function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {

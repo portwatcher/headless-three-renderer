@@ -10868,6 +10868,26 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(rgbUshortData[rgbCenter + 1] < 0x1000, `RGBFormat green channel should stay near zero (${rgbUshortData[rgbCenter + 1]})`)
   assert.ok(rgbUshortData[rgbCenter + 2] < 0x1000, `RGBFormat blue channel should stay near zero (${rgbUshortData[rgbCenter + 2]})`)
 
+  const packed4444Target = { texture: { type: THREE.UnsignedShort4444Type } }
+  renderToTarget(scene, camera, packed4444Target, options)
+  const packed4444Data = packed4444Target.texture.image.data
+  const packed4444 = packed4444Data[redCenter]
+  assert.ok(packed4444Data instanceof Uint16Array, 'UnsignedShort4444Type color target should receive Uint16Array data')
+  assert.ok(((packed4444 >> 12) & 0xf) > 7, `UnsignedShort4444Type red channel should be packed (${packed4444.toString(16)})`)
+  assert.ok(((packed4444 >> 8) & 0xf) < 2, `UnsignedShort4444Type green channel should stay near zero (${packed4444.toString(16)})`)
+  assert.ok(((packed4444 >> 4) & 0xf) < 2, `UnsignedShort4444Type blue channel should stay near zero (${packed4444.toString(16)})`)
+  assert.equal(packed4444 & 0xf, 0xf, `UnsignedShort4444Type alpha channel should stay opaque (${packed4444.toString(16)})`)
+
+  const packed5551Target = { texture: { type: THREE.UnsignedShort5551Type } }
+  renderToTarget(scene, camera, packed5551Target, options)
+  const packed5551Data = packed5551Target.texture.image.data
+  const packed5551 = packed5551Data[redCenter]
+  assert.ok(packed5551Data instanceof Uint16Array, 'UnsignedShort5551Type color target should receive Uint16Array data')
+  assert.ok(((packed5551 >> 11) & 0x1f) > 15, `UnsignedShort5551Type red channel should be packed (${packed5551.toString(16)})`)
+  assert.ok(((packed5551 >> 6) & 0x1f) < 2, `UnsignedShort5551Type green channel should stay near zero (${packed5551.toString(16)})`)
+  assert.ok(((packed5551 >> 1) & 0x1f) < 2, `UnsignedShort5551Type blue channel should stay near zero (${packed5551.toString(16)})`)
+  assert.equal(packed5551 & 0x1, 1, `UnsignedShort5551Type alpha channel should stay opaque (${packed5551.toString(16)})`)
+
   const uintTarget = { texture: { type: THREE.UnsignedIntType } }
   renderToTarget(scene, camera, uintTarget, options)
   const uintData = uintTarget.texture.image.data
@@ -10989,7 +11009,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.AlphaFormat } }, /target color texture format .*not supported.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'color texture format'],
-    [{ texture: { type: THREE.UnsignedShort4444Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType/i, 'color texture type'],
+    [{ texture: { type: THREE.UnsignedInt5999Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'depth-stencil format with scalar type'],
