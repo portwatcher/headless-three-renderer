@@ -9731,21 +9731,47 @@ test('MeshPhysicalMaterial iridescenceThicknessMap samples the selected secondar
   )
 })
 
-test('MeshPhysicalMaterial iridescence maps honor horizontal wrap modes', () => {
-  function renderIridescenceMap(wrapS) {
-    const iridescenceMap = rgbaTexture([
-      0, 0, 0, 255,
-      255, 0, 0, 255,
-    ], 2, 1)
+test('MeshPhysicalMaterial iridescence maps honor horizontal and vertical wrap modes', () => {
+  function iridescenceWrapMap(vertical) {
+    return vertical
+      ? rgbaTexture([
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 0, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 1)
+  }
+
+  function thicknessWrapMap(vertical) {
+    return vertical
+      ? rgbaTexture([
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 0, 0, 255,
+        0, 255, 0, 255,
+      ], 2, 1)
+  }
+
+  function renderIridescenceMap({ wrapS, wrapT, offsetX = 0, offsetY = 0, vertical = false }) {
+    const iridescenceMap = iridescenceWrapMap(vertical)
     iridescenceMap.magFilter = THREE.NearestFilter
     iridescenceMap.minFilter = THREE.NearestFilter
-    iridescenceMap.offset.set(1, 0)
+    iridescenceMap.offset.set(offsetX, offsetY)
     if (wrapS != null) iridescenceMap.wrapS = wrapS
+    if (wrapT != null) iridescenceMap.wrapT = wrapT
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.add(new THREE.Mesh(
-      constantUvPlane(0.25, 0.5),
+      constantUvPlane(0.25, vertical ? 0.25 : 0.5),
       new THREE.MeshPhysicalMaterial({
         color: 0x000000,
         roughness: 0.08,
@@ -9768,20 +9794,18 @@ test('MeshPhysicalMaterial iridescence maps honor horizontal wrap modes', () => 
     return renderRgba(scene, camera, { width: 64, height: 64 })
   }
 
-  function renderThicknessMap(wrapS) {
-    const iridescenceThicknessMap = rgbaTexture([
-      0, 0, 0, 255,
-      0, 255, 0, 255,
-    ], 2, 1)
+  function renderThicknessMap({ wrapS, wrapT, offsetX = 0, offsetY = 0, vertical = false }) {
+    const iridescenceThicknessMap = thicknessWrapMap(vertical)
     iridescenceThicknessMap.magFilter = THREE.NearestFilter
     iridescenceThicknessMap.minFilter = THREE.NearestFilter
-    iridescenceThicknessMap.offset.set(1, 0)
+    iridescenceThicknessMap.offset.set(offsetX, offsetY)
     if (wrapS != null) iridescenceThicknessMap.wrapS = wrapS
+    if (wrapT != null) iridescenceThicknessMap.wrapT = wrapT
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.add(new THREE.Mesh(
-      constantUvPlane(0.25, 0.5),
+      constantUvPlane(0.25, vertical ? 0.25 : 0.5),
       new THREE.MeshPhysicalMaterial({
         color: 0x000000,
         roughness: 0.08,
@@ -9804,15 +9828,25 @@ test('MeshPhysicalMaterial iridescence maps honor horizontal wrap modes', () => 
     return renderRgba(scene, camera, { width: 64, height: 64 })
   }
 
-  const clampedIridescence = renderIridescenceMap(undefined)
-  const repeatedIridescence = renderIridescenceMap(THREE.RepeatWrapping)
+  const clampedIridescence = renderIridescenceMap({ offsetX: 1 })
+  const repeatedIridescence = renderIridescenceMap({ wrapS: THREE.RepeatWrapping, offsetX: 1 })
   const iridescenceDiff = meanAbsDiff(clampedIridescence, repeatedIridescence)
   assert.ok(iridescenceDiff > 0.5, `RepeatWrapping should wrap iridescenceMap UVs before sampling, diff=${iridescenceDiff.toFixed(2)}`)
 
-  const clampedThickness = renderThicknessMap(undefined)
-  const repeatedThickness = renderThicknessMap(THREE.RepeatWrapping)
+  const clampedThickness = renderThicknessMap({ offsetX: 1 })
+  const repeatedThickness = renderThicknessMap({ wrapS: THREE.RepeatWrapping, offsetX: 1 })
   const thicknessDiff = meanAbsDiff(clampedThickness, repeatedThickness)
   assert.ok(thicknessDiff > 0.5, `RepeatWrapping should wrap iridescenceThicknessMap UVs before sampling, diff=${thicknessDiff.toFixed(2)}`)
+
+  const clampedVerticalIridescence = renderIridescenceMap({ offsetY: 1, vertical: true })
+  const repeatedVerticalIridescence = renderIridescenceMap({ wrapT: THREE.RepeatWrapping, offsetY: 1, vertical: true })
+  const verticalIridescenceDiff = meanAbsDiff(clampedVerticalIridescence, repeatedVerticalIridescence)
+  assert.ok(verticalIridescenceDiff > 0.5, `RepeatWrapping should wrap iridescenceMap V coordinates before sampling, diff=${verticalIridescenceDiff.toFixed(2)}`)
+
+  const clampedVerticalThickness = renderThicknessMap({ offsetY: 1, vertical: true })
+  const repeatedVerticalThickness = renderThicknessMap({ wrapT: THREE.RepeatWrapping, offsetY: 1, vertical: true })
+  const verticalThicknessDiff = meanAbsDiff(clampedVerticalThickness, repeatedVerticalThickness)
+  assert.ok(verticalThicknessDiff > 0.5, `RepeatWrapping should wrap iridescenceThicknessMap V coordinates before sampling, diff=${verticalThicknessDiff.toFixed(2)}`)
 })
 
 test('physical extension maps apply texture UV transforms', () => {
