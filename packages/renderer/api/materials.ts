@@ -1405,6 +1405,7 @@ function requiredVector3LikeToArray(value: unknown, label: string): number[] {
 
   const arrayLike = value as ArrayLike<unknown>
   if (typeof arrayLike.length === 'number' && arrayLike.length >= 3) {
+    validateEulerLikeOrder(arrayLike[3], `${label}[3]`)
     return [
       requiredFiniteNumber(arrayLike[0], `${label}[0]`),
       requiredFiniteNumber(arrayLike[1], `${label}[1]`),
@@ -1414,6 +1415,7 @@ function requiredVector3LikeToArray(value: unknown, label: string): number[] {
 
   const vector = value as { x?: unknown; y?: unknown; z?: unknown }
   if ('x' in vector || 'y' in vector || 'z' in vector) {
+    validateEulerLikeOrder((vector as { order?: unknown }).order, `${label}.order`)
     return [
       requiredFiniteNumber(vector.x, `${label}.x`),
       requiredFiniteNumber(vector.y, `${label}.y`),
@@ -1422,6 +1424,21 @@ function requiredVector3LikeToArray(value: unknown, label: string): number[] {
   }
 
   throw new TypeError(`${label} must be a finite Vector3-like value.`)
+}
+
+function validateEulerLikeOrder(value: unknown, label: string): void {
+  if (value == null) return
+  if (
+    value === 'XYZ' ||
+    value === 'YXZ' ||
+    value === 'ZXY' ||
+    value === 'ZYX' ||
+    value === 'YZX' ||
+    value === 'XZY'
+  ) {
+    return
+  }
+  throw new TypeError(`${label} must be one of XYZ, YXZ, ZXY, ZYX, YZX, or XZY.`)
 }
 
 function sameVector3Like(left: unknown, right: unknown): boolean {

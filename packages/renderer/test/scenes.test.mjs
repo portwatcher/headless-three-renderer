@@ -2947,6 +2947,23 @@ test('unsupported material envMap inputs fail clearly', () => {
     )
   }
 
+  {
+    const invalidRotation = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      envMap,
+    })
+    invalidRotation.envMapRotation = [0, 0, 0, 'BAD']
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), invalidRotation))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      /material\.envMapRotation\[3\] must be one of XYZ, YXZ, ZXY, ZYX, YZX, or XZY/i,
+      'invalid material envMapRotation order',
+    )
+  }
+
   const firstEnvMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
   })
