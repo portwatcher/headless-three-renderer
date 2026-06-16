@@ -2261,7 +2261,59 @@ function batchedGeometryView(
 ): ThreeBufferGeometryLike {
   const view = Object.create(geometry) as ThreeBufferGeometryLike
   view.drawRange = { start: range.start, count: range.count }
+  view.boundingSphere = batchedGeometryRangeBoundingSphere(geometry, range)
   return view
+}
+
+function batchedGeometryRangeBoundingSphere(
+  geometry: ThreeBufferGeometryLike,
+  range: { start: number; count: number },
+): { center: { x: number; y: number; z: number }; radius: number } | undefined {
+  const position = getAttribute(geometry, 'position')
+  if (!position || range.count <= 0) return undefined
+
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
+  const start = Math.max(0, range.start)
+  const end = Math.max(start, range.start + range.count)
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let minZ = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  let maxZ = Number.NEGATIVE_INFINITY
+  const vertexIndices: number[] = []
+
+  for (let offset = start; offset < end; offset += 1) {
+    const vertexIndex = index ? index[offset] : offset
+    if (!Number.isInteger(vertexIndex) || vertexIndex < 0 || vertexIndex >= position.count) continue
+    vertexIndices.push(vertexIndex)
+    const x = attributeComponent(position, vertexIndex, 0, 'geometry.attributes.position')
+    const y = attributeComponent(position, vertexIndex, 1, 'geometry.attributes.position')
+    const z = attributeComponent(position, vertexIndex, 2, 'geometry.attributes.position')
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    minZ = Math.min(minZ, z)
+    maxX = Math.max(maxX, x)
+    maxY = Math.max(maxY, y)
+    maxZ = Math.max(maxZ, z)
+  }
+
+  if (vertexIndices.length === 0) return undefined
+
+  const center = {
+    x: (minX + maxX) * 0.5,
+    y: (minY + maxY) * 0.5,
+    z: (minZ + maxZ) * 0.5,
+  }
+  let radiusSq = 0
+  for (const vertexIndex of vertexIndices) {
+    const dx = attributeComponent(position, vertexIndex, 0, 'geometry.attributes.position') - center.x
+    const dy = attributeComponent(position, vertexIndex, 1, 'geometry.attributes.position') - center.y
+    const dz = attributeComponent(position, vertexIndex, 2, 'geometry.attributes.position') - center.z
+    radiusSq = Math.max(radiusSq, dx * dx + dy * dy + dz * dz)
+  }
+
+  return { center, radius: Math.sqrt(radiusSq) }
 }
 
 function batchedInstanceMatrix(object: ThreeObject3DLike, instanceId: number): number[] {

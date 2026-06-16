@@ -421,6 +421,44 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   assert.ok(centerMean.b < 5 && centerMean.r < 5 && centerMean.g < 5, `hidden BatchedMesh instance should not render at center (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
 })
 
+test('BatchedMesh transparent sorting uses each geometry range center', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const nearGeometry = new THREE.PlaneGeometry(2, 2)
+  nearGeometry.translate(0, 0, 0.35)
+  const farGeometry = new THREE.PlaneGeometry(2, 2)
+  farGeometry.translate(0, 0, -0.35)
+
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    depthWrite: false,
+    transparent: true,
+  })
+  const batched = new THREE.BatchedMesh(
+    2,
+    nearGeometry.getAttribute('position').count + farGeometry.getAttribute('position').count,
+    nearGeometry.index.count + farGeometry.index.count,
+    material,
+  )
+  const nearGeometryId = batched.addGeometry(nearGeometry)
+  const farGeometryId = batched.addGeometry(farGeometry)
+  const near = batched.addInstance(nearGeometryId)
+  const far = batched.addInstance(farGeometryId)
+  batched.setMatrixAt(near, new THREE.Matrix4())
+  batched.setMatrixAt(far, new THREE.Matrix4())
+  batched.setColorAt(near, new THREE.Color(1, 0, 0))
+  batched.setColorAt(far, new THREE.Color(0, 0, 1))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 80, `near red BatchedMesh range should sort over far blue range (${mean.r} vs ${mean.b})`)
+})
+
 test('invalid output dimensions fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
