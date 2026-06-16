@@ -2172,6 +2172,26 @@ test('invalid material envMap scalar values fail clearly', () => {
   }
 })
 
+test('envMap on non-env-map material classes is ignored', () => {
+  const envMap = Object.assign(solidTexture(255, 255, 255), {
+    mapping: THREE.EquirectangularReflectionMapping,
+  })
+
+  function renderMatcap(envMapped) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshMatcapMaterial({ color: 0xffffff })
+    if (envMapped) material.envMap = envMap
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), material))
+    return renderRgba(scene, makeCamera(), { width: 64, height: 64 })
+  }
+
+  const withoutEnvMap = renderMatcap(false)
+  const withEnvMap = renderMatcap(true)
+  const diff = meanAbsDiff(withoutEnvMap, withEnvMap)
+  assert.ok(diff < 0.5, `MeshMatcapMaterial envMap should be ignored like Three.js (${diff.toFixed(3)})`)
+})
+
 test('unsupported material envMap inputs fail clearly', () => {
   const envMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularReflectionMapping,
@@ -2179,20 +2199,6 @@ test('unsupported material envMap inputs fail clearly', () => {
   const refractionEnvMap = Object.assign(solidTexture(255, 255, 255), {
     mapping: THREE.EquirectangularRefractionMapping,
   })
-
-  const unsupportedMaterial = new THREE.MeshMatcapMaterial({ color: 0xffffff })
-  unsupportedMaterial.envMap = envMap
-  {
-    const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0, 0, 0)
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), unsupportedMaterial))
-
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /material\.envMap.*only supported/i,
-      'MeshMatcapMaterial envMap',
-    )
-  }
 
   {
     const scene = new THREE.Scene()

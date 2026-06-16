@@ -1426,9 +1426,13 @@ function assertSupportedMaterialState(
   context: MaterialExtractionContext,
 ): void {
   optionalBoolean(material.wireframe, 'material.wireframe')
-  if (material.envMap != null && context.materialEnvironmentMaps?.has(material) !== true) {
+  if (
+    material.envMap != null &&
+    supportsNativeMaterialEnvironmentMap(material) &&
+    context.materialEnvironmentMaps?.has(material) !== true
+  ) {
     throw new Error(
-      'material.envMap is only supported for MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial when one shared reflection envMap can be represented by the native IBL path. Use scene.environment, remove material.envMap from unsupported materials, or render separate passes.',
+      'material.envMap on MeshBasicMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshPhongMaterial, and MeshLambertMaterial requires one shared material envMap represented by the native IBL path. Use scene.environment, remove material.envMap when a scene environment or reflection probe is active, or render separate passes.',
     )
   }
 }
