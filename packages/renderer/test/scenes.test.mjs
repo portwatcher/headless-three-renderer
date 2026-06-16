@@ -555,15 +555,59 @@ test('malformed object children containers fail clearly', () => {
 
 test('malformed BatchedMesh inputs fail clearly', () => {
   const camera = makeCamera()
-  const scene = new THREE.Scene()
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }))
-  mesh.isBatchedMesh = true
-  scene.add(mesh)
+  const makeBatchedScene = () => {
+    const scene = new THREE.Scene()
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }))
+    mesh.isBatchedMesh = true
+    scene.add(mesh)
+    return { scene, mesh }
+  }
 
+  const { scene } = makeBatchedScene()
   assert.throws(
     () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
     /THREE\.BatchedMesh instance table is not readable.*ordinary Mesh or InstancedMesh/i,
   )
+
+  const matrixCases = [
+    ['matrix texture container', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      mesh._matricesTexture = 'matrices'
+    }, /THREE\.BatchedMesh\._matricesTexture must be a texture-like object/i],
+    ['matrix texture image container', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      mesh._matricesTexture = { image: 'matrices' }
+    }, /THREE\.BatchedMesh\._matricesTexture\.image must be an image-like object/i],
+    ['matrix texture data container', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      mesh._matricesTexture = { image: { data: 'matrices' } }
+    }, /THREE\.BatchedMesh\._matricesTexture\.image\.data must be an array-like object/i],
+    ['color texture image container', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      mesh._matricesTexture = { image: { data: new Float32Array(16) } }
+      mesh._colorsTexture = { image: 'colors' }
+    }, /THREE\.BatchedMesh\._colorsTexture\.image must be an image-like object/i],
+    ['color texture data container', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      mesh._matricesTexture = { image: { data: new Float32Array(16) } }
+      mesh._colorsTexture = { image: { data: 'colors' } }
+    }, /THREE\.BatchedMesh\._colorsTexture\.image\.data must be an array-like object/i],
+  ]
+
+  for (const [name, setup, pattern] of matrixCases) {
+    const { scene, mesh } = makeBatchedScene()
+    setup(mesh)
+    assert.throws(
+      () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
 })
 
 test('BatchedMesh renders visible instance transforms and colors', () => {

@@ -2716,9 +2716,13 @@ function batchedGeometryRangeBoundingSphere(
 }
 
 function batchedInstanceMatrix(object: ThreeObject3DLike, instanceId: number): number[] {
-  const data = object._matricesTexture?.image?.data
+  const data = batchedTextureImageData(
+    object._matricesTexture,
+    'THREE.BatchedMesh._matricesTexture',
+    instanceId,
+  )
   const offset = instanceId * 16
-  if (!data || typeof data.length !== 'number' || data.length < offset + 16) {
+  if (typeof data.length !== 'number' || data.length < offset + 16) {
     throw new Error(
       `THREE.BatchedMesh matrix texture is not readable for instance ${instanceId}. Use a real THREE.BatchedMesh or expand the batch before rendering.`,
     )
@@ -2732,8 +2736,9 @@ function batchedInstanceMatrix(object: ThreeObject3DLike, instanceId: number): n
 }
 
 function batchedInstanceColor(object: ThreeObject3DLike, instanceId: number): Color4 | undefined {
-  const data = object._colorsTexture?.image?.data
-  if (!data) return undefined
+  const texture = object._colorsTexture
+  if (texture == null) return undefined
+  const data = batchedTextureImageData(texture, 'THREE.BatchedMesh._colorsTexture', instanceId)
 
   const offset = instanceId * 4
   if (typeof data.length !== 'number' || data.length < offset + 4) {
@@ -2748,6 +2753,21 @@ function batchedInstanceColor(object: ThreeObject3DLike, instanceId: number): Co
     finiteArrayValue(data, offset + 2, 'THREE.BatchedMesh._colorsTexture.image.data'),
     finiteArrayValue(data, offset + 3, 'THREE.BatchedMesh._colorsTexture.image.data'),
   ]
+}
+
+function batchedTextureImageData(texture: unknown, label: string, instanceId: number): ArrayLike<number> {
+  if (!texture || typeof texture !== 'object') {
+    throw new TypeError(`${label} must be a texture-like object for instance ${instanceId}.`)
+  }
+  const image = (texture as { image?: unknown }).image
+  if (!image || typeof image !== 'object') {
+    throw new TypeError(`${label}.image must be an image-like object for instance ${instanceId}.`)
+  }
+  const data = (image as { data?: unknown }).data
+  if (!data || typeof data !== 'object') {
+    throw new TypeError(`${label}.image.data must be an array-like object for instance ${instanceId}.`)
+  }
+  return data as ArrayLike<number>
 }
 
 function batchedOptionalBoolean(value: unknown, label: string, fallback: boolean): boolean {
