@@ -1017,23 +1017,46 @@ function effectiveGroups(
   const drawStart = clampInteger(range.start ?? 0, 0, maxCount)
   const requestedCount = range.count == null || range.count === Infinity ? maxCount : range.count
   const drawEnd = clampInteger(drawStart + requestedCount, drawStart, maxCount)
+  if (geometry.groups != null && !Array.isArray(geometry.groups)) {
+    throw new TypeError('geometry.groups must be an array.')
+  }
+
   const sourceGroups = Array.isArray(geometry.groups) && geometry.groups.length
     ? geometry.groups
-    : [{ start: drawStart, count: drawEnd - drawStart, materialIndex: 0 }]
+    : null
+  if (!sourceGroups) {
+    return [{ start: drawStart, count: drawEnd - drawStart, materialIndex: 0 }]
+  }
 
   const groups: GeometryGroup[] = []
-  for (const group of sourceGroups) {
-    const start = Math.max(drawStart, clampInteger(group.start ?? 0, 0, maxCount))
-    const end = Math.min(drawEnd, clampInteger((group.start ?? 0) + (group.count ?? 0), 0, maxCount))
+  for (let groupIndex = 0; groupIndex < sourceGroups.length; groupIndex += 1) {
+    const group = sourceGroups[groupIndex]
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      throw new TypeError(`geometry.groups[${groupIndex}] must be an object.`)
+    }
+    const groupStart = geometryGroupNonNegativeInteger(group.start, `geometry.groups[${groupIndex}].start`)
+    const groupCount = geometryGroupNonNegativeInteger(group.count, `geometry.groups[${groupIndex}].count`)
+    const groupMaterialIndex = group.materialIndex == null
+      ? 0
+      : geometryGroupNonNegativeInteger(group.materialIndex, `geometry.groups[${groupIndex}].materialIndex`)
+    const start = Math.max(drawStart, clampInteger(groupStart, 0, maxCount))
+    const end = Math.min(drawEnd, clampInteger(groupStart + groupCount, 0, maxCount))
     if (end > start) {
       groups.push({
         start,
         count: end - start,
-        materialIndex: group.materialIndex ?? 0,
+        materialIndex: groupMaterialIndex,
       })
     }
   }
   return groups
+}
+
+function geometryGroupNonNegativeInteger(value: unknown, label: string): number {
+  if (typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0) {
+    return value
+  }
+  throw new TypeError(`${label} must be a non-negative integer.`)
 }
 
 /**

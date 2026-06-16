@@ -369,6 +369,36 @@ test('invalid geometry attribute values fail clearly', () => {
   )
 })
 
+test('invalid geometry group values fail clearly', () => {
+  const camera = makeCamera()
+  const makeScene = (groups) => {
+    const scene = new THREE.Scene()
+    const geometry = new THREE.PlaneGeometry(1, 1)
+    geometry.groups = groups
+    scene.add(new THREE.Mesh(geometry, [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    ]))
+    return scene
+  }
+
+  const cases = [
+    ['container', 'groups', /geometry\.groups must be an array/i],
+    ['group object', [null], /geometry\.groups\[0\] must be an object/i],
+    ['start', [{ start: '0', count: 6, materialIndex: 0 }], /geometry\.groups\[0\]\.start must be a non-negative integer/i],
+    ['count', [{ start: 0, count: Number.NaN, materialIndex: 0 }], /geometry\.groups\[0\]\.count must be a non-negative integer/i],
+    ['materialIndex', [{ start: 0, count: 6, materialIndex: -1 }], /geometry\.groups\[0\]\.materialIndex must be a non-negative integer/i],
+  ]
+
+  for (const [name, groups, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(groups), camera, { width: 32, height: 32 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('malformed BatchedMesh inputs fail clearly', () => {
   const camera = makeCamera()
   const scene = new THREE.Scene()
