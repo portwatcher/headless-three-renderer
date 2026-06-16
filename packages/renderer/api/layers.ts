@@ -20,7 +20,11 @@ export function objectLayersMatchCamera(
 }
 
 function layerMask(layers: ThreeLayersLike | undefined, label: string): number {
-  if (layers?.mask == null) return DEFAULT_LAYER_MASK
+  if (layers == null) return DEFAULT_LAYER_MASK
+  if (typeof layers !== 'object' || Array.isArray(layers)) {
+    throw new TypeError(`${label} must be a layers-like object.`)
+  }
+  if (layers.mask == null) return DEFAULT_LAYER_MASK
   if (typeof layers.mask === 'number' && Number.isFinite(layers.mask)) return layers.mask
   throw new TypeError(`${label}.mask must be a finite number.`)
 }

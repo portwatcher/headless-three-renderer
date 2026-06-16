@@ -4296,8 +4296,26 @@ test('camera layers filter renderable objects', () => {
   assert.ok(mean.g > mean.r + 20, `layer 1 object should dominate over filtered layer 0 object (${mean.g} vs ${mean.r})`)
 })
 
-test('invalid layer masks fail clearly', () => {
+test('invalid layer containers and masks fail clearly', () => {
   const camera = makeCamera()
+
+  const objectContainerScene = new THREE.Scene()
+  const objectWithBadLayers = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+  objectWithBadLayers.layers = 'visible'
+  objectContainerScene.add(objectWithBadLayers)
+  assert.throws(
+    () => renderRgba(objectContainerScene, camera, { width: 32, height: 32 }),
+    /object\.layers must be a layers-like object/i,
+  )
+
+  const cameraContainerScene = new THREE.Scene()
+  cameraContainerScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
+  const badLayersCamera = makeCamera()
+  badLayersCamera.layers = []
+  assert.throws(
+    () => renderRgba(cameraContainerScene, badLayersCamera, { width: 32, height: 32 }),
+    /camera\.layers must be a layers-like object/i,
+  )
 
   const objectScene = new THREE.Scene()
   const object = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
