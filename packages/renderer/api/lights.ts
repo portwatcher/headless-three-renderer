@@ -360,30 +360,36 @@ function applyShadowCascadeOptions(out: NativeSceneLight, light: ThreeObject3DLi
 
 function shadowCascadeHints(light: ThreeObject3DLike): { value: unknown; label: string } | null {
   const modernHints = light.userData?.headlessThreeRenderer
-  if (modernHints?.shadowCascades != null) {
-    return {
-      value: modernHints.shadowCascades,
-      label: 'light.userData.headlessThreeRenderer.shadowCascades',
+  if (modernHints != null) {
+    assertPlainObject(modernHints, 'light.userData.headlessThreeRenderer')
+    if (modernHints.shadowCascades != null) {
+      return {
+        value: modernHints.shadowCascades,
+        label: 'light.userData.headlessThreeRenderer.shadowCascades',
+      }
     }
-  }
-  if (modernHints?.cascades != null) {
-    return {
-      value: modernHints.cascades,
-      label: 'light.userData.headlessThreeRenderer.cascades',
+    if (modernHints.cascades != null) {
+      return {
+        value: modernHints.cascades,
+        label: 'light.userData.headlessThreeRenderer.cascades',
+      }
     }
   }
 
   const legacyHints = light.userData?.headlessRenderer
-  if (legacyHints?.shadowCascades != null) {
-    return {
-      value: legacyHints.shadowCascades,
-      label: 'light.userData.headlessRenderer.shadowCascades',
+  if (legacyHints != null) {
+    assertPlainObject(legacyHints, 'light.userData.headlessRenderer')
+    if (legacyHints.shadowCascades != null) {
+      return {
+        value: legacyHints.shadowCascades,
+        label: 'light.userData.headlessRenderer.shadowCascades',
+      }
     }
-  }
-  if (legacyHints?.cascades != null) {
-    return {
-      value: legacyHints.cascades,
-      label: 'light.userData.headlessRenderer.cascades',
+    if (legacyHints.cascades != null) {
+      return {
+        value: legacyHints.cascades,
+        label: 'light.userData.headlessRenderer.cascades',
+      }
     }
   }
 

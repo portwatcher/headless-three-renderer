@@ -13357,9 +13357,15 @@ test('invalid directional shadow cascade hints fail clearly', () => {
   })
 
   const containerCases = [
+    ['modern hint container', (light) => {
+      light.userData.headlessThreeRenderer = 'cascades'
+    }, /light\.userData\.headlessThreeRenderer must be an object/i],
     ['modern shadowCascades', (light) => {
       light.userData.headlessThreeRenderer = { shadowCascades: 'cascades' }
     }, /light\.userData\.headlessThreeRenderer\.shadowCascades must be an array/i],
+    ['legacy hint container', (light) => {
+      light.userData.headlessRenderer = []
+    }, /light\.userData\.headlessRenderer must be an object/i],
     ['legacy cascades', (light) => {
       light.userData.headlessRenderer = { cascades: 'cascades' }
     }, /light\.userData\.headlessRenderer\.cascades must be an array/i],
