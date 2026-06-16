@@ -4605,6 +4605,36 @@ test('camera layers filter renderable objects', () => {
   assert.ok(mean.g > mean.r + 20, `layer 1 object should dominate over filtered layer 0 object (${mean.g} vs ${mean.r})`)
 })
 
+test('camera layers filter direct lights', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(3, 3),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+  )
+  mesh.layers.set(1)
+  scene.add(mesh)
+
+  const redFiltered = new THREE.DirectionalLight(0xff0000, 8)
+  redFiltered.position.set(0, 0, 3)
+  redFiltered.layers.set(0)
+  scene.add(redFiltered)
+
+  const greenVisible = new THREE.DirectionalLight(0x00ff00, 4)
+  greenVisible.position.set(0, 0, 3)
+  greenVisible.layers.set(1)
+  scene.add(greenVisible)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.layers.set(1)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 25, `camera layer should select the green light and ignore red (${mean.g} vs ${mean.r})`)
+})
+
 test('invalid layer containers and masks fail clearly', () => {
   const camera = makeCamera()
 
