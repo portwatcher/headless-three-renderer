@@ -10,6 +10,7 @@ export function createSceneCorpus() {
     customBlendingCorpus(),
     backgroundOverrideCorpus(),
     twoDimensionalBackgroundTextureCorpus(),
+    signedRawTextureCorpus(),
     equirectangularBackgroundCorpus(),
     cubeBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
@@ -177,6 +178,56 @@ function alphaToCoverageCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
     minMeanAlpha: 220,
+  }
+}
+
+function signedRawTextureCorpus() {
+  const background = new THREE.DataTexture(
+    new Int16Array([0, 0x3000, 0x7fff, 0x7fff]),
+    1,
+    1,
+    THREE.RGBAFormat,
+    THREE.ShortType,
+  )
+  background.needsUpdate = true
+
+  const map = new THREE.DataTexture(
+    new Int8Array([
+      80, 20, 127, 127,
+      20, 80, 127, 127,
+      127, 20, 80, 127,
+      80, 127, 20, 127,
+    ]),
+    2,
+    2,
+    THREE.RGBAFormat,
+    THREE.ByteType,
+  )
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = background
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 1.5),
+    new THREE.MeshBasicMaterial({ map }),
+  )
+  scene.add(mesh)
+
+  return {
+    name: 'signed-raw-datatexture-material-background',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    },
+    background: [0, 96, 255],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
   }
 }
 
