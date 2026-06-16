@@ -16,6 +16,7 @@ export function createSceneCorpus() {
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
     meshDepthMaterialCorpus(),
+    meshDistanceMaterialCorpus(),
     meshNormalMaterialCorpus(),
     meshMatcapMaterialCorpus(),
     meshToonMaterialCorpus(),
@@ -695,6 +696,37 @@ function meshDepthMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function meshDistanceMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const material = new THREE.MeshDistanceMaterial()
+  material.referencePosition = new THREE.Vector3(0, 0, -4)
+  material.nearDistance = 0
+  material.farDistance = 7
+
+  const near = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.1), material)
+  near.position.set(-0.5, 0, -3.6)
+  scene.add(near)
+
+  const far = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.1), material.clone())
+  far.material.referencePosition = material.referencePosition.clone()
+  far.material.nearDistance = material.nearDistance
+  far.material.farDistance = material.farDistance
+  far.position.set(0.5, 0, 1.8)
+  scene.add(far)
+
+  return {
+    name: 'mesh-distance-material-range',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
   }
 }
 
