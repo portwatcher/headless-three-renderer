@@ -13779,6 +13779,65 @@ test('LineDashedMaterial alphaMap samples reconstructed secondary UVs', () => {
   assert.ok(primary < secondary * 0.35, `dashed line alphaMap channel=0 should sample the transparent primary UV (${primary} vs ${secondary})`)
 })
 
+test('LineDashedMaterial map and alphaMap can sample distinct non-primary UV channels', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.channel = 1
+  const alphaMap = rgbaTexture([
+    255, 255, 255, 255,
+    255, 0, 255, 255,
+  ], 2, 1)
+  alphaMap.channel = 2
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.5, 0, 0),
+    new THREE.Vector3(1.5, 0, 0),
+  ])
+  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geom.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  geom.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+
+  const material = new THREE.LineDashedMaterial({
+    alphaMap,
+    alphaTest: 0.5,
+    color: 0xffffff,
+    dashSize: 0.5,
+    gapSize: 0.2,
+    map,
+    scale: 1,
+  })
+  const line = new THREE.Line(geom, material)
+  line.computeLineDistances()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(line)
+
+  const rgba = renderRgba(scene, makeCamera(), { width: 96, height: 96 })
+  const greenPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    8,
+    42,
+    88,
+    54,
+    (r, g, b) => g > 80 && g > r + 40 && g > b + 40,
+  )
+  assert.ok(greenPixels > 4, `dashed line map channel=1 should render green while alphaMap channel=2 keeps it visible (${greenPixels})`)
+})
+
 test('LineDashedMaterial map applies texture UV transforms', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
