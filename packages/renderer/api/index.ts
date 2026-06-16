@@ -615,6 +615,7 @@ const HalfFloatType = 1016
 const UnsignedShort4444Type = 1017
 const UnsignedShort5551Type = 1018
 const UnsignedInt248Type = 1020
+const AlphaFormat = 1021
 const RGBFormat = 1022
 const RGBAFormat = 1023
 const DepthFormat = 1026
@@ -1659,13 +1660,14 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
   const format = texture.format
   if (
     format != null &&
+    format !== AlphaFormat &&
     format !== RedFormat &&
     format !== RGFormat &&
     format !== RGBFormat &&
     format !== RGBAFormat
   ) {
     throw new Error(
-      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use RedFormat, RGFormat, RGBFormat, RGBAFormat, or omit format for RGBA8 readback.`,
+      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, RedFormat, RGFormat, RGBFormat, RGBAFormat, or omit format for RGBA8 readback.`,
     )
   }
   const type = texture.type
@@ -1832,7 +1834,7 @@ function writeRenderTargetTexture(
 
 function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNullable<RenderTargetImageLike['data']> {
   const channels = colorTextureChannelCount(texture.format)
-  const values = channels === 4 ? rgba : narrowedColorTextureBytes(rgba, channels)
+  const values = colorTextureBytes(rgba, texture.format, channels)
   if (texture.type === FloatType) {
     const color = new Float32Array(values.length)
     for (let i = 0; i < values.length; i += 1) {
@@ -1925,6 +1927,7 @@ function packedUnsignedShort5551ColorTextureData(values: Uint8Array, channels: 1
 
 function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
   switch (format) {
+    case AlphaFormat:
     case RedFormat:
       return 1
     case RGFormat:
@@ -1934,6 +1937,20 @@ function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
     default:
       return 4
   }
+}
+
+function colorTextureBytes(rgba: Buffer, format: number | undefined, channels: 1 | 2 | 3 | 4): Uint8Array {
+  if (format === AlphaFormat) return alphaColorTextureBytes(rgba)
+  return channels === 4 ? rgba : narrowedColorTextureBytes(rgba, channels)
+}
+
+function alphaColorTextureBytes(rgba: Buffer): Uint8Array {
+  const pixels = rgba.length / 4
+  const out = new Uint8Array(pixels)
+  for (let i = 0, p = 0; i < rgba.length; i += 4, p += 1) {
+    out[p] = rgba[i + 3]
+  }
+  return out
 }
 
 function narrowedColorTextureBytes(rgba: Buffer, channels: 1 | 2 | 3): Uint8Array {

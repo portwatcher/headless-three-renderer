@@ -526,7 +526,7 @@ export interface RenderTargetTextureLike {
   isArrayTexture?: boolean
   is3DTexture?: boolean
   format?: number
-  /** Color targets support Red/RG/RGB/RGBA readback with byte, signed/unsigned integer, packed 16-bit color, FloatType, and HalfFloatType arrays. */
+  /** Color targets support Alpha/Red/RG/RGB/RGBA readback with byte, signed/unsigned integer, packed 16-bit color, FloatType, and HalfFloatType arrays. */
   type?: number
   needsUpdate?: boolean
   needsPMREMUpdate?: boolean
