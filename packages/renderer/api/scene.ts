@@ -217,6 +217,7 @@ function appendBatchedMesh(
       materialContext,
       [draw.instance],
       sortKeyOverride,
+      object,
     )
   }
 }
@@ -232,6 +233,7 @@ function appendMesh(
   materialContext: MaterialExtractionContext,
   instanceOverride?: MeshInstance[],
   sortKeyOverride?: SortKeyOverride,
+  sortItemObject?: ThreeObject3DLike,
 ): void {
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -321,7 +323,7 @@ function appendMesh(
 
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
-        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group)
+        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group, sortItemObject)
         const sortKeys = mergeSortKeys(sortInfo.keys, sortKeyOverride)
         pushMesh(meshes, {
           positions: expandedPositions,
@@ -380,7 +382,7 @@ function appendMesh(
         : undefined
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
-        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group)
+        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group, sortItemObject)
         const sortKeys = mergeSortKeys(sortInfo.keys, sortKeyOverride)
         pushMesh(meshes, {
           positions: expandedGroupPositions,
@@ -1451,6 +1453,7 @@ function sortInfoForObject(
   transform?: number[],
   geometry?: ThreeBufferGeometryLike,
   group?: GeometryGroup,
+  sortItemObject?: ThreeObject3DLike,
 ): MeshSortInfo {
   const renderOrder = finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
   const z = camera ? projectedObjectZ(object, camera, transform) : 0
@@ -1468,7 +1471,7 @@ function sortInfoForObject(
     },
     item: {
       id,
-      object,
+      object: sortItemObject ?? object,
       geometry,
       material,
       group,

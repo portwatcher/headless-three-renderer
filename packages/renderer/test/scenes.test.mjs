@@ -665,6 +665,49 @@ test('BatchedMesh customSort controls instance draw order', () => {
   assert.ok(mean.b > mean.r + 80, `BatchedMesh customSort should draw custom-ordered blue instance last (${mean.b} vs ${mean.r})`)
 })
 
+test('BatchedMesh renderer sort callbacks receive the source object', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    depthWrite: false,
+    transparent: true,
+  })
+  const batched = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count,
+    source.index.count,
+    material,
+  )
+  const geometryId = batched.addGeometry(source)
+  const left = batched.addInstance(geometryId)
+  const right = batched.addInstance(geometryId)
+  batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.25, 0, 0))
+  batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.25, 0, 0))
+
+  const scene = new THREE.Scene()
+  scene.add(batched)
+
+  let calls = 0
+  renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    transparentSort: (a, b) => {
+      calls += 1
+      assert.equal(a.object, batched)
+      assert.equal(b.object, batched)
+      assert.equal(a.material, material)
+      assert.equal(b.material, material)
+      return 0
+    },
+  })
+
+  assert.ok(calls > 0, 'transparentSort should compare BatchedMesh-expanded draw items')
+})
+
 test('invalid output dimensions fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
