@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import * as THREE from 'three'
 import native from '../native.js'
 import pkg from '../dist/index.js'
 import { createSceneCorpus } from './corpus.mjs'
@@ -9,12 +10,37 @@ import {
   BROWSER_REFERENCE_MANIFEST_FILE,
   createBrowserReferenceFixtures,
   createBrowserReferenceManifest,
+  normalizeBrowserReferenceOutputColorSpace,
 } from './browser-reference/manifest.mjs'
 
 const { Renderer } = pkg
 
 const referenceDir = process.env.HEADLESS_THREE_BROWSER_REFERENCE_DIR
 const maxMeanDiff = Number(process.env.HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF ?? 18)
+
+test('browser reference manifest normalizes outputColorSpace aliases', () => {
+  const fixtures = [
+    { name: 'constant', options: { width: 1, height: 1, outputColorSpace: THREE.LinearSRGBColorSpace } },
+    { name: 'hyphen-alias', options: { width: 1, height: 1, outputColorSpace: 'linear-srgb' } },
+    { name: 'compact-alias', options: { width: 1, height: 1, outputColorSpace: 'linearsrgb' } },
+    { name: 'short-alias', options: { width: 1, height: 1, outputColorSpace: 'linear' } },
+    { name: 'default-srgb', options: { width: 1, height: 1 } },
+    { name: 'renderer-only', browserReference: false, options: { width: 1, height: 1, outputColorSpace: 'linear' } },
+  ]
+  const manifest = createBrowserReferenceManifest(fixtures)
+
+  assert.deepEqual(
+    manifest.fixtures.map((fixture) => [fixture.name, fixture.outputColorSpace]),
+    [
+      ['constant', THREE.LinearSRGBColorSpace],
+      ['hyphen-alias', THREE.LinearSRGBColorSpace],
+      ['compact-alias', THREE.LinearSRGBColorSpace],
+      ['short-alias', THREE.LinearSRGBColorSpace],
+      ['default-srgb', THREE.SRGBColorSpace],
+    ],
+  )
+  assert.equal(normalizeBrowserReferenceOutputColorSpace('srgb'), THREE.SRGBColorSpace)
+})
 
 test('generated corpus matches browser WebGLRenderer golden references', {
   skip: referenceDir

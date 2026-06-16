@@ -19,7 +19,20 @@ export function createBrowserReferenceManifest(fixtures = createSceneCorpus()) {
       name: fixture.name,
       width: fixture.options.width,
       height: fixture.options.height,
-      outputColorSpace: fixture.options.outputColorSpace ?? THREE.SRGBColorSpace,
+      outputColorSpace: normalizeBrowserReferenceOutputColorSpace(fixture.options.outputColorSpace),
     })),
   }
+}
+
+export function normalizeBrowserReferenceOutputColorSpace(value) {
+  if (
+    value === THREE.LinearSRGBColorSpace ||
+    value === 'srgb-linear' ||
+    value === 'linear-srgb' ||
+    value === 'linearsrgb' ||
+    value === 'linear'
+  ) {
+    return THREE.LinearSRGBColorSpace
+  }
+  return THREE.SRGBColorSpace
 }

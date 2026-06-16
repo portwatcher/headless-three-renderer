@@ -100,7 +100,7 @@ The public API accepts only Three.js-like objects:
 - `options.clippingPlanes`: global world-space clipping planes for the render.
 - `options.localClippingEnabled`: `false` disables material-local clipping planes while preserving `options.clippingPlanes`; defaults to `true`, and invalid values fail clearly.
 - `options.format`: `'png'` by default, or `'rgba'` for raw RGBA8 bytes; unsupported values fail clearly.
-- `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`) for material and texture background output conversion; unsupported values fail clearly.
+- `options.outputColorSpace`: `THREE.SRGBColorSpace` (`'srgb'`, default) or `THREE.LinearSRGBColorSpace` (`'srgb-linear'`, `'linear-srgb'`, `'linearsrgb'`, or `'linear'`) for material and texture background output conversion; unsupported values fail clearly.
 - `options.renderMode`: `'color'` by default, `'mask'` for white visible geometry on black, `'object-id'` for flat RGB object IDs, or `'normal'` for view-space normal colors; invalid values fail clearly.
 - `options.target`: a non-array target-like object populated for a single color output, including `target.texture`, `target.textures[0]`, or one-element `target.texture` arrays. Top-level `target.data` remains raw RGBA8; color textures can also request Alpha/Red/RG/RGB/RGBA formats plus normalized `FloatType`, signed/unsigned integer, packed color, or `HalfFloatType` readback arrays.
 - `options.postProcessing`: built-in post effects (`exposure`, `contrast`, `saturation`, `vignette`, `grayscale`, `invert`); malformed containers and invalid effect values fail clearly.

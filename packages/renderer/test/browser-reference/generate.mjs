@@ -5,6 +5,7 @@ import {
   BROWSER_REFERENCE_MANIFEST_FILE,
   createBrowserReferenceFixtures,
   createBrowserReferenceManifest,
+  normalizeBrowserReferenceOutputColorSpace,
 } from './manifest.mjs'
 
 const fixturesEl = document.getElementById('fixtures')
@@ -271,10 +272,7 @@ function applyFixtureRenderMode(fixture) {
 }
 
 function outputColorSpace(value) {
-  if (value === THREE.LinearSRGBColorSpace || value === 'srgb-linear') {
-    return THREE.LinearSRGBColorSpace
-  }
-  return THREE.SRGBColorSpace
+  return normalizeBrowserReferenceOutputColorSpace(value)
 }
 
 function nextFrame() {
