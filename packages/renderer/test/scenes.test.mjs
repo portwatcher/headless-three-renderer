@@ -10932,6 +10932,37 @@ test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
   assert.ok(visible.r > 80, `opaque alphaMap region should write visible mesh depth (${visible.r})`)
 })
 
+test('renderToTarget depthTexture preserves base texture alpha cutouts', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const map = rgbaTexture([
+    255, 255, 255, 0,
+    255, 255, 255, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(3.2, 2.4),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map,
+      alphaTest: 0.5,
+    }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = {}
+  renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+
+  const discarded = meanRegion(depthTexture.image.data, 64, 64, 14, 26, 24, 38)
+  const visible = meanRegion(depthTexture.image.data, 64, 64, 40, 26, 50, 38)
+  assert.ok(discarded.r < 2, `base texture cutout should keep background depth (${discarded.r})`)
+  assert.ok(visible.r > 80, `opaque base texture region should write visible mesh depth (${visible.r})`)
+})
+
 test('renderToTarget depthTexture honors transparent default depthWrite', () => {
   function renderTransparentDepth(depthWrite) {
     const scene = new THREE.Scene()
