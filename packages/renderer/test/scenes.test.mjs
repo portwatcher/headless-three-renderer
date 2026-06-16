@@ -9696,6 +9696,90 @@ test('MeshPhysicalMaterial iridescenceThicknessMap samples the selected secondar
   )
 })
 
+test('MeshPhysicalMaterial iridescence maps honor horizontal wrap modes', () => {
+  function renderIridescenceMap(wrapS) {
+    const iridescenceMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], 2, 1)
+    iridescenceMap.magFilter = THREE.NearestFilter
+    iridescenceMap.minFilter = THREE.NearestFilter
+    iridescenceMap.offset.set(1, 0)
+    if (wrapS != null) iridescenceMap.wrapS = wrapS
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceMap,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      }),
+    ))
+
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function renderThicknessMap(wrapS) {
+    const iridescenceThicknessMap = rgbaTexture([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 1)
+    iridescenceThicknessMap.magFilter = THREE.NearestFilter
+    iridescenceThicknessMap.minFilter = THREE.NearestFilter
+    iridescenceThicknessMap.offset.set(1, 0)
+    if (wrapS != null) iridescenceThicknessMap.wrapS = wrapS
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [120, 760],
+        iridescenceThicknessMap,
+      }),
+    ))
+
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const clampedIridescence = renderIridescenceMap(undefined)
+  const repeatedIridescence = renderIridescenceMap(THREE.RepeatWrapping)
+  const iridescenceDiff = meanAbsDiff(clampedIridescence, repeatedIridescence)
+  assert.ok(iridescenceDiff > 0.5, `RepeatWrapping should wrap iridescenceMap UVs before sampling, diff=${iridescenceDiff.toFixed(2)}`)
+
+  const clampedThickness = renderThicknessMap(undefined)
+  const repeatedThickness = renderThicknessMap(THREE.RepeatWrapping)
+  const thicknessDiff = meanAbsDiff(clampedThickness, repeatedThickness)
+  assert.ok(thicknessDiff > 0.5, `RepeatWrapping should wrap iridescenceThicknessMap UVs before sampling, diff=${thicknessDiff.toFixed(2)}`)
+})
+
 test('physical extension maps apply texture UV transforms', () => {
   const transmissionMap = rgbaTexture([
     0, 0, 0, 255,
