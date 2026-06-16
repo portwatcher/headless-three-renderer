@@ -2941,7 +2941,9 @@ test('material envMap colorSpace controls LDR IBL decode', () => {
   const srgb = renderColorSpace(THREE.SRGBColorSpace)
   const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
   assert.ok(linear.r > srgb.r + 20, `linear material envMap should render brighter than decoded sRGB (${linear.r} vs ${srgb.r})`)
-  assert.deepEqual(renderColorSpace('linear-srgb'), linear, 'linear alias should match THREE.LinearSRGBColorSpace for material envMap IBL')
+  for (const alias of ['srgb-linear', 'linear-srgb', 'linearsrgb', 'linear']) {
+    assert.deepEqual(renderColorSpace(alias), linear, `${alias} should match THREE.LinearSRGBColorSpace for material envMap IBL`)
+  }
 })
 
 test('scene environment does not affect MeshBasicMaterial without material envMap', () => {
