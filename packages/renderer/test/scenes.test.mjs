@@ -14150,6 +14150,73 @@ test('LineDashedMaterial map samples the selected secondary UV channel', () => {
   assert.ok(greenPixels > 2, `dashed line map channel=1 should sample uv1 green texel (${greenPixels})`)
 })
 
+test('line and point maps sample texture channel 3 from uv3 attributes', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 3
+
+  function setUvChannels(geometry, count) {
+    const redUvs = new Float32Array(count * 2)
+    const greenUvs = new Float32Array(count * 2)
+    for (let i = 0; i < count; i += 1) {
+      redUvs[i * 2] = 0.25
+      redUvs[i * 2 + 1] = 0.5
+      greenUvs[i * 2] = 0.75
+      greenUvs[i * 2 + 1] = 0.5
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(redUvs.slice(), 2))
+    geometry.setAttribute('uv1', new THREE.BufferAttribute(redUvs.slice(), 2))
+    geometry.setAttribute('uv2', new THREE.BufferAttribute(redUvs.slice(), 2))
+    geometry.setAttribute('uv3', new THREE.BufferAttribute(greenUvs, 2))
+  }
+
+  function renderLine(material) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    setUvChannels(geometry, 2)
+    const line = new THREE.Line(geometry, material)
+    if (material.isLineDashedMaterial === true) line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+    return renderRgba(scene, makeCamera(), { width: 96, height: 96 })
+  }
+
+  const basic = renderLine(new THREE.LineBasicMaterial({ color: 0xffffff, map }))
+  const dashed = renderLine(new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 4,
+    gapSize: 0,
+    map,
+    scale: 1,
+  }))
+  const greenLinePixels = countRegionPixels(basic, 96, 96, 0, 42, 96, 54, (r, g, b) => g > r + 40 && g > b + 40)
+  const greenDashedPixels = countRegionPixels(dashed, 96, 96, 0, 42, 96, 54, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(greenLinePixels > 2, `line map channel=3 should sample uv3 green texel (${greenLinePixels})`)
+  assert.ok(greenDashedPixels > 2, `dashed line map channel=3 should sample uv3 green texel (${greenDashedPixels})`)
+
+  const pointGeometry = new THREE.BufferGeometry()
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  setUvChannels(pointGeometry, 1)
+  const pointScene = new THREE.Scene()
+  pointScene.background = new THREE.Color(0, 0, 0)
+  pointScene.add(new THREE.Points(pointGeometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+  const pointMean = meanRegion(renderRgba(pointScene, makeCamera(), { width: 96, height: 96 }), 96, 96, 40, 40, 56, 56)
+  assert.ok(pointMean.g > pointMean.r + 60, `point map channel=3 should sample uv3 green texel (${pointMean.g} vs ${pointMean.r})`)
+})
+
 test('LineDashedMaterial interpolates vertex colors across dash segments', () => {
   const geom = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-1.5, 0, 0),
