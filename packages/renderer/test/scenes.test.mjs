@@ -13515,6 +13515,7 @@ test('scene environment colorSpace controls RGBA8 IBL decode', () => {
   const srgb = renderColorSpace(THREE.SRGBColorSpace)
   const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
   assert.ok(linear.r > srgb.r + 20, `linear environment should precompute brighter IBL than decoded sRGB (${linear.r} vs ${srgb.r})`)
+  assert.deepEqual(renderColorSpace('linear'), linear, 'linear alias should match THREE.LinearSRGBColorSpace for scene environment IBL')
 })
 
 test('cube environment and reflection probe colorSpace controls IBL decode', () => {
@@ -13582,12 +13583,22 @@ test('cube environment and reflection probe colorSpace controls IBL decode', () 
     linearEnvironment.r > srgbEnvironment.r + 20,
     `linear cube environment should precompute brighter IBL than decoded sRGB (${linearEnvironment.r} vs ${srgbEnvironment.r})`,
   )
+  assert.deepEqual(
+    renderSceneEnvironment('linear-srgb'),
+    linearEnvironment,
+    'linear-srgb alias should match THREE.LinearSRGBColorSpace for cube environment IBL',
+  )
 
   const srgbProbe = renderReflectionProbe(THREE.SRGBColorSpace)
   const linearProbe = renderReflectionProbe(THREE.LinearSRGBColorSpace)
   assert.ok(
     linearProbe.r > srgbProbe.r + 20,
     `linear cube reflection probe should precompute brighter IBL than decoded sRGB (${linearProbe.r} vs ${srgbProbe.r})`,
+  )
+  assert.deepEqual(
+    renderReflectionProbe('linearsrgb'),
+    linearProbe,
+    'linearsrgb alias should match THREE.LinearSRGBColorSpace for reflection probe IBL',
   )
 })
 
