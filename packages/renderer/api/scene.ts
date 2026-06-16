@@ -576,8 +576,7 @@ function appendSprite(
   materialContext: MaterialExtractionContext,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
-  const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
-  assertUnsupportedSpriteShadows(objectReceivesShadow)
+  optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
 
   const material = materialForGroup(object.material, 0)
   if (material?.visible === false) return
@@ -691,8 +690,7 @@ function appendPoints(
   materialContext: MaterialExtractionContext,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
-  const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
-  assertUnsupportedPointShadows(objectReceivesShadow)
+  optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
 
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
@@ -909,18 +907,6 @@ function optionalSceneBoolean(value: unknown, label: string): boolean | undefine
   if (value == null) return undefined
   if (typeof value === 'boolean') return value
   throw new TypeError(`${label} must be a boolean.`)
-}
-
-function assertUnsupportedSpriteShadows(receiveShadow: boolean): void {
-  if (receiveShadow) {
-    throw new Error('THREE.Sprite receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the sprite to mesh geometry before receiving shadows.')
-  }
-}
-
-function assertUnsupportedPointShadows(receiveShadow: boolean): void {
-  if (receiveShadow) {
-    throw new Error('THREE.Points receiveShadow is not supported by @headless-three/renderer yet. Disable receiveShadow or expand the points to mesh geometry before receiving shadows.')
-  }
 }
 
 function pointVertexColor(

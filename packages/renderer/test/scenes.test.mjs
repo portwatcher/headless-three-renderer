@@ -3333,16 +3333,16 @@ test('invalid billboard and line scalar values fail clearly', () => {
   }
 })
 
-test('Sprite receiveShadow fails clearly', () => {
-  const receiveScene = new THREE.Scene()
+test('Sprite receiveShadow is accepted as an unlit WebGL-compatible no-op', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
   const receiver = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
   receiver.receiveShadow = true
-  receiveScene.add(receiver)
-  assert.throws(
-    () => renderRgba(receiveScene, makeCamera(), { width: 64, height: 64 }),
-    /THREE\.Sprite receiveShadow.*not supported/i,
-    'receiveShadow',
-  )
+  receiver.scale.set(1.2, 1.2, 1)
+  scene.add(receiver)
+
+  const mean = meanRegion(renderRgba(scene, makeCamera(), { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > 180 && mean.g > 180 && mean.b > 180, `sprite receiveShadow no-op should still render the unlit billboard (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('Sprite casts point-light shadows from expanded billboard quads', () => {
@@ -13877,19 +13877,18 @@ test('Points with InstancedBufferGeometry expand offsets and colors', () => {
   assert.ok(greenPixels > 20, `right instanced point should render green pixels (${greenPixels})`)
 })
 
-test('Points receiveShadow fails clearly', () => {
+test('Points receiveShadow is accepted as an unlit WebGL-compatible no-op', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
 
   const receiveScene = new THREE.Scene()
+  receiveScene.background = new THREE.Color(0, 0, 0)
   const receiver = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xffffff, size: 12 }))
   receiver.receiveShadow = true
   receiveScene.add(receiver)
-  assert.throws(
-    () => renderRgba(receiveScene, makeCamera(), { width: 64, height: 64 }),
-    /THREE\.Points receiveShadow.*not supported/i,
-    'receiveShadow',
-  )
+
+  const mean = meanRegion(renderRgba(receiveScene, makeCamera(), { width: 64, height: 64 }), 64, 64, 28, 28, 36, 36)
+  assert.ok(mean.r > 180 && mean.g > 180 && mean.b > 180, `points receiveShadow no-op should still render the unlit billboard (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('Points cast point-light shadows from expanded billboard quads', () => {
