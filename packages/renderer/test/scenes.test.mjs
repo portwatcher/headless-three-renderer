@@ -399,6 +399,33 @@ test('invalid geometry group values fail clearly', () => {
   }
 })
 
+test('invalid geometry drawRange values fail clearly', () => {
+  const camera = makeCamera()
+  const makeScene = (drawRange) => {
+    const scene = new THREE.Scene()
+    const geometry = new THREE.PlaneGeometry(1, 1)
+    geometry.drawRange = drawRange
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+    return scene
+  }
+
+  const cases = [
+    ['container', 'range', /geometry\.drawRange must be an object/i],
+    ['start', { start: '0', count: 6 }, /geometry\.drawRange\.start must be a non-negative integer/i],
+    ['negative start', { start: -1, count: 6 }, /geometry\.drawRange\.start must be a non-negative integer/i],
+    ['count', { start: 0, count: Number.NaN }, /geometry\.drawRange\.count must be a non-negative integer/i],
+    ['fractional count', { start: 0, count: 1.5 }, /geometry\.drawRange\.count must be a non-negative integer/i],
+  ]
+
+  for (const [name, drawRange, pattern] of cases) {
+    assert.throws(
+      () => renderRgba(makeScene(drawRange), camera, { width: 32, height: 32 }),
+      pattern,
+      name,
+    )
+  }
+})
+
 test('malformed BatchedMesh inputs fail clearly', () => {
   const camera = makeCamera()
   const scene = new THREE.Scene()

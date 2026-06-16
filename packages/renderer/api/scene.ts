@@ -1013,9 +1013,12 @@ function effectiveGroups(
   vertexCount: number,
 ): GeometryGroup[] {
   const range = geometry.drawRange ?? {}
+  if (range != null && (typeof range !== 'object' || Array.isArray(range))) {
+    throw new TypeError('geometry.drawRange must be an object.')
+  }
   const maxCount = index ? index.length : vertexCount
-  const drawStart = clampInteger(range.start ?? 0, 0, maxCount)
-  const requestedCount = range.count == null || range.count === Infinity ? maxCount : range.count
+  const drawStart = clampInteger(geometryDrawRangeStart(range.start), 0, maxCount)
+  const requestedCount = geometryDrawRangeCount(range.count, maxCount)
   const drawEnd = clampInteger(drawStart + requestedCount, drawStart, maxCount)
   if (geometry.groups != null && !Array.isArray(geometry.groups)) {
     throw new TypeError('geometry.groups must be an array.')
@@ -1050,6 +1053,16 @@ function effectiveGroups(
     }
   }
   return groups
+}
+
+function geometryDrawRangeStart(value: unknown): number {
+  if (value == null) return 0
+  return geometryGroupNonNegativeInteger(value, 'geometry.drawRange.start')
+}
+
+function geometryDrawRangeCount(value: unknown, fallback: number): number {
+  if (value == null || value === Infinity) return fallback
+  return geometryGroupNonNegativeInteger(value, 'geometry.drawRange.count')
 }
 
 function geometryGroupNonNegativeInteger(value: unknown, label: string): number {
