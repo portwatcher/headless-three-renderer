@@ -9,7 +9,9 @@ export function createSceneCorpus() {
     stencilRenderStateCorpus(),
     customBlendingCorpus(),
     backgroundOverrideCorpus(),
+    twoDimensionalBackgroundTextureCorpus(),
     equirectangularBackgroundCorpus(),
+    cubeBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
     viewportScissorCorpus(),
     customSortGroupCorpus(),
@@ -34,7 +36,6 @@ export function createSceneCorpus() {
     maskRenderModeCorpus(),
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
-    twoDimensionalBackgroundTextureCorpus(),
     spriteMaterialCorpus(),
     pointSpotLightCorpus(),
     rectAreaLightCorpus(),
@@ -91,6 +92,17 @@ function gradientTexture() {
   ]), 2, 1, THREE.RGBAFormat)
   texture.magFilter = THREE.NearestFilter
   texture.minFilter = THREE.NearestFilter
+  texture.needsUpdate = true
+  return texture
+}
+
+function cubeTexture(faceColors) {
+  const faces = faceColors.map(([r, g, b, a = 255]) => ({
+    data: new Uint8Array([r, g, b, a]),
+    width: 1,
+    height: 1,
+  }))
+  const texture = new THREE.CubeTexture(faces)
   texture.needsUpdate = true
   return texture
 }
@@ -1099,6 +1111,31 @@ function equirectangularBackgroundCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
+  }
+}
+
+function cubeBackgroundTextureCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = cubeTexture([
+    [48, 80, 255],
+    [255, 225, 72],
+    [255, 64, 220],
+    [32, 210, 220],
+    [32, 200, 96],
+    [255, 48, 32],
+  ])
+  scene.background.magFilter = THREE.NearestFilter
+  scene.background.minFilter = THREE.NearestFilter
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI, 0)
+
+  return {
+    name: 'cube-background-texture-rotation',
+    scene,
+    camera: makeCamera([0, 0, 0], [0, 0, -1]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
+    browserReference: false,
   }
 }
 
