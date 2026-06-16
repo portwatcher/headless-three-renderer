@@ -204,13 +204,14 @@ function extractMaterialEnvironmentMap(
       if (optionalBoolean(material.visible, 'material.visible') === false) continue
       if (!supportsNativeMaterialEnvironmentMap(material)) continue
       assertSupportedMaterialEnvironmentMap(material)
-      if (hasNonZeroVector3Like(material.envMapRotation)) {
-        if (envRotation && !sameVector3Like(envRotation, material.envMapRotation)) {
+      const materialEnvRotation = materialEnvMapRotation(material)
+      if (materialEnvRotation) {
+        if (envRotation && !sameVector3Like(envRotation, materialEnvRotation)) {
           throw new Error(
             'Multiple material.envMapRotation values are not supported by @headless-three/renderer yet. Use one shared material envMapRotation, scene.environmentRotation, or render separate passes.',
           )
         }
-        envRotation = material.envMapRotation
+        envRotation = materialEnvRotation
       }
       if (envTex && envTex !== materialEnvMap) {
         throw new Error(
@@ -1388,9 +1389,39 @@ function vector3LikeToArray(value: unknown): number[] | undefined {
   return undefined
 }
 
-function hasNonZeroVector3Like(value: unknown): boolean {
-  const components = vector3LikeToArray(value)
-  return components ? components.some((component) => Math.abs(component) > 1e-12) : false
+function materialEnvMapRotation(material: ThreeMaterialLike): ThreeMaterialLike['envMapRotation'] | undefined {
+  const value = material.envMapRotation
+  if (value == null) return undefined
+  const components = requiredVector3LikeToArray(value, 'material.envMapRotation')
+  return components.some((component) => Math.abs(component) > 1e-12)
+    ? value
+    : undefined
+}
+
+function requiredVector3LikeToArray(value: unknown, label: string): number[] {
+  if (!value || typeof value !== 'object') {
+    throw new TypeError(`${label} must be a finite Vector3-like value.`)
+  }
+
+  const arrayLike = value as ArrayLike<unknown>
+  if (typeof arrayLike.length === 'number' && arrayLike.length >= 3) {
+    return [
+      requiredFiniteNumber(arrayLike[0], `${label}[0]`),
+      requiredFiniteNumber(arrayLike[1], `${label}[1]`),
+      requiredFiniteNumber(arrayLike[2], `${label}[2]`),
+    ]
+  }
+
+  const vector = value as { x?: unknown; y?: unknown; z?: unknown }
+  if ('x' in vector || 'y' in vector || 'z' in vector) {
+    return [
+      requiredFiniteNumber(vector.x, `${label}.x`),
+      requiredFiniteNumber(vector.y, `${label}.y`),
+      requiredFiniteNumber(vector.z, `${label}.z`),
+    ]
+  }
+
+  throw new TypeError(`${label} must be a finite Vector3-like value.`)
 }
 
 function sameVector3Like(left: unknown, right: unknown): boolean {
