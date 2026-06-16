@@ -13,6 +13,7 @@ export function createSceneCorpus() {
     equirectangularBackgroundCorpus(),
     cubeBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
+    cubeCameraCaptureCorpus(),
     viewportScissorCorpus(),
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
@@ -1080,6 +1081,39 @@ function arrayCameraViewportCorpus() {
     camera: new THREE.ArrayCamera([leftCamera, rightCamera]),
     options: { width, height, format: 'rgba' },
     background: [0, 0, 20],
+  }
+}
+
+function cubeCameraCaptureCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const addPlane = (position, rotation, color) => {
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+    )
+    plane.position.set(position[0], position[1], position[2])
+    plane.rotation.set(rotation[0], rotation[1], rotation[2])
+    scene.add(plane)
+  }
+  addPlane([2, 0, 0], [0, Math.PI / 2, 0], 0xff0000)
+  addPlane([-2, 0, 0], [0, Math.PI / 2, 0], 0x00ff00)
+  addPlane([0, 2, 0], [Math.PI / 2, 0, 0], 0x0000ff)
+  addPlane([0, -2, 0], [Math.PI / 2, 0, 0], 0xffff00)
+  addPlane([0, 0, 2], [0, 0, 0], 0xff00ff)
+  addPlane([0, 0, -2], [0, 0, 0], 0x00ffff)
+
+  const target = new THREE.WebGLCubeRenderTarget(CORPUS_RENDER_SIZE)
+  const camera = new THREE.CubeCamera(0.01, 100, target)
+
+  return {
+    name: 'cube-camera-face-capture',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
   }
 }
 
