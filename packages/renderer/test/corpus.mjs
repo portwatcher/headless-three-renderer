@@ -27,6 +27,7 @@ export function createSceneCorpus() {
     materialLocalClippingCorpus(),
     nestedClippingGroupCorpus(),
     lightProbeCorpus(),
+    lightProbeMaterialModelsCorpus(),
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
@@ -296,6 +297,43 @@ function lightProbeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [8, 8, 10],
     minNonBackgroundRatio: 0.02,
+  }
+}
+
+function lightProbeMaterialModelsCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const probe = new THREE.LightProbe(undefined, 1.5)
+  for (const coefficient of probe.sh.coefficients) {
+    coefficient.set(0, 0, 0)
+  }
+  probe.sh.coefficients[0].set(1.0, 0.18, 0.08)
+  scene.add(probe)
+
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 20 }),
+    new THREE.MeshToonMaterial({ color: 0xffffff }),
+  ]
+
+  for (const [index, material] of materials.entries()) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 1.2), material)
+    mesh.position.x = (index - 1) * 0.65
+    scene.add(mesh)
+  }
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'light-probe-lit-material-models',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
   }
 }
 
