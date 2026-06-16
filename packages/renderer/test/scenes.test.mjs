@@ -5874,6 +5874,18 @@ test('invalid skinning matrix values fail clearly', () => {
   camera.lookAt(0, 0, 0)
 
   const cases = [
+    ['skeleton container', ({ mesh }) => {
+      mesh.skeleton = 'skeleton'
+    }, /mesh\.skeleton must be an object/i],
+    ['bones container', ({ skeleton }) => {
+      skeleton.bones = 'bones'
+    }, /skeleton\.bones must be an array/i],
+    ['bone inverse container', ({ skeleton }) => {
+      skeleton.boneInverses = 'inverses'
+    }, /skeleton\.boneInverses must be an array/i],
+    ['bone entry', ({ skeleton }) => {
+      skeleton.bones[0] = 'bone'
+    }, /skeleton\.bones\[0\] must be an object/i],
     ['bone world matrix', ({ bone }) => {
       bone.matrixWorld.elements[13] = Number.NaN
     }, /skeleton\.bones\[0\]\.matrixWorld\.elements\[13\] must be a finite number/i],

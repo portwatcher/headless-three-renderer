@@ -200,7 +200,7 @@ Scene-level reflection probes are supported through `scene.userData.headlessThre
 
 ### Skinning / Skeletal Animation
 
-`THREE.SkinnedMesh` objects are automatically detected and skinned on the CPU. The renderer reads `skinIndex` and `skinWeight` attributes, computes bone matrices from `skeleton.bones` and `skeleton.boneInverses`, and transforms vertex positions and normals before sending them to the GPU. Invalid bone, inverse bind, and mesh bind matrix values fail clearly.
+`THREE.SkinnedMesh` objects are automatically detected and skinned on the CPU. The renderer reads `skinIndex` and `skinWeight` attributes, computes bone matrices from `skeleton.bones` and `skeleton.boneInverses`, and transforms vertex positions and normals before sending them to the GPU. Malformed mesh/skeleton containers and invalid bone, inverse bind, and mesh bind matrix values fail clearly.
 
 Compatible with:
 

@@ -26,20 +26,41 @@ export function applyCpuSkinning(
     return { positions, normals }
   }
 
-  if (typeof skeleton.update === 'function') {
-    skeleton.update()
+  if (typeof skeleton !== 'object' || Array.isArray(skeleton)) {
+    throw new TypeError('mesh.skeleton must be an object.')
   }
 
   const bones = skeleton.bones
   const boneInverses = skeleton.boneInverses
-  if (!bones || !boneInverses || bones.length === 0) {
+  if (!bones || !boneInverses) {
     return { positions, normals }
+  }
+  if (!Array.isArray(bones)) {
+    throw new TypeError('skeleton.bones must be an array.')
+  }
+  if (!Array.isArray(boneInverses)) {
+    throw new TypeError('skeleton.boneInverses must be an array.')
+  }
+  if (bones.length === 0) {
+    return { positions, normals }
+  }
+
+  for (let i = 0; i < bones.length; i++) {
+    const bone = bones[i]
+    if (bone != null && (typeof bone !== 'object' || Array.isArray(bone))) {
+      throw new TypeError(`skeleton.bones[${i}] must be an object.`)
+    }
+  }
+
+  if (typeof skeleton.update === 'function') {
+    skeleton.update()
   }
 
   const boneCount = bones.length
   const boneMatrices = new Array<Mat4>(boneCount)
   for (let i = 0; i < boneCount; i++) {
-    const boneWorld = bones[i]?.matrixWorld
+    const bone = bones[i]
+    const boneWorld = bone?.matrixWorld
     const boneInv = boneInverses[i]
     if (!boneWorld || !boneInv) {
       boneMatrices[i] = IDENTITY_4X4
