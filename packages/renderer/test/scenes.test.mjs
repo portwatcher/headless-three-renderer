@@ -6135,6 +6135,44 @@ test('invalid instanced attributes fail clearly', () => {
     () => renderRgba(colorValueScene, camera, { width: 64, height: 64 }),
     /geometry\.attributes\.color\[0\]\.x must be a finite number/i,
   )
+
+  const uvCountGeometry = new THREE.InstancedBufferGeometry()
+  uvCountGeometry.index = base.index
+  uvCountGeometry.setAttribute('position', base.getAttribute('position'))
+  const uvCount = new THREE.InstancedBufferAttribute(new Float32Array([0.5, 0.5]), 2)
+  uvCount.count = 'many'
+  uvCountGeometry.setAttribute('uv', uvCount)
+  const uvCountScene = new THREE.Scene()
+  uvCountScene.add(new THREE.Mesh(uvCountGeometry, material))
+  assert.throws(
+    () => renderRgba(uvCountScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.uv\.count must be a non-negative integer/i,
+  )
+
+  const uvValueGeometry = new THREE.InstancedBufferGeometry()
+  uvValueGeometry.index = base.index
+  uvValueGeometry.setAttribute('position', base.getAttribute('position'))
+  uvValueGeometry.instanceCount = 1
+  uvValueGeometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([Number.NaN, 0.5]), 2))
+  const uvValueScene = new THREE.Scene()
+  uvValueScene.add(new THREE.Mesh(uvValueGeometry, material))
+  assert.throws(
+    () => renderRgba(uvValueScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.uv\[0\]\.x must be a finite number/i,
+  )
+
+  const uvRepeatGeometry = new THREE.InstancedBufferGeometry()
+  uvRepeatGeometry.index = base.index
+  uvRepeatGeometry.setAttribute('position', base.getAttribute('position'))
+  const uvRepeat = new THREE.InstancedBufferAttribute(new Float32Array([0.5, 0.5]), 2)
+  uvRepeat.meshPerAttribute = 0
+  uvRepeatGeometry.setAttribute('uv', uvRepeat)
+  const uvRepeatScene = new THREE.Scene()
+  uvRepeatScene.add(new THREE.Mesh(uvRepeatGeometry, material))
+  assert.throws(
+    () => renderRgba(uvRepeatScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.uv\.meshPerAttribute must be a positive finite number/i,
+  )
 })
 
 test('invalid morph target influence values fail clearly', () => {
