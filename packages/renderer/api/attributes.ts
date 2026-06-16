@@ -4,10 +4,20 @@ import { clamp01 } from './math'
 const COMPONENT_LABELS = ['x', 'y', 'z', 'w']
 
 export function getAttribute(geometry: ThreeBufferGeometryLike, name: string): ThreeBufferAttributeLike | undefined {
+  const attributes = geometryAttributes(geometry)
   if (typeof geometry.getAttribute === 'function') {
     return geometry.getAttribute(name)
   }
-  return geometry.attributes?.[name]
+  return attributes[name]
+}
+
+export function geometryAttributes(geometry: ThreeBufferGeometryLike): Record<string, ThreeBufferAttributeLike | undefined> {
+  const attributes = geometry.attributes
+  if (attributes == null) return {}
+  if (typeof attributes !== 'object' || Array.isArray(attributes)) {
+    throw new TypeError('geometry.attributes must be an object.')
+  }
+  return attributes
 }
 
 export function readVec3Attribute(attribute: ThreeBufferAttributeLike, label = 'THREE.BufferAttribute'): number[] {

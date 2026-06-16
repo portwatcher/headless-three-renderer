@@ -372,6 +372,15 @@ test('invalid geometry attribute values fail clearly', () => {
 test('invalid geometry attribute count values fail clearly', () => {
   const camera = makeCamera()
 
+  const containerScene = new THREE.Scene()
+  const containerGeometry = new THREE.BufferGeometry()
+  containerGeometry.attributes = 'attributes'
+  containerScene.add(new THREE.Mesh(containerGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  assert.throws(
+    () => renderRgba(containerScene, camera, { width: 32, height: 32 }),
+    /geometry\.attributes must be an object/i,
+  )
+
   const positionScene = new THREE.Scene()
   const positionGeometry = new THREE.BufferGeometry()
   positionGeometry.setAttribute('position', {

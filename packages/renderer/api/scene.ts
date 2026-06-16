@@ -20,6 +20,7 @@ import {
   readVec2Attribute,
   readColorAttribute,
   readIndexAttribute,
+  geometryAttributes,
 } from './attributes'
 import {
   materialForGroup,
@@ -1852,7 +1853,7 @@ function unsignedSortKey(value: unknown, fallback: number): number {
 }
 
 function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number {
-  const attributes = Object.entries(geometry.attributes ?? {})
+  const attributes = Object.entries(geometryAttributes(geometry))
   const instancedAttributes = attributes.filter((entry): entry is [string, ThreeBufferAttributeLike] => isInstancedAttribute(entry[1]))
   if (geometry.isInstancedBufferGeometry !== true && instancedAttributes.length === 0) return 1
 
