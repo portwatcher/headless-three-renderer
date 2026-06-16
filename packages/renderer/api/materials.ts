@@ -807,10 +807,9 @@ export function extractPbrProperties(
     props.depthPacking = materialDepthPacking(material) ?? BasicDepthPacking
   }
   if (material.isMeshDistanceMaterial) {
-    const hints = material.userData?.headlessThreeRenderer ?? material.userData?.headlessRenderer ?? {}
-    const hintsLabel = material.userData?.headlessThreeRenderer != null
-      ? 'material.userData.headlessThreeRenderer'
-      : 'material.userData.headlessRenderer'
+    const hintBag = materialRendererHints(material.userData)
+    const hints = hintBag?.value ?? {}
+    const hintsLabel = hintBag?.label ?? 'material.userData.headlessThreeRenderer'
     const referencePosition = vector3LikeToArray(
       material.referencePosition ?? hints.referencePosition ?? hints.distanceReferencePosition,
     )
@@ -1487,13 +1486,20 @@ function extractCustomFragmentShader(material: ThreeMaterialLike | undefined): s
   return undefined
 }
 
-function customFragmentHints(userData: Record<string, any> | undefined): { value: Record<string, unknown>; label: string } | undefined {
+function materialRendererHints(userData: Record<string, any> | undefined): { value: Record<string, unknown>; label: string } | undefined {
   const value = userData?.headlessThreeRenderer ?? userData?.headlessRenderer
-  if (value == null || typeof value !== 'object') return undefined
+  if (value == null) return undefined
   const label = userData?.headlessThreeRenderer != null
     ? 'material.userData.headlessThreeRenderer'
     : 'material.userData.headlessRenderer'
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object.`)
+  }
   return { value: value as Record<string, unknown>, label }
+}
+
+function customFragmentHints(userData: Record<string, any> | undefined): { value: Record<string, unknown>; label: string } | undefined {
+  return materialRendererHints(userData)
 }
 
 function customFragmentCandidate(value: unknown, label: string): string | undefined {

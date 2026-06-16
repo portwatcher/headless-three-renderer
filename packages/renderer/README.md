@@ -133,7 +133,7 @@ The public API accepts only Three.js-like objects:
 - PBR metallic/roughness via `MeshStandardMaterial` and `MeshPhysicalMaterial`
 - `MeshPhysicalMaterial` clearcoat, sheen, anisotropy, scalar iridescence, specular intensity/color, IOR, attenuation, approximate dispersion, and roughness-aware environment-backed or scene-color transmission / refraction; invalid physical color/scalar values fail clearly
 - physical material extension maps for clearcoat, clearcoat roughness, clearcoat normals, sheen color/roughness, anisotropy, iridescence factor/thickness, specular color/intensity, transmission, and thickness; all current physical-extension maps include primary/secondary `texture.channel` UV selection, texture transforms including explicit matrices, packed texture-group sampler settings with direct iridescence factor/thickness wrap/filter coverage, clear failures for incompatible packed samplers, and sheen/specular color maps include sRGB color-space decode
-- custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path
+- custom WGSL fragment bodies via `material.userData.headlessThreeRenderer.fragmentWgsl`; `ShaderMaterial`, `RawShaderMaterial`, NodeMaterial, and `onBeforeCompile` customizations require this explicit override path, and malformed renderer hint containers fail clearly
 - metallic/roughness map (`material.metalnessMap` / `material.roughnessMap`) with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings
 - normal map with configurable `normalScale`, plus bump map with `bumpScale`, both with primary/secondary `texture.channel` UV selection and wrap/filter sampler settings; invalid scalar values fail clearly
 - `MeshNormalMaterial` and `MeshMatcapMaterial` normal-map output
@@ -142,7 +142,7 @@ The public API accepts only Three.js-like objects:
 - displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, and texture transforms; invalid scale/bias values fail clearly
 - `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode and wrap/filter sampler settings; direct conformance also covers toon base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing, with clear failures for unsupported depth-packing constants
-- `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, with invalid range values failing clearly, plus alpha-map cutouts and CPU-baked displacement
+- `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, with invalid range values and malformed renderer hint containers failing clearly, plus alpha-map cutouts and CPU-baked displacement
 - main-pass `material.wireframe` output for supported mesh materials, including direct coverage for `MeshBasicMaterial`, `MeshDepthMaterial`, and `MeshDistanceMaterial`
 - `Object3D.customDepthMaterial` and `customDistanceMaterial` for mesh shadow caster alpha-tested and displacement material inputs, plus alpha-tested sprite/point billboard shadow cutouts
 - emissive color, intensity, and emissive map, with primary/secondary `texture.channel` UV selection, sRGB color-space decode, and wrap/filter sampler settings; invalid color/intensity values fail clearly
@@ -280,6 +280,8 @@ Built-in post-processing can be enabled with `options.postProcessing`. Supported
 Materials can provide a WGSL fragment body with `material.userData.headlessThreeRenderer.fragmentWgsl`. The body runs inside the renderer's standard vertex, uniform, color, UV, and base-texture setup and returns a `vec4<f32>`.
 
 Three.js `ShaderMaterial`, `RawShaderMaterial`, and NodeMaterial are not translated directly; provide the headless WGSL fragment override above or use a built-in material.
+
+`material.userData.headlessThreeRenderer` and the legacy `material.userData.headlessRenderer` key must be objects when present.
 
 ### Lines and Points
 

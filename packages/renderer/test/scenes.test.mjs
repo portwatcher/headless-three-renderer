@@ -3697,6 +3697,12 @@ test('invalid MeshDistanceMaterial range values fail clearly', () => {
     ['hint distanceFar', (material) => {
       material.userData.headlessThreeRenderer = { distanceFar: Number.POSITIVE_INFINITY }
     }, /material\.userData\.headlessThreeRenderer\.distanceFar must be a finite number/i],
+    ['modern hint container', (material) => {
+      material.userData.headlessThreeRenderer = 'distance'
+    }, /material\.userData\.headlessThreeRenderer must be an object/i],
+    ['legacy hint container', (material) => {
+      material.userData.headlessRenderer = []
+    }, /material\.userData\.headlessRenderer must be an object/i],
   ]
 
   for (const [name, mutate, pattern] of cases) {
@@ -11687,6 +11693,12 @@ test('custom WGSL fragment override values fail clearly', () => {
     ['legacy fragmentWgsl', (material) => {
       material.userData.headlessRenderer = { fragmentWgsl: false }
     }, /material\.userData\.headlessRenderer\.fragmentWgsl must be a string/i],
+    ['modern hint container', (material) => {
+      material.userData.headlessThreeRenderer = 1
+    }, /material\.userData\.headlessThreeRenderer must be an object/i],
+    ['legacy hint container', (material) => {
+      material.userData.headlessRenderer = []
+    }, /material\.userData\.headlessRenderer must be an object/i],
   ]
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
