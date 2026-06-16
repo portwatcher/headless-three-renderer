@@ -483,6 +483,13 @@ function linearFogCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [5, 5, 8],
     minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const fogged = meanRegion(rgba, width, 20, 24, 38, 72)
+      const unfogged = meanRegion(rgba, width, 58, 24, 76, 72)
+      if (!(fogged.b > fogged.r + 180 && unfogged.r > unfogged.b + 180)) {
+        throw new Error(`linear fog corpus should keep only the opt-out panel red, got fogged=${JSON.stringify(fogged)} unfogged=${JSON.stringify(unfogged)}`)
+      }
+    },
   }
 }
 
