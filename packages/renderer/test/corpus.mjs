@@ -31,6 +31,7 @@ export function createSceneCorpus() {
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
     maskRenderModeCorpus(),
+    objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
     spriteMaterialCorpus(),
     pointSpotLightCorpus(),
@@ -403,6 +404,45 @@ function maskRenderModeCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+  }
+}
+
+function objectIdRenderModeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+
+  const left = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 1.0),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  left.position.x = -0.5
+  scene.add(left)
+
+  const right = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 1.0),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  )
+  right.position.x = 0.5
+  scene.add(right)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'object-id-render-mode-planes',
+    scene,
+    camera,
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      renderMode: 'object-id',
+    },
+    background: [0, 0, 0],
+    backgroundTolerance: 0,
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
   }
 }
 
