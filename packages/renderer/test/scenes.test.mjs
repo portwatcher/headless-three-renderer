@@ -4032,11 +4032,12 @@ test('invalid billboard and line scalar values fail clearly', () => {
     return scene
   }
 
-  function lineScene(material) {
+  function lineScene(material, configureGeometry = () => {}) {
     const geometry = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(-0.5, 0, 0),
       new THREE.Vector3(0.5, 0, 0),
     ])
+    configureGeometry(geometry)
     const scene = new THREE.Scene()
     scene.add(new THREE.Line(geometry, material))
     return scene
@@ -4098,6 +4099,22 @@ test('invalid billboard and line scalar values fail clearly', () => {
       material.scale = 0
       return lineScene(material)
     }, /material\.scale must be positive/i],
+    ['line distance finite', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      return lineScene(material, (geometry) => {
+        geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, Number.NaN]), 1))
+      })
+    }, /geometry\.attributes\.lineDistance\[1\]\.x must be a finite number/i],
+    ['line distance itemSize', () => {
+      const material = new THREE.LineDashedMaterial({ color: 0xffffff })
+      return lineScene(material, (geometry) => {
+        geometry.setAttribute('lineDistance', {
+          count: 2,
+          itemSize: 0,
+          array: new Float32Array([0, 1]),
+        })
+      })
+    }, /geometry\.attributes\.lineDistance\.itemSize must be a positive integer/i],
   ]
 
   for (const [label, makeScene, pattern] of cases) {

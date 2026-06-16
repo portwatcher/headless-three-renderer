@@ -2767,8 +2767,8 @@ function lineSegmentsWithDistances(
       const a = source[start + i]
       const b = source[start + i + 1]
       const length = vertexDistance(positions, a, b)
-      const d0 = lineDistance ? attributeComponent(lineDistance, a, 0) : cumulative
-      const d1 = lineDistance ? attributeComponent(lineDistance, b, 0) : d0 + length
+      const d0 = lineDistance ? attributeComponent(lineDistance, a, 0, 'geometry.attributes.lineDistance') : cumulative
+      const d1 = lineDistance ? attributeComponent(lineDistance, b, 0, 'geometry.attributes.lineDistance') : d0 + length
       segments.push({ a, b, d0, d1 })
       cumulative = d1
     }
@@ -2776,11 +2776,11 @@ function lineSegmentsWithDistances(
   }
 
   let previous = source[start]
-  let previousDistance = lineDistance ? attributeComponent(lineDistance, previous, 0) : 0
+  let previousDistance = lineDistance ? attributeComponent(lineDistance, previous, 0, 'geometry.attributes.lineDistance') : 0
   for (let i = 1; i < count; i += 1) {
     const current = source[start + i]
     const length = vertexDistance(positions, previous, current)
-    const currentDistance = lineDistance ? attributeComponent(lineDistance, current, 0) : previousDistance + length
+    const currentDistance = lineDistance ? attributeComponent(lineDistance, current, 0, 'geometry.attributes.lineDistance') : previousDistance + length
     segments.push({ a: previous, b: current, d0: previousDistance, d1: currentDistance })
     previous = current
     previousDistance = currentDistance
