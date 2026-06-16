@@ -8193,6 +8193,39 @@ test('LightProbe spherical harmonics contribute diffuse lighting', () => {
   assert.ok(mean.r > mean.b + 40, `LightProbe should tint diffuse lighting red (${mean.r} vs ${mean.b})`)
 })
 
+test('LightProbe ignores invisible probes and hidden ancestors', () => {
+  function makeProbe(r, g, b) {
+    const probe = new THREE.LightProbe(undefined, 1.8)
+    for (const coefficient of probe.sh.coefficients) {
+      coefficient.set(0, 0, 0)
+    }
+    probe.sh.coefficients[0].set(r, g, b)
+    return probe
+  }
+
+  const hiddenProbe = makeProbe(1, 0, 0)
+  const hiddenGroup = new THREE.Group()
+  hiddenGroup.visible = false
+  hiddenGroup.add(hiddenProbe)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(hiddenGroup)
+  scene.add(makeProbe(0, 1, 0))
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 25, `visible green LightProbe should ignore hidden red probe (${mean.g} vs ${mean.r})`)
+  assert.ok(mean.g > mean.b + 40, `visible LightProbe should tint diffuse lighting green (${mean.g} vs ${mean.b})`)
+})
+
 test('LightProbe honors camera layer filtering', () => {
   function makeProbe(r, g, b, layer) {
     const probe = new THREE.LightProbe(undefined, 1.8)
