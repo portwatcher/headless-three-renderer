@@ -526,14 +526,14 @@ export interface RenderTargetTextureLike {
   isArrayTexture?: boolean
   is3DTexture?: boolean
   format?: number
-  /** Color targets support Red/RG/RGB/RGBA readback with byte, unsigned integer, FloatType, and HalfFloatType arrays. */
+  /** Color targets support Red/RG/RGB/RGBA readback with byte, signed/unsigned integer, FloatType, and HalfFloatType arrays. */
   type?: number
   needsUpdate?: boolean
   needsPMREMUpdate?: boolean
 }
 
 export interface RenderTargetImageLike {
-  data?: Buffer | Uint8Array | Uint8ClampedArray | Uint16Array | Uint32Array | Float32Array
+  data?: Buffer | Int8Array | Uint8Array | Uint8ClampedArray | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array
   width?: number
   height?: number
   depth?: number

@@ -10825,6 +10825,14 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(floatData[center + 1] < 0.05, `FloatType green channel should stay near zero (${floatData[center + 1]})`)
   assert.ok(floatData[center + 3] > 0.99, `FloatType alpha channel should stay opaque (${floatData[center + 3]})`)
 
+  const byteTarget = { texture: { type: THREE.ByteType } }
+  renderToTarget(scene, camera, byteTarget, options)
+  const byteData = byteTarget.texture.image.data
+  assert.ok(byteData instanceof Int8Array, 'ByteType color target should receive Int8Array data')
+  assert.ok(byteData[center] > 63, `ByteType red channel should be normalized (${byteData[center]})`)
+  assert.ok(byteData[center + 1] < 8, `ByteType green channel should stay near zero (${byteData[center + 1]})`)
+  assert.ok(byteData[center + 3] > 120, `ByteType alpha channel should stay opaque (${byteData[center + 3]})`)
+
   const rgFloatTarget = { texture: { format: THREE.RGFormat, type: THREE.FloatType } }
   renderToTarget(scene, camera, rgFloatTarget, options)
   const rgFloatData = rgFloatTarget.texture.image.data
@@ -10841,6 +10849,14 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(ushortData[center] > 0x8000, `UnsignedShortType red channel should be normalized (${ushortData[center]})`)
   assert.ok(ushortData[center + 1] < 0x1000, `UnsignedShortType green channel should stay near zero (${ushortData[center + 1]})`)
   assert.ok(ushortData[center + 3] > 0xff00, `UnsignedShortType alpha channel should stay opaque (${ushortData[center + 3]})`)
+
+  const shortTarget = { texture: { type: THREE.ShortType } }
+  renderToTarget(scene, camera, shortTarget, options)
+  const shortData = shortTarget.texture.image.data
+  assert.ok(shortData instanceof Int16Array, 'ShortType color target should receive Int16Array data')
+  assert.ok(shortData[center] > 0x4000, `ShortType red channel should be normalized (${shortData[center]})`)
+  assert.ok(shortData[center + 1] < 0x1000, `ShortType green channel should stay near zero (${shortData[center + 1]})`)
+  assert.ok(shortData[center + 3] > 0x7f00, `ShortType alpha channel should stay opaque (${shortData[center + 3]})`)
 
   const rgbUshortTarget = { texture: { format: THREE.RGBFormat, type: THREE.UnsignedShortType } }
   renderToTarget(scene, camera, rgbUshortTarget, options)
@@ -10859,6 +10875,14 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(uintData[center] > 0x80000000, `UnsignedIntType red channel should be normalized (${uintData[center]})`)
   assert.ok(uintData[center + 1] < 0x10000000, `UnsignedIntType green channel should stay near zero (${uintData[center + 1]})`)
   assert.ok(uintData[center + 3] > 0xff000000, `UnsignedIntType alpha channel should stay opaque (${uintData[center + 3]})`)
+
+  const intTarget = { texture: { type: THREE.IntType } }
+  renderToTarget(scene, camera, intTarget, options)
+  const intData = intTarget.texture.image.data
+  assert.ok(intData instanceof Int32Array, 'IntType color target should receive Int32Array data')
+  assert.ok(intData[center] > 0x40000000, `IntType red channel should be normalized (${intData[center]})`)
+  assert.ok(intData[center + 1] < 0x10000000, `IntType green channel should stay near zero (${intData[center + 1]})`)
+  assert.ok(intData[center + 3] > 0x7f000000, `IntType alpha channel should stay opaque (${intData[center + 3]})`)
 
   const halfTarget = { texture: { type: THREE.HalfFloatType } }
   renderToTarget(scene, camera, halfTarget, options)
@@ -10965,7 +10989,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.AlphaFormat } }, /target color texture format .*not supported.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'color texture format'],
-    [{ texture: { type: THREE.ByteType } }, /target color texture type .*not supported.*UnsignedByteType.*UnsignedShortType.*UnsignedIntType.*HalfFloatType.*FloatType/i, 'color texture type'],
+    [{ texture: { type: THREE.UnsignedShort4444Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'depth-stencil format with scalar type'],

@@ -605,7 +605,10 @@ type InternalRenderOptions = RenderOptions & {
 const WEBGL_COORDINATE_SYSTEM = 2000
 const CUBE_FACE_COUNT = 6
 const UnsignedByteType = 1009
+const ByteType = 1010
+const ShortType = 1011
 const UnsignedShortType = 1012
+const IntType = 1013
 const UnsignedIntType = 1014
 const FloatType = 1015
 const HalfFloatType = 1016
@@ -1667,13 +1670,16 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
   if (
     type != null &&
     type !== UnsignedByteType &&
+    type !== ByteType &&
+    type !== ShortType &&
     type !== UnsignedShortType &&
+    type !== IntType &&
     type !== UnsignedIntType &&
     type !== FloatType &&
     type !== HalfFloatType
   ) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, UnsignedShortType, UnsignedIntType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -1830,10 +1836,31 @@ function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNu
     }
     return color
   }
+  if (texture.type === ByteType) {
+    const color = new Int8Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = normalizedByteToSignedInteger(values[i], 0x7f)
+    }
+    return color
+  }
+  if (texture.type === ShortType) {
+    const color = new Int16Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = normalizedByteToSignedInteger(values[i], 0x7fff)
+    }
+    return color
+  }
   if (texture.type === UnsignedShortType) {
     const color = new Uint16Array(values.length)
     for (let i = 0; i < values.length; i += 1) {
       color[i] = Math.round((values[i] / 255) * 0xffff)
+    }
+    return color
+  }
+  if (texture.type === IntType) {
+    const color = new Int32Array(values.length)
+    for (let i = 0; i < values.length; i += 1) {
+      color[i] = normalizedByteToSignedInteger(values[i], 0x7fffffff)
     }
     return color
   }
@@ -1852,6 +1879,10 @@ function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNu
     return color
   }
   return values
+}
+
+function normalizedByteToSignedInteger(value: number, max: number): number {
+  return Math.round((value / 255) * max)
 }
 
 function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
@@ -1946,8 +1977,11 @@ function normalizedFloatToHalf(value: number): number {
 function cloneTargetData(data: NonNullable<RenderTargetImageLike['data']>): NonNullable<RenderTargetImageLike['data']> {
   if (Buffer.isBuffer(data)) return Buffer.from(data)
   if (data instanceof Float32Array) return new Float32Array(data)
+  if (data instanceof Int32Array) return new Int32Array(data)
   if (data instanceof Uint32Array) return new Uint32Array(data)
+  if (data instanceof Int16Array) return new Int16Array(data)
   if (data instanceof Uint16Array) return new Uint16Array(data)
+  if (data instanceof Int8Array) return new Int8Array(data)
   if (data instanceof Uint8ClampedArray) return new Uint8ClampedArray(data)
   return new Uint8Array(data)
 }
