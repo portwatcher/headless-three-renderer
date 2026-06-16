@@ -597,10 +597,12 @@ export function extractPbrProperties(
   if (iridescenceIor !== undefined) {
     props.iridescenceIor = Math.max(1, Math.min(2.333, iridescenceIor))
   }
-  const iridescenceThicknessRange = material.iridescenceThicknessRange
-  if (iridescenceThicknessRange && iridescenceThicknessRange.length >= 2) {
-    const min = requiredFiniteNumber(iridescenceThicknessRange[0], 'material.iridescenceThicknessRange[0]')
-    const max = requiredFiniteNumber(iridescenceThicknessRange[1], 'material.iridescenceThicknessRange[1]')
+  const iridescenceThicknessRange = materialRangePair(
+    material.iridescenceThicknessRange,
+    'material.iridescenceThicknessRange',
+  )
+  if (iridescenceThicknessRange) {
+    const [min, max] = iridescenceThicknessRange
     props.iridescenceThicknessMin = Math.max(0, min)
     props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
   }
@@ -1323,6 +1325,21 @@ function optionalFiniteNumberOrInfinityDefault(value: unknown, label: string): n
 function requiredFiniteNumber(value: unknown, label: string): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function materialRangePair(value: unknown, label: string): [number, number] | undefined {
+  if (value == null) return undefined
+  if (typeof value !== 'object') {
+    throw new TypeError(`${label} must be an array-like pair.`)
+  }
+  const range = value as ArrayLike<unknown>
+  if (typeof range.length !== 'number' || range.length < 2) {
+    throw new TypeError(`${label} must contain at least two values.`)
+  }
+  return [
+    requiredFiniteNumber(range[0], `${label}[0]`),
+    requiredFiniteNumber(range[1], `${label}[1]`),
+  ]
 }
 
 function finiteNumberOrDefault(value: unknown, label: string, fallback: number): number {

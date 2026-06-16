@@ -9723,7 +9723,13 @@ test('invalid physical material scalar values fail clearly', () => {
     ['iridescenceIOR', (material) => {
       material.iridescenceIOR = Number.NaN
     }, /material\.iridescenceIOR must be a finite number/i],
-    ['iridescenceThicknessRange', (material) => {
+    ['iridescenceThicknessRange container', (material) => {
+      material.iridescenceThicknessRange = 'range'
+    }, /material\.iridescenceThicknessRange must be an array-like pair/i],
+    ['iridescenceThicknessRange length', (material) => {
+      material.iridescenceThicknessRange = [100]
+    }, /material\.iridescenceThicknessRange must contain at least two values/i],
+    ['iridescenceThicknessRange value', (material) => {
       material.iridescenceThicknessRange = [100, 'thick']
     }, /material\.iridescenceThicknessRange\[1\] must be a finite number/i],
     ['transmission', (material) => {
