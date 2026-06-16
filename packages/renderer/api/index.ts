@@ -29,6 +29,7 @@ import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLig
 import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
+import { matrixElements } from './math'
 
 export {
   applyVrmAnimation,
@@ -2151,4 +2152,6 @@ function validateThreeCamera(camera: unknown, label = 'render(scene, camera)'): 
   if (!cameraLike.projectionMatrix || !cameraLike.matrixWorldInverse) {
     throw new TypeError(defaultLabel ? 'THREE.Camera must have projectionMatrix and matrixWorldInverse' : `${label} must have projectionMatrix and matrixWorldInverse.`)
   }
+  matrixElements(cameraLike.projectionMatrix, defaultLabel ? 'camera.projectionMatrix' : `${label}.projectionMatrix`)
+  matrixElements(cameraLike.matrixWorldInverse, defaultLabel ? 'camera.matrixWorldInverse' : `${label}.matrixWorldInverse`)
 }

@@ -1246,6 +1246,27 @@ test('invalid camera clipping distances fail clearly', () => {
     /camera\.projectionMatrix\.elements\[0\] must be a finite number/i,
   )
 
+  const missingMatrixCamera = makeCamera()
+  missingMatrixCamera.projectionMatrix = null
+  assert.throws(
+    () => new Renderer().render(scene, missingMatrixCamera, { width: 32, height: 32 }),
+    /THREE\.Camera must have projectionMatrix and matrixWorldInverse/i,
+  )
+
+  const projectionContainerCamera = makeCamera()
+  projectionContainerCamera.projectionMatrix = { elements: [1, 2, 3] }
+  assert.throws(
+    () => new Renderer().render(scene, projectionContainerCamera, { width: 32, height: 32 }),
+    /camera\.projectionMatrix must be a THREE\.Matrix4/i,
+  )
+
+  const viewMatrixCamera = makeCamera()
+  viewMatrixCamera.matrixWorldInverse.elements[4] = Number.NaN
+  assert.throws(
+    () => new Renderer().render(scene, viewMatrixCamera, { width: 32, height: 32 }),
+    /camera\.matrixWorldInverse\.elements\[4\] must be a finite number/i,
+  )
+
   const worldMatrixCamera = makeCamera()
   worldMatrixCamera.updateMatrixWorld = () => {}
   worldMatrixCamera.matrixWorld.elements[12] = Number.NaN
@@ -1367,6 +1388,13 @@ test('malformed ArrayCamera sub-camera containers fail clearly', () => {
   assert.throws(
     () => renderRgba(scene, arrayCamera, { width: 64, height: 64 }),
     /THREE\.ArrayCamera\.cameras\[0\] cannot be a THREE\.ArrayCamera/i,
+  )
+
+  const matrixArrayCamera = makeLayeredArrayCamera()
+  matrixArrayCamera.cameras[0].matrixWorldInverse.elements[1] = Number.NaN
+  assert.throws(
+    () => renderRgba(scene, matrixArrayCamera, { width: 64, height: 64 }),
+    /THREE\.ArrayCamera\.cameras\[0\]\.matrixWorldInverse\.elements\[1\] must be a finite number/i,
   )
 })
 
@@ -1548,6 +1576,13 @@ test('malformed CubeCamera child camera containers fail clearly', () => {
   assert.throws(
     () => renderRgba(scene, cubeCamera, { width: 32, height: 32 }),
     /THREE\.CubeCamera\.children\[0\] cannot be a THREE\.CubeCamera/i,
+  )
+
+  const matrixCubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(32))
+  matrixCubeCamera.children[0].projectionMatrix = { elements: [1, 2, 3] }
+  assert.throws(
+    () => renderRgba(scene, matrixCubeCamera, { width: 32, height: 32 }),
+    /THREE\.CubeCamera\.children\[0\]\.projectionMatrix must be a THREE\.Matrix4/i,
   )
 })
 
