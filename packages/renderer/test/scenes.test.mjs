@@ -9132,6 +9132,30 @@ test('texture colorSpace string aliases match LinearSRGBColorSpace', () => {
   }
 })
 
+test('background texture colorSpace string aliases match LinearSRGBColorSpace', () => {
+  function renderBackgroundColorSpace(colorSpace) {
+    const background = solidTexture(128, 128, 128)
+    background.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = background
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, {
+      width: 32,
+      height: 32,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const linear = renderBackgroundColorSpace(THREE.LinearSRGBColorSpace)
+  for (const alias of ['srgb-linear', 'linear-srgb', 'linearsrgb', 'linear']) {
+    assert.deepEqual(renderBackgroundColorSpace(alias), linear, `${alias} should match THREE.LinearSRGBColorSpace`)
+  }
+})
+
 test('color-space decoding composes with explicit texture matrices', () => {
   function transformedGrayTexture(colorSpace) {
     const texture = rgbaTexture([
