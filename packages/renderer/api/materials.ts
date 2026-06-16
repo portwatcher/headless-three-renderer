@@ -1336,7 +1336,10 @@ function finiteIntegerOrDefault(value: unknown, fallback: number): number {
 }
 
 export function textureUvChannel(texture: ThreeTextureLike | null | undefined): number {
-  if (!Number.isInteger(texture?.channel)) return 0
+  if (texture?.channel == null) return 0
+  if (!Number.isInteger(texture.channel)) {
+    throw new TypeError('texture.channel must be an integer.')
+  }
   const channel = texture!.channel!
   if (channel >= 0 && channel <= 3) return channel
   throw new Error(

@@ -8684,6 +8684,18 @@ test('unsupported texture channel indices fail clearly', () => {
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
     /texture\.channel 4.*not supported.*channel 0.*1.*2.*3/i,
   )
+
+  const malformedMap = solidTexture(255, 255, 255)
+  malformedMap.channel = '1'
+  const malformedScene = new THREE.Scene()
+  malformedScene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: malformedMap }),
+  ))
+  assert.throws(
+    () => renderRgba(malformedScene, makeCamera(), { width: 64, height: 64 }),
+    /texture\.channel must be an integer/i,
+  )
 })
 
 test('MeshBasicMaterial map and alphaMap can sample distinct non-primary UV channels', () => {
