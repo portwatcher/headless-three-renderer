@@ -739,6 +739,8 @@ function appendPoints(
   const positions = readVec3Attribute(position, 'geometry.attributes.position')
   const vertexColors = getAttribute(geometry, 'color')
   const pointUvAttribute = getAttribute(geometry, 'uv')
+  const primaryPointUvs = pointUvAttribute ? readVec2Attribute(pointUvAttribute, 'geometry.attributes.uv') : null
+  const pointUvChannels = readUvChannels(geometry, primaryPointUvs)
   const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index') : null
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
@@ -749,8 +751,11 @@ function appendPoints(
   for (const group of groups) {
     const material = materialForGroup(object.material, group.materialIndex)
     if (material?.visible === false) continue
-    const pointUvs = pointUvAttribute && (material?.map || material?.alphaMap)
-      ? readVec2Attribute(pointUvAttribute, 'geometry.attributes.uv')
+    const pointUvs = primaryPointUvs && (material?.map || material?.alphaMap)
+      ? secondaryUvsForMaterial(pointUvChannels, {
+        map: material.map,
+        alphaMap: material.alphaMap,
+      })
       : null
 
     const baseColor = materialColor(material)
