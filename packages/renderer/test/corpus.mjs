@@ -51,6 +51,7 @@ export function createSceneCorpus() {
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
+    pointsMaterialTextureCorpus(),
     instancedLinesPointsCorpus(),
     instancedTextureUvCorpus(),
     batchedMeshCorpus(),
@@ -1873,6 +1874,71 @@ function dashedLineMaterialTextureCorpus() {
       )
       if (greenPixels < 3 || redPixels > 1) {
         throw new Error(`textured dashed-line corpus should render green alpha-tested dashes, got green=${greenPixels} red=${redPixels}`)
+      }
+    },
+  }
+}
+
+function pointsMaterialTextureCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const map = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  map.colorSpace = THREE.SRGBColorSpace
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.needsUpdate = true
+
+  const alphaMap = new THREE.DataTexture(new Uint8Array([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.needsUpdate = true
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    alphaMap,
+    alphaTest: 0.5,
+    color: 0xffffff,
+    map,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  return {
+    name: 'points-material-textured-alpha',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.05,
+    validate(rgba, { width, height }) {
+      const greenPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => g > 120 && g > r + 60 && g > b + 60,
+      )
+      const redPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => r > 120 && r > g + 60 && r > b + 60,
+      )
+      if (greenPixels < 400 || redPixels > 4) {
+        throw new Error(`textured point corpus should render green alpha-tested point-sprite UVs, got green=${greenPixels} red=${redPixels}`)
       }
     },
   }
