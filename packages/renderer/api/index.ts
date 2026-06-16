@@ -1088,6 +1088,9 @@ function formatWgslFloat(value: number): string {
 
 function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene> {
   if (!fog) return {}
+  if (typeof fog !== 'object') {
+    throw new TypeError('scene.fog must be a THREE.Fog or THREE.FogExp2 object.')
+  }
   const color = strictColorLikeToArray(fog.color, 'scene.fog.color')
   if (fog.isFogExp2) {
     return {
@@ -1105,7 +1108,7 @@ function fogToNative(fog: ThreeSceneRootLike['fog']): Partial<NativeRenderScene>
       fogFar: clipDistances.fogFar,
     }
   }
-  return {}
+  throw new TypeError('scene.fog must be a THREE.Fog or THREE.FogExp2 object.')
 }
 
 function postProcessingToNative(post: RenderOptions['postProcessing']): Partial<NativeRenderScene> {

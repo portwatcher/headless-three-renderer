@@ -39,7 +39,7 @@ Already supported in the current implementation:
 - Line material arrays with geometry groups, plus `LineDashedMaterial` dash/gap/scale patterns and custom `lineDistance` attributes for common line, line segment, line loop, and instanced line cases, with invalid line scalar values and malformed line-distance attributes failing clearly.
 - Object/camera layer filtering for renderable objects and lights, plus native draw-order keys for group order, `renderOrder`, material id, WebGL material variant, transmissive/transparent buckets, projected geometry bounding-sphere z, object/insertion ties, `sortObjects`, and custom opaque/transparent sort callbacks with object/material/geometry/group render-item metadata, with invalid layer masks, `renderOrder`, sort option, and reusable-renderer setter values failing clearly.
 - `THREE.LOD` auto-update selection for the active camera, with invalid auto-update flags, camera zoom, malformed level entries, or level distance/hysteresis values failing clearly.
-- `THREE.Fog` and `THREE.FogExp2` in mesh, shadow, sprite, point, and line material paths, using view-space depth fog with `material.fog` opt-out and invalid fog color/parameter values failing clearly, including generated browser-reference corpus coverage for linear fog opt-out behavior.
+- `THREE.Fog` and `THREE.FogExp2` in mesh, shadow, sprite, point, and line material paths, using view-space depth fog with `material.fog` opt-out and malformed fog objects plus invalid fog color/parameter values failing clearly, including generated browser-reference corpus coverage for linear fog opt-out behavior.
 - Packaged artifacts are built and install-verified in CI across Linux x64, Linux arm64, macOS x64, macOS arm64, and Windows x64.
 
 Distance to the project goal:

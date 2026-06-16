@@ -9504,6 +9504,18 @@ test('invalid fog parameter values fail clearly', () => {
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0xff0000 })))
   const camera = makeCamera()
 
+  scene.fog = 'fog'
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog must be a THREE\.Fog or THREE\.FogExp2 object/i,
+  )
+
+  scene.fog = { color: new THREE.Color(0x00ff00) }
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog must be a THREE\.Fog or THREE\.FogExp2 object/i,
+  )
+
   scene.fog = new THREE.Fog(0x00ff00, 0, 1)
   scene.fog.near = Number.NaN
   assert.throws(
