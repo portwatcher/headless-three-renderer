@@ -71,7 +71,7 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 It also exports Node loader helpers:
 
 - `applyVrmAnimation(vrm, vrmAnimation, options)`: creates a VRMA animation clip with `createVRMAnimationClip`, seeks a `THREE.AnimationMixer` to `options.time`, and updates the VRM scene for still-frame rendering.
-- `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed; malformed helper paths and option containers fail clearly.
+- `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files with encoded texture handlers and local `file://` buffer support already installed; malformed helper paths, option containers, and glTF image metadata fail clearly.
 - `loadVrmFromFile(filePath, options)`: loads local VRM files with `@pixiv/three-vrm`'s `VRMLoaderPlugin` registered. The Pixiv package remains an optional dependency in your project.
 - `loadVrmAnimationFromFile(filePath, options)`: loads local VRMA files with `@pixiv/three-vrm-animation`'s `VRMAnimationLoaderPlugin` registered. The animation package remains optional.
 - `createNodeGltfLoader(rootDir, options)`: creates a configured `GLTFLoader` bundle for advanced flows, including plugin registration through `options.configureLoader`; malformed helper boolean options, callback hooks, and custom managers fail clearly.

@@ -123,6 +123,16 @@ test('loadGltfFromFile rejects external compressed glTF image references with pr
   }
 })
 
+test('loadGltfFromFile rejects malformed glTF image metadata clearly', async () => {
+  await assertRejectsMutatedGltfSource((source) => {
+    source.images = 'images'
+  }, /glTF\.images must be an array/i)
+
+  await assertRejectsMutatedGltfSource((source) => {
+    source.images[0] = 'image'
+  }, /glTF\.images\[0\] must be an object/i)
+})
+
 test('committed vertex-color glTF fixture renders COLOR_0 attributes', async () => {
   const gltf = await loadGltfFixture(VERTEX_COLOR_QUAD)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
@@ -357,6 +367,22 @@ function assertTexturedQuadRendersTexture(gltf, label) {
 
 async function loadGltfFixture(filePath, options) {
   return await loadGltfFromFile(filePath, options)
+}
+
+async function assertRejectsMutatedGltfSource(mutator, pattern) {
+  const source = JSON.parse(await readFile(TEXTURED_QUAD, 'utf8'))
+  mutator(source)
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'headless-three-gltf-malformed-image-'))
+  try {
+    const modelPath = path.join(tmp, 'malformed-image-metadata.gltf')
+    await writeFile(modelPath, JSON.stringify(source))
+    await assert.rejects(
+      () => loadGltfFixture(modelPath),
+      pattern,
+    )
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
 }
 
 function buildTexturedQuadGlb(source) {

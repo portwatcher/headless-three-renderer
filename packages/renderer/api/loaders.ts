@@ -441,7 +441,7 @@ function rewriteGlbBufferViewImages(bytes: Buffer): Buffer | null {
   }
 
   let changed = false
-  for (const image of Array.isArray(json.images) ? json.images : []) {
+  for (const image of gltfImages(json, 'GLB')) {
     validateGltfImageUri(image)
     if (!image || !Number.isInteger(image.bufferView)) continue
     if (typeof image.mimeType !== 'string') {
@@ -469,12 +469,27 @@ function validateGltfTextImageReferences(data: Buffer | string): void {
     return
   }
 
-  for (const image of Array.isArray(json.images) ? json.images : []) {
+  for (const image of gltfImages(json, 'glTF')) {
     validateGltfImageUri(image)
     if (image && Number.isInteger(image.bufferView) && typeof image.mimeType === 'string') {
       validateSupportedEmbeddedImageType('glTF bufferView image', image.mimeType)
     }
   }
+}
+
+function gltfImages(json: any, label: string): any[] {
+  const images = json.images
+  if (images == null) return []
+  if (!Array.isArray(images)) {
+    throw new Error(`${label}.images must be an array.`)
+  }
+  for (let i = 0; i < images.length; i += 1) {
+    const image = images[i]
+    if (!image || typeof image !== 'object' || Array.isArray(image)) {
+      throw new Error(`${label}.images[${i}] must be an object.`)
+    }
+  }
+  return images
 }
 
 function validateGltfImageUri(image: any): void {
