@@ -35,6 +35,7 @@ const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
+const SAMPLE_ASSET_BOOM_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBox', 'glTF', 'BoomBox.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box With Spaces', 'glTF', 'Box With Spaces.gltf')
@@ -374,6 +375,78 @@ test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture map
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'Khronos Avocado sample should render visible PBR textured pixels')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 10 && mean.g > mean.b + 10, `Avocado texture should contribute green/yellow output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets BoomBox fixture loads emissive and packed ORM maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_BOOM_BOX, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'BoomBox.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'BoomBox_baseColor.png',
+    'BoomBox_occlusionRoughnessMetallic.png',
+    'BoomBox_normal.png',
+    'BoomBox_emissive.png',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOOM_BOX)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos BoomBox sample should load a mesh')
+  assert.equal(mesh.name, 'BoomBox')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3575)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 3575)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 3575)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 3575)
+  assert.equal(mesh.geometry.index?.count, 18108)
+  assert.equal(mesh.material.name, 'BoomBox_Mat')
+  assert.deepEqual(mesh.material.emissive.toArray(), [1, 1, 1])
+
+  const { map, aoMap, roughnessMap, metalnessMap, normalMap, emissiveMap } = mesh.material
+  assert.ok(map?.isTexture, 'BoomBox sample should load a base color texture')
+  assert.ok(aoMap?.isTexture, 'BoomBox sample should load an occlusion texture')
+  assert.ok(roughnessMap?.isTexture, 'BoomBox sample should load a roughness texture')
+  assert.ok(metalnessMap?.isTexture, 'BoomBox sample should load a metalness texture')
+  assert.ok(normalMap?.isTexture, 'BoomBox sample should load a normal texture')
+  assert.ok(emissiveMap?.isTexture, 'BoomBox sample should load an emissive texture')
+  assert.equal(aoMap, roughnessMap, 'BoomBox occlusion/roughness channels should share the packed texture')
+  assert.equal(roughnessMap, metalnessMap, 'BoomBox metallic/roughness channels should share the packed texture')
+  assert.deepEqual(pngDimensions(map.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(aoMap.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(normalMap.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(emissiveMap.image), [2048, 2048])
+  assert.equal(map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(map.flipY, false)
+  assert.equal(aoMap.flipY, false)
+  assert.equal(normalMap.flipY, false)
+  assert.equal(emissiveMap.flipY, false)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.4)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y, size.z) * 0.72
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.001, 10)
+  camera.position.set(center.x, center.y + 0.012, center.z + 0.05)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'Khronos BoomBox sample should render visible textured pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 8 && mean.g > 8 && mean.b > 8, `BoomBox textures should contribute non-black output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxInterleaved fixture loads byteStride attributes', async () => {
