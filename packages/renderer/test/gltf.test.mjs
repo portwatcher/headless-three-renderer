@@ -29,6 +29,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
+const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
@@ -406,6 +407,49 @@ test('committed Khronos glTF Sample Assets SimpleSparseAccessor fixture applies 
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'SimpleSparseAccessor sample should render visible sparse geometry')
+})
+
+test('committed Khronos glTF Sample Assets SimpleInstancing fixture loads EXT_mesh_gpu_instancing', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_INSTANCING)
+  const mesh = findFirst(gltf.scene, (object) => object.isInstancedMesh === true)
+  assert.ok(mesh, 'Khronos SimpleInstancing sample should load an InstancedMesh')
+  assert.equal(mesh.count, 125)
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.ok(mesh.instanceMatrix?.isInstancedBufferAttribute, 'EXT_mesh_gpu_instancing should populate instance matrices')
+  assert.deepEqual(Array.from(mesh.instanceMatrix.array.slice(0, 16)), [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+  ])
+  assert.deepEqual(Array.from(mesh.instanceMatrix.array.slice(124 * 16, 125 * 16)), [
+    0, 2, 0, 0,
+    0, 0, 2, 0,
+    2, 0, 0, 0,
+    10, 10, 10, 1,
+  ])
+
+  const camera = new THREE.OrthographicCamera(-1, 12, 12, -1, 0.01, 50)
+  camera.position.set(6, 6, 20)
+  camera.lookAt(6, 6, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.2)
+  light.position.set(10, 12, 20)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'SimpleInstancing sample should render visible instanced geometry')
 })
 
 test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders external PNG UV quadrants', async () => {
