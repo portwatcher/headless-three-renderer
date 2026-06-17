@@ -32,6 +32,7 @@ const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Camer
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
+const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
@@ -765,6 +766,62 @@ test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and 
   assert.ok(triangleFan.r > 120 && triangleFan.g > 120 && triangleFan.b > 120, `TRIANGLE_FAN primitive should render visible pixels (${triangleFan.r}, ${triangleFan.g}, ${triangleFan.b})`)
 })
 
+test('committed Khronos glTF Sample Assets NegativeScaleTest fixture preserves negative node determinants', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_NEGATIVE_SCALE_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'NegativeScaleBack',
+    'BackgroundMesh',
+    'Labels',
+    'PositiveScaleTest',
+    'NegativeScaleFront',
+    'NotShiny1',
+    'NotShinyMinus1',
+    'Shiny1',
+    'ShinyMinus1',
+    'Dark1',
+    'DarkMinus1',
+  ])
+
+  const positivePanel = gltf.scene.getObjectByName('PositiveScaleTest')
+  const negativeFrontPanel = gltf.scene.getObjectByName('NegativeScaleFront')
+  const labelPanel = gltf.scene.getObjectByName('Labels')
+  const notShinyMinusOne = gltf.scene.getObjectByName('NotShinyMinus1')
+  const shinyOne = gltf.scene.getObjectByName('Shiny1')
+  const shinyMinusOne = gltf.scene.getObjectByName('ShinyMinus1')
+  assert.ok(positivePanel?.isMesh, 'NegativeScaleTest should load the positive front-face panel')
+  assert.ok(negativeFrontPanel?.isMesh, 'NegativeScaleTest should load the negative-scale front-face panel')
+  assert.ok(labelPanel?.isMesh, 'NegativeScaleTest should load the external PNG label panel')
+  assert.ok(notShinyMinusOne?.isMesh, 'NegativeScaleTest should load the negative-scale double-sided sphere')
+  assert.ok(shinyOne?.isMesh, 'NegativeScaleTest should load a child under a negative-scale parent')
+  assert.ok(shinyMinusOne?.isMesh, 'NegativeScaleTest should load a negative-scale child under a negative-scale parent')
+
+  assert.equal(positivePanel.material.side, THREE.FrontSide)
+  assert.equal(negativeFrontPanel.material.side, THREE.FrontSide)
+  assert.equal(notShinyMinusOne.material.side, THREE.DoubleSide)
+  assert.equal(Buffer.isBuffer(negativeFrontPanel.material.map?.image), true, 'NegativeScaleTest check/X PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(labelPanel.material.map?.image), true, 'NegativeScaleTest label PNG should load as an encoded Buffer')
+
+  assert.ok(worldDeterminant(positivePanel) > 0, 'positive-scale panel should keep positive world winding')
+  assert.ok(worldDeterminant(negativeFrontPanel) < 0, 'negative-scale panel should expose negative world winding')
+  assert.ok(worldDeterminant(shinyOne) < 0, 'child under a negative-scale parent should inherit negative world winding')
+  assert.ok(worldDeterminant(shinyMinusOne) > 0, 'negative-scale child under a negative-scale parent should recover positive world winding')
+
+  const renderer = new Renderer()
+  assert.ok(
+    renderSingleObjectRatio(renderer, positivePanel) > 0.3,
+    'NegativeScaleTest positive-scale front-face panel should render visible pixels',
+  )
+  assert.ok(
+    renderSingleObjectRatio(renderer, negativeFrontPanel) > 0.15,
+    'NegativeScaleTest negative-scale front-face panel should render visible pixels',
+  )
+})
+
 test('committed Khronos glTF Sample Assets MultipleScenes fixture preserves default and alternate scenes', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_MULTIPLE_SCENES)
   assert.equal(gltf.scenes.length, 2)
@@ -1258,6 +1315,45 @@ async function loadGltfFixture(filePath, options) {
 
 function vectorFromAttribute(attribute, index) {
   return [attribute.getX(index), attribute.getY(index), attribute.getZ(index)]
+}
+
+function worldDeterminant(object) {
+  object.updateWorldMatrix(true, false)
+  return object.matrixWorld.determinant()
+}
+
+function renderSingleObjectRatio(renderer, object) {
+  object.updateWorldMatrix(true, true)
+  const bounds = new THREE.Box3().setFromObject(object)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const padding = 0.2
+
+  const scene = new THREE.Scene()
+  scene.add(object.clone(true))
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+
+  const camera = new THREE.OrthographicCamera(
+    -size.x / 2 - padding,
+    size.x / 2 + padding,
+    size.y / 2 + padding,
+    -size.y / 2 - padding,
+    0.01,
+    20,
+  )
+  camera.position.set(center.x, center.y, center.z + 8)
+  camera.lookAt(center)
+  scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = renderer.render(scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  return nonBackgroundRatio(rgba, [0, 0, 0], 3)
 }
 
 async function assertRejectsMutatedGltfSource(mutator, pattern) {
