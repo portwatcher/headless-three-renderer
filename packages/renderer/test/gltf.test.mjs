@@ -124,6 +124,7 @@ const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
+const SAMPLE_ASSET_SPECULAR_SILK_POUF = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularSilkPouf', 'glTF', 'SpecularSilkPouf.gltf')
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
 const SAMPLE_ASSET_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Suzanne', 'glTF', 'Suzanne.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
@@ -6216,6 +6217,90 @@ test('committed Khronos glTF Sample Assets SheenTestGrid fixture loads sheen col
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.35, 'SheenTestGrid should render visible sheen color and roughness samples')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 20 && mean.g > 20 && mean.b > 35, `SheenTestGrid should render lit sheen grid pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets SpecularSilkPouf fixture loads real sheen and specular silk material', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SPECULAR_SILK_POUF, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_materials_specular', 'KHR_materials_sheen'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_specular', 'KHR_materials_sheen'])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 2313984, uri: 'SpecularSilkPouf.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'SpecularSilkPouf_occlusion.png',
+    'SpecularSilkPouf_normal.png',
+  ])
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), ['SpecularSilkPouf'])
+  assert.deepEqual(source.meshes[0].primitives[0].attributes, {
+    NORMAL: 1,
+    POSITION: 0,
+    TEXCOORD_0: 2,
+  })
+  assert.deepEqual(source.materials[0].extensions, {
+    KHR_materials_sheen: {
+      sheenColorFactor: [0.025, 0.03, 0.075],
+      sheenRoughnessFactor: 0.6,
+    },
+    KHR_materials_specular: {
+      specularColorFactor: [10, 0.6, 0],
+      specularFactor: 0.5,
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SPECULAR_SILK_POUF)
+  assert.deepEqual(gltf.parser?.json?.extensionsRequired, ['KHR_materials_specular', 'KHR_materials_sheen'])
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'SpecularSilkPouf should load a mesh')
+  assert.equal(mesh.name, 'SpecularSilkPouf')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 41832)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 41832)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 41832)
+  assert.equal(mesh.geometry.index?.count, 243840)
+
+  const material = mesh.material
+  assert.equal(material.name, 'shot silk')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.deepEqual(material.color.toArray(), [0.025, 0.03, 0.075])
+  assert.equal(material.metalness, 0)
+  assert.equal(material.roughness, 0.65)
+  assert.equal(material.sheen, 1)
+  assert.deepEqual(material.sheenColor.toArray(), [0.025, 0.03, 0.075])
+  assert.equal(material.sheenRoughness, 0.6)
+  assert.equal(material.specularIntensity, 0.5)
+  assert.deepEqual(material.specularColor.toArray(), [10, 0.6, 0])
+  assert.equal(Buffer.isBuffer(material.aoMap?.image), true, 'SpecularSilkPouf occlusion PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(material.normalMap?.image), true, 'SpecularSilkPouf normal PNG should load as an encoded Buffer')
+  assert.equal(material.aoMap.name, 'SpecularSilkPouf_occlusion')
+  assert.equal(material.normalMap.name, 'SpecularSilkPouf_normal')
+  assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.normalMap.flipY, false)
+  assert.deepEqual(pngDimensions(material.aoMap.image), [512, 512])
+  assert.deepEqual(pngDimensions(material.normalMap.image), [1024, 1024])
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.001, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, 1, 0).multiplyScalar(2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.copy(center).add(new THREE.Vector3(0.5, 0.8, 1))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.15, 'SpecularSilkPouf should render visible dark silk geometry')
+  const centerSample = meanRegion(rgba, 128, 128, 48, 48, 80, 80)
+  assert.ok(centerSample.b > centerSample.r && centerSample.b > centerSample.g && centerSample.b < 5, `SpecularSilkPouf center should render dark blue silk (${centerSample.r}, ${centerSample.g}, ${centerSample.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materials_specular scalar and texture inputs', async () => {
