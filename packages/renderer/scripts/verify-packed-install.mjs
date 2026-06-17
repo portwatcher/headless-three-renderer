@@ -148,9 +148,11 @@ function safeReaddir(dir) {
 }
 
 function run(command, args, cwd) {
-  execFileSync(resolveCommand(command), args, {
+  const resolved = resolveCommand(command, args)
+  execFileSync(resolved.command, resolved.args, {
     cwd,
     stdio: 'inherit',
+    ...resolved.options,
     env: {
       ...process.env,
       npm_config_cache: process.env.npm_config_cache ?? path.join(tmp, 'npm-cache'),
@@ -159,7 +161,14 @@ function run(command, args, cwd) {
   })
 }
 
-function resolveCommand(command) {
-  if (process.platform === 'win32' && command === 'npm') return 'npm.cmd'
-  return command
+function resolveCommand(command, args) {
+  if (process.platform === 'win32' && command === 'npm') {
+    const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    if (existsSync(npmCli)) {
+      return { command: process.execPath, args: [npmCli, ...args], options: {} }
+    }
+    return { command, args, options: { shell: true } }
+  }
+
+  return { command, args, options: {} }
 }
