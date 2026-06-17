@@ -60,6 +60,7 @@ const SAMPLE_ASSET_COMPARE_ROUGHNESS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_COMPARE_SHEEN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareSheen', 'glTF', 'CompareSheen.gltf')
 const SAMPLE_ASSET_COMPARE_SPECULAR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareSpecular', 'glTF', 'CompareSpecular.gltf')
 const SAMPLE_ASSET_COMPARE_TRANSMISSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareTransmission', 'glTF', 'CompareTransmission.gltf')
+const SAMPLE_ASSET_COMPARE_VOLUME = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareVolume', 'glTF', 'CompareVolume.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
@@ -1280,6 +1281,115 @@ test('committed Khronos glTF Sample Assets CompareTransmission fixture loads alp
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.4, 'CompareTransmission should render visible alpha/transmission comparison geometry')
+})
+
+test('committed Khronos glTF Sample Assets CompareVolume fixture loads transmission volume variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_VOLUME, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_materials_volume'])
+  assert.equal(source.buffers[0].uri, 'CompareVolume.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Volume_img0.jpg',
+    'Compare_Volume_img1.jpg',
+    'Compare_Volume_img2.png',
+    'Compare_Volume_img3.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+    material.extensions?.KHR_materials_transmission?.transmissionFactor ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessFactor ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessTexture?.index ?? null,
+  ]), [
+    ['checker', 2, null, null, null, null],
+    ['glTF Transmission', null, 0, 1, null, null],
+    ['gold', null, null, null, null, null],
+    ['glTF Volume', null, 0, 1, 0.75, 1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_VOLUME)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Sphere001_0',
+    'Sphere001_1',
+    'Sphere002_0',
+    'Sphere002_1',
+    'Checker',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), [
+    'glTF Transmission',
+    'gold',
+    'glTF Volume',
+    'gold',
+    'checker',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [2732, 390, 2732, 390, 6])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [2732, 390, 2732, 390, 6])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [2732, 390, 2732, 390, 6])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [15744, 1920, 15744, 1920, 6])
+
+  const [transmissionShell, goldLeft, volumeShell, goldRight, checker] = meshes.map((mesh) => mesh.material)
+  assert.equal(transmissionShell.isMeshPhysicalMaterial, true)
+  assert.equal(volumeShell.isMeshPhysicalMaterial, true)
+  assert.equal(transmissionShell.transmission, 1)
+  assert.equal(volumeShell.transmission, 1)
+  assert.equal(transmissionShell.thickness, 0)
+  assert.equal(volumeShell.thickness, 0.75)
+  assert.equal(volumeShell.attenuationDistance, 0.25)
+  assertVectorClose(volumeShell.attenuationColor.toArray(), [0.15, 1, 0.5], 'CompareVolume attenuation color')
+  assert.equal(goldLeft, goldRight, 'both volume comparison cores should share the gold material instance')
+  assertVectorClose(goldLeft.color.toArray(), [
+    0.8823530077934265,
+    0.5921568870544434,
+    0.250980406999588,
+  ], 'CompareVolume gold baseColorFactor')
+  assert.equal(goldLeft.metalness, 1)
+  assert.equal(goldLeft.roughness, 0.2)
+
+  assert.equal(transmissionShell.roughnessMap, transmissionShell.metalnessMap)
+  assert.equal(volumeShell.roughnessMap, volumeShell.metalnessMap)
+  assert.equal(transmissionShell.roughnessMap, volumeShell.roughnessMap)
+  assert.equal(Buffer.isBuffer(volumeShell.roughnessMap?.image), true, 'shared metallic-roughness JPEG should load as an encoded Buffer')
+  assert.equal(volumeShell.roughnessMap.name, 'Compare_Volume_img0.jpg')
+  assert.equal(volumeShell.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(volumeShell.roughnessMap.flipY, false)
+
+  assert.equal(transmissionShell.thicknessMap ?? null, null)
+  assert.equal(Buffer.isBuffer(volumeShell.thicknessMap?.image), true, 'volume thickness JPEG should load as an encoded Buffer')
+  assert.equal(volumeShell.thicknessMap.name, 'Compare_Volume_img1.jpg')
+  assert.equal(volumeShell.thicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(volumeShell.thicknessMap.flipY, false)
+
+  assert.equal(Buffer.isBuffer(checker.map?.image), true, 'checker PNG should load as an encoded Buffer')
+  assert.equal(checker.map.name, 'Compare_Volume_img2.png')
+  assert.deepEqual(pngDimensions(checker.map.image), [64, 64])
+  assert.equal(checker.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(checker.map.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -3.2, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.35, 'CompareVolume should render visible volume comparison geometry')
 })
 
 test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-map comparison variants', async () => {
