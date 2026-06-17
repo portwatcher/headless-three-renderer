@@ -103,6 +103,7 @@ const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'S
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
+const SAMPLE_ASSET_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Suzanne', 'glTF', 'Suzanne.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_ENCODING_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureEncodingTest', 'glTF', 'TextureEncodingTest.gltf')
 const SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureLinearInterpolationTest', 'glTF', 'TextureLinearInterpolationTest.gltf')
@@ -3958,6 +3959,66 @@ test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materi
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'SpecularTest should render visible specular material samples')
+})
+
+test('committed Khronos glTF Sample Assets Suzanne fixture loads dense textured PBR mesh', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SUZANNE, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 590400, uri: 'Suzanne.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Suzanne_BaseColor.png',
+    'Suzanne_MetallicRoughness.png',
+  ])
+  assert.equal(source.meshes[0].name, 'Suzanne')
+  assert.equal(source.materials[0].name, 'Suzanne')
+  assert.equal(source.materials[0].pbrMetallicRoughness.baseColorTexture.index, 0)
+  assert.equal(source.materials[0].pbrMetallicRoughness.metallicRoughnessTexture.index, 1)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SUZANNE)
+  const mesh = gltf.scene.getObjectByName('Suzanne')
+  assert.ok(mesh?.isMesh, 'Suzanne sample should load a named mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 11808)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 11808)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 11808)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 11808)
+  assert.equal(mesh.geometry.index?.count, 11808)
+  assert.equal(mesh.material.name, 'Suzanne')
+  assert.equal(mesh.material.metalness, 1)
+  assert.equal(mesh.material.roughness, 1)
+
+  const { map, roughnessMap, metalnessMap } = mesh.material
+  assert.ok(map?.isTexture, 'Suzanne sample should load a base-color texture')
+  assert.ok(roughnessMap?.isTexture, 'Suzanne sample should load a roughness texture')
+  assert.ok(metalnessMap?.isTexture, 'Suzanne sample should load a metalness texture')
+  assert.equal(roughnessMap, metalnessMap, 'Suzanne metallic/roughness channels should share the packed texture')
+  assert.equal(map.name, 'Suzanne_BaseColor.png')
+  assert.equal(roughnessMap.name, 'Suzanne_MetallicRoughness.png')
+  assert.deepEqual(pngDimensions(map.image), [1024, 1024])
+  assert.deepEqual(pngDimensions(roughnessMap.image), [1024, 1024])
+  assert.equal(map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(roughnessMap.colorSpace, THREE.NoColorSpace)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y, size.z) / 2 + 0.1
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.01, 20)
+  camera.position.set(center.x + 2, center.y + 1.5, center.z + 2.5)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'Suzanne should render visible dense textured PBR geometry')
 })
 
 test('committed Khronos glTF Sample Assets EmissiveStrengthTest fixture loads KHR_materials_emissive_strength factors', async () => {
