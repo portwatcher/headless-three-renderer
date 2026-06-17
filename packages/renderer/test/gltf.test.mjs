@@ -33,6 +33,7 @@ const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation',
 const SAMPLE_ASSET_ANIMATED_COLORS_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedColorsCube', 'glTF', 'AnimatedColorsCube.gltf')
 const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
 const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
+const SAMPLE_ASSET_ANIMATION_POINTER_UVS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimationPointerUVs', 'glTF', 'AnimationPointerUVs.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyRotationTest', 'glTF', 'AnisotropyRotationTest.gltf')
@@ -2475,6 +2476,137 @@ test('committed Khronos glTF Sample Assets AnimatedColorsCube fixture applies ma
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'AnimatedColorsCube should render visible animated colored cubes')
+})
+
+test('committed Khronos glTF Sample Assets AnimationPointerUVs fixture loads animation-pointer texture transform coverage', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANIMATION_POINTER_UVS, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_materials_unlit', 'KHR_lights_punctual'])
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_specular',
+    'KHR_materials_sheen',
+    'KHR_materials_clearcoat',
+    'KHR_texture_transform',
+    'KHR_animation_pointer',
+    'KHR_materials_anisotropy',
+    'KHR_materials_iridescence',
+    'KHR_materials_diffuse_transmission',
+    'KHR_materials_unlit',
+    'KHR_lights_punctual',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 5329724, uri: 'AnimationPointerUVs.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'AnimationPointerUVs_BaseColor.png',
+    'AnimationPointerUVs_DiffuseTransmission.png',
+    'AnimationPointerUVs_Orm.png',
+    'AnimationPointerUVs_Emissive.png',
+    'AnimationPointerUVs_NormalFlat.png',
+    'AnimationPointerUVs_Clearcoat.png',
+    'AnimationPointerUVs_Normal.png',
+    'AnimationPointerUVs_Anisotropy.png',
+    'AnimationPointerUVs_ClearcoatNormal.png',
+    'AnimationPointerUVs_Iridescence.png',
+    'AnimationPointerUVs_Sheen.png',
+    'AnimationPointerUVs_Specular.png',
+    'AnimationPointerUVs_TransmissionVolume.png',
+  ])
+  assert.equal(source.textures.length, 61)
+  assert.equal(source.materials.length, 82)
+  assert.equal(source.meshes.length, 106)
+
+  const clipSource = source.animations[0]
+  assert.equal(source.animations.length, 1)
+  assert.equal(clipSource.channels.length, 103)
+  assert.equal(clipSource.samplers.length, 103)
+  assert.equal(clipSource.channels.every((channel) => channel.target.path === 'pointer'), true)
+  const pointers = clipSource.channels.map((channel) => channel.target.extensions.KHR_animation_pointer.pointer)
+  assert.equal(new Set(pointers).size, 99)
+  for (const pointer of [
+    '/materials/11/pbrMetallicRoughness/baseColorTexture/extensions/KHR_texture_transform/scale',
+    '/materials/27/extensions/KHR_materials_anisotropy/anisotropyTexture/extensions/KHR_texture_transform/rotation',
+    '/materials/57/extensions/KHR_materials_sheen/sheenColorTexture/extensions/KHR_texture_transform/rotation',
+    '/materials/67/extensions/KHR_materials_specular/specularTexture/extensions/KHR_texture_transform/offset',
+    '/materials/72/extensions/KHR_materials_transmission/transmissionTexture/extensions/KHR_texture_transform/rotation',
+    '/materials/77/extensions/KHR_materials_volume/thicknessTexture/extensions/KHR_texture_transform/scale',
+    '/materials/8/extensions/KHR_materials_diffuse_transmission/diffuseTransmissionTexture/extensions/KHR_texture_transform/scale',
+  ]) {
+    assert.ok(pointers.includes(pointer), `AnimationPointerUVs should include pointer target ${pointer}`)
+  }
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANIMATION_POINTER_UVS)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_animation_pointer'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_texture_transform'))
+  assert.equal(gltf.cameras.length, 11)
+  assert.equal(gltf.animations.length, 1)
+
+  const meshes = []
+  const lights = []
+  const materials = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) {
+      meshes.push(object)
+      if (!materials.includes(object.material)) materials.push(object.material)
+    }
+    if (object.isLight === true) lights.push(object)
+  })
+  assert.equal(meshes.length, 132)
+  assert.deepEqual(lights.map((light) => [light.type, light.name, light.intensity]), [
+    ['DirectionalLight', 'light_rear', 50],
+  ])
+  assert.deepEqual(materials.reduce((counts, material) => {
+    counts[material.type] = (counts[material.type] ?? 0) + 1
+    return counts
+  }, {}), {
+    MeshStandardMaterial: 27,
+    MeshPhysicalMaterial: 51,
+    MeshBasicMaterial: 3,
+  })
+
+  const materialsByName = new Map(materials.map((material) => [material.name, material]))
+  const assertTexture = (materialName, slot, textureName, colorSpace = THREE.NoColorSpace, dimensions = [512, 512]) => {
+    const texture = materialsByName.get(materialName)?.[slot]
+    assert.equal(texture?.name, textureName, `${materialName}.${slot} should load ${textureName}`)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${textureName} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), dimensions)
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assertTexture('Material #60', 'map', 'AnimationPointerUVs_BaseColor.png', THREE.SRGBColorSpace)
+  assertTexture('Material #57', 'emissiveMap', 'AnimationPointerUVs_Emissive.png', THREE.SRGBColorSpace)
+  assertTexture('Material #99', 'normalMap', 'AnimationPointerUVs_Normal.png')
+  assertTexture('Material #99', 'anisotropyMap', 'AnimationPointerUVs_Anisotropy.png')
+  assertTexture('Material #120', 'clearcoatMap', 'AnimationPointerUVs_Clearcoat.png')
+  assertTexture('Material #120', 'clearcoatNormalMap', 'AnimationPointerUVs_Normal.png')
+  assertTexture('Material #133', 'clearcoatNormalMap', 'AnimationPointerUVs_ClearcoatNormal.png')
+  assertTexture('Material #148', 'iridescenceMap', 'AnimationPointerUVs_Iridescence.png')
+  assertTexture('Material #158', 'sheenColorMap', 'AnimationPointerUVs_Sheen.png', THREE.SRGBColorSpace)
+  assertTexture('Material #167', 'specularColorMap', 'AnimationPointerUVs_Specular.png', THREE.SRGBColorSpace)
+  assertTexture('Material #176', 'transmissionMap', 'AnimationPointerUVs_TransmissionVolume.png')
+  assertTexture('Material #120', 'normalMap', 'AnimationPointerUVs_NormalFlat.png', THREE.NoColorSpace, [4, 4])
+  assert.equal(materialsByName.get('Material #120').clearcoatMap.source, materialsByName.get('Material #120').clearcoatRoughnessMap.source)
+  assert.equal(materialsByName.get('Material #148').iridescenceMap.source, materialsByName.get('Material #148').iridescenceThicknessMap.source)
+  assert.equal(materialsByName.get('Material #158').sheenColorMap.source, materialsByName.get('Material #158').sheenRoughnessMap.source)
+  assert.equal(materialsByName.get('Material #167').specularColorMap.source, materialsByName.get('Material #167').specularIntensityMap.source)
+  assert.equal(materialsByName.get('Material #176').transmissionMap.source, materialsByName.get('Material #176').thicknessMap.source)
+
+  const camera = gltf.cameras.find((candidate) => candidate.name === 'camera_all')
+  assert.ok(camera?.isPerspectiveCamera, 'AnimationPointerUVs should load the all-panels camera')
+  camera.aspect = 1.5
+  camera.updateProjectionMatrix()
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 64,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'AnimationPointerUVs should render visible physical texture-transform panels')
 })
 
 test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform animation', async () => {
