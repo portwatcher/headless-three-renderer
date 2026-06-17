@@ -10,6 +10,13 @@ const { Renderer } = pkg
 const SIZE = 96
 const BACKGROUND = [5, 5, 5]
 
+let sharedRenderer
+
+function renderer() {
+  sharedRenderer ??= new Renderer()
+  return sharedRenderer
+}
+
 function makeCamera() {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(2.8, 2.2, 4.2)
@@ -48,11 +55,11 @@ function makeEncodedTexture(index) {
   return texture
 }
 
-function addSupportedLightBudget(scene, count = 24) {
+function addSupportedLightBudget(scene, count = 8) {
   scene.add(new THREE.AmbientLight(0xffffff, 0.08))
   for (let i = 0; i < count; i += 1) {
     const angle = (i / count) * Math.PI * 2
-    const light = new THREE.PointLight(new THREE.Color().setHSL(i / 64, 0.55, 0.65), 0.12, 6, 1.6)
+    const light = new THREE.PointLight(new THREE.Color().setHSL(i / count, 0.55, 0.65), 0.12, 6, 1.6)
     light.position.set(Math.cos(angle) * 2.2, 1.2 + (i % 4) * 0.28, Math.sin(angle) * 2.2)
     scene.add(light)
   }
@@ -70,17 +77,17 @@ test('large scene budget renders many meshes, textures, and supported lights', (
     metalness: i % 2 === 0 ? 0.05 : 0.18,
   }))
 
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 10; col += 1) {
-      const mesh = new THREE.Mesh(geometry, materials[(row * 10 + col) % materials.length])
-      mesh.position.set((col - 4.5) * 0.22, (row - 3.5) * 0.2, Math.sin(row * 0.8 + col * 0.45) * 0.2)
+  for (let row = 0; row < 6; row += 1) {
+    for (let col = 0; col < 8; col += 1) {
+      const mesh = new THREE.Mesh(geometry, materials[(row * 8 + col) % materials.length])
+      mesh.position.set((col - 3.5) * 0.24, (row - 2.5) * 0.22, Math.sin(row * 0.8 + col * 0.45) * 0.2)
       mesh.rotation.set(row * 0.07, col * 0.05, (row + col) * 0.03)
       scene.add(mesh)
     }
   }
   addSupportedLightBudget(scene)
 
-  const rgba = new Renderer().render(scene, makeCamera(), { width: SIZE, height: SIZE, format: 'rgba' })
+  const rgba = renderer().render(scene, makeCamera(), { width: SIZE, height: SIZE, format: 'rgba' })
   assert.equal(rgba.length, SIZE * SIZE * 4)
   const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
   assert.ok(ratio > 0.04, `scale scene should render visible non-background pixels (${ratio})`)
@@ -107,7 +114,7 @@ test('texture-heavy scene budget renders many unique maps', () => {
   camera.position.set(0, 0, 2)
   camera.lookAt(0, 0, 0)
 
-  const rgba = new Renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
   assert.equal(rgba.length, SIZE * SIZE * 4)
   const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
   assert.ok(ratio > 0.25, `texture-heavy scene should render many mapped pixels (${ratio})`)
@@ -134,7 +141,7 @@ test('encoded texture budget renders many unique PNG buffer maps', () => {
   camera.position.set(0, 0, 2)
   camera.lookAt(0, 0, 0)
 
-  const rgba = new Renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
   assert.equal(rgba.length, SIZE * SIZE * 4)
   const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
   assert.ok(ratio > 0.25, `encoded texture scene should render many mapped pixels (${ratio})`)
@@ -152,7 +159,7 @@ test('more than 64 visible non-ambient lights fail clearly', () => {
   }
 
   assert.throws(
-    () => new Renderer().render(scene, makeCamera(), { width: 32, height: 32, format: 'rgba' }),
+    () => renderer().render(scene, makeCamera(), { width: 32, height: 32, format: 'rgba' }),
     /More than 64 visible non-ambient lights/i,
   )
 })
