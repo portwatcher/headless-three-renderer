@@ -71,6 +71,7 @@ const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
+const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
@@ -3875,6 +3876,72 @@ test('committed Khronos glTF Sample Assets EmissiveStrengthTest fixture loads KH
   const high = meanRegion(rgba, 220, 110, 139, 34, 161, 55)
   assert.ok(high.g > low.g + 30, `higher emissive strength should brighten the green channel (${high.g} vs ${low.g})`)
   assert.ok(high.b > low.b + 20, `higher emissive strength should brighten the blue channel (${high.b} vs ${low.b})`)
+})
+
+test('committed Khronos glTF Sample Assets EnvironmentTest fixture loads imported camera and metallic-roughness sphere grids', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ENVIRONMENT_TEST, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'EnvironmentTest_binary.bin')
+  assert.equal(source.buffers[0].byteLength, 340472)
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'EnvironmentTest_images/roughness_metallic_0.png',
+    'EnvironmentTest_images/roughness_metallic_1.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => [material.name, material.doubleSided ?? false]), [
+    ['MetallicSpheresMat', true],
+    ['DielectricSpheresMat', true],
+    ['DielectricSpheresMat', true],
+  ])
+  assert.equal(source.meshes.length, 3)
+  assert.equal(source.cameras.length, 1)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ENVIRONMENT_TEST)
+  assert.equal(gltf.cameras.length, 1)
+  const importedCamera = gltf.cameras[0]
+  assert.equal(importedCamera.name, 'render_camera_n3d')
+  assert.equal(importedCamera.isPerspectiveCamera, true)
+  assert.ok(Math.abs(importedCamera.fov - 34.515876027228366) < 1e-6, `EnvironmentTest camera fov should load (${importedCamera.fov})`)
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Metallic0', 'Dielectric0', 'Dielectric0-Black'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [4598, 4598, 4598])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [4598, 4598, 4598])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [4598, 4598, 4598])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [25344, 25344, 25344])
+
+  const [metallic, dielectric, black] = meshes.map((mesh) => mesh.material)
+  assert.deepEqual([metallic.name, dielectric.name, black.name], ['MetallicSpheresMat', 'DielectricSpheresMat', 'DielectricSpheresMat'])
+  assert.ok([metallic, dielectric, black].every((material) => material.side === THREE.DoubleSide))
+  assert.deepEqual(black.color.toArray(), [0, 0, 0])
+  assert.equal(Buffer.isBuffer(metallic.roughnessMap?.image), true, 'metallic roughness PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(dielectric.roughnessMap?.image), true, 'dielectric roughness PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(metallic.roughnessMap.image), [512, 512])
+  assert.deepEqual(pngDimensions(dielectric.roughnessMap.image), [512, 512])
+  assert.equal(metallic.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(dielectric.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(metallic.roughnessMap, metallic.metalnessMap)
+  assert.equal(dielectric.roughnessMap, dielectric.metalnessMap)
+  assert.equal(black.roughnessMap, black.metalnessMap)
+
+  importedCamera.aspect = 1.5
+  importedCamera.updateProjectionMatrix()
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(1, 5, 10)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  importedCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, importedCamera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'EnvironmentTest should render visible metallic-roughness sphere grids through its imported camera')
 })
 
 test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin animation', async () => {
