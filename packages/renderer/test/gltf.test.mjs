@@ -87,6 +87,7 @@ const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
 const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PrimitiveModeNormalsTest', 'glTF', 'PrimitiveModeNormalsTest.gltf')
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
+const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedFigure', 'glTF', 'RiggedFigure.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
@@ -3904,6 +3905,105 @@ test('committed Khronos glTF Sample Assets RiggedSimple fixture applies skinned 
   assert.ok(base.width > 80 && base.height < 30, `RiggedSimple base pose should render a long straight cylinder (${base.width}x${base.height})`)
   assert.ok(animated.height > base.height + 25, `RiggedSimple bone animation should bend the cylinder taller in side view (${animated.height} vs ${base.height})`)
   assert.ok(animated.minY < base.minY - 25, `RiggedSimple bone animation should lift the bent tip upward (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets RiggedFigure fixture loads full skinned animation hierarchy', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_RIGGED_FIGURE, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 22184, uri: 'RiggedFigure0.bin' }])
+  assert.equal(source.nodes.length, 22)
+  assert.equal(source.skins.length, 1)
+  assert.equal(source.skins[0].joints.length, 19)
+  assert.equal(source.skins[0].skeleton, 2)
+  assert.equal(source.meshes[0].name, 'Proxy')
+  assert.equal(source.animations.length, 1)
+  assert.equal(source.animations[0].channels.length, 57)
+  assert.equal(source.animations[0].samplers.length, 57)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_RIGGED_FIGURE)
+  const skinnedMeshes = []
+  const bones = []
+  gltf.scene.traverse((object) => {
+    if (object.isSkinnedMesh === true) skinnedMeshes.push(object)
+    if (object.isBone === true) bones.push(object)
+  })
+
+  assert.equal(skinnedMeshes.length, 1)
+  const mesh = skinnedMeshes[0]
+  assert.equal(mesh.name, 'Proxy')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 370)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 370)
+  assert.equal(mesh.geometry.getAttribute('skinIndex')?.count, 370)
+  assert.equal(mesh.geometry.getAttribute('skinWeight')?.count, 370)
+  assert.equal(mesh.geometry.index?.count, 768)
+  assert.equal(mesh.material.name, 'Default-effect')
+  assert.equal(mesh.skeleton.bones.length, 19)
+  assert.deepEqual(bones.map((bone) => bone.name), [
+    'torso_joint_1',
+    'torso_joint_2',
+    'torso_joint_3',
+    'neck_joint_1',
+    'neck_joint_2',
+    'arm_joint_L_1',
+    'arm_joint_L_2',
+    'arm_joint_L_3',
+    'arm_joint_R_1',
+    'arm_joint_R_2',
+    'arm_joint_R_3',
+    'leg_joint_L_1',
+    'leg_joint_L_2',
+    'leg_joint_L_3',
+    'leg_joint_L_5',
+    'leg_joint_R_1',
+    'leg_joint_R_2',
+    'leg_joint_R_3',
+    'leg_joint_R_5',
+  ])
+
+  assert.equal(gltf.animations.length, 1)
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'animation_0')
+  assert.equal(clip.tracks.length, 57)
+  assert.equal(clip.duration, 1.25)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.position')).length, 19)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.quaternion')).length, 19)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.scale')).length, 19)
+  assert.ok(clip.tracks.every((track) => track.times.length === 2), 'every RiggedFigure track should contain 2 keyframes')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(clip.duration / 2)
+  gltf.scene.updateMatrixWorld(true)
+  const torso = gltf.scene.getObjectByName('torso_joint_1')
+  const leftArm = gltf.scene.getObjectByName('arm_joint_L_2')
+  const rightLeg = gltf.scene.getObjectByName('leg_joint_R_3')
+  assert.ok(Math.abs(torso.quaternion.x) > 0.03, `RiggedFigure torso should rotate at mid animation (${torso.quaternion.x})`)
+  assert.ok(Math.abs(leftArm.quaternion.z) > 0.25, `RiggedFigure left arm should rotate at mid animation (${leftArm.quaternion.z})`)
+  assert.ok(rightLeg.quaternion.x > 0.8, `RiggedFigure right leg should rotate at mid animation (${rightLeg.quaternion.x})`)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  const light = new THREE.DirectionalLight(0xffffff, 2.0)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const halfHeight = size.y / 2 + 0.1
+  const halfWidth = Math.max(size.x / 2 + 0.1, halfHeight)
+  const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, 0.01, 20)
+  camera.position.set(center.x, center.y, center.z + 8)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'RiggedFigure should render visible skinned figure geometry')
 })
 
 test('committed Khronos glTF Sample Assets RecursiveSkeletons fixture loads recursive skinned hierarchies', async () => {
