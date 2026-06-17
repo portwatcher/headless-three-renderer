@@ -48,6 +48,7 @@ const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box With Spaces', 'glTF', 'Box With Spaces.gltf')
 const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxInterleaved', 'glTF', 'BoxInterleaved.gltf')
+const SAMPLE_ASSET_BOX_TEXTURED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxTextured', 'glTF', 'BoxTextured.gltf')
 const SAMPLE_ASSET_BOX_TEXTURED_NPOT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxTexturedNonPowerOfTwo', 'glTF', 'BoxTexturedNonPowerOfTwo.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
@@ -301,6 +302,68 @@ test('committed Khronos glTF Sample Assets Unicode❤♻Test fixture resolves Un
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'Unicode sample should render visible textured pixels')
   const center = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
   assert.ok(center.b > 10 && center.g > 5 && center.b > center.r + 10, `Unicode texture center should render blue-green texels (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets BoxTextured fixture loads POT texture sampler state', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_BOX_TEXTURED, 'utf8'))
+  assert.deepEqual(source.buffers, [
+    { byteLength: 840, uri: 'BoxTextured0.bin' },
+  ])
+  assert.equal(source.images[0].uri, 'CesiumLogoFlat.png')
+  assert.deepEqual(source.samplers, [
+    {
+      magFilter: 9729,
+      minFilter: 9986,
+      wrapS: 10497,
+      wrapT: 10497,
+    },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOX_TEXTURED)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'BoxTextured should load a mesh')
+  assert.equal(mesh.name, 'Mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.material.isMeshStandardMaterial, true)
+  assert.equal(mesh.material.name, 'Texture')
+  assert.equal(mesh.material.metalness, 0)
+
+  const texture = mesh.material.map
+  assert.ok(texture?.isTexture, 'BoxTextured should load a base color texture')
+  assert.equal(texture.name, 'CesiumLogoFlat.png')
+  assert.equal(Buffer.isBuffer(texture.image), true, 'BoxTextured PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(texture.image), [256, 256])
+  assert.equal(texture.wrapS, THREE.RepeatWrapping)
+  assert.equal(texture.wrapT, THREE.RepeatWrapping)
+  assert.equal(texture.magFilter, THREE.LinearFilter)
+  assert.equal(texture.minFilter, THREE.NearestMipmapLinearFilter)
+  assert.equal(texture.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(texture.flipY, false)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(1.3, 1.1, 2.2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.4)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'BoxTextured should render visible textured pixels')
+  const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
+  assert.ok(center.r > 70 && center.g > 90 && center.b > 100, `BoxTextured should render the repeated logo texture (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxTexturedNonPowerOfTwo fixture loads NPOT texture sampler state', async () => {
