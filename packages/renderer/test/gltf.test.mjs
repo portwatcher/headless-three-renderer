@@ -108,6 +108,7 @@ const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-s
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ORDER_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionOrderTest', 'glTF', 'TransmissionOrderTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
+const SAMPLE_ASSET_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Triangle', 'glTF', 'Triangle.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TwoSidedPlane', 'glTF', 'TwoSidedPlane.gltf')
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
@@ -5805,6 +5806,46 @@ test('committed Khronos glTF Sample Assets UnlitTest fixture loads KHR_materials
   const right = meanRegion(rgba, 128, 96, 74, 32, 104, 64)
   assert.ok(left.r > left.g + 180 && left.r > left.b + 200, `unlit orange mesh should render orange without lights (${left.r}, ${left.g}, ${left.b})`)
   assert.ok(right.b > right.g + 150 && right.b > right.r + 180, `unlit blue mesh should render blue without lights (${right.r}, ${right.g}, ${right.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Triangle fixture loads minimal indexed primitive', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TRIANGLE, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'Triangle.bin', byteLength: 44 }])
+  assert.deepEqual(source.meshes[0].primitives, [
+    {
+      attributes: { POSITION: 1 },
+      indices: 0,
+    },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TRIANGLE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Triangle sample should load a mesh')
+  assert.equal(mesh.name, 'mesh_0')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3)
+  assert.equal(mesh.geometry.getAttribute('normal') ?? null, null)
+  assert.equal(mesh.geometry.getAttribute('uv') ?? null, null)
+  assert.equal(mesh.geometry.index?.count, 3)
+  assert.equal(mesh.material.isMeshStandardMaterial, true)
+  assert.deepEqual(mesh.material.color.toArray(), [1, 1, 1])
+  assert.equal(mesh.material.metalness, 1)
+  assert.equal(mesh.material.roughness, 1)
+
+  const camera = new THREE.OrthographicCamera(-0.2, 1.2, 1.2, -0.2, 0.01, 10)
+  camera.position.set(0.5, 0.5, 2)
+  camera.lookAt(0.5, 0.5, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'Triangle sample should render visible minimal indexed geometry')
 })
 
 test('committed Khronos glTF Sample Assets TriangleWithoutIndices fixture loads non-indexed geometry', async () => {
