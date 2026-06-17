@@ -30,6 +30,7 @@ const REAL_VRM_EXPRESSION_SAMPLE = path.join(
   'VRMC_vrm_expressions_isBinary_Overridden.vrm',
 )
 const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
+const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
@@ -541,6 +542,58 @@ test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph wei
   assert.ok(base.height > 10, `SimpleMorph base triangle should render visible bounds (${base.height})`)
   assert.ok(animated.height > base.height + 35, `SimpleMorph animation should expand rendered height (${animated.height} vs ${base.height})`)
   assert.ok(animated.minY < base.minY - 35, `SimpleMorph animation should lift the triangle top (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets AnimatedMorphCube fixture applies animated morph normals', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANIMATED_MORPH_CUBE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos AnimatedMorphCube sample should load a mesh')
+  assert.equal(mesh.name, 'AnimatedMorphCube')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.geometry.morphAttributes.position?.length, 2)
+  assert.equal(mesh.geometry.morphAttributes.normal?.length, 2)
+  assert.deepEqual(mesh.morphTargetInfluences, [0, 0])
+  assert.deepEqual(mesh.morphTargetDictionary, { 0: 0, 1: 1 })
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].name, 'Square')
+  assert.equal(gltf.animations[0].tracks[0].name, 'AnimatedMorphCube.morphTargetInfluences')
+  assert.equal(gltf.animations[0].tracks[0].getInterpolation(), THREE.InterpolateLinear)
+  assert.equal(gltf.animations[0].tracks[0].getValueSize(), 2)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 30)
+  camera.position.set(3, 2.5, 5)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.4)
+  light.position.set(3, 4, 5)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const renderer = new Renderer()
+  const renderBounds = () => nonBackgroundBounds(renderer.render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 96, 96, [0, 0, 0], 3)
+
+  const base = renderBounds()
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(gltf.animations[0]).play()
+  mixer.setTime(2)
+  gltf.scene.updateMatrixWorld(true)
+  const animated = renderBounds()
+
+  assert.ok(mesh.morphTargetInfluences[0] > 0.75, `AnimatedMorphCube first morph target should be active at t=2 (${mesh.morphTargetInfluences[0]})`)
+  assert.ok(mesh.morphTargetInfluences[1] > 0.15, `AnimatedMorphCube second morph target should be active at t=2 (${mesh.morphTargetInfluences[1]})`)
+  assert.ok(base.width > 45 && base.height > 45, `AnimatedMorphCube base pose should render a broad cube (${base.width}x${base.height})`)
+  assert.ok(animated.width < base.width - 10, `AnimatedMorphCube morph animation should narrow the rendered cube (${animated.width} vs ${base.width})`)
+  assert.ok(animated.height < base.height - 10, `AnimatedMorphCube morph animation should shorten the rendered cube (${animated.height} vs ${base.height})`)
 })
 
 test('committed Khronos glTF Sample Assets SimpleSparseAccessor fixture applies sparse POSITION overrides', async () => {
