@@ -36,6 +36,7 @@ const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
 const SAMPLE_ASSET_ANIMATION_POINTER_UVS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimationPointerUVs', 'glTF', 'AnimationPointerUVs.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
+const SAMPLE_ASSET_ANISOTROPY_BARN_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyBarnLamp', 'glTF', 'AnisotropyBarnLamp.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyRotationTest', 'glTF', 'AnisotropyRotationTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyStrengthTest', 'glTF', 'AnisotropyStrengthTest.gltf')
@@ -4664,6 +4665,128 @@ test('committed Khronos glTF Sample Assets VertexColorTest fixture combines text
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'VertexColorTest should render visible textured vertex-color swatches')
   const center = meanRegion(rgba, 160, 160, 60, 60, 100, 100)
   assert.ok(center.b > center.r + 60 && center.b > center.g + 50, `VertexColorTest center should include the blue check texture (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets AnisotropyBarnLamp fixture loads anisotropy, clearcoat, emissive, and glass materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANISOTROPY_BARN_LAMP, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_anisotropy',
+    'KHR_materials_clearcoat',
+    'KHR_materials_emissive_strength',
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+  ])
+  assert.deepEqual(source.buffers, [{ uri: 'AnisotropyBarnLamp.bin', byteLength: 409580 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'AnisotropyBarnLamp_normalbump.png',
+    'AnisotropyBarnLamp_occlusionroughnessmetal.png',
+    'AnisotropyBarnLamp_basecolor.png',
+    'AnisotropyBarnLamp_anisotropy.png',
+  ])
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), ['Lamp Metal', 'Lamp Filament', 'Lamp Glass'])
+  assert.deepEqual(source.materials.map((material) => material.name), ['Lamp Metal', 'Lamp Filament', 'Lamp Glass'])
+  assert.deepEqual(source.materials[0].extensions, {
+    KHR_materials_anisotropy: {
+      anisotropyStrength: 1,
+      anisotropyRotation: 0,
+      anisotropyTexture: { index: 3 },
+    },
+    KHR_materials_clearcoat: {
+      clearcoatFactor: 0.25,
+      clearcoatRoughnessFactor: 0.15,
+      clearcoatNormalTexture: { index: 0 },
+    },
+  })
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_emissive_strength: {
+      emissiveStrength: 25,
+    },
+  })
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+    KHR_materials_volume: {
+      thicknessFactor: 0.01,
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANISOTROPY_BARN_LAMP)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Lamp_Metal', 'Lamp_Filament', 'Lamp_Glass'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [6803, 140, 769])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [6803, 140, 769])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [25257, 840, 4512])
+
+  const [metalMesh, filamentMesh, glassMesh] = meshes
+  const metal = metalMesh.material
+  assert.equal(metal.name, 'Lamp Metal')
+  assert.equal(metal.isMeshPhysicalMaterial, true)
+  assert.equal(metal.metalness, 1)
+  assert.equal(metal.roughness, 1)
+  assert.equal(metal.anisotropy, 1)
+  assert.equal(metal.anisotropyRotation, 0)
+  assert.equal(metal.clearcoat, 0.25)
+  assert.equal(metal.clearcoatRoughness, 0.15)
+  assert.equal(metal.map.name, 'AnisotropyBarnLamp_basecolor.png')
+  assert.equal(metal.normalMap.name, 'AnisotropyBarnLamp_normalbump.png')
+  assert.equal(metal.roughnessMap.name, 'AnisotropyBarnLamp_occlusionroughnessmetal.png')
+  assert.equal(metal.metalnessMap, metal.roughnessMap)
+  assert.equal(metal.aoMap, metal.roughnessMap)
+  assert.equal(metal.anisotropyMap.name, 'AnisotropyBarnLamp_anisotropy.png')
+  assert.equal(Buffer.isBuffer(metal.map.image), true, 'BarnLamp base-color PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(metal.map.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(metal.anisotropyMap.image), [2048, 2048])
+  assert.equal(metal.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(metal.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(metal.anisotropyMap.colorSpace, THREE.NoColorSpace)
+
+  const filament = filamentMesh.material
+  assert.equal(filament.name, 'Lamp Filament')
+  assert.equal(filament.isMeshStandardMaterial, true)
+  assert.deepEqual(filament.color.toArray(), [0.09, 0.09, 0.09])
+  assert.deepEqual(filament.emissive.toArray(), [1, 0.5, 0.25])
+  assert.equal(filament.emissiveIntensity, 25)
+  assert.equal(filament.roughness, 0.7)
+
+  const glass = glassMesh.material
+  assert.equal(glass.name, 'Lamp Glass')
+  assert.equal(glass.isMeshPhysicalMaterial, true)
+  assert.equal(glass.transmission, 1)
+  assert.equal(glass.thickness, 0.01)
+  assert.equal(glass.roughness, 0)
+
+  gltf.scene.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(gltf.scene)
+  const center = box.getCenter(new THREE.Vector3())
+  const size = box.getSize(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.95))
+  const light = new THREE.DirectionalLight(0xffffff, 2.2)
+  light.position.copy(center).add(new THREE.Vector3(0.5, 0.8, 1))
+  gltf.scene.add(light)
+  const padding = 0.02
+  const halfHeight = size.y / 2 + padding
+  const halfWidth = Math.max(size.x / 2 + padding, size.z / 2 + padding, halfHeight)
+  const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, 0.001, 10)
+  camera.position.copy(center).add(new THREE.Vector3(0, 0, 2))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'AnisotropyBarnLamp should render visible anisotropic lamp geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g && mean.g > mean.b, `BarnLamp materials should render warm metal and filament colors (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AnisotropyDiscTest fixture loads KHR_materials_anisotropy texture inputs', async () => {
