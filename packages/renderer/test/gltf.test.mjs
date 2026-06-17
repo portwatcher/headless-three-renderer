@@ -51,6 +51,7 @@ const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
+const SAMPLE_ASSET_COMPARE_NORMAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareNormal', 'glTF', 'CompareNormal.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
@@ -602,6 +603,76 @@ test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-c
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'CompareBaseColor should render visible base-color comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-map comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_NORMAL, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'CompareNormal.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), ['Compare_Normal_img0.jpg'])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.normalTexture?.index ?? null,
+    material.pbrMetallicRoughness?.baseColorFactor,
+  ]), [
+    ['Wicker no Normal', null, [0.501960813999176, 0.4392157196998596, 0.3529411852359772, 1]],
+    ['Wicker with Normal', 0, [0.501960813999176, 0.4431372880935669, 0.3529411852359772, 1]],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_NORMAL)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Sphere001', 'Sphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['Wicker no Normal', 'Wicker with Normal'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [1538, 1728])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [1538, 1728])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count ?? null), [null, 1728])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [9216, 9216])
+
+  const [flat, normalMapped] = meshes
+  assert.equal(flat.material.normalMap ?? null, null)
+  assertVectorClose(flat.material.color.toArray(), [
+    0.501960813999176,
+    0.4392157196998596,
+    0.3529411852359772,
+  ], 'CompareNormal no-normal baseColorFactor')
+  assertVectorClose(normalMapped.material.color.toArray(), [
+    0.501960813999176,
+    0.4431372880935669,
+    0.3529411852359772,
+  ], 'CompareNormal normal-mapped baseColorFactor')
+
+  assert.equal(normalMapped.material.metalness, 0)
+  assert.equal(normalMapped.material.roughness, 0.25)
+  assert.equal(Buffer.isBuffer(normalMapped.material.normalMap?.image), true, 'normal-map JPEG should load as an encoded Buffer')
+  assert.ok(normalMapped.material.normalMap.image.length > 0, 'normal-map JPEG buffer should not be empty')
+  assert.equal(normalMapped.material.normalMap.name, 'Compare_Normal_img0.jpg')
+  assert.equal(normalMapped.material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(normalMapped.material.normalMap.flipY, false)
+  assertVectorClose(normalMapped.material.normalScale.toArray(), [1, -1], 'glTF normal map should use Three.js Y-flipped normal scale')
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -3.2, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'CompareNormal should render visible normal-map comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture maps', async () => {
