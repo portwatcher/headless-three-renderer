@@ -51,6 +51,7 @@ const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
+const SAMPLE_ASSET_COMPARE_METALLIC = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareMetallic', 'glTF', 'CompareMetallic.gltf')
 const SAMPLE_ASSET_COMPARE_NORMAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareNormal', 'glTF', 'CompareNormal.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
@@ -603,6 +604,78 @@ test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-c
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'CompareBaseColor should render visible base-color comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareMetallic fixture loads metallic texture comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_METALLIC, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'CompareMetallic.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Metallic_img0.jpg',
+    'Compare_Metallic_img1.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicFactor ?? null,
+    material.pbrMetallicRoughness?.roughnessFactor ?? null,
+  ]), [
+    ['glTF Logo', 0, null, 0, 0.1],
+    ['glTF Logo Metallic', 0, 1, null, 0.1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_METALLIC)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['GeoSphere001', 'GeoSphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['glTF Logo', 'glTF Logo Metallic'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [3840, 3840])
+
+  const [dielectric, metallic] = meshes.map((mesh) => mesh.material)
+  assert.equal(dielectric.metalness, 0)
+  assert.equal(dielectric.roughness, 0.1)
+  assert.equal(metallic.metalness, 1)
+  assert.equal(metallic.roughness, 0.1)
+  assert.equal(dielectric.map, metallic.map, 'both metallic comparison materials should share the base-color texture')
+  assert.equal(Buffer.isBuffer(dielectric.map?.image), true, 'base-color JPEG should load as an encoded Buffer')
+  assert.equal(dielectric.map.name, 'Compare_Metallic_img0.jpg')
+  assert.equal(dielectric.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(dielectric.map.flipY, false)
+
+  assert.equal(dielectric.metalnessMap ?? null, null)
+  assert.equal(dielectric.roughnessMap ?? null, null)
+  assert.equal(metallic.metalnessMap, metallic.roughnessMap, 'metalness and roughness should share the packed texture')
+  assert.equal(Buffer.isBuffer(metallic.metalnessMap?.image), true, 'metallic-roughness JPEG should load as an encoded Buffer')
+  assert.equal(metallic.metalnessMap.name, 'Compare_Metallic_img1.jpg')
+  assert.equal(metallic.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(metallic.metalnessMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -2.7, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'CompareMetallic should render visible metallic comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-map comparison variants', async () => {
