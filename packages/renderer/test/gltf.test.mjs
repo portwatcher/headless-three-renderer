@@ -101,6 +101,7 @@ const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
+const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -2549,6 +2550,106 @@ test('committed Khronos glTF Sample Assets BoxVertexColors fixture renders COLOR
   assert.ok(topLeft.g > bottomLeft.g + 80, `vertex color gradient should make the upper-left face greener than lower-left (${topLeft.g} vs ${bottomLeft.g})`)
   assert.ok(bottomRight.r > bottomLeft.r + 80, `vertex color gradient should make the lower-right face redder than lower-left (${bottomRight.r} vs ${bottomLeft.r})`)
   assert.ok(bottomLeft.b > 170 && bottomRight.b > 170, `vertex color gradient should keep blue channel visible (${bottomLeft.b}, ${bottomRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets VertexColorTest fixture combines textures with COLOR_0 attributes', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_VERTEX_COLOR_TEST, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'VertexColorTest.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'VertexColorTestLabels.png',
+    'VertexColorChecks.png',
+  ])
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), ['LabelMesh', 'VertexColorTestMesh'])
+  assert.equal(source.meshes[1].primitives[0].attributes.COLOR_0, 10)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_VERTEX_COLOR_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => ({
+    name: mesh.name,
+    material: mesh.material.name,
+    positions: mesh.geometry.getAttribute('position')?.count,
+    normals: mesh.geometry.getAttribute('normal')?.count,
+    tangents: mesh.geometry.getAttribute('tangent')?.count,
+    uvs: mesh.geometry.getAttribute('uv')?.count,
+    colors: mesh.geometry.getAttribute('color')
+      ? {
+          count: mesh.geometry.getAttribute('color').count,
+          itemSize: mesh.geometry.getAttribute('color').itemSize,
+          normalized: mesh.geometry.getAttribute('color').normalized,
+        }
+      : null,
+    index: mesh.geometry.index?.count,
+    vertexColors: mesh.material.vertexColors,
+    map: mesh.material.map?.name,
+  })), [
+    {
+      name: 'Labels',
+      material: 'Label_Mat',
+      positions: 24,
+      normals: 24,
+      tangents: 24,
+      uvs: 24,
+      colors: null,
+      index: 36,
+      vertexColors: false,
+      map: 'VertexColorTestLabels.png',
+    },
+    {
+      name: 'VertexColorTest',
+      material: 'VC_Checks_Mat',
+      positions: 48,
+      normals: 48,
+      tangents: 48,
+      uvs: 48,
+      colors: { count: 48, itemSize: 4, normalized: false },
+      index: 72,
+      vertexColors: true,
+      map: 'VertexColorChecks.png',
+    },
+  ])
+
+  for (const mesh of meshes) {
+    assert.equal(Buffer.isBuffer(mesh.material.map.image), true, `${mesh.name} should load an encoded PNG texture`)
+    assert.deepEqual(pngDimensions(mesh.material.map.image), [256, 256])
+    assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(mesh.material.map.flipY, false)
+  }
+
+  const color = meshes[1].geometry.getAttribute('color')
+  const min = [Infinity, Infinity, Infinity, Infinity]
+  const max = [-Infinity, -Infinity, -Infinity, -Infinity]
+  for (let i = 0; i < color.count; i += 1) {
+    for (let component = 0; component < 4; component += 1) {
+      const value = color.getComponent(i, component)
+      min[component] = Math.min(min[component], value)
+      max[component] = Math.max(max[component], value)
+    }
+  }
+  assertVectorClose(min, [0, 0, 0, 1], 'VertexColorTest COLOR_0 minimum')
+  assertVectorClose(max, [1, 1, 1, 1], 'VertexColorTest COLOR_0 maximum')
+
+  const camera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.01, 20)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 160,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'VertexColorTest should render visible textured vertex-color swatches')
+  const center = meanRegion(rgba, 160, 160, 60, 60, 100, 100)
+  assert.ok(center.b > center.r + 60 && center.b > center.g + 50, `VertexColorTest center should include the blue check texture (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AnisotropyDiscTest fixture loads KHR_materials_anisotropy texture inputs', async () => {
