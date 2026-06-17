@@ -52,6 +52,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
+const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
@@ -2548,6 +2549,40 @@ test('committed Khronos glTF Sample Assets TextureTransformMultiTest fixture loa
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'TextureTransformMultiTest should render the transformed texture grid')
   const baseColorRow = meanRegion(rgba, 180, 420, 38, 36, 142, 70)
   assert.ok(baseColorRow.b > baseColorRow.r + 30 && baseColorRow.b > baseColorRow.g + 30, `TextureTransformMultiTest should render blue background and transformed panels (${baseColorRow.r}, ${baseColorRow.g}, ${baseColorRow.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MetalRoughSpheres fixture loads packed metallic-roughness maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_METAL_ROUGH_SPHERES, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'MetalRoughSpheres0.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Spheres_BaseColor.png',
+    'Spheres_MetalRough.png',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_METAL_ROUGH_SPHERES)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Spheres', 'Spheres001', 'Spheres002', 'Spheres003', 'Spheres004'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [36590, 62664, 62664, 62664, 31332])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [215088, 368640, 368640, 368640, 184320])
+
+  const material = meshes[0].material
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.ok(material.map?.isTexture, 'MetalRoughSpheres should load a base color texture')
+  assert.ok(material.roughnessMap?.isTexture, 'MetalRoughSpheres should load a roughness texture')
+  assert.ok(material.metalnessMap?.isTexture, 'MetalRoughSpheres should load a metalness texture')
+  assert.equal(material.roughnessMap, material.metalnessMap, 'packed metallic-roughness channels should share one texture')
+  assert.deepEqual(pngDimensions(material.map.image), [1024, 1024])
+  assert.deepEqual(pngDimensions(material.roughnessMap.image), [1024, 1024])
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.map.flipY, false)
+  assert.equal(material.roughnessMap.flipY, false)
+
+  const ratio = renderSingleObjectRatio(new Renderer(), meshes[0])
+  assert.ok(ratio > 0.03, `MetalRoughSpheres representative mesh should render visible pixels (${ratio})`)
 })
 
 test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and renders primitive modes', async () => {
