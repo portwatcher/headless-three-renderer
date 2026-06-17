@@ -75,6 +75,7 @@ const SAMPLE_ASSET_COMPARE_SHEEN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 
 const SAMPLE_ASSET_COMPARE_SPECULAR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareSpecular', 'glTF', 'CompareSpecular.gltf')
 const SAMPLE_ASSET_COMPARE_TRANSMISSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareTransmission', 'glTF', 'CompareTransmission.gltf')
 const SAMPLE_ASSET_COMPARE_VOLUME = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareVolume', 'glTF', 'CompareVolume.gltf')
+const SAMPLE_ASSET_CORSET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Corset', 'glTF', 'Corset.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DAMAGED_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DamagedHelmet', 'glTF', 'DamagedHelmet.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
@@ -516,6 +517,91 @@ test('committed Khronos glTF Sample Assets AntiqueCamera fixture loads multi-mes
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'AntiqueCamera should render visible textured geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 1, `AntiqueCamera should render warm textured output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Corset fixture loads tangent-space ORM texture set', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CORSET, 'utf8'))
+  assert.deepEqual(source.buffers, [
+    { uri: 'Corset.bin', byteLength: 662184 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Corset_baseColor.png',
+    'Corset_occlusionRoughnessMetallic.png',
+    'Corset_normal.png',
+  ])
+  assert.equal(source.meshes[0].name, 'pCube49')
+  assert.deepEqual(source.meshes[0].primitives[0].attributes, {
+    TEXCOORD_0: 0,
+    NORMAL: 1,
+    TANGENT: 2,
+    POSITION: 3,
+  })
+  assert.deepEqual(source.materials[0], {
+    pbrMetallicRoughness: {
+      baseColorTexture: { index: 0 },
+      metallicRoughnessTexture: { index: 1 },
+    },
+    normalTexture: { index: 2 },
+    occlusionTexture: { index: 1 },
+    name: 'Corset_O',
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CORSET)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Corset should load a mesh')
+  assert.equal(mesh.name, 'Corset')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 11505)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 11505)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 11505)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 11505)
+  assert.equal(mesh.geometry.index?.count, 54972)
+
+  const material = mesh.material
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.name, 'Corset_O')
+  assert.deepEqual(material.color.toArray(), [1, 1, 1])
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+
+  const assertCorsetTexture = (texture, name, colorSpace) => {
+    assert.ok(texture?.isTexture, `${name} should load as a texture`)
+    assert.equal(texture.name, name)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 2048])
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assertCorsetTexture(material.map, 'Corset_baseColor.png', THREE.SRGBColorSpace)
+  assertCorsetTexture(material.roughnessMap, 'Corset_occlusionRoughnessMetallic.png', THREE.NoColorSpace)
+  assert.equal(material.metalnessMap, material.roughnessMap, 'Corset should reuse the ORM map for metalness')
+  assert.equal(material.aoMap, material.roughnessMap, 'Corset should reuse the ORM map for ambient occlusion')
+  assertCorsetTexture(material.normalMap, 'Corset_normal.png', THREE.NoColorSpace)
+
+  gltf.scene.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(gltf.scene)
+  const center = box.getCenter(new THREE.Vector3())
+  const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.001, 10)
+  renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.35, 1).normalize().multiplyScalar(0.09))
+  renderCamera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.copy(center).add(new THREE.Vector3(0.4, 0.6, 0.7))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  renderCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, renderCamera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'Corset should render visible textured geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g && mean.g > mean.b, `Corset texture should render warm fabric colors (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alpha modes and JPEG textures', async () => {
