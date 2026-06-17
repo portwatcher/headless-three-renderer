@@ -103,6 +103,7 @@ const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-s
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
+const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
 
@@ -231,6 +232,46 @@ test('committed Khronos glTF Sample Assets Box With Spaces fixture resolves exte
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.07, 'Box With Spaces sample should render visible textured pixels')
   const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
   assert.ok(center.r > 5 || center.g > 5 || center.b > 5, `Box With Spaces sample should render non-black center pixels (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Unicode❤♻Test fixture resolves Unicode external paths', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_UNICODE_TEST, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'Unicode❤♻Binary.bin', byteLength: 152 }])
+  assert.deepEqual(source.images.map((image) => image.uri), ['Unicode❤♻Texture.png'])
+  assert.equal(source.meshes[0].name, 'Unicode❤♻Mesh')
+  assert.equal(source.materials[0].name, 'Unicode❤♻Material')
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_UNICODE_TEST)
+  const mesh = gltf.scene.getObjectByName('Unicode❤♻Mesh')
+  assert.ok(mesh?.isMesh, 'Unicode sample should load its Unicode-named mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 4)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 4)
+  assert.equal(mesh.geometry.index?.count, 6)
+  assert.equal(mesh.material.name, 'Unicode❤♻Material')
+  assert.equal(mesh.material.map?.name, 'Unicode❤♻Texture.png')
+  assert.equal(Buffer.isBuffer(mesh.material.map?.image), true, 'Unicode texture path should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(mesh.material.map.image), [256, 256])
+  assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(mesh.material.map.flipY, false)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'Unicode sample should render visible textured pixels')
+  const center = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  assert.ok(center.b > 10 && center.g > 5 && center.b > center.r + 10, `Unicode texture center should render blue-green texels (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxTexturedNonPowerOfTwo fixture loads NPOT texture sampler state', async () => {
