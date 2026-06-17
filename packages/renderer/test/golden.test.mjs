@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
 import native from '../native.js'
 import pkg from '../dist/index.js'
@@ -15,7 +17,7 @@ import {
 
 const { Renderer } = pkg
 
-const referenceDir = process.env.HEADLESS_THREE_BROWSER_REFERENCE_DIR
+const referenceDir = resolveBrowserReferenceDir()
 const maxMeanDiff = Number(process.env.HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF ?? 18)
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
@@ -46,10 +48,23 @@ test('browser reference manifest normalizes outputColorSpace aliases', () => {
   )
 })
 
+test('browser reference directory resolution prefers explicit env over platform defaults', () => {
+  const defaultDir = defaultBrowserReferenceDir()
+  assert.equal(
+    resolveBrowserReferenceDir(
+      { HEADLESS_THREE_BROWSER_REFERENCE_DIR: '/tmp/browser-refs' },
+      () => false,
+    ),
+    '/tmp/browser-refs',
+  )
+  assert.equal(resolveBrowserReferenceDir({}, (candidate) => candidate === defaultDir), defaultDir)
+  assert.equal(resolveBrowserReferenceDir({}, () => false), undefined)
+})
+
 test('generated corpus matches browser WebGLRenderer golden references', {
   skip: referenceDir
     ? false
-    : 'set HEADLESS_THREE_BROWSER_REFERENCE_DIR to a directory of browser-generated corpus PNGs',
+    : `set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}`,
 }, async (t) => {
   assert.ok(Number.isFinite(maxMeanDiff) && maxMeanDiff >= 0, 'HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number')
 
@@ -133,4 +148,26 @@ function diffRgba(actual, expected) {
     max,
     mean: total / actual.length,
   }
+}
+
+function resolveBrowserReferenceDir(
+  env = process.env,
+  exists = existsSync,
+) {
+  const explicitDir = env.HEADLESS_THREE_BROWSER_REFERENCE_DIR
+  if (explicitDir) {
+    return explicitDir
+  }
+
+  const defaultDir = defaultBrowserReferenceDir()
+  return exists(defaultDir) ? defaultDir : undefined
+}
+
+function defaultBrowserReferenceDir() {
+  return path.join(
+    fileURLToPath(new URL('.', import.meta.url)),
+    'browser-reference',
+    'references',
+    `${process.platform}-${process.arch}`,
+  )
 }
