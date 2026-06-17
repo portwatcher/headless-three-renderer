@@ -57,6 +57,7 @@ const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
+const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_ENCODING_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureEncodingTest', 'glTF', 'TextureEncodingTest.gltf')
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
@@ -720,6 +721,83 @@ test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_material
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'SheenChair should render visible sheen material geometry')
+})
+
+test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materials_specular scalar and texture inputs', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SPECULAR_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 24)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_specular'))
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  assert.equal(materials.size, 24)
+
+  const disabled = materials.get('M1.1_specFac')
+  const enabled = materials.get('M1.5_specFac')
+  assert.equal(disabled?.isMeshPhysicalMaterial, true)
+  assert.equal(enabled?.isMeshPhysicalMaterial, true)
+  assert.equal(disabled.specularIntensity, 0)
+  assert.equal(enabled.specularIntensity, 1)
+  assert.deepEqual(enabled.specularColor.toArray(), [1, 1, 1])
+
+  const specularTexture = materials.get('M2_SpecTex')
+  assert.equal(specularTexture?.isMeshPhysicalMaterial, true)
+  assert.equal(specularTexture.specularIntensity, 1)
+  assert.equal(Buffer.isBuffer(specularTexture.specularIntensityMap?.image), true, 'specular factor PNG should load as an encoded Buffer')
+  assert.equal(specularTexture.specularIntensityMap.name, 'specularTextureGrid')
+  assert.equal(specularTexture.specularIntensityMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(specularTexture.specularIntensityMap.magFilter, THREE.LinearFilter)
+  assert.equal(specularTexture.specularIntensityMap.minFilter, THREE.LinearMipmapLinearFilter)
+  assert.equal(specularTexture.specularIntensityMap.flipY, false)
+
+  const whiteTexture = materials.get('M4_whiteTex')
+  assert.equal(whiteTexture?.isMeshPhysicalMaterial, true)
+  assert.equal(Buffer.isBuffer(whiteTexture.specularColorMap?.image), true, 'white specular color PNG should load as an encoded Buffer')
+  assert.equal(whiteTexture.specularColorMap.name, 'WhiteGrid')
+  assert.equal(whiteTexture.specularColorMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(whiteTexture.specularColorMap.flipY, false)
+
+  const yellowTexture = materials.get('M6_yellowTex')
+  assert.equal(yellowTexture?.isMeshPhysicalMaterial, true)
+  assert.equal(Buffer.isBuffer(yellowTexture.specularColorMap?.image), true, 'yellow specular color PNG should load as an encoded Buffer')
+  assert.equal(yellowTexture.specularColorMap.name, 'YellowGrid')
+  assert.equal(yellowTexture.specularColorMap.colorSpace, THREE.SRGBColorSpace)
+
+  const hdrFactor = materials.get('M7.5_HDR')
+  assert.equal(hdrFactor?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(hdrFactor.specularColor.toArray(), [25, 25, 25])
+
+  const specularTextureMesh = meshes.find((mesh) => mesh.material.name === 'M2_SpecTex')
+  assert.equal(specularTextureMesh.geometry.getAttribute('position')?.count, 3645)
+  assert.equal(specularTextureMesh.geometry.getAttribute('uv')?.count, 3645)
+  assert.equal(specularTextureMesh.geometry.index?.count, 19200)
+
+  const scalarMesh = meshes.find((mesh) => mesh.material.name === 'M1.5_specFac')
+  assert.equal(scalarMesh.geometry.getAttribute('position')?.count, 642)
+  assert.equal(scalarMesh.geometry.index?.count, 3840)
+
+  const camera = new THREE.OrthographicCamera(-0.7, 0.7, 0.52, -0.52, 0.01, 20)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.25))
+  const light = new THREE.DirectionalLight(0xffffff, 4)
+  light.position.set(0.2, 0.5, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 120,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'SpecularTest should render visible specular material samples')
 })
 
 test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin animation', async () => {
