@@ -52,6 +52,7 @@ const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-samp
 const SAMPLE_ASSET_COMPARE_ANISOTROPY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAnisotropy', 'glTF', 'CompareAnisotropy.gltf')
 const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
 const SAMPLE_ASSET_COMPARE_CLEARCOAT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareClearcoat', 'glTF', 'CompareClearcoat.gltf')
+const SAMPLE_ASSET_COMPARE_DISPERSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareDispersion', 'glTF', 'CompareDispersion.gltf')
 const SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareEmissiveStrength', 'glTF', 'CompareEmissiveStrength.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_COMPARE_IRIDESCENCE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIridescence', 'glTF', 'CompareIridescence.gltf')
@@ -811,6 +812,95 @@ test('committed Khronos glTF Sample Assets CompareClearcoat fixture loads clearc
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'CompareClearcoat should render visible clearcoat comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareDispersion fixture loads dispersion comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_DISPERSION, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_ior',
+    'KHR_materials_dispersion',
+  ])
+  assert.equal(source.buffers[0].uri, 'CompareDispersion.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Dispersion_img0.jpg',
+    'Compare_Dispersion_img1.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.extensions?.KHR_materials_transmission?.transmissionTexture?.index ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessFactor ?? null,
+    material.extensions?.KHR_materials_ior?.ior ?? null,
+    material.extensions?.KHR_materials_dispersion?.dispersion ?? null,
+  ]), [
+    ['checker', 1, null, null, null, null],
+    ['No Dispersion', null, 0, 0.5, 2.42, null],
+    ['Dispersion', null, 0, 0.5, 2.42, 5],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_DISPERSION)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Checker', 'GeoSphere001', 'GeoSphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['checker', 'No Dispersion', 'Dispersion'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [6, 96, 96])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [6, 96, 96])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [6, 96, 96])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [6, 96, 96])
+
+  const [checker, noDispersion, dispersion] = meshes.map((mesh) => mesh.material)
+  assert.equal(checker.isMeshStandardMaterial, true)
+  assert.equal(noDispersion.isMeshPhysicalMaterial, true)
+  assert.equal(dispersion.isMeshPhysicalMaterial, true)
+  assert.equal(noDispersion.transmission, 1)
+  assert.equal(dispersion.transmission, 1)
+  assert.equal(noDispersion.thickness, 0.5)
+  assert.equal(dispersion.thickness, 0.5)
+  assert.equal(noDispersion.attenuationDistance, 1)
+  assert.equal(dispersion.attenuationDistance, 1)
+  assert.equal(noDispersion.ior, 2.42)
+  assert.equal(dispersion.ior, 2.42)
+  assert.equal(noDispersion.dispersion, 0)
+  assert.equal(dispersion.dispersion, 5)
+  assert.equal(noDispersion.roughness, 0.1)
+  assert.equal(dispersion.roughness, 0.1)
+
+  assert.equal(noDispersion.transmissionMap, dispersion.transmissionMap)
+  assert.equal(Buffer.isBuffer(noDispersion.transmissionMap?.image), true, 'dispersion transmission JPEG should load as an encoded Buffer')
+  assert.equal(noDispersion.transmissionMap.name, 'Compare_Dispersion_img0.jpg')
+  assert.equal(noDispersion.transmissionMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(noDispersion.transmissionMap.flipY, false)
+
+  assert.equal(Buffer.isBuffer(checker.map?.image), true, 'dispersion checker JPEG should load as an encoded Buffer')
+  assert.equal(checker.map.name, 'Compare_Dispersion_img1.jpg')
+  assert.equal(checker.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(checker.map.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.4, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -2.6, 1.2))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'CompareDispersion should render visible dispersion comparison geometry')
 })
 
 test('committed Khronos glTF Sample Assets CompareEmissiveStrength fixture loads emissive strength variants', async () => {
