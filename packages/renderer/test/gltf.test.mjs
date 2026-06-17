@@ -72,6 +72,7 @@ const SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'g
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformMultiTest', 'glTF', 'TextureTransformMultiTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
+const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 
@@ -1125,6 +1126,109 @@ test('committed Khronos glTF Sample Assets CompareIor fixture loads transmission
   const right = meanRegion(rgba, 128, 128, 76, 48, 108, 82)
   assert.ok(left.g > left.b + 15 && left.r > left.b + 5, `baseline transmission sphere should render lit textured pixels (${left.r}, ${left.g}, ${left.b})`)
   assert.ok(right.g > right.b + 15 && right.r > right.b + 5, `IOR transmission sphere should render lit textured pixels (${right.r}, ${right.g}, ${right.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TransmissionRoughnessTest fixture loads IOR and roughness texture inputs', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_ior',
+    'KHR_materials_volume',
+  ])
+  assert.equal(source.buffers[0].uri, 'TransmissionRoughnessTest.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'IOR_Labels.png',
+    'RoughnessGrid.png',
+    'RoughnessGrid-1.png',
+    'GridWithDetails.png',
+    'SmoothVsRough.png',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_transmission'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_ior'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_volume'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Labels',
+    'IOR_10',
+    'IOR_133',
+    'IOR_150',
+    'IOR_176',
+    'IOR_242',
+    'Opaque',
+    'Flat_Backdrop',
+    'SmoothRoughLabels',
+  ])
+
+  const byName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  const samples = ['IOR_10', 'IOR_133', 'IOR_150', 'IOR_176', 'IOR_242'].map((name) => byName.get(name))
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.getAttribute('position')?.count), [7866, 7866, 7866, 7866, 7866])
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.index?.count), [38880, 38880, 38880, 38880, 38880])
+
+  const sampleMaterials = samples.map((mesh) => mesh.material)
+  assert.ok(sampleMaterials.every((material) => material.isMeshPhysicalMaterial === true), 'IOR samples should load as MeshPhysicalMaterial')
+  assert.deepEqual(sampleMaterials.map((material) => material.name), [
+    'Mat_IOR_1.0',
+    'Mat_IOR_1.33',
+    'Mat_IOR_1.50',
+    'Mat_IOR_1.76',
+    'Mat_IOR_2.42',
+  ])
+  assert.deepEqual(sampleMaterials.map((material) => material.transmission), [1, 1, 1, 1, 1])
+  assert.deepEqual(sampleMaterials.map((material) => material.ior), [1, 1.33, 1.5, 1.76, 2.42])
+  assert.ok(sampleMaterials.every((material) => material.thickness === 0.005))
+  assert.ok(sampleMaterials.every((material) => material.roughnessMap === material.metalnessMap))
+  assert.equal(new Set(sampleMaterials.map((material) => material.roughnessMap)).size, 1, 'IOR samples should share the same roughness texture object')
+  assert.equal(sampleMaterials[0].roughnessMap.name, 'RoughnessGrid')
+  assert.equal(sampleMaterials[0].roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(sampleMaterials[0].roughnessMap.image), [64, 64])
+
+  const labels = byName.get('Labels')
+  assert.equal(labels.material.name, 'LabelMat')
+  assert.equal(labels.material.map.name, 'IOR_Labels')
+  assert.equal(labels.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.deepEqual(pngDimensions(labels.material.map.image), [512, 512])
+
+  const opaque = byName.get('Opaque')
+  assert.equal(opaque.material.name, 'Mat_Opaque')
+  assert.equal(opaque.material.isMeshStandardMaterial, true)
+  assert.equal(opaque.material.roughnessMap.name, 'RoughnessGrid')
+  assert.notEqual(opaque.material.roughnessMap, sampleMaterials[0].roughnessMap)
+  assert.deepEqual(pngDimensions(opaque.material.roughnessMap.image), [64, 64])
+
+  const backdrop = byName.get('Flat_Backdrop')
+  assert.equal(backdrop.material.name, 'FlatBackdrop')
+  assert.equal(backdrop.material.map.name, 'GridWithDetails')
+  assert.deepEqual(pngDimensions(backdrop.material.map.image), [256, 256])
+
+  const smoothRoughLabels = byName.get('SmoothRoughLabels')
+  assert.equal(smoothRoughLabels.material.side, THREE.DoubleSide)
+  assert.equal(smoothRoughLabels.material.map.name, 'SmoothVsRough')
+  assert.deepEqual(pngDimensions(smoothRoughLabels.material.map.image), [256, 256])
+
+  const camera = new THREE.OrthographicCamera(-1.1, 1.1, 0.65, -0.65, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.55, 'TransmissionRoughnessTest should render visible roughness and IOR samples')
+  const center = meanRegion(rgba, 160, 96, 64, 24, 96, 72)
+  assert.ok(center.r > 110 && center.g > 110 && center.b > 110, `TransmissionRoughnessTest center samples should render visible panels (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_materials_sheen and variants metadata', async () => {
