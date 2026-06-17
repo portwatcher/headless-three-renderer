@@ -45,6 +45,7 @@ const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentMirrorTest', 'glTF', 'NormalTangentMirrorTest.gltf')
 const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
+const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
@@ -501,6 +502,60 @@ test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin anima
   assert.ok(base.height > 50, `SimpleSkin base pose should render a tall strip (${base.height})`)
   assert.ok(animated.width > base.width + 10, `SimpleSkin animation should widen the skinned mesh (${animated.width} vs ${base.width})`)
   assert.ok(animated.minY > base.minY + 10, `SimpleSkin animation should bend the top downward (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets RiggedSimple fixture applies skinned bone animation', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_RIGGED_SIMPLE)
+  const mesh = findFirst(gltf.scene, (object) => object.isSkinnedMesh === true)
+  assert.ok(mesh, 'Khronos RiggedSimple sample should load a SkinnedMesh')
+  assert.equal(mesh.name, 'Cylinder')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 160)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 160)
+  assert.equal(mesh.geometry.getAttribute('skinIndex')?.count, 160)
+  assert.equal(mesh.geometry.getAttribute('skinWeight')?.count, 160)
+  assert.equal(mesh.geometry.index?.count, 564)
+  assert.deepEqual(mesh.skeleton.bones.map((bone) => bone.name), ['Bone', 'Bone001'])
+  assert.equal(gltf.animations.length, 1)
+  assert.deepEqual(gltf.animations[0].tracks.map((track) => track.name), [
+    'Bone001.position',
+    'Bone001.quaternion',
+    'Bone001.scale',
+  ])
+
+  const camera = new THREE.OrthographicCamera(-3, 3, 5, -1, 0.01, 30)
+  camera.position.set(8, 0, 3)
+  camera.lookAt(0, 0, 1.8)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  const light = new THREE.DirectionalLight(0xffffff, 1.0)
+  light.position.set(2, 3, 5)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const renderer = new Renderer()
+  const renderBounds = () => nonBackgroundBounds(renderer.render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 96, 96, [0, 0, 0], 3)
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(gltf.animations[0]).play()
+  mixer.setTime(0)
+  gltf.scene.updateMatrixWorld(true)
+  const base = renderBounds()
+
+  mixer.setTime(1)
+  gltf.scene.updateMatrixWorld(true)
+  const animated = renderBounds()
+  const animatedBone = gltf.scene.getObjectByName('Bone001')
+
+  assert.ok(animatedBone.quaternion.x > 0.25, `RiggedSimple peak pose should rotate the animated bone (${animatedBone.quaternion.x})`)
+  assert.ok(base.width > 80 && base.height < 30, `RiggedSimple base pose should render a long straight cylinder (${base.width}x${base.height})`)
+  assert.ok(animated.height > base.height + 25, `RiggedSimple bone animation should bend the cylinder taller in side view (${animated.height} vs ${base.height})`)
+  assert.ok(animated.minY < base.minY - 25, `RiggedSimple bone animation should lift the bent tip upward (${animated.minY} vs ${base.minY})`)
 })
 
 test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph weight animation', async () => {
