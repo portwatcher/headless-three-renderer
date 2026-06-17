@@ -41,7 +41,7 @@ try {
   await cp(path.join(packageRoot, 'package.json'), path.join(rootStage, 'package.json'))
   await rewritePackageJson(path.join(rootStage, 'package.json'), (pkg) => {
     pkg.optionalDependencies = {
-      [platform.packageName]: pathToFileURL(nativeTarball).href,
+      [platform.packageName]: localFileSpec(nativeTarball),
     }
     return pkg
   })
@@ -50,14 +50,14 @@ try {
   const project = path.join(tmp, 'project')
   mkdirSync(project)
   const threeSpec = existsSync(path.join(repoRoot, 'node_modules', 'three', 'package.json'))
-    ? pathToFileURL(path.join(repoRoot, 'node_modules', 'three')).href
+    ? localFileSpec(path.join(repoRoot, 'node_modules', 'three'))
     : rootPackage.devDependencies?.three ?? rootPackage.peerDependencies?.three ?? 'latest'
   writeFileSync(path.join(project, 'package.json'), JSON.stringify({
     name: 'verify-packed-renderer',
     private: true,
     type: 'module',
     dependencies: {
-      '@headless-three/renderer': pathToFileURL(rootTarball).href,
+      '@headless-three/renderer': localFileSpec(rootTarball),
       three: threeSpec,
     },
   }, null, 2))
@@ -145,6 +145,10 @@ function safeReaddir(dir) {
   } catch {
     return []
   }
+}
+
+function localFileSpec(file) {
+  return pathToFileURL(file).href.replace(/%7E/gi, '~')
 }
 
 function run(command, args, cwd) {
