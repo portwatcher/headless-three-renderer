@@ -52,6 +52,7 @@ const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_BOX_TEXTURED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxTextured', 'glTF', 'BoxTextured.gltf')
 const SAMPLE_ASSET_BOX_TEXTURED_NPOT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxTexturedNonPowerOfTwo', 'glTF', 'BoxTexturedNonPowerOfTwo.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
+const SAMPLE_ASSET_BRAIN_STEM = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BrainStem', 'glTF', 'BrainStem.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CARBON_FIBRE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CarbonFibre', 'glTF', 'CarbonFibre.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
@@ -6190,6 +6191,136 @@ test('committed Khronos glTF Sample Assets RiggedFigure fixture loads full skinn
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'RiggedFigure should render visible skinned figure geometry')
+})
+
+test('committed Khronos glTF Sample Assets BrainStem fixture loads multi-primitive skinned animation', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_BRAIN_STEM, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 3105104, uri: 'BrainStem0.bin' }])
+  assert.equal(source.images, undefined)
+  assert.equal(source.materials.length, 59)
+  assert.deepEqual(source.materials.slice(0, 5).map((material) => material.name), [
+    'frameInStem-effect',
+    'componentsStem-effect',
+    'Stem-effect',
+    'footStem-effect',
+    'footFlangeStem-effect',
+  ])
+  assert.deepEqual(source.materials.slice(-5).map((material) => material.name), [
+    'headCaseStem-effect',
+    'headGrillStem-effect',
+    'headHornStem-effect',
+    'eyeStem-effect',
+    'eyeRimStem-effect',
+  ])
+  assert.equal(source.meshes[0].name, 'Figure_2_geometry')
+  assert.equal(source.meshes[0].primitives.length, 59)
+  assert.deepEqual(source.meshes[0].primitives[0].attributes, {
+    JOINTS_0: 1,
+    NORMAL: 2,
+    POSITION: 3,
+    WEIGHTS_0: 4,
+  })
+  assert.ok(source.meshes[0].primitives.every((primitive, index) => primitive.material === index), 'BrainStem primitives should map one-to-one to materials')
+  assert.equal(source.nodes.length, 22)
+  assert.equal(source.skins.length, 1)
+  assert.equal(source.skins[0].joints.length, 18)
+  assert.equal(source.animations.length, 1)
+  assert.equal(source.animations[0].channels.length, 57)
+  assert.equal(source.animations[0].samplers.length, 57)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BRAIN_STEM)
+  const skinnedMeshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isSkinnedMesh === true) skinnedMeshes.push(object)
+  })
+  assert.equal(skinnedMeshes.length, 59)
+  assert.deepEqual(skinnedMeshes.slice(0, 5).map((mesh) => mesh.name), [
+    'Figure_2_geometry',
+    'Figure_2_geometry_1',
+    'Figure_2_geometry_2',
+    'Figure_2_geometry_3',
+    'Figure_2_geometry_4',
+  ])
+  assert.deepEqual(skinnedMeshes.slice(-5).map((mesh) => mesh.name), [
+    'Figure_2_geometry_54',
+    'Figure_2_geometry_55',
+    'Figure_2_geometry_56',
+    'Figure_2_geometry_57',
+    'Figure_2_geometry_58',
+  ])
+  assert.deepEqual(skinnedMeshes.slice(0, 5).map((mesh) => mesh.material.name), [
+    'frameInStem-effect',
+    'componentsStem-effect',
+    'Stem-effect',
+    'footStem-effect',
+    'footFlangeStem-effect',
+  ])
+  assert.ok(skinnedMeshes.every((mesh) => mesh.material.isMeshStandardMaterial === true), 'BrainStem materials should load as MeshStandardMaterial instances')
+  assert.ok(skinnedMeshes.every((mesh) => mesh.material.metalness === 0 && mesh.material.roughness === 1), 'BrainStem materials should load scalar PBR defaults')
+  assert.ok(skinnedMeshes.every((mesh) => mesh.skeleton.bones.length === 18), 'every BrainStem primitive should retain the shared 18-bone skeleton')
+  assert.ok(skinnedMeshes.every((mesh) => mesh.geometry.getAttribute('position')?.count === mesh.geometry.getAttribute('normal')?.count))
+  assert.ok(skinnedMeshes.every((mesh) => mesh.geometry.getAttribute('position')?.count === mesh.geometry.getAttribute('skinIndex')?.count))
+  assert.ok(skinnedMeshes.every((mesh) => mesh.geometry.getAttribute('position')?.count === mesh.geometry.getAttribute('skinWeight')?.count))
+  assert.equal(skinnedMeshes.reduce((sum, mesh) => sum + mesh.geometry.getAttribute('position').count, 0), 34159)
+  assert.equal(skinnedMeshes.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? 0), 0), 184998)
+
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'animation_0')
+  assert.ok(Math.abs(clip.duration - 34.880001068115234) < 1e-6, `BrainStem clip duration should match source timing (${clip.duration})`)
+  assert.equal(clip.tracks.length, 57)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.position')).length, 19)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.quaternion')).length, 19)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.scale')).length, 19)
+  assert.ok(clip.tracks.every((track) => track.times.length === 1309), 'every BrainStem track should contain 1309 keyframes')
+
+  const movingQuaternionTrack = clip.tracks.find((track) => {
+    if (!track.name.endsWith('.quaternion')) return false
+    const valueSize = track.getValueSize()
+    const lastOffset = track.values.length - valueSize
+    for (let i = 0; i < valueSize; i += 1) {
+      if (Math.abs(track.values[i] - track.values[lastOffset + i]) > 1e-4) return true
+    }
+    return false
+  })
+  assert.ok(movingQuaternionTrack, 'BrainStem should include at least one changing quaternion track')
+  const animatedObject = gltf.scene.getObjectByProperty('uuid', movingQuaternionTrack.name.replace(/\.quaternion$/, ''))
+  assert.equal(animatedObject?.isBone, true, 'changing BrainStem quaternion track should target a bone')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(0)
+  const startQuaternion = animatedObject.quaternion.clone()
+  mixer.setTime(clip.duration * 0.75)
+  const endQuaternion = animatedObject.quaternion.clone()
+  assert.ok(startQuaternion.angleTo(endQuaternion) > 0.1, 'BrainStem animation should move the selected bone')
+
+  gltf.scene.updateMatrixWorld(true)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  const light = new THREE.DirectionalLight(0xffffff, 2.0)
+  light.position.copy(center).add(new THREE.Vector3(2, 4, 5))
+  gltf.scene.add(light)
+  const halfHeight = Math.max(size.y, size.z) / 2 + 0.08
+  const halfWidth = Math.max(size.x / 2 + 0.08, halfHeight)
+  const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, 0, 5))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.07, 'BrainStem should render visible multi-primitive skinned geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b, `BrainStem material colors should render warm highlights (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets CesiumMan fixture loads textured skinned character animation', async () => {
