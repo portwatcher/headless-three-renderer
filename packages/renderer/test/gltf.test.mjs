@@ -30,6 +30,7 @@ const REAL_VRM_EXPRESSION_SAMPLE = path.join(
   'VRMC_vrm_expressions_isBinary_Overridden.vrm',
 )
 const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
+const SAMPLE_ASSET_ANIMATED_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedCube', 'glTF', 'AnimatedCube.gltf')
 const SAMPLE_ASSET_ANIMATED_COLORS_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedColorsCube', 'glTF', 'AnimatedColorsCube.gltf')
 const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
 const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
@@ -2705,6 +2706,65 @@ test('committed Khronos glTF Sample Assets AnimatedTriangle fixture loads extern
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'AnimatedTriangle should render visible animated geometry')
+})
+
+test('committed Khronos glTF Sample Assets AnimatedCube fixture loads textured quaternion animation', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANIMATED_CUBE, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 1860, uri: 'AnimatedCube.bin' }])
+  assert.deepEqual(source.images, [{ uri: 'AnimatedCube_BaseColor.png' }])
+  assert.equal(source.accessors[0].count, 3)
+  assert.equal(source.accessors[1].type, 'VEC4')
+  assert.equal(source.animations[0].name, 'animation_AnimatedCube')
+  assert.deepEqual(source.animations[0].channels, [
+    { sampler: 0, target: { node: 0, path: 'rotation' } },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANIMATED_CUBE)
+  const mesh = gltf.scene.getObjectByName('AnimatedCube')
+  assert.ok(mesh?.isMesh, 'AnimatedCube should load a named mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 36)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 36)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 36)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 36)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.material.name, 'AnimatedCube')
+  assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(mesh.material.metalness, 0)
+  assert.equal(mesh.material.roughness, 0.079)
+
+  assert.equal(gltf.animations.length, 1)
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'animation_AnimatedCube')
+  assert.equal(clip.duration, 2)
+  assert.equal(clip.tracks.length, 1)
+  const track = clip.tracks[0]
+  assert.equal(track.name, 'AnimatedCube.quaternion')
+  assert.equal(track.getInterpolation(), THREE.InterpolateLinear)
+  assert.equal(track.getValueSize(), 4)
+  assert.deepEqual(Array.from(track.times), [0, 1, 2])
+  assertVectorClose(Array.from(track.values.slice(4, 8)), [0, 1, 0, -4.371138828673793e-8], 'AnimatedCube middle quaternion key')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(1)
+  gltf.scene.updateMatrixWorld(true)
+  assertVectorClose(mesh.quaternion.toArray(), [0, 1, 0, -4.371138828673793e-8], 'AnimatedCube half-turn pose')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const camera = new THREE.OrthographicCamera(-2.2, 2.2, 2.2, -2.2, 0.01, 20)
+  camera.position.set(0, 0, 6)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'AnimatedCube should render visible textured cube geometry')
 })
 
 test('committed Khronos glTF Sample Assets AnimatedColorsCube fixture applies material color animation pointers', async () => {
