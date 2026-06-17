@@ -120,6 +120,7 @@ const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
+const SAMPLE_ASSET_WATER_BOTTLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'WaterBottle', 'glTF', 'WaterBottle.gltf')
 const SAMPLE_ASSET_XMP_METADATA_ROUNDED_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'XmpMetadataRoundedCube', 'glTF', 'XmpMetadataRoundedCube.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
@@ -2505,6 +2506,105 @@ test('committed Khronos glTF Sample Assets Duck fixture loads textured external 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'Khronos Duck sample should render visible textured pixels')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 8 && mean.g > mean.b + 6, `Duck texture should contribute warm yellow output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets WaterBottle fixture loads textured PBR maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_WATER_BOTTLE, 'utf8'))
+  assert.equal(source.asset.generator, 'glTF Tools for Unity')
+  assert.deepEqual(source.buffers, [{ uri: 'WaterBottle.bin', byteLength: 149412 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'WaterBottle_baseColor.png',
+    'WaterBottle_occlusionRoughnessMetallic.png',
+    'WaterBottle_normal.png',
+    'WaterBottle_emissive.png',
+  ])
+  assert.deepEqual(source.textures, [
+    { source: 0 },
+    { source: 1 },
+    { source: 2 },
+    { source: 3 },
+  ])
+  assert.equal(source.materials.length, 1)
+  assert.equal(source.materials[0].name, 'BottleMat')
+  assert.deepEqual(source.materials[0].pbrMetallicRoughness, {
+    baseColorTexture: { index: 0 },
+    metallicRoughnessTexture: { index: 1 },
+  })
+  assert.deepEqual(source.materials[0].normalTexture, { index: 2 })
+  assert.deepEqual(source.materials[0].occlusionTexture, { index: 1 })
+  assert.deepEqual(source.materials[0].emissiveTexture, { index: 3 })
+  assert.deepEqual(source.materials[0].emissiveFactor, [1, 1, 1])
+
+  const primitive = source.meshes[0].primitives[0]
+  assert.deepEqual(primitive.attributes, {
+    TEXCOORD_0: 0,
+    NORMAL: 1,
+    TANGENT: 2,
+    POSITION: 3,
+  })
+  assert.equal(primitive.indices, 4)
+  assert.deepEqual(source.nodes[0].rotation, [0, 1, 0, 0])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_WATER_BOTTLE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos WaterBottle sample should load a mesh')
+  assert.equal(mesh.name, 'WaterBottle')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 2549)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 2549)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 2549)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 2549)
+  assert.equal(mesh.geometry.index?.count, 13530)
+  assert.deepEqual(mesh.quaternion.toArray(), [0, 1, 0, 0])
+
+  const material = mesh.material
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.name, 'BottleMat')
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+  assert.deepEqual(material.emissive.toArray(), [1, 1, 1])
+
+  const assertLoadedTexture = (texture, name, colorSpace) => {
+    assert.ok(texture?.isTexture, `${name} should load a texture`)
+    assert.equal(texture.name, name)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 2048])
+    assert.equal(texture.wrapS, THREE.RepeatWrapping)
+    assert.equal(texture.wrapT, THREE.RepeatWrapping)
+    assert.equal(texture.magFilter, THREE.LinearFilter)
+    assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter)
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assertLoadedTexture(material.map, 'WaterBottle_baseColor.png', THREE.SRGBColorSpace)
+  assertLoadedTexture(material.metalnessMap, 'WaterBottle_occlusionRoughnessMetallic.png', THREE.NoColorSpace)
+  assertLoadedTexture(material.normalMap, 'WaterBottle_normal.png', THREE.NoColorSpace)
+  assertLoadedTexture(material.emissiveMap, 'WaterBottle_emissive.png', THREE.SRGBColorSpace)
+  assert.equal(material.metalnessMap, material.roughnessMap, 'WaterBottle should reuse the ORM texture for roughness')
+  assert.equal(material.metalnessMap, material.aoMap, 'WaterBottle should reuse the ORM texture for occlusion')
+
+  const camera = new THREE.OrthographicCamera(-0.08, 0.08, 0.16, -0.16, 0.01, 2)
+  camera.position.set(0, 0, 0.6)
+  camera.lookAt(0, 0, 0)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(0.2, 0.4, 0.7)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'WaterBottle should render visible textured PBR geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 15 && mean.g > mean.b + 15, `WaterBottle texture should contribute warm label pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets PointLightIntensityTest fixture loads KHR_lights_punctual point lights', async () => {
