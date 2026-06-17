@@ -26,6 +26,7 @@ const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
+const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
@@ -296,6 +297,68 @@ test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders
   assert.ok(topRight.r > topRight.g + 140 && topRight.r > topRight.b + 140, `top-right UV quadrant should sample red texels (${topRight.r}, ${topRight.g}, ${topRight.b})`)
   assert.ok(bottomLeft.b > bottomLeft.r + 120 && bottomLeft.b > bottomLeft.g + 120, `bottom-left UV quadrant should sample blue texels (${bottomLeft.r}, ${bottomLeft.g}, ${bottomLeft.b})`)
   assert.ok(bottomRight.g > bottomRight.r + 100 && bottomRight.g > bottomRight.b + 100, `bottom-right UV quadrant should sample green texels (${bottomRight.r}, ${bottomRight.g}, ${bottomRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and renders primitive modes', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MESH_PRIMITIVE_MODES)
+  const renderables = []
+  gltf.scene.traverse((object) => {
+    if (
+      object.isMesh === true ||
+      object.isLine === true ||
+      object.isLineSegments === true ||
+      object.isLineLoop === true ||
+      object.isPoints === true
+    ) {
+      renderables.push(object)
+    }
+  })
+
+  assert.deepEqual(renderables.map((object) => ({
+    name: object.name,
+    type: object.type,
+    index: object.geometry.index?.count,
+    positions: object.geometry.getAttribute('position')?.count,
+  })), [
+    { name: 'mesh_with_POINTS', type: 'Points', index: 7, positions: 7 },
+    { name: 'mesh_with_LINES', type: 'LineSegments', index: 12, positions: 7 },
+    { name: 'mesh_with_LINE_LOOP', type: 'LineLoop', index: 7, positions: 7 },
+    { name: 'mesh_with_LINE_STRIP', type: 'Line', index: 7, positions: 7 },
+    { name: 'mesh_with_TRIANGLES', type: 'Mesh', index: 18, positions: 7 },
+    { name: 'mesh_with_GL_TRIANGLE_STRIP', type: 'Mesh', index: 12, positions: 7 },
+    { name: 'mesh_with_GL_TRIANGLE_FAN', type: 'Mesh', index: 18, positions: 7 },
+  ])
+
+  for (const object of renderables) {
+    if (object.material?.color) object.material.color.set(0xffffff)
+    if (object.isPoints === true) object.material.size = 10
+    if (object.isLine === true || object.isLineSegments === true || object.isLineLoop === true) {
+      object.material.linewidth = 4
+    }
+  }
+
+  const camera = new THREE.OrthographicCamera(-4, 4, 4, -4, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'MeshPrimitiveModes sample should render visible points, lines, and meshes')
+  const points = meanRegion(rgba, 128, 128, 56, 8, 72, 24)
+  const lineLoop = meanRegion(rgba, 128, 128, 56, 56, 72, 72)
+  const triangleFan = meanRegion(rgba, 128, 128, 88, 104, 104, 120)
+  assert.ok(points.r > 60 && points.g > 60 && points.b > 60, `POINTS primitive should render visible pixels (${points.r}, ${points.g}, ${points.b})`)
+  assert.ok(lineLoop.r > 40 && lineLoop.g > 40 && lineLoop.b > 40, `LINE_LOOP primitive should render visible pixels (${lineLoop.r}, ${lineLoop.g}, ${lineLoop.b})`)
+  assert.ok(triangleFan.r > 120 && triangleFan.g > 120 && triangleFan.b > 120, `TRIANGLE_FAN primitive should render visible pixels (${triangleFan.r}, ${triangleFan.g}, ${triangleFan.b})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
