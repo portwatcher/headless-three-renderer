@@ -23,6 +23,7 @@ const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
 const SKINNED_QUAD = path.join(FIXTURE_DIR, 'skinned-quad.gltf')
 const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
+const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxInterleaved', 'glTF', 'BoxInterleaved.gltf')
@@ -110,6 +111,52 @@ test('committed Khronos glTF Sample Assets Box fixture loads external buffer and
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos Box sample should render visible pixels')
   const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
   assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `Khronos Box sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alpha modes and JPEG textures', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 9)
+
+  const meshesByName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  assert.equal(meshesByName.get('TestBlend')?.material.transparent, true)
+  assert.equal(meshesByName.get('DecalBlend')?.material.transparent, true)
+  assert.equal(meshesByName.get('TestOpaque')?.material.transparent, false)
+  assert.equal(meshesByName.get('TestCutoff25')?.material.alphaTest, 0.25)
+  assert.equal(meshesByName.get('TestCutoffDefault')?.material.alphaTest, 0.5)
+  assert.equal(meshesByName.get('TestCutoff75')?.material.alphaTest, 0.75)
+  assert.ok(
+    meshes.every((mesh) => Buffer.isBuffer(mesh.material.map?.image)),
+    'AlphaBlendModeTest PNG and JPEG material textures should load as encoded Buffers',
+  )
+
+  const bed = meshesByName.get('Bed')
+  assert.ok(Buffer.isBuffer(bed?.material.normalMap?.image), 'AlphaBlendModeTest JPEG normal map should load as an encoded Buffer')
+  assert.ok(Buffer.isBuffer(bed?.material.aoMap?.image), 'AlphaBlendModeTest JPEG ORM map should load as an encoded Buffer')
+  assert.ok(Buffer.isBuffer(bed?.material.roughnessMap?.image), 'AlphaBlendModeTest JPEG roughness map should load as an encoded Buffer')
+  assert.ok(Buffer.isBuffer(bed?.material.metalnessMap?.image), 'AlphaBlendModeTest JPEG metalness map should load as an encoded Buffer')
+
+  const camera = new THREE.PerspectiveCamera(35, 4 / 3, 0.01, 50)
+  camera.position.set(0, 1.4, 8)
+  camera.lookAt(0, 0.8, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 120,
+    format: 'rgba',
+    background: [0.04, 0.04, 0.04],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [10, 10, 10], 4) > 0.4, 'AlphaBlendModeTest should render visible alpha-mode geometry')
+  const center = meanRegion(rgba, 160, 120, 60, 40, 100, 80)
+  assert.ok(center.r > 80 && center.g > 80 && center.b > 70, `AlphaBlendModeTest render should include the textured material bed (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxInterleaved fixture loads byteStride attributes', async () => {
