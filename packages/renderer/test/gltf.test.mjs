@@ -72,6 +72,7 @@ const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
+const SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheresNoTextures', 'glTF', 'MetalRoughSpheresNoTextures.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MORPH_PRIMITIVES_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphPrimitivesTest', 'glTF', 'MorphPrimitivesTest.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
@@ -4377,6 +4378,77 @@ test('committed Khronos glTF Sample Assets MetalRoughSpheres fixture loads packe
   assert.ok(ratio > 0.03, `MetalRoughSpheres representative mesh should render visible pixels (${ratio})`)
 })
 
+test('committed Khronos glTF Sample Assets MetalRoughSpheresNoTextures fixture loads scalar metallic-roughness grids', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 241588, uri: 'MetalRoughSpheresNoTextures.bin' }])
+  assert.equal(source.images, undefined)
+  assert.equal(source.textures, undefined)
+  assert.equal(source.meshes.length, 102)
+  assert.equal(source.materials.length, 98)
+  assert.equal(
+    source.materials.every((material) => (
+      material.pbrMetallicRoughness?.baseColorTexture === undefined &&
+      material.pbrMetallicRoughness?.metallicRoughnessTexture === undefined
+    )),
+    true,
+    'MetalRoughSpheresNoTextures should rely on scalar PBR factors instead of textures',
+  )
+
+  const expectedSteps = [0, 0.1666666716337204, 0.3333333432674408, 0.5, 0.6666666865348816, 0.8333333134651184, 1]
+  assert.deepEqual(source.materials.slice(0, 7).map((material) => material.pbrMetallicRoughness.roughnessFactor), expectedSteps)
+  assert.deepEqual(source.materials.slice(0, 49).filter((_, index) => index % 7 === 0).map((material) => material.pbrMetallicRoughness.metallicFactor), expectedSteps)
+  assert.deepEqual(source.materials.slice(49, 56).map((material) => material.pbrMetallicRoughness.roughnessFactor), expectedSteps)
+  assert.deepEqual(source.materials.slice(49).filter((_, index) => index % 7 === 0).map((material) => material.pbrMetallicRoughness.metallicFactor), expectedSteps)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+
+  assert.equal(meshes.length, 123)
+  const materialGrid = meshes.slice(0, 98)
+  assert.deepEqual(materialGrid.slice(0, 7).map((mesh) => mesh.name), [
+    'm0%_r0%',
+    'm0%_r16%',
+    'm0%_r33%',
+    'm0%_r50%',
+    'm0%_r66%',
+    'm0%_r83%',
+    'm0%_r100%',
+  ])
+  assert.deepEqual(materialGrid.slice(49, 56).map((mesh) => mesh.name), [
+    'g_m0%_r0%',
+    'g_m0%_r16%',
+    'g_m0%_r33%',
+    'g_m0%_r50%',
+    'g_m0%_r66%',
+    'g_m0%_r83%',
+    'g_m0%_r100%',
+  ])
+  assert.deepEqual(materialGrid.slice(0, 3).map((mesh) => mesh.geometry.getAttribute('position')?.count), [5374, 5374, 5374])
+  assert.deepEqual(materialGrid.slice(0, 3).map((mesh) => mesh.geometry.index?.count), [31800, 31800, 31800])
+  assert.equal(new Set(materialGrid.map((mesh) => mesh.material.uuid)).size, 98)
+  assert.equal(materialGrid.every((mesh) => mesh.material.isMeshStandardMaterial === true), true)
+  assert.equal(materialGrid.every((mesh) => mesh.material.map === null && mesh.material.roughnessMap === null && mesh.material.metalnessMap === null), true)
+
+  assert.equal(materialGrid[0].material.metalness, 0)
+  assert.equal(materialGrid[0].material.roughness, 0)
+  assert.equal(materialGrid[6].material.metalness, 0)
+  assert.equal(materialGrid[6].material.roughness, 1)
+  assert.equal(materialGrid[48].material.metalness, 1)
+  assert.equal(materialGrid[48].material.roughness, 1)
+  assert.equal(materialGrid[97].material.metalness, 1)
+  assert.equal(materialGrid[97].material.roughness, 1)
+  assertVectorClose(materialGrid[0].material.color.toArray(), [0.6038269996643066, 0.6038269996643066, 0.6038269996643066], 'neutral scalar sphere color')
+  assertVectorClose(materialGrid[97].material.color.toArray(), [0.6038274168968201, 0.4396572411060333, 0.01228648703545332], 'gold scalar sphere color')
+
+  const neutralRatio = renderSingleObjectRatio(new Renderer(), materialGrid[0], 0.001)
+  assert.ok(neutralRatio > 0.03, `MetalRoughSpheresNoTextures neutral representative mesh should render visible pixels (${neutralRatio})`)
+  const goldRatio = renderSingleObjectRatio(new Renderer(), materialGrid[97], 0.001)
+  assert.ok(goldRatio > 0.03, `MetalRoughSpheresNoTextures gold representative mesh should render visible pixels (${goldRatio})`)
+})
+
 test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and renders primitive modes', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_MESH_PRIMITIVE_MODES)
   const renderables = []
@@ -5346,12 +5418,11 @@ function worldDeterminant(object) {
   return object.matrixWorld.determinant()
 }
 
-function renderSingleObjectRatio(renderer, object) {
+function renderSingleObjectRatio(renderer, object, padding = 0.2) {
   object.updateWorldMatrix(true, true)
   const bounds = new THREE.Box3().setFromObject(object)
   const center = bounds.getCenter(new THREE.Vector3())
   const size = bounds.getSize(new THREE.Vector3())
-  const padding = 0.2
 
   const scene = new THREE.Scene()
   scene.add(object.clone(true))
