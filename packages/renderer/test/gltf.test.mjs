@@ -52,6 +52,7 @@ const SAMPLE_ASSET_BOX_TEXTURED_NPOT = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
+const SAMPLE_ASSET_CLEARCOAT_CAR_PAINT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatCarPaint', 'glTF', 'ClearCoatCarPaint.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_CLEARCOAT_WICKER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearcoatWicker', 'glTF', 'ClearcoatWicker.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
@@ -4069,6 +4070,90 @@ test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_mater
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'ClearCoatTest should render visible clearcoat panels')
+})
+
+test('committed Khronos glTF Sample Assets ClearCoatCarPaint fixture loads clearcoat normal texture transforms', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CLEARCOAT_CAR_PAINT, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_texture_transform', 'KHR_materials_clearcoat'])
+  assert.deepEqual(source.extensionsRequired, ['KHR_texture_transform', 'KHR_materials_clearcoat'])
+  assert.deepEqual(source.buffers, [{ uri: 'ClearCoatCarPaint.bin', byteLength: 73728 }])
+  assert.deepEqual(source.images.map((image) => image.uri), ['ClearCoatCarPaint_Normal.png'])
+
+  const materialSource = source.materials[0]
+  assert.equal(materialSource.name, 'Clear Coat Car Paint')
+  assert.deepEqual(materialSource.pbrMetallicRoughness, {
+    baseColorFactor: [0.7, 0, 0, 1],
+    metallicFactor: 0.3,
+    roughnessFactor: 0.4,
+  })
+  assert.deepEqual(materialSource.normalTexture, {
+    index: 0,
+    scale: 0.2,
+    extensions: {
+      KHR_texture_transform: {
+        scale: [3, 3],
+      },
+    },
+  })
+  assert.deepEqual(materialSource.extensions.KHR_materials_clearcoat, {
+    clearcoatFactor: 1,
+    clearcoatRoughnessFactor: 0,
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CLEARCOAT_CAR_PAINT)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_clearcoat'))
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos ClearCoatCarPaint sample should load a mesh')
+  assert.equal(mesh.name, 'Sphere')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 1728)
+  assert.equal(mesh.geometry.index?.count, 9216)
+  assert.deepEqual(mesh.position.toArray(), [0, 0.5, 0])
+
+  const material = mesh.material
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.name, 'Clear Coat Car Paint')
+  assert.deepEqual(material.color.toArray(), [0.7, 0, 0])
+  assert.equal(material.metalness, 0.3)
+  assert.equal(material.roughness, 0.4)
+  assert.equal(material.clearcoat, 1)
+  assert.equal(material.clearcoatRoughness, 0)
+  assert.deepEqual(material.normalScale.toArray(), [0.2, -0.2])
+
+  const normalMap = material.normalMap
+  assert.ok(normalMap?.isTexture, 'ClearCoatCarPaint normal map should load')
+  assert.equal(normalMap.name, 'ClearCoatCarPaint_Normal.png')
+  assert.equal(Buffer.isBuffer(normalMap.image), true, 'ClearCoatCarPaint normal PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(normalMap.image), [128, 128])
+  assert.equal(normalMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(normalMap.repeat.toArray(), [3, 3])
+  assert.deepEqual(normalMap.offset.toArray(), [0, 0])
+  assert.equal(normalMap.rotation, 0)
+  assert.deepEqual(normalMap.center.toArray(), [0, 0])
+  assert.equal(normalMap.flipY, false)
+
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0.5, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'ClearCoatCarPaint should render visible clearcoat car-paint geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g + 20 && mean.r > mean.b + 20, `ClearCoatCarPaint should render a red clearcoat material (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets ClearcoatWicker fixture loads textured clearcoat normal maps', async () => {
