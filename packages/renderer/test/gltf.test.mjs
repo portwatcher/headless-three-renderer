@@ -45,6 +45,7 @@ const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
+const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
 const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentMirrorTest', 'glTF', 'NormalTangentMirrorTest.gltf')
@@ -1593,6 +1594,61 @@ test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders
   assert.ok(topRight.r > topRight.g + 140 && topRight.r > topRight.b + 140, `top-right UV quadrant should sample red texels (${topRight.r}, ${topRight.g}, ${topRight.b})`)
   assert.ok(bottomLeft.b > bottomLeft.r + 120 && bottomLeft.b > bottomLeft.g + 120, `bottom-left UV quadrant should sample blue texels (${bottomLeft.r}, ${bottomLeft.g}, ${bottomLeft.b})`)
   assert.ok(bottomRight.g > bottomRight.r + 100 && bottomRight.g > bottomRight.b + 100, `bottom-right UV quadrant should sample green texels (${bottomRight.r}, ${bottomRight.g}, ${bottomRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MultiUVTest fixture loads primary and secondary texture UVs', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MULTI_UV_TEST)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos MultiUVTest sample should load a mesh')
+  assert.equal(mesh.name, 'Cube')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('uv1')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+
+  const { material } = mesh
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.name, 'Material')
+  assert.deepEqual(material.emissive.toArray(), [1, 1, 1])
+  assert.equal(material.emissiveIntensity, 1)
+
+  const { map, emissiveMap } = material
+  assert.ok(map?.isTexture, 'MultiUVTest sample should load a base color texture')
+  assert.ok(emissiveMap?.isTexture, 'MultiUVTest sample should load an emissive texture')
+  assert.equal(map.name, 'uv0.png')
+  assert.equal(emissiveMap.name, 'uv1.png')
+  assert.equal(Buffer.isBuffer(map.image), true, 'MultiUVTest base color PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(emissiveMap.image), true, 'MultiUVTest emissive PNG should load as an encoded Buffer')
+  assert.equal(map.channel, 0)
+  assert.equal(emissiveMap.channel, 1)
+  assert.equal(map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(map.flipY, false)
+  assert.equal(emissiveMap.flipY, false)
+
+  const camera = gltf.cameras[0]
+  assert.ok(camera?.isPerspectiveCamera, 'MultiUVTest sample should load its camera')
+  camera.aspect = 1
+  camera.updateProjectionMatrix()
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'MultiUVTest should render visible multi-UV textured geometry')
+  const center = meanRegion(rgba, 128, 128, 48, 48, 80, 80)
+  assert.ok(center.r > 80 && center.g > 90 && center.b > 100, `MultiUVTest center should include textured/emissive color (${center.r}, ${center.g}, ${center.b})`)
+  const lowerLeft = meanRegion(rgba, 128, 128, 20, 80, 48, 108)
+  assert.ok(lowerLeft.r > lowerLeft.b + 20 && lowerLeft.g > lowerLeft.b + 20, `MultiUVTest secondary UV sample should contribute warm emissive texels (${lowerLeft.r}, ${lowerLeft.g}, ${lowerLeft.b})`)
 })
 
 test('committed Khronos glTF Sample Assets TextureTransformTest fixture loads KHR_texture_transform', async () => {
