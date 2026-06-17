@@ -40,6 +40,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
+const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
@@ -668,6 +669,51 @@ test('committed Khronos glTF Sample Assets TextureSettingsTest fixture loads wra
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.75, 'TextureSettingsTest should render visible sampler and sidedness panels')
+})
+
+test('committed Khronos glTF Sample Assets NormalTangentTest fixture loads normal and ORM texture maps', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_NORMAL_TANGENT_TEST)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'NormalTangentTest should load a mesh')
+  assert.equal(mesh.name, 'NormalTangentTest_low')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3983)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 3983)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 3983)
+  assert.equal(mesh.geometry.getAttribute('tangent'), undefined)
+  assert.equal(mesh.geometry.index?.count, 23322)
+
+  const material = mesh.material
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.side, THREE.DoubleSide)
+  assert.ok(Buffer.isBuffer(material.map?.image), 'NormalTangentTest base-color PNG should load as an encoded Buffer')
+  assert.ok(Buffer.isBuffer(material.normalMap?.image), 'NormalTangentTest normal PNG should load as an encoded Buffer')
+  assert.ok(Buffer.isBuffer(material.aoMap?.image), 'NormalTangentTest packed ORM PNG should load as an encoded Buffer')
+  assert.equal(material.roughnessMap, material.aoMap)
+  assert.equal(material.metalnessMap, material.aoMap)
+  assert.equal(material.map.flipY, false)
+  assert.equal(material.normalMap.flipY, false)
+  assert.deepEqual(material.normalScale.toArray(), [1, -1])
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, -0.1, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.0)
+  light.position.set(1, 2, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.35, 'NormalTangentTest should render visible textured geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 45 && mean.g > 45 && mean.b > 40, `NormalTangentTest render should include textured material color (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders external PNG UV quadrants', async () => {
