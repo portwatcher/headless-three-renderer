@@ -25,6 +25,7 @@ const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
+const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
@@ -173,6 +174,47 @@ test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin anima
   assert.ok(base.height > 50, `SimpleSkin base pose should render a tall strip (${base.height})`)
   assert.ok(animated.width > base.width + 10, `SimpleSkin animation should widen the skinned mesh (${animated.width} vs ${base.width})`)
   assert.ok(animated.minY > base.minY + 10, `SimpleSkin animation should bend the top downward (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph weight animation', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_MORPH)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos SimpleMorph sample should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3)
+  assert.equal(mesh.geometry.index?.count, 3)
+  assert.equal(mesh.geometry.morphAttributes.position?.length, 2)
+  assert.deepEqual(mesh.morphTargetInfluences, [0.5, 0.5])
+  assert.equal(gltf.animations.length, 1)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0.5, 0.5, 3.2)
+  camera.lookAt(0.45, 0.4, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const renderer = new Renderer()
+  const renderBounds = () => nonBackgroundBounds(renderer.render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 96, 96, [0, 0, 0], 3)
+
+  mesh.morphTargetInfluences = [0, 0]
+  gltf.scene.updateMatrixWorld(true)
+  const base = renderBounds()
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(gltf.animations[0]).play()
+  mixer.setTime(2)
+  gltf.scene.updateMatrixWorld(true)
+  const animated = renderBounds()
+
+  assert.ok(base.height > 10, `SimpleMorph base triangle should render visible bounds (${base.height})`)
+  assert.ok(animated.height > base.height + 35, `SimpleMorph animation should expand rendered height (${animated.height} vs ${base.height})`)
+  assert.ok(animated.minY < base.minY - 35, `SimpleMorph animation should lift the triangle top (${animated.minY} vs ${base.minY})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
