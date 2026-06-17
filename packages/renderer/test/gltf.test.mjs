@@ -35,6 +35,7 @@ const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
+const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -530,6 +531,65 @@ test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders
   assert.ok(topRight.r > topRight.g + 140 && topRight.r > topRight.b + 140, `top-right UV quadrant should sample red texels (${topRight.r}, ${topRight.g}, ${topRight.b})`)
   assert.ok(bottomLeft.b > bottomLeft.r + 120 && bottomLeft.b > bottomLeft.g + 120, `bottom-left UV quadrant should sample blue texels (${bottomLeft.r}, ${bottomLeft.g}, ${bottomLeft.b})`)
   assert.ok(bottomRight.g > bottomRight.r + 100 && bottomRight.g > bottomRight.b + 100, `bottom-right UV quadrant should sample green texels (${bottomRight.r}, ${bottomRight.g}, ${bottomRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TextureTransformTest fixture loads KHR_texture_transform', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST)
+  const offsetU = gltf.scene.getObjectByName('Offset_U')
+  const offsetV = gltf.scene.getObjectByName('Offset_V')
+  const offsetUv = gltf.scene.getObjectByName('Offset_UV')
+  const rotation = gltf.scene.getObjectByName('Rotation')
+  const scale = gltf.scene.getObjectByName('Scale')
+  const all = gltf.scene.getObjectByName('All')
+  assert.ok(offsetU?.isMesh, 'TextureTransformTest should load Offset_U mesh')
+  assert.ok(offsetV?.isMesh, 'TextureTransformTest should load Offset_V mesh')
+  assert.ok(offsetUv?.isMesh, 'TextureTransformTest should load Offset_UV mesh')
+  assert.ok(rotation?.isMesh, 'TextureTransformTest should load Rotation mesh')
+  assert.ok(scale?.isMesh, 'TextureTransformTest should load Scale mesh')
+  assert.ok(all?.isMesh, 'TextureTransformTest should load All mesh')
+
+  assert.equal(Buffer.isBuffer(offsetU.material.map.image), true)
+  assert.deepEqual(offsetU.material.map.offset.toArray(), [0.5, 0])
+  assert.deepEqual(offsetV.material.map.offset.toArray(), [0, 0.5])
+  assert.deepEqual(offsetUv.material.map.offset.toArray(), [0.5, 0.5])
+  assert.ok(Math.abs(rotation.material.map.rotation - 0.39269908169872414) < 1e-12)
+  assert.deepEqual(scale.material.map.repeat.toArray(), [1.5, 1.5])
+  assert.deepEqual(all.material.map.offset.toArray(), [-0.2, -0.1])
+  assert.deepEqual(all.material.map.repeat.toArray(), [1.5, 1.5])
+  assert.ok(Math.abs(all.material.map.rotation - 0.3) < 1e-12)
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 12, 'TextureTransformTest should load transformed samples and reference badges')
+  assert.ok(
+    meshes.every((mesh) => Buffer.isBuffer(mesh.material.map?.image)),
+    'TextureTransformTest external PNG textures should load as encoded Buffers',
+  )
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.2, -1.2, 0.01, 20)
+  camera.position.set(0, 0, 10)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'TextureTransformTest should render visible transformed texture samples')
+  const topLeft = meanRegion(rgba, 144, 96, 18, 16, 38, 36)
+  const topCenter = meanRegion(rgba, 144, 96, 62, 16, 82, 36)
+  const topRight = meanRegion(rgba, 144, 96, 106, 16, 126, 36)
+  assert.ok(topLeft.g > topLeft.r + 60 && topLeft.g > topLeft.b + 60, `offset-U sample should expose green-dominant texels (${topLeft.r}, ${topLeft.g}, ${topLeft.b})`)
+  assert.ok(topCenter.b > topCenter.r + 80 && topCenter.b > topCenter.g + 80, `offset-V sample should expose blue-dominant texels (${topCenter.r}, ${topCenter.g}, ${topCenter.b})`)
+  assert.ok(topRight.g > topRight.r + 60 && topRight.b > topRight.r + 60, `offset-UV sample should expose cyan texels (${topRight.r}, ${topRight.g}, ${topRight.b})`)
 })
 
 test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and renders primitive modes', async () => {
