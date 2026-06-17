@@ -36,6 +36,10 @@ function renderRgba(scene, camera, options = {}) {
   return getRenderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
 }
 
+function renderRgbaIsolated(scene, camera, options = {}) {
+  return new Renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
+}
+
 function makeEnvironmentTexture() {
   const data = new Uint8Array([
     255, 255, 255, 255,
@@ -15255,7 +15259,7 @@ test('source material shadowSide applies to customDepthMaterial shadow casters',
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
     camera.position.set(0, 6, 8)
     camera.lookAt(0, 0, 0)
-    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return meanRgba(renderRgbaIsolated(scene, camera, { width: 96, height: 96 }))
   }
 
   const front = renderCustomDepthShadowSide(THREE.FrontSide)
@@ -16648,7 +16652,7 @@ test('LineDashedMaterial map alpha samples reconstructed dash UVs', () => {
   scene.background = new THREE.Color(0.1, 0.1, 0.1)
   scene.add(line)
 
-  const ratio = nonBackgroundRatio(renderRgba(scene, makeCamera(), { width: 96, height: 96 }), BG)
+  const ratio = nonBackgroundRatio(renderRgbaIsolated(scene, makeCamera(), { width: 96, height: 96 }), BG)
   assert.ok(ratio > 0.0005, `dashed line UVs should sample the opaque map region (${ratio})`)
 })
 
@@ -18259,7 +18263,7 @@ test('encoded cube background textures decode face images', () => {
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
     camera.position.set(0, 0, 0)
     camera.lookAt(target)
-    return meanRegion(renderRgba(scene, camera, {
+    return meanRegion(renderRgbaIsolated(scene, camera, {
       width: 64,
       height: 64,
       outputColorSpace: THREE.LinearSRGBColorSpace,
