@@ -44,6 +44,7 @@ const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Camer
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
+const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
@@ -454,6 +455,67 @@ test('committed Khronos glTF Sample Assets DirectionalLight fixture loads KHR_li
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'DirectionalLight sample should render visible imported-light geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 1 && mean.g > mean.b + 1, `imported yellow light should tint the rendered samples (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Duck fixture loads textured external assets', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DUCK, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'Duck0.bin')
+  assert.equal(source.images[0].uri, 'DuckCM.png')
+  assert.deepEqual(source.samplers, [
+    {
+      magFilter: 9729,
+      minFilter: 9986,
+      wrapS: 10497,
+      wrapT: 10497,
+    },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DUCK)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Duck sample should load a mesh')
+  assert.equal(mesh.name, 'LOD3spShape')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 2399)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 2399)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 2399)
+  assert.equal(mesh.geometry.index?.count, 12636)
+  assert.equal(mesh.material.name, 'blinn3-fx')
+  assert.equal(mesh.material.metalness, 0)
+
+  const texture = mesh.material.map
+  assert.ok(texture?.isTexture, 'Duck sample should load a base color texture')
+  assert.equal(texture.name, 'DuckCM.png')
+  assert.equal(Buffer.isBuffer(texture.image), true, 'Duck external PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(texture.image), [512, 512])
+  assert.equal(texture.wrapS, THREE.RepeatWrapping)
+  assert.equal(texture.wrapT, THREE.RepeatWrapping)
+  assert.equal(texture.magFilter, THREE.LinearFilter)
+  assert.equal(texture.minFilter, THREE.NearestMipmapLinearFilter)
+  assert.equal(texture.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(texture.flipY, false)
+
+  const camera = gltf.cameras[0]
+  assert.ok(camera, 'Khronos Duck sample should load an imported camera')
+  camera.aspect = 1
+  camera.updateProjectionMatrix()
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'Khronos Duck sample should render visible textured pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 8 && mean.g > mean.b + 6, `Duck texture should contribute warm yellow output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets PointLightIntensityTest fixture loads KHR_lights_punctual point lights', async () => {
