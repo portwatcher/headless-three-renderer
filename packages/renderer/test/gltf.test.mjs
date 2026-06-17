@@ -32,6 +32,7 @@ const REAL_VRM_EXPRESSION_SAMPLE = path.join(
 const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
 const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
+const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box With Spaces', 'glTF', 'Box With Spaces.gltf')
@@ -466,6 +467,78 @@ test('committed Khronos glTF Sample Assets BoxVertexColors fixture renders COLOR
   assert.ok(topLeft.g > bottomLeft.g + 80, `vertex color gradient should make the upper-left face greener than lower-left (${topLeft.g} vs ${bottomLeft.g})`)
   assert.ok(bottomRight.r > bottomLeft.r + 80, `vertex color gradient should make the lower-right face redder than lower-left (${bottomRight.r} vs ${bottomLeft.r})`)
   assert.ok(bottomLeft.b > 170 && bottomRight.b > 170, `vertex color gradient should keep blue channel visible (${bottomLeft.b}, ${bottomRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets AnisotropyDiscTest fixture loads KHR_materials_anisotropy texture inputs', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANISOTROPY_DISC_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Box001',
+    'Box002',
+    'Box003',
+    'Box004',
+    'Box005',
+    'Box006',
+    'Box007',
+    'Box008',
+    'Box009',
+    'Box010',
+    'Text',
+    'Box000',
+  ])
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_anisotropy'))
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const smooth = materials.get('roughness 0.0')
+  const rough = materials.get('roughness 1.0')
+  assert.equal(smooth?.isMeshPhysicalMaterial, true)
+  assert.equal(rough?.isMeshPhysicalMaterial, true)
+  assert.equal(smooth.metalness, 1)
+  assert.equal(smooth.roughness, 0)
+  assert.equal(smooth.anisotropy, 1)
+  assert.equal(smooth.anisotropyRotation, 0)
+  assert.equal(rough.roughness, 1)
+  assert.equal(rough.anisotropy, 1)
+
+  const anisotropyMap = smooth.anisotropyMap
+  assert.equal(Buffer.isBuffer(anisotropyMap?.image), true, 'anisotropy PNG should load as an encoded Buffer')
+  assert.equal(anisotropyMap.name, 'AnisotropyDiscs')
+  assert.equal(anisotropyMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(anisotropyMap.wrapS, THREE.RepeatWrapping)
+  assert.equal(anisotropyMap.wrapT, THREE.RepeatWrapping)
+  assert.equal(anisotropyMap.magFilter, THREE.LinearFilter)
+  assert.equal(anisotropyMap.minFilter, THREE.LinearMipmapLinearFilter)
+  assert.equal(anisotropyMap.flipY, false)
+
+  const firstDisc = meshes[0]
+  assert.equal(firstDisc.geometry.getAttribute('position')?.count, 9)
+  assert.equal(firstDisc.geometry.getAttribute('normal')?.count, 9)
+  assert.equal(firstDisc.geometry.getAttribute('uv')?.count, 9)
+  assert.equal(firstDisc.geometry.getAttribute('tangent')?.count, 9)
+  assert.equal(firstDisc.geometry.index?.count, 24)
+
+  const camera = new THREE.OrthographicCamera(-4.2, 3.2, 3.0, -3.2, 0.01, 30)
+  camera.position.set(-0.5, -0.1, 8)
+  camera.lookAt(-0.5, -0.1, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.4))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.set(0, 2, 8)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'AnisotropyDiscTest should render visible anisotropic material panels')
 })
 
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
