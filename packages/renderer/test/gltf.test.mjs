@@ -27,6 +27,7 @@ const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
+const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
@@ -153,6 +154,70 @@ test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imp
   const orthographicCenter = meanRegion(orthographicRgba, 96, 96, 24, 24, 72, 72)
   assert.ok(perspectiveCenter.r > 80 && perspectiveCenter.g > 80 && perspectiveCenter.b > 80, `perspective camera should see the white mesh (${perspectiveCenter.r}, ${perspectiveCenter.g}, ${perspectiveCenter.b})`)
   assert.ok(orthographicCenter.r > 80 && orthographicCenter.g > 80 && orthographicCenter.b > 80, `orthographic camera should see the white mesh (${orthographicCenter.r}, ${orthographicCenter.g}, ${orthographicCenter.b})`)
+})
+
+test('committed Khronos glTF Sample Assets InterpolationTest fixture applies animation interpolation modes', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_INTERPOLATION_TEST)
+  assert.deepEqual(gltf.animations.map((clip) => clip.name), [
+    'Step Scale',
+    'Linear Scale',
+    'CubicSpline Scale',
+    'Step Rotation',
+    'CubicSpline Rotation',
+    'Linear Rotation',
+    'Step Translation',
+    'CubicSpline Translation',
+    'Linear Translation',
+  ])
+
+  const tracksByClip = new Map(gltf.animations.map((clip) => [clip.name, clip.tracks[0]]))
+  assert.equal(tracksByClip.get('Step Scale')?.name, 'Cube.scale')
+  assert.equal(tracksByClip.get('Step Scale')?.getInterpolation(), THREE.InterpolateDiscrete)
+  assert.equal(tracksByClip.get('Linear Scale')?.getInterpolation(), THREE.InterpolateLinear)
+  assert.equal(tracksByClip.get('CubicSpline Scale')?.getValueSize(), 9)
+  assert.equal(tracksByClip.get('Step Rotation')?.name, 'Cube003.quaternion')
+  assert.equal(tracksByClip.get('Linear Rotation')?.getInterpolation(), THREE.InterpolateLinear)
+  assert.equal(tracksByClip.get('CubicSpline Rotation')?.getValueSize(), 12)
+  assert.equal(tracksByClip.get('Step Translation')?.name, 'Cube006.position')
+  assert.equal(tracksByClip.get('Linear Translation')?.getInterpolation(), THREE.InterpolateLinear)
+  assert.equal(tracksByClip.get('CubicSpline Translation')?.getValueSize(), 9)
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 10, 'InterpolationTest should load nine animated cubes plus one textured plane')
+  const plane = gltf.scene.getObjectByName('Plane')
+  assert.ok(Buffer.isBuffer(plane?.material?.map?.image), 'InterpolationTest external PNG should load as an encoded Buffer')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  for (const clip of gltf.animations) mixer.clipAction(clip).play()
+  mixer.setTime(0.25)
+  gltf.scene.updateMatrixWorld(true)
+
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube').scale.x - 1) < 1e-6, 'STEP scale should hold the previous keyframe at t=0.25')
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube001').scale.x - 0.5) < 1e-6, 'LINEAR scale should interpolate halfway at t=0.25')
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube002').scale.x - 0.5) < 1e-6, 'CUBICSPLINE scale should interpolate halfway at t=0.25')
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube003').quaternion.z) < 1e-6, 'STEP rotation should hold the previous keyframe at t=0.25')
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube005').quaternion.z + 0.19509032) < 1e-5, 'LINEAR rotation should slerp at t=0.25')
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube006').position.y - 6.80000019) < 1e-5, 'STEP translation should hold the previous keyframe at t=0.25')
+  assert.ok(Math.abs(gltf.scene.getObjectByName('Cube009').position.y - 8.80000019) < 1e-5, 'LINEAR translation should interpolate halfway at t=0.25')
+
+  const camera = new THREE.OrthographicCamera(-6, 6, 10, -2.5, 0.01, 20)
+  camera.position.set(0, 3.6, 10)
+  camera.lookAt(0, 3.6, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'InterpolationTest animated fixture should render visible geometry')
 })
 
 test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform animation', async () => {
