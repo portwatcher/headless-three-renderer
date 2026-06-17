@@ -49,6 +49,7 @@ const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentMirrorTest', 'glTF', 'NormalTangentMirrorTest.gltf')
 const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
+const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
@@ -383,6 +384,83 @@ test('committed Khronos glTF Sample Assets DirectionalLight fixture loads KHR_li
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'DirectionalLight sample should render visible imported-light geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 1 && mean.g > mean.b + 1, `imported yellow light should tint the rendered samples (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets PointLightIntensityTest fixture loads KHR_lights_punctual point lights', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_lights_punctual'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_unlit'))
+
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+  assert.equal(meshes.length, 13)
+  assert.equal(lights.length, 8)
+  assert.ok(lights.every((light) => light.isPointLight === true), 'all imported punctual lights should become PointLight objects')
+  assert.deepEqual(lights.map((light) => light.name), [
+    'Light_4_-_White',
+    'Light_1_-_Red',
+    'Light_3_-_Blue',
+    'Light_2_-_Green',
+    'Light_5_-_Gray',
+    'Light_6_B',
+    'Light_6_G',
+    'Light_6_R',
+  ])
+  assert.deepEqual(lights.map((light) => light.color.toArray()), [
+    [1, 1, 1],
+    [1, 0, 0],
+    [0, 0, 1],
+    [0, 1, 0],
+    [0.5, 0.5, 0.5],
+    [0, 0, 1],
+    [0, 1, 0],
+    [1, 0, 0],
+  ])
+  assert.ok(lights.every((light) => light.intensity === 1 && light.distance === 1.125 && light.decay === 2))
+
+  gltf.scene.updateMatrixWorld(true)
+  const firstLightPosition = lights[0].getWorldPosition(new THREE.Vector3()).toArray()
+  const rgbLightPositions = lights.slice(5).map((light) => light.getWorldPosition(new THREE.Vector3()).toArray())
+  assert.deepEqual(firstLightPosition, [0, -2.5, 0.20000000298023224])
+  assert.deepEqual(rgbLightPositions, [
+    [-2.25, -2.5, 0.20000000298023224],
+    [-2.25, -2.5, 0.20000000298023224],
+    [-2.25, -2.5, 0.20000000298023224],
+  ])
+
+  const label = meshes.find((mesh) => mesh.name === 'Labels')
+  assert.equal(label?.material.isMeshBasicMaterial, true)
+  assert.equal(Buffer.isBuffer(label.material.map?.image), true, 'point-light label PNG should load as an encoded Buffer')
+  assert.equal(label.material.map.name, 'LampColorNames')
+  assert.equal(label.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(label.material.map.flipY, false)
+
+  const litSurface = meshes.find((mesh) => mesh.material.name === 'Test Surface Material')
+  const frame = meshes.find((mesh) => mesh.material.name === 'Frame Material')
+  assert.equal(litSurface?.geometry.getAttribute('position')?.count, 24)
+  assert.equal(litSurface.geometry.index?.count, 36)
+  assert.equal(frame?.geometry.getAttribute('position')?.count, 248)
+  assert.equal(frame.geometry.index?.count, 768)
+
+  const camera = new THREE.OrthographicCamera(-4.1, 4.1, 1.4, -4.0, 0.01, 20)
+  camera.position.set(0, -1.25, 8)
+  camera.lookAt(0, -1.25, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 180,
+    height: 120,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'PointLightIntensityTest should render visible point-light panels')
 })
 
 test('committed Khronos glTF Sample Assets InterpolationTest fixture applies animation interpolation modes', async () => {
