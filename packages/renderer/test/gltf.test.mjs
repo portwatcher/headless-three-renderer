@@ -48,6 +48,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
+const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
@@ -419,6 +420,96 @@ test('committed Khronos glTF Sample Assets CompareAlphaCoverage fixture loads al
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.03, 'CompareAlphaCoverage should render visible alpha coverage panels')
+})
+
+test('committed Khronos glTF Sample Assets CompareAmbientOcclusion fixture loads AO material pairs', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'CompareAmbientOcclusion_data.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'FruitBaseColor.jpg',
+    'FruitORM.jpg',
+    'BasketORM.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.occlusionTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+  ]), [
+    ['Basket with Occlusion', 2, null],
+    ['Fruit with Occlusion', 1, 1],
+    ['Logo', null, null],
+    ['Basket without Occlusion', null, null],
+    ['Fruit without Occlusion', null, 1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'BasketRight',
+    'FruitRight',
+    'LogoRight',
+    'BasketLeft',
+    'FruitLeft',
+    'LogoLeft',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), [
+    'Basket with Occlusion',
+    'Fruit with Occlusion',
+    'Logo',
+    'Basket without Occlusion',
+    'Fruit without Occlusion',
+    'Logo',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [17832, 28918, 1605, 11240, 28918, 1605])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [66828, 117600, 2865, 66828, 117600, 2865])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const basketWithAo = materials.get('Basket with Occlusion')
+  const basketWithoutAo = materials.get('Basket without Occlusion')
+  const fruitWithAo = materials.get('Fruit with Occlusion')
+  const fruitWithoutAo = materials.get('Fruit without Occlusion')
+  assert.equal(Buffer.isBuffer(basketWithAo?.aoMap?.image), true, 'basket AO JPEG should load as an encoded Buffer')
+  assert.equal(basketWithAo.aoMap.name, 'BasketORM.jpg')
+  assert.equal(basketWithAo.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(basketWithAo.aoMap.flipY, false)
+  assert.equal(basketWithoutAo?.aoMap ?? null, null)
+
+  for (const material of [fruitWithAo, fruitWithoutAo]) {
+    assert.equal(Buffer.isBuffer(material.map?.image), true, `${material.name} base color JPEG should load as an encoded Buffer`)
+    assert.equal(material.map.name, 'FruitBaseColor.jpg')
+    assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.map.flipY, false)
+    assert.equal(material.roughnessMap, material.metalnessMap, `${material.name} roughness and metalness should share the packed ORM texture`)
+    assert.equal(Buffer.isBuffer(material.roughnessMap?.image), true, `${material.name} ORM JPEG should load as an encoded Buffer`)
+    assert.equal(material.roughnessMap.name, 'FruitORM.jpg')
+    assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.roughnessMap.flipY, false)
+  }
+  assert.equal(fruitWithAo.aoMap, fruitWithAo.roughnessMap, 'fruit AO should share the packed ORM texture when occlusion is enabled')
+  assert.equal(fruitWithoutAo.aoMap ?? null, null)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(1.5, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 10)
+  camera.position.set(0, -1.4, 0.65)
+  camera.lookAt(0, 0, 0.05)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'CompareAmbientOcclusion should render visible paired AO samples')
 })
 
 test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture maps', async () => {
