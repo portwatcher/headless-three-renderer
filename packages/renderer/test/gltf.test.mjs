@@ -49,6 +49,7 @@ const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_BOX_TEXTURED_NPOT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxTexturedNonPowerOfTwo', 'glTF', 'BoxTexturedNonPowerOfTwo.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
+const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
@@ -4064,6 +4065,104 @@ test('committed Khronos glTF Sample Assets RiggedFigure fixture loads full skinn
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'RiggedFigure should render visible skinned figure geometry')
+})
+
+test('committed Khronos glTF Sample Assets CesiumMan fixture loads textured skinned character animation', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CESIUM_MAN, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'CesiumMan_data.bin', byteLength: 252664 }])
+  assert.deepEqual(source.images, [{ uri: 'CesiumMan_img0.jpg' }])
+  assert.equal(source.meshes[0].name, 'Cesium_Man')
+  assert.equal(source.skins.length, 1)
+  assert.equal(source.skins[0].joints.length, 19)
+  assert.equal(source.skins[0].skeleton, 3)
+  assert.equal(source.animations.length, 1)
+  assert.equal(source.animations[0].channels.length, 57)
+  assert.equal(source.animations[0].samplers.length, 57)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CESIUM_MAN)
+  const skinnedMeshes = []
+  const bones = []
+  gltf.scene.traverse((object) => {
+    if (object.isSkinnedMesh === true) skinnedMeshes.push(object)
+    if (object.isBone === true) bones.push(object)
+  })
+
+  assert.equal(skinnedMeshes.length, 1)
+  const mesh = skinnedMeshes[0]
+  assert.equal(mesh.name, 'Cesium_Man')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3273)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 3273)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 3273)
+  assert.equal(mesh.geometry.getAttribute('skinIndex')?.count, 3273)
+  assert.equal(mesh.geometry.getAttribute('skinWeight')?.count, 3273)
+  assert.equal(mesh.geometry.index?.count, 14016)
+  assert.equal(mesh.material.name, 'Cesium_Man-effect')
+  assert.equal(mesh.material.metalness, 0)
+  assert.equal(mesh.material.roughness, 1)
+  assert.equal(Buffer.isBuffer(mesh.material.map?.image), true, 'CesiumMan base-color JPEG should load as an encoded Buffer')
+  assert.equal(mesh.material.map.name, 'CesiumMan_img0.jpg')
+  assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(mesh.skeleton.bones.length, 19)
+  assert.deepEqual(bones.map((bone) => bone.name), [
+    'Skeleton_torso_joint_1',
+    'Skeleton_torso_joint_2',
+    'torso_joint_3',
+    'Skeleton_neck_joint_1',
+    'Skeleton_neck_joint_2',
+    'Skeleton_arm_joint_L__4_',
+    'Skeleton_arm_joint_L__3_',
+    'Skeleton_arm_joint_L__2_',
+    'Skeleton_arm_joint_R',
+    'Skeleton_arm_joint_R__2_',
+    'Skeleton_arm_joint_R__3_',
+    'leg_joint_L_1',
+    'leg_joint_L_2',
+    'leg_joint_L_3',
+    'leg_joint_L_5',
+    'leg_joint_R_1',
+    'leg_joint_R_2',
+    'leg_joint_R_3',
+    'leg_joint_R_5',
+  ])
+
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'animation_0')
+  assert.equal(clip.duration, 2)
+  assert.equal(clip.tracks.length, 57)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.position')).length, 19)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.quaternion')).length, 19)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.scale')).length, 19)
+  assert.ok(clip.tracks.every((track) => track.times.length === 48), 'every CesiumMan track should contain 48 keyframes')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(clip.duration / 2)
+  gltf.scene.updateMatrixWorld(true)
+  const torso = gltf.scene.getObjectByName('Skeleton_torso_joint_1')
+  const rightArm = gltf.scene.getObjectByName('Skeleton_arm_joint_R__2_')
+  const leftLeg = gltf.scene.getObjectByName('leg_joint_L_3')
+  assert.ok(Math.abs(torso.position.y + 0.025) < 0.001, `CesiumMan torso should translate at mid animation (${torso.position.y})`)
+  assert.ok(rightArm.quaternion.y > 0.9, `CesiumMan right arm should rotate at mid animation (${rightArm.quaternion.y})`)
+  assert.ok(leftLeg.quaternion.y < -0.85, `CesiumMan left leg should rotate at mid animation (${leftLeg.quaternion.y})`)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 0.75, 0.01, 20)
+  camera.position.set(0, -3, 1.4)
+  camera.lookAt(0, 0, 0.7)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'CesiumMan should render visible textured skinned character geometry')
 })
 
 test('committed Khronos glTF Sample Assets RecursiveSkeletons fixture loads recursive skinned hierarchies', async () => {
