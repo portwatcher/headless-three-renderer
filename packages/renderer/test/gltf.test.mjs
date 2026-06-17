@@ -50,6 +50,7 @@ const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets',
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
+const SAMPLE_ASSET_COMPARE_CLEARCOAT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareClearcoat', 'glTF', 'CompareClearcoat.gltf')
 const SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareEmissiveStrength', 'glTF', 'CompareEmissiveStrength.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_COMPARE_METALLIC = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareMetallic', 'glTF', 'CompareMetallic.gltf')
@@ -607,6 +608,90 @@ test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-c
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'CompareBaseColor should render visible base-color comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareClearcoat fixture loads clearcoat comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_CLEARCOAT, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_clearcoat', 'KHR_materials_ior'])
+  assert.equal(source.buffers[0].uri, 'CompareClearcoat.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Clearcoat_img0.jpg',
+    'Compare_Clearcoat_img1.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+    material.extensions?.KHR_materials_clearcoat?.clearcoatFactor ?? null,
+    material.extensions?.KHR_materials_ior?.ior ?? null,
+  ]), [
+    ['green glossy', 0, 1, null, null],
+    ['green rough', 0, 1, null, null],
+    ['green clearcoat', 0, 1, 1, 1.6],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_CLEARCOAT)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['GeoSphere001', 'GeoSphere002', 'GeoSphere003'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['green glossy', 'green rough', 'green clearcoat'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [673, 673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [673, 673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [673, 673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [3840, 3840, 3840])
+
+  const [glossy, rough, clearcoat] = meshes.map((mesh) => mesh.material)
+  assert.equal(glossy.isMeshStandardMaterial, true)
+  assert.equal(rough.isMeshStandardMaterial, true)
+  assert.equal(clearcoat.isMeshPhysicalMaterial, true)
+  assert.equal(glossy.roughness, 0)
+  assert.equal(rough.roughness, 0.5)
+  assert.equal(clearcoat.roughness, 0.5)
+  assert.equal(clearcoat.clearcoat, 1)
+  assert.equal(clearcoat.clearcoatRoughness, 0)
+  assert.equal(clearcoat.ior, 1.6)
+  assert.ok([glossy, rough, clearcoat].every((material) => material.metalness === 1))
+
+  assert.equal(glossy.map, rough.map)
+  assert.equal(rough.map, clearcoat.map)
+  assert.equal(Buffer.isBuffer(glossy.map?.image), true, 'clearcoat base-color JPEG should load as an encoded Buffer')
+  assert.equal(glossy.map.name, 'Compare_Clearcoat_img0.jpg')
+  assert.equal(glossy.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(glossy.map.flipY, false)
+
+  assert.equal(glossy.roughnessMap, glossy.metalnessMap)
+  assert.equal(rough.roughnessMap, rough.metalnessMap)
+  assert.equal(clearcoat.roughnessMap, clearcoat.metalnessMap)
+  assert.equal(glossy.roughnessMap, rough.roughnessMap)
+  assert.equal(rough.roughnessMap, clearcoat.roughnessMap)
+  assert.equal(Buffer.isBuffer(glossy.roughnessMap?.image), true, 'clearcoat metallic-roughness JPEG should load as an encoded Buffer')
+  assert.equal(glossy.roughnessMap.name, 'Compare_Clearcoat_img1.jpg')
+  assert.equal(glossy.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(glossy.roughnessMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const light = new THREE.DirectionalLight(0xffffff, 4)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.7, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -3.8, 1.6))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'CompareClearcoat should render visible clearcoat comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets CompareEmissiveStrength fixture loads emissive strength variants', async () => {
