@@ -31,6 +31,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
+const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
@@ -375,6 +376,36 @@ test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph wei
   assert.ok(base.height > 10, `SimpleMorph base triangle should render visible bounds (${base.height})`)
   assert.ok(animated.height > base.height + 35, `SimpleMorph animation should expand rendered height (${animated.height} vs ${base.height})`)
   assert.ok(animated.minY < base.minY - 35, `SimpleMorph animation should lift the triangle top (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets SimpleSparseAccessor fixture applies sparse POSITION overrides', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos SimpleSparseAccessor sample should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 14)
+  assert.equal(mesh.geometry.index?.count, 36)
+
+  const position = mesh.geometry.getAttribute('position')
+  assert.deepEqual(vectorFromAttribute(position, 8), [1, 2, 0])
+  assert.deepEqual(vectorFromAttribute(position, 10), [3, 3, 0])
+  assert.deepEqual(vectorFromAttribute(position, 12), [5, 4, 0])
+
+  const camera = new THREE.OrthographicCamera(-0.5, 6.5, 4.5, -0.5, 0.01, 10)
+  camera.position.set(3, 2, 5)
+  camera.lookAt(3, 2, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'SimpleSparseAccessor sample should render visible sparse geometry')
 })
 
 test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders external PNG UV quadrants', async () => {
@@ -788,6 +819,10 @@ function assertTexturedQuadRendersTexture(gltf, label) {
 
 async function loadGltfFixture(filePath, options) {
   return await loadGltfFromFile(filePath, options)
+}
+
+function vectorFromAttribute(attribute, index) {
+  return [attribute.getX(index), attribute.getY(index), attribute.getZ(index)]
 }
 
 async function assertRejectsMutatedGltfSource(mutator, pattern) {
