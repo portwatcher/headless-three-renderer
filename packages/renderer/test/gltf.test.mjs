@@ -33,6 +33,7 @@ const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation',
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
+const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box With Spaces', 'glTF', 'Box With Spaces.gltf')
 const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxInterleaved', 'glTF', 'BoxInterleaved.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
@@ -127,6 +128,61 @@ test('committed Khronos glTF Sample Assets Box fixture loads external buffer and
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos Box sample should render visible pixels')
   const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
   assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `Khronos Box sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Box With Spaces fixture resolves external paths with spaces', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_BOX_WITH_SPACES, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'Box With Spaces.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Normal%20Map.png',
+    'glTF%20Logo%20With%20Spaces.png',
+    'Roughness%20Metallic.png',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOX_WITH_SPACES)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Box With Spaces sample should load a mesh')
+  assert.equal(mesh.name, 'Cube')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.material.name, 'Material')
+
+  const { map, normalMap, metalnessMap, roughnessMap } = mesh.material
+  assert.equal(Buffer.isBuffer(map?.image), true, 'space-containing base color PNG path should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(normalMap?.image), true, 'space-containing normal PNG path should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(metalnessMap?.image), true, 'space-containing metallic-roughness PNG path should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(roughnessMap?.image), true, 'space-containing roughness PNG path should load as an encoded Buffer')
+  assert.equal(map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(map.flipY, false)
+  assert.equal(normalMap.flipY, false)
+  assert.equal(metalnessMap.flipY, false)
+  assert.equal(roughnessMap.flipY, false)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
+  camera.position.set(3, 2.1, 4.5)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.2)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.07, 'Box With Spaces sample should render visible textured pixels')
+  const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
+  assert.ok(center.r > 5 || center.g > 5 || center.b > 5, `Box With Spaces sample should render non-black center pixels (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alpha modes and JPEG textures', async () => {
