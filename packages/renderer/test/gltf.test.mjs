@@ -47,6 +47,7 @@ const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
+const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
@@ -611,6 +612,106 @@ test('committed Khronos glTF Sample Assets LightVisibility fixture applies KHR_n
   assert.ok(left.r < 10, `invisible red light branch should not tint the left panel red (${left.r}, ${left.g}, ${left.b})`)
   assert.ok(center.g > 80 && center.g > center.r + 80, `visible green light should tint the center panel (${center.r}, ${center.g}, ${center.b})`)
   assert.ok(right.b > 20 && right.b > right.r + 20, `visible animated blue light should tint the right panel (${right.r}, ${right.g}, ${right.b})`)
+})
+
+test('committed Khronos glTF Sample Assets LightsPunctualLamp fixture loads textured point-light scene', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_lights_punctual'])
+  assert.equal(source.buffers[0].uri, 'LightsPunctualLamp.data.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'material0_basecolor.jpeg',
+    'material0_normal.png',
+    'material0_emissive.jpeg',
+    'material0_metallic_roughness.jpeg',
+    'material1_basecolor.png',
+    'material1_normal.png',
+    'material2_transmission.jpeg',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_lights_punctual'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_transmission'))
+
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['mesh_0', 'mesh_1', 'mesh_2'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [3212, 18, 1325])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('tangent')?.count), [3212, 18, 1325])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [12210, 42, 5748])
+
+  assert.equal(lights.length, 5)
+  assert.ok(lights.every((light) => light.isPointLight === true), 'all imported punctual lights should become PointLight objects')
+  assert.deepEqual(lights.map((light) => light.name), [
+    'Point_Orientation',
+    'Point002_Orientation',
+    'Point001_Orientation',
+    'Point003_Orientation',
+    'Point004_Orientation',
+  ])
+  assert.deepEqual(lights.map((light) => light.intensity), [15, 1.5, 80, 80, 180])
+  assert.ok(lights.every((light) => light.distance === 0 && light.decay === 2))
+  assertVectorClose(lights[0].color.toArray(), [1, 0.6318749785423279, 0.23909975588321689], 'warm lamp point-light color')
+  assertVectorClose(lights[2].color.toArray(), [0.21223080158233645, 0.5906190276145935, 0.5583405494689941], 'cyan lamp point-light color')
+
+  gltf.scene.updateMatrixWorld(true)
+  assertVectorClose(lights[0].getWorldPosition(new THREE.Vector3()).toArray(), [0.04622355476021767, 0.9077973365783693, 0.006696629337966442], 'first lamp light position')
+  assertVectorClose(lights[4].getWorldPosition(new THREE.Vector3()).toArray(), [0.2920210361480713, 1.0323998928070068, 1.5589159727096558], 'last lamp light position')
+
+  const [body, shade, glass] = meshes
+  assert.equal(body.material.isMeshStandardMaterial, true)
+  assert.equal(body.material.side, THREE.DoubleSide)
+  assert.equal(body.material.emissiveMap.name, 'material0_emissive.jpeg')
+  assert.equal(body.material.map.name, 'material0_basecolor.jpeg')
+  assert.equal(body.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(body.material.normalMap.name, 'material0_normal.png')
+  assert.equal(body.material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(body.material.metalnessMap.name, 'material0_metallic_roughness.jpeg')
+  assert.equal(body.material.roughnessMap, body.material.metalnessMap)
+  assert.deepEqual(pngDimensions(body.material.normalMap.image), [2048, 2048])
+
+  assert.equal(shade.material.transparent, true)
+  assert.equal(shade.material.side, THREE.DoubleSide)
+  assert.equal(shade.material.metalness, 0)
+  assert.equal(shade.material.roughness, 0.5)
+  assert.equal(shade.material.map.name, 'material1_basecolor.png')
+  assert.equal(shade.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(shade.material.normalMap.name, 'material1_normal.png')
+  assert.deepEqual(pngDimensions(shade.material.map.image), [512, 512])
+  assert.deepEqual(pngDimensions(shade.material.normalMap.image), [512, 512])
+
+  assert.equal(glass.material.isMeshPhysicalMaterial, true)
+  assert.equal(glass.material.side, THREE.DoubleSide)
+  assert.equal(glass.material.transmission, 1)
+  assert.equal(glass.material.map, body.material.map)
+  assert.equal(glass.material.normalMap, body.material.normalMap)
+  assert.equal(glass.material.transmissionMap.name, 'material2_transmission.jpeg')
+  assert.equal(Buffer.isBuffer(glass.material.transmissionMap.image), true)
+  assert.equal(glass.material.transmissionMap.colorSpace, THREE.NoColorSpace)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -3.1, 1.2))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'LightsPunctualLamp should render visible textured geometry')
+  const centerRegion = meanRegion(rgba, 96, 96, 32, 32, 64, 64)
+  assert.ok(centerRegion.r > 60 && centerRegion.g > 45 && centerRegion.b > 40, `lamp render should include warm textured light contribution (${centerRegion.r}, ${centerRegion.g}, ${centerRegion.b})`)
 })
 
 test('committed Khronos glTF Sample Assets InterpolationTest fixture applies animation interpolation modes', async () => {
