@@ -41,6 +41,7 @@ const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'S
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
+const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
@@ -604,6 +605,61 @@ test('committed Khronos glTF Sample Assets SimpleTexture fixture loads sampler s
 
   const center = meanRegion(rgba, 96, 96, 38, 38, 58, 58)
   assert.ok(center.r > topLeft.r + 80 && center.g > topLeft.g + 80, `repeated texture center should sample brighter texels (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TextureSettingsTest fixture loads wrap modes and material sidedness', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TEXTURE_SETTINGS_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'LabelMesh',
+    'SingleSidedMesh',
+    'DoubleSidedMesh',
+    'TextureClampMeshS',
+    'TextureRepeatMeshS',
+    'BackgroundMesh',
+    'TextureClampMeshT',
+    'TextureRepeatMeshT',
+    'TextureMirrorMeshS',
+    'TextureMirrorMeshT',
+  ])
+
+  const meshByName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  assert.equal(meshByName.get('SingleSidedMesh')?.material.side, THREE.FrontSide)
+  assert.equal(meshByName.get('DoubleSidedMesh')?.material.side, THREE.DoubleSide)
+  assertTextureSampler(meshByName.get('SingleSidedMesh'), THREE.RepeatWrapping, THREE.RepeatWrapping)
+  assertTextureSampler(meshByName.get('DoubleSidedMesh'), THREE.RepeatWrapping, THREE.RepeatWrapping)
+  assertTextureSampler(meshByName.get('TextureClampMeshS'), THREE.ClampToEdgeWrapping, THREE.RepeatWrapping)
+  assertTextureSampler(meshByName.get('TextureClampMeshT'), THREE.RepeatWrapping, THREE.ClampToEdgeWrapping)
+  assertTextureSampler(meshByName.get('TextureRepeatMeshS'), THREE.RepeatWrapping, THREE.ClampToEdgeWrapping)
+  assertTextureSampler(meshByName.get('TextureRepeatMeshT'), THREE.ClampToEdgeWrapping, THREE.RepeatWrapping)
+  assertTextureSampler(meshByName.get('TextureMirrorMeshS'), THREE.MirroredRepeatWrapping, THREE.RepeatWrapping)
+  assertTextureSampler(meshByName.get('TextureMirrorMeshT'), THREE.RepeatWrapping, THREE.MirroredRepeatWrapping)
+  assertTextureSampler(meshByName.get('LabelMesh'), THREE.RepeatWrapping, THREE.RepeatWrapping)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y) / 2 + 0.5
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.01, 40)
+  camera.position.set(center.x, center.y, center.z + 15)
+  camera.lookAt(center)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 160,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.75, 'TextureSettingsTest should render visible sampler and sidedness panels')
 })
 
 test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders external PNG UV quadrants', async () => {
@@ -1307,6 +1363,18 @@ function assertTexturedQuadRendersTexture(gltf, label) {
   const right = meanRegion(rgba, 96, 96, 54, 36, 72, 60)
   assert.ok(left.r > left.g + 80, `left half should sample the red texture texel (${left.r} vs ${left.g})`)
   assert.ok(right.g > right.r + 80, `right half should sample the green texture texel (${right.g} vs ${right.r})`)
+}
+
+function assertTextureSampler(mesh, wrapS, wrapT) {
+  assert.ok(mesh?.isMesh, 'texture sampler assertion requires a mesh')
+  const texture = mesh.material.map
+  assert.ok(texture?.isTexture, `${mesh.name} should load a base color texture`)
+  assert.equal(Buffer.isBuffer(texture.image), true, `${mesh.name} texture should load as an encoded Buffer`)
+  assert.equal(texture.wrapS, wrapS, `${mesh.name} should preserve sampler wrapS`)
+  assert.equal(texture.wrapT, wrapT, `${mesh.name} should preserve sampler wrapT`)
+  assert.equal(texture.magFilter, THREE.LinearFilter)
+  assert.equal(texture.minFilter, THREE.NearestMipmapLinearFilter)
+  assert.equal(texture.flipY, false)
 }
 
 async function loadGltfFixture(filePath, options) {
