@@ -109,6 +109,7 @@ const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_TRANSMISSION_ORDER_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionOrderTest', 'glTF', 'TransmissionOrderTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
+const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TwoSidedPlane', 'glTF', 'TwoSidedPlane.gltf')
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
@@ -4626,6 +4627,68 @@ test('committed Khronos glTF Sample Assets TextureSettingsTest fixture loads wra
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.75, 'TextureSettingsTest should render visible sampler and sidedness panels')
+})
+
+test('committed Khronos glTF Sample Assets TwoSidedPlane fixture renders mapped double-sided PBR material', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TWO_SIDED_PLANE, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 300, uri: 'TwoSidedPlane.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'TwoSidedPlane_BaseColor.png',
+    'TwoSidedPlane_MetallicRoughness.png',
+    'TwoSidedPlane_Normal.png',
+  ])
+  assert.equal(source.materials[0].doubleSided, true)
+  assert.equal(source.materials[0].normalTexture.index, 2)
+  assert.equal(source.materials[0].pbrMetallicRoughness.baseColorTexture.index, 0)
+  assert.equal(source.materials[0].pbrMetallicRoughness.metallicRoughnessTexture.index, 1)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TWO_SIDED_PLANE)
+  const mesh = gltf.scene.getObjectByName('TwoSidedPlane')
+  assert.ok(mesh?.isMesh, 'TwoSidedPlane should load a named mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 6)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 6)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 6)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 6)
+  assert.equal(mesh.geometry.index?.count, 6)
+
+  const material = mesh.material
+  assert.equal(material.side, THREE.DoubleSide)
+  assert.equal(Buffer.isBuffer(material.map?.image), true, 'TwoSidedPlane base-color PNG should load as an encoded Buffer')
+  assert.equal(material.map.name, 'TwoSidedPlane_BaseColor.png')
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(Buffer.isBuffer(material.normalMap?.image), true, 'TwoSidedPlane normal PNG should load as an encoded Buffer')
+  assert.equal(material.normalMap.name, 'TwoSidedPlane_Normal.png')
+  assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(Buffer.isBuffer(material.roughnessMap?.image), true, 'TwoSidedPlane metallic-roughness PNG should load as an encoded Buffer')
+  assert.equal(material.roughnessMap.name, 'TwoSidedPlane_MetallicRoughness.png')
+  assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.metalnessMap, material.roughnessMap)
+
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
+  const renderer = new Renderer()
+  const renderRatio = (y) => {
+    light.position.set(0, y, 2)
+    camera.position.set(0, y, 0.2)
+    camera.lookAt(0, 0, 0)
+    gltf.scene.updateMatrixWorld(true)
+    camera.updateMatrixWorld(true)
+    return nonBackgroundRatio(renderer.render(gltf.scene, camera, {
+      width: 96,
+      height: 96,
+      format: 'rgba',
+      background: [0, 0, 0],
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), [0, 0, 0], 3)
+  }
+
+  const frontRatio = renderRatio(3)
+  const backRatio = renderRatio(-3)
+  assert.ok(frontRatio > 0.6, `TwoSidedPlane front side should render visibly (${frontRatio})`)
+  assert.ok(backRatio > 0.6, `TwoSidedPlane back side should render visibly (${backRatio})`)
+  assert.ok(Math.abs(frontRatio - backRatio) < 0.01, `TwoSidedPlane front/back coverage should match (${frontRatio} vs ${backRatio})`)
 })
 
 test('committed Khronos glTF Sample Assets TextureEncodingTest fixture preserves texture color roles', async () => {
