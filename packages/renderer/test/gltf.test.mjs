@@ -65,6 +65,7 @@ const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_ENCODING_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureEncodingTest', 'glTF', 'TextureEncodingTest.gltf')
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
+const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformMultiTest', 'glTF', 'TextureTransformMultiTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
@@ -1708,6 +1709,94 @@ test('committed Khronos glTF Sample Assets TextureTransformTest fixture loads KH
   assert.ok(topLeft.g > topLeft.r + 60 && topLeft.g > topLeft.b + 60, `offset-U sample should expose green-dominant texels (${topLeft.r}, ${topLeft.g}, ${topLeft.b})`)
   assert.ok(topCenter.b > topCenter.r + 80 && topCenter.b > topCenter.g + 80, `offset-V sample should expose blue-dominant texels (${topCenter.r}, ${topCenter.g}, ${topCenter.b})`)
   assert.ok(topRight.g > topRight.r + 60 && topRight.b > topRight.r + 60, `offset-UV sample should expose cyan texels (${topRight.r}, ${topRight.g}, ${topRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TextureTransformMultiTest fixture loads KHR_texture_transform across texture slots', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_clearcoat',
+    'KHR_materials_unlit',
+    'KHR_texture_transform',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 29, 'TextureTransformMultiTest should load transform panels plus labels/background')
+
+  const meshesByName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  const transformedOffset = [0.7049999535083774, 0.28500004152502995]
+  const transformedRepeat = [0.3499999940395355, 0.3499999940395355]
+  const transformedRotation = 1.5707963705062866
+  const assertTransformedTexture = ({
+    meshName,
+    slot,
+    channel,
+    textureName = 'TestMap',
+    colorSpace,
+    materialType,
+  }) => {
+    const mesh = meshesByName.get(meshName)
+    assert.ok(mesh?.isMesh, `${meshName} should load a mesh`)
+    if (materialType) {
+      assert.equal(mesh.material.type, materialType)
+    }
+    const positionCount = mesh.geometry.getAttribute('position')?.count
+    assert.ok(positionCount > 0, `${meshName} should load positions`)
+    assert.equal(mesh.geometry.getAttribute('uv')?.count, positionCount, `${meshName} should load primary UVs`)
+    assert.equal(mesh.geometry.getAttribute('uv1')?.count, positionCount, `${meshName} should load secondary UVs`)
+
+    const texture = mesh.material[slot]
+    assert.ok(texture?.isTexture, `${meshName}.${slot} should load a texture`)
+    assert.equal(texture.name, textureName)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${meshName}.${slot} should load an encoded PNG Buffer`)
+    assert.equal(texture.channel, channel)
+    assertVectorClose(texture.offset.toArray(), transformedOffset, `${meshName}.${slot}.offset`, 1e-7)
+    assertVectorClose(texture.repeat.toArray(), transformedRepeat, `${meshName}.${slot}.repeat`, 1e-7)
+    assert.ok(Math.abs(texture.rotation - transformedRotation) < 1e-7, `${meshName}.${slot}.rotation should preserve KHR_texture_transform`)
+    assertVectorClose(texture.center.toArray(), [0, 0], `${meshName}.${slot}.center`)
+    assert.equal(texture.flipY, false)
+    if (colorSpace !== undefined) {
+      assert.equal(texture.colorSpace, colorSpace)
+    }
+  }
+
+  assertTransformedTexture({ meshName: 'BaseColorUV0', slot: 'map', channel: 0, colorSpace: THREE.SRGBColorSpace, materialType: 'MeshStandardMaterial' })
+  assertTransformedTexture({ meshName: 'BaseColorUV1', slot: 'map', channel: 1, colorSpace: THREE.SRGBColorSpace, materialType: 'MeshStandardMaterial' })
+  assertTransformedTexture({ meshName: 'EmissionUV1', slot: 'emissiveMap', channel: 1, colorSpace: THREE.SRGBColorSpace, materialType: 'MeshStandardMaterial' })
+  assertTransformedTexture({ meshName: 'NormalUV1', slot: 'normalMap', channel: 1, textureName: 'TestMap_Normal', colorSpace: THREE.NoColorSpace, materialType: 'MeshStandardMaterial' })
+  assertTransformedTexture({ meshName: 'MetalRoughUV1', slot: 'roughnessMap', channel: 1, materialType: 'MeshStandardMaterial' })
+  assertTransformedTexture({ meshName: 'MetalRoughUV1', slot: 'metalnessMap', channel: 1, materialType: 'MeshStandardMaterial' })
+  assert.equal(meshesByName.get('MetalRoughUV1').material.roughnessMap.source, meshesByName.get('MetalRoughUV1').material.metalnessMap.source)
+  assertTransformedTexture({ meshName: 'OcclusionUV1', slot: 'aoMap', channel: 1, materialType: 'MeshStandardMaterial' })
+  assertTransformedTexture({ meshName: 'UnlitUV1', slot: 'map', channel: 1, materialType: 'MeshBasicMaterial' })
+  assertTransformedTexture({ meshName: 'ClearcoatUV1', slot: 'clearcoatMap', channel: 1, materialType: 'MeshPhysicalMaterial' })
+  assertTransformedTexture({ meshName: 'ClearcoatRoughUV1', slot: 'clearcoatRoughnessMap', channel: 1, colorSpace: THREE.NoColorSpace, materialType: 'MeshPhysicalMaterial' })
+  assertTransformedTexture({ meshName: 'ClearcoatNormalUV1', slot: 'clearcoatNormalMap', channel: 1, textureName: 'TestMap_Normal', colorSpace: THREE.NoColorSpace, materialType: 'MeshPhysicalMaterial' })
+
+  const camera = new THREE.OrthographicCamera(-0.05, 0.75, 0.95, -1.45, 0.01, 10)
+  camera.position.set(0.35, -0.25, 2)
+  camera.lookAt(0.35, -0.25, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(0.2, 1, 2)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 180,
+    height: 420,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'TextureTransformMultiTest should render the transformed texture grid')
+  const baseColorRow = meanRegion(rgba, 180, 420, 38, 36, 142, 70)
+  assert.ok(baseColorRow.b > baseColorRow.r + 30 && baseColorRow.b > baseColorRow.g + 30, `TextureTransformMultiTest should render blue background and transformed panels (${baseColorRow.r}, ${baseColorRow.g}, ${baseColorRow.b})`)
 })
 
 test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and renders primitive modes', async () => {
