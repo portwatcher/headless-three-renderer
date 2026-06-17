@@ -48,6 +48,7 @@ const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sam
 const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
+const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
@@ -580,6 +581,72 @@ test('committed Khronos glTF Sample Assets IridescenceLamp fixture loads physica
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'IridescenceLamp should render visible physical-material geometry')
+})
+
+test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_materials_sheen and variants metadata', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SHEEN_CHAIR)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 4)
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'SheenChair_fabric',
+    'SheenChair_wood',
+    'SheenChair_metal',
+    'SheenChair_label',
+  ])
+
+  const variants = gltf.parser?.json?.extensions?.KHR_materials_variants?.variants
+  assert.deepEqual(variants?.map((variant) => variant.name), ['Mango Velvet', 'Peacock Velvet'])
+  const fabric = meshes.find((mesh) => mesh.name === 'SheenChair_fabric')
+  assert.ok(fabric.userData.gltfExtensions?.KHR_materials_variants?.mappings?.length >= 2, 'fabric mesh should preserve material variant mappings')
+  assert.equal(fabric.geometry.getAttribute('position')?.count, 14350)
+  assert.equal(fabric.geometry.getAttribute('uv')?.count, 14350)
+
+  const fabricMaterial = fabric.material
+  assert.equal(fabricMaterial.isMeshPhysicalMaterial, true)
+  assert.equal(fabricMaterial.sheen, 1)
+  assert.deepEqual(fabricMaterial.sheenColor.toArray(), [1, 0.329, 0.1])
+  assert.equal(fabricMaterial.sheenRoughness, 0.8)
+  assert.equal(Buffer.isBuffer(fabricMaterial.map?.image), true, 'fabric base color PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(fabricMaterial.normalMap?.image), true, 'fabric normal PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(fabricMaterial.aoMap?.image), true, 'fabric occlusion PNG should load as an encoded Buffer')
+  assert.equal(fabricMaterial.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fabricMaterial.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fabricMaterial.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fabricMaterial.aoMap.channel, 1)
+  assert.deepEqual(fabricMaterial.map.offset.toArray(), [-3, 3])
+  assert.deepEqual(fabricMaterial.map.repeat.toArray(), [7, 7])
+
+  const woodMaterial = meshes.find((mesh) => mesh.name === 'SheenChair_wood').material
+  assert.equal(woodMaterial.isMeshStandardMaterial, true)
+  assert.equal(Buffer.isBuffer(woodMaterial.map?.image), true, 'wood base color PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(woodMaterial.roughnessMap?.image), true, 'wood roughness PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(woodMaterial.metalnessMap?.image), true, 'wood metalness PNG should load as an encoded Buffer')
+  assert.equal(woodMaterial.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(woodMaterial.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(woodMaterial.aoMap.channel, 1)
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
+  camera.position.set(0.6, 0.8, 2.2)
+  camera.lookAt(0, 0.35, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.3)
+  light.position.set(1.5, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'SheenChair should render visible sheen material geometry')
 })
 
 test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin animation', async () => {
