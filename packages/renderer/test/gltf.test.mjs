@@ -78,7 +78,9 @@ const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
 const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'glTF', 'Fox.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
+const SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceDielectricSpheres', 'glTF', 'IridescenceDielectricSpheres.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
+const SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceMetallicSpheres', 'glTF', 'IridescenceMetallicSpheres.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
@@ -1190,6 +1192,117 @@ test('committed Khronos glTF Sample Assets CompareIridescence fixture loads irid
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02, 'CompareIridescence should render visible iridescence comparison geometry')
+})
+
+test('committed Khronos glTF Sample Assets iridescence sphere-grid fixtures load dielectric and metallic variants', async () => {
+  const cases = [
+    {
+      label: 'IridescenceDielectricSpheres',
+      filePath: SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES,
+      bufferUri: 'IridescenceDielectricSpheres.bin',
+      expectedBufferLength: 34068,
+      expectedMaterialIors: [1, 1.17, 1.33, 1.5, 1.67, 1.83, 2],
+      expectedMetalness: 0,
+      minimumVisibleRatio: 0.2,
+    },
+    {
+      label: 'IridescenceMetallicSpheres',
+      filePath: SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES,
+      bufferUri: 'IridescenceMetallicSpheres.bin',
+      expectedBufferLength: 34068,
+      expectedMaterialIors: [1.5],
+      expectedMetalness: 1,
+      minimumVisibleRatio: 0.15,
+    },
+  ]
+
+  for (const fixture of cases) {
+    const source = JSON.parse(await readFile(fixture.filePath, 'utf8'))
+    assert.deepEqual(source.extensionsUsed, ['KHR_materials_ior', 'KHR_materials_iridescence'])
+    assert.deepEqual(source.buffers, [{ uri: fixture.bufferUri, byteLength: fixture.expectedBufferLength }])
+    assert.deepEqual(source.images, [{ name: 'guides', mimeType: 'image/png', uri: 'textures/guides.png' }])
+    assert.equal(source.materials.length, 344)
+    assert.equal(source.meshes.length, 346)
+    assert.equal(source.nodes.length, 346)
+
+    const iridescentSources = source.materials.filter((material) => material.extensions?.KHR_materials_iridescence)
+    assert.equal(iridescentSources.length, 343)
+    assert.deepEqual(
+      [...new Set(iridescentSources.map((material) => Number((material.extensions.KHR_materials_ior?.ior ?? 1.5).toFixed(2))))].sort((a, b) => a - b),
+      fixture.expectedMaterialIors,
+    )
+    assert.deepEqual(
+      [...new Set(iridescentSources.map((material) => Number(material.extensions.KHR_materials_iridescence.iridescenceIor.toFixed(2))))].sort((a, b) => a - b),
+      [1, 1.17, 1.33, 1.5, 1.67, 1.83, 2],
+    )
+    assert.deepEqual(
+      [...new Set(iridescentSources.map((material) => material.extensions.KHR_materials_iridescence.iridescenceThicknessMaximum ?? 400))].sort((a, b) => a - b),
+      [100, 200, 300, 400, 500, 600, 700],
+    )
+
+    const gltf = await loadGltfFixture(fixture.filePath)
+    assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_iridescence'))
+    const meshes = []
+    gltf.scene.traverse((object) => {
+      if (object.isMesh === true) meshes.push(object)
+    })
+    assert.equal(meshes.length, 346)
+
+    const sphereMeshes = meshes.filter((mesh) => /^Sphere\d+$/.test(mesh.name))
+    assert.equal(sphereMeshes.length, 343)
+    assert.ok(sphereMeshes.every((mesh) => mesh.material.isMeshPhysicalMaterial === true), `${fixture.label} spheres should use MeshPhysicalMaterial`)
+    assert.ok(sphereMeshes.every((mesh) => mesh.geometry.getAttribute('position')?.count === 961))
+    assert.ok(sphereMeshes.every((mesh) => mesh.geometry.index?.count === 5400))
+
+    const sphereMaterials = sphereMeshes.map((mesh) => mesh.material)
+    assert.deepEqual([...new Set(sphereMaterials.map((material) => Number(material.ior.toFixed(2))))].sort((a, b) => a - b), fixture.expectedMaterialIors)
+    assert.deepEqual([...new Set(sphereMaterials.map((material) => material.metalness))].sort((a, b) => a - b), [fixture.expectedMetalness])
+    assert.ok(sphereMaterials.every((material) => material.iridescence === 1))
+    assert.deepEqual([...new Set(sphereMaterials.map((material) => Number(material.iridescenceIOR.toFixed(2))))].sort((a, b) => a - b), [1, 1.17, 1.33, 1.5, 1.67, 1.83, 2])
+    assert.deepEqual([...new Set(sphereMaterials.map((material) => material.iridescenceThicknessRange[1]))].sort((a, b) => a - b), [100, 200, 300, 400, 500, 600, 700])
+
+    const guides = meshes.filter((mesh) => ['ThicknessPlane', 'IorPlane', 'ThinFilmIorPlane'].includes(mesh.name))
+    assert.equal(guides.length, 3)
+    assert.ok(guides.every((mesh) => mesh.material.name === 'Guides Material'))
+    assert.ok(guides.every((mesh) => mesh.geometry.getAttribute('position')?.count === 4))
+    assert.ok(guides.every((mesh) => mesh.geometry.index?.count === 6))
+    assert.equal(guides[0].material.map, guides[1].material.map)
+    assert.equal(guides[0].material.map, guides[2].material.map)
+    assert.equal(Buffer.isBuffer(guides[0].material.map?.image), true, `${fixture.label} guide PNG should load as an encoded Buffer`)
+    assert.equal(guides[0].material.map.name, 'guides')
+    assert.deepEqual(pngDimensions(guides[0].material.map.image), [2048, 2048])
+    assert.equal(guides[0].material.map.colorSpace, THREE.SRGBColorSpace)
+
+    const bounds = new THREE.Box3().setFromObject(gltf.scene)
+    const center = bounds.getCenter(new THREE.Vector3())
+    const size = bounds.getSize(new THREE.Vector3())
+    gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(2, 3, 4)
+    gltf.scene.add(light)
+    const camera = new THREE.OrthographicCamera(
+      -size.x / 2 - 0.25,
+      size.x / 2 + 0.25,
+      size.y / 2 + 0.25,
+      -size.y / 2 - 0.25,
+      0.01,
+      20,
+    )
+    camera.position.copy(center).add(new THREE.Vector3(0, 0, 8))
+    camera.lookAt(center)
+    gltf.scene.updateMatrixWorld(true)
+    camera.updateMatrixWorld(true)
+
+    const rgba = new Renderer().render(gltf.scene, camera, {
+      width: 128,
+      height: 128,
+      format: 'rgba',
+      background: [0, 0, 0],
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+
+    assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > fixture.minimumVisibleRatio, `${fixture.label} should render visible iridescence sphere-grid geometry`)
+  }
 })
 
 test('committed Khronos glTF Sample Assets CompareMetallic fixture loads metallic texture comparison variants', async () => {
