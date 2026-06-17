@@ -41,6 +41,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
+const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
@@ -932,6 +933,69 @@ test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materi
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.18, 'SpecularTest should render visible specular material samples')
+})
+
+test('committed Khronos glTF Sample Assets EmissiveStrengthTest fixture loads KHR_materials_emissive_strength factors', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_emissive_strength'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Cube4',
+    'MeterGrid',
+    'Cube2',
+    'Cube1',
+    'Cube8',
+    'Cube16',
+  ])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  assert.deepEqual(
+    ['Emit1', 'Emit2', 'Emit4', 'Emit8', 'Emit16'].map((name) => materials.get(name)?.emissiveIntensity),
+    [1, 2, 4, 8, 16],
+  )
+  for (const name of ['Emit1', 'Emit2', 'Emit4', 'Emit8', 'Emit16']) {
+    const material = materials.get(name)
+    assert.equal(material?.isMeshStandardMaterial, true)
+    assert.deepEqual(material.emissive.toArray(), [0.1, 0.5, 0.9])
+  }
+
+  const backdrop = materials.get('FlatBackdrop')
+  assert.equal(backdrop?.isMeshStandardMaterial, true)
+  assert.equal(Buffer.isBuffer(backdrop.map?.image), true, 'emissive-strength backdrop PNG should load as an encoded Buffer')
+  assert.equal(backdrop.map.name, 'PlainGrid')
+  assert.equal(backdrop.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(backdrop.map.flipY, false)
+
+  const cube1 = meshes.find((mesh) => mesh.name === 'Cube1')
+  const cube8 = meshes.find((mesh) => mesh.name === 'Cube8')
+  assert.equal(cube1.geometry.getAttribute('position')?.count, 24)
+  assert.equal(cube1.geometry.index?.count, 36)
+  assert.equal(cube8.geometry.getAttribute('position')?.count, 24)
+  assert.equal(cube8.geometry.index?.count, 36)
+
+  const camera = new THREE.OrthographicCamera(-8.8, 8.8, 3.2, -4.6, 0.01, 30)
+  camera.position.set(0, 0, 12)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 220,
+    height: 110,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.8, 'EmissiveStrengthTest should render visible emissive-strength samples')
+  const low = meanRegion(rgba, 220, 110, 28, 34, 50, 55)
+  const high = meanRegion(rgba, 220, 110, 139, 34, 161, 55)
+  assert.ok(high.g > low.g + 30, `higher emissive strength should brighten the green channel (${high.g} vs ${low.g})`)
+  assert.ok(high.b > low.b + 20, `higher emissive strength should brighten the blue channel (${high.b} vs ${low.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin animation', async () => {
