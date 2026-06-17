@@ -39,6 +39,7 @@ const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-a
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyRotationTest', 'glTF', 'AnisotropyRotationTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyStrengthTest', 'glTF', 'AnisotropyStrengthTest.gltf')
+const SAMPLE_ASSET_ANTIQUE_CAMERA = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AntiqueCamera', 'glTF', 'AntiqueCamera.gltf')
 const SAMPLE_ASSET_ATTENUATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AttenuationTest', 'glTF', 'AttenuationTest.gltf')
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
 const SAMPLE_ASSET_BARRAMUNDI_FISH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BarramundiFish', 'glTF', 'BarramundiFish.gltf')
@@ -424,6 +425,96 @@ test('committed Khronos glTF Sample Assets BoxTexturedNonPowerOfTwo fixture load
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'BoxTexturedNonPowerOfTwo should render visible textured pixels')
   const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
   assert.ok(center.r > 80 && center.g > 100 && center.b > 110, `BoxTexturedNonPowerOfTwo should render the NPOT logo texture (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets AntiqueCamera fixture loads multi-mesh PBR texture sets', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANTIQUE_CAMERA, 'utf8'))
+  assert.deepEqual(source.buffers, [
+    { byteLength: 798092, uri: 'AntiqueCamera.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => [image.name, image.uri]), [
+    ['camera_camera_Normal', 'camera_camera_Normal.png'],
+    ['camera_camera_BaseColor', 'camera_camera_BaseColor.png'],
+    ['camera_tripod_BaseColor', 'camera_tripod_BaseColor.png'],
+    ['camera_tripod_Normal', 'camera_tripod_Normal.png'],
+    ['camera_camera_Roughness', 'camera_camera_Roughness.png'],
+    ['camera_tripod_Roughness', 'camera_tripod_Roughness.png'],
+  ])
+  assert.deepEqual(
+    source.materials.map((material) => [
+      material.name,
+      material.pbrMetallicRoughness.baseColorTexture.index,
+      material.pbrMetallicRoughness.metallicRoughnessTexture.index,
+      material.normalTexture.index,
+    ]),
+    [
+      ['camera', 1, 4, 0],
+      ['tripod', 2, 5, 3],
+    ],
+  )
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANTIQUE_CAMERA)
+  const cameraMesh = gltf.scene.getObjectByName('camera')
+  const tripodMesh = gltf.scene.getObjectByName('tripod')
+  assert.ok(cameraMesh?.isMesh, 'AntiqueCamera should load the camera mesh')
+  assert.ok(tripodMesh?.isMesh, 'AntiqueCamera should load the tripod mesh')
+
+  assert.equal(cameraMesh.geometry.getAttribute('position')?.count, 14668)
+  assert.equal(cameraMesh.geometry.getAttribute('normal')?.count, 14668)
+  assert.equal(cameraMesh.geometry.getAttribute('uv')?.count, 14668)
+  assert.equal(cameraMesh.geometry.index?.count, 41838)
+  assert.equal(tripodMesh.geometry.getAttribute('position')?.count, 6510)
+  assert.equal(tripodMesh.geometry.getAttribute('normal')?.count, 6510)
+  assert.equal(tripodMesh.geometry.getAttribute('uv')?.count, 6510)
+  assert.equal(tripodMesh.geometry.index?.count, 18360)
+
+  const assertAntiqueTexture = (texture, name, colorSpace) => {
+    assert.ok(texture?.isTexture, `${name} should load as a texture`)
+    assert.equal(texture.name, name)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 2048])
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assert.equal(cameraMesh.material.isMeshStandardMaterial, true)
+  assert.equal(cameraMesh.material.name, 'camera')
+  assertAntiqueTexture(cameraMesh.material.map, 'camera_camera_BaseColor', THREE.SRGBColorSpace)
+  assertAntiqueTexture(cameraMesh.material.roughnessMap, 'camera_camera_Roughness', THREE.NoColorSpace)
+  assert.equal(cameraMesh.material.metalnessMap, cameraMesh.material.roughnessMap)
+  assertAntiqueTexture(cameraMesh.material.normalMap, 'camera_camera_Normal', THREE.NoColorSpace)
+
+  assert.equal(tripodMesh.material.isMeshStandardMaterial, true)
+  assert.equal(tripodMesh.material.name, 'tripod')
+  assertAntiqueTexture(tripodMesh.material.map, 'camera_tripod_BaseColor', THREE.SRGBColorSpace)
+  assertAntiqueTexture(tripodMesh.material.roughnessMap, 'camera_tripod_Roughness', THREE.NoColorSpace)
+  assert.equal(tripodMesh.material.metalnessMap, tripodMesh.material.roughnessMap)
+  assertAntiqueTexture(tripodMesh.material.normalMap, 'camera_tripod_Normal', THREE.NoColorSpace)
+
+  gltf.scene.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(gltf.scene)
+  const center = box.getCenter(new THREE.Vector3())
+  const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.45, 1).normalize().multiplyScalar(9))
+  renderCamera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.copy(center).add(new THREE.Vector3(4, 6, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  renderCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, renderCamera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'AntiqueCamera should render visible textured geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 1, `AntiqueCamera should render warm textured output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alpha modes and JPEG textures', async () => {
