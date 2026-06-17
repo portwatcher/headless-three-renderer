@@ -30,6 +30,7 @@ const REAL_VRM_EXPRESSION_SAMPLE = path.join(
   'VRMC_vrm_expressions_isBinary_Overridden.vrm',
 )
 const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
+const SAMPLE_ASSET_ANIMATED_COLORS_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedColorsCube', 'glTF', 'AnimatedColorsCube.gltf')
 const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
 const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
@@ -1097,6 +1098,55 @@ test('committed Khronos glTF Sample Assets AnimatedTriangle fixture loads extern
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'AnimatedTriangle should render visible animated geometry')
+})
+
+test('committed Khronos glTF Sample Assets AnimatedColorsCube fixture applies material color animation pointers', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANIMATED_COLORS_CUBE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_animation_pointer'])
+  assert.equal(source.buffers[0].uri, 'AnimatedColorsCube.bin')
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANIMATED_COLORS_CUBE)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['TestCube', '1-RedCube', '2-GreenCube', '3-BlueCube'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['AnimatedColorMaterial', 'Red', 'Green', 'Blue'])
+
+  assert.equal(gltf.animations.length, 1)
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'Cube Animation')
+  assert.deepEqual(clip.tracks.map((track) => track.name), [
+    'TestCube.position',
+    'TestCube.quaternion',
+    'TestCube.material.color',
+  ])
+  const colorTrack = clip.tracks[2]
+  assert.equal(colorTrack.getValueSize(), 3)
+  assert.equal(colorTrack.getInterpolation(), THREE.InterpolateLinear)
+
+  const animated = meshes[0]
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(1.5)
+  gltf.scene.updateMatrixWorld(true)
+  assertVectorClose(animated.position.toArray(), [3, 3, 0], 'AnimatedColorsCube translation at t=1.5')
+  assertVectorClose(animated.material.color.toArray(), [0.019999999552965164, 0.019999999552965164, 0.800000011920929], 'AnimatedColorsCube material color at t=1.5')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.1))
+  const camera = new THREE.OrthographicCamera(-5, 5, 4.8, -2, 0.01, 20)
+  camera.position.set(0, 0, 10)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 110,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'AnimatedColorsCube should render visible animated colored cubes')
 })
 
 test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform animation', async () => {

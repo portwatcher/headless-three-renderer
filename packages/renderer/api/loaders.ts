@@ -3,8 +3,11 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { AnimationMixer, LoadingManager, Texture } = require('three') as {
+const { AnimationMixer, ColorKeyframeTrack, InterpolateDiscrete, InterpolateLinear, LoadingManager, Texture } = require('three') as {
   AnimationMixer: AnimationMixerConstructor
+  ColorKeyframeTrack: KeyframeTrackConstructor
+  InterpolateDiscrete: number
+  InterpolateLinear: number
   LoadingManager: new () => ThreeLoadingManagerLike
   Texture: new () => TextureLike
 }
@@ -19,6 +22,7 @@ export type VrmAnimationMixerLike = {
 }
 export type AnimationMixerConstructor = new (root: unknown) => VrmAnimationMixerLike
 export type VrmAnimationClipFactory = (vrmAnimation: unknown, vrm: unknown) => unknown
+type KeyframeTrackConstructor = new (name: string, times: ArrayLike<number>, values: ArrayLike<number>, interpolation?: number) => unknown
 export type ApplyVrmAnimationOptions = {
   AnimationMixer?: AnimationMixerConstructor
   createVRMAnimationClip?: VrmAnimationClipFactory
@@ -58,6 +62,50 @@ type GltfNodeVisibilityParser = {
   json?: {
     nodes?: unknown[]
   }
+}
+type GltfAnimationPointerParser = {
+  associations?: Map<unknown, Record<string, number>>
+  getDependency?: (type: string, index: number) => Promise<GltfAccessorLike>
+  json?: {
+    animations?: GltfAnimationDef[]
+  }
+}
+type GltfAnimationDef = {
+  channels?: GltfAnimationChannelDef[]
+  samplers?: GltfAnimationSamplerDef[]
+}
+type GltfAnimationChannelDef = {
+  sampler?: number
+  target?: {
+    path?: string
+    extensions?: {
+      KHR_animation_pointer?: {
+        pointer?: string
+      }
+    }
+  }
+}
+type GltfAnimationSamplerDef = {
+  input?: number
+  output?: number
+  interpolation?: string
+}
+type GltfAccessorLike = {
+  array?: ArrayLike<number>
+  itemSize?: number
+}
+type AnimationClipLike = {
+  tracks?: unknown[]
+  resetDuration?: () => unknown
+}
+type MaterialLike = {
+  name?: string
+}
+type MeshLike = TraversableObjectLike & {
+  isMesh?: boolean
+  name?: string
+  uuid?: string
+  material?: MaterialLike | MaterialLike[]
 }
 type TraversableObjectLike = {
   traverse?: (callback: (object: unknown) => void) => void
@@ -182,6 +230,7 @@ export async function createNodeGltfLoader(
   const { GLTFLoader } = await importGltfLoader()
   const loader = new GLTFLoader(loadingManager)
   await configureLoader?.(loader)
+  installAnimationPointerExtension(loader)
   installNodeVisibilityExtension(loader)
   installEmbeddedGlbImageNormalizer(loader)
   return { encodedImages, loader, manager: loadingManager, rootDir: root }
@@ -421,6 +470,94 @@ function installNodeVisibilityExtension(loader: ThreeGltfLoaderLike): void {
       applyNodeVisibilityExtension(gltf, parser as GltfNodeVisibilityParser)
     },
   }), 'KHR_node_visibility')
+}
+
+function installAnimationPointerExtension(loader: ThreeGltfLoaderLike): void {
+  registerLoaderPlugin(loader, (parser) => ({
+    name: 'KHR_animation_pointer',
+    afterRoot(gltf: unknown) {
+      return applyAnimationPointerExtension(gltf, parser as GltfAnimationPointerParser)
+    },
+  }), 'KHR_animation_pointer')
+}
+
+async function applyAnimationPointerExtension(gltf: unknown, parser: GltfAnimationPointerParser): Promise<void> {
+  const animationDefs = parser.json?.animations
+  const clips = (gltf as { animations?: AnimationClipLike[] }).animations
+  if (!Array.isArray(animationDefs) || !Array.isArray(clips) || typeof parser.getDependency !== 'function') return
+
+  for (let animationIndex = 0; animationIndex < animationDefs.length; animationIndex++) {
+    const animationDef = animationDefs[animationIndex]
+    const clip = clips[animationIndex]
+    if (!clip || !Array.isArray(clip.tracks) || !Array.isArray(animationDef.channels) || !Array.isArray(animationDef.samplers)) continue
+
+    for (const channel of animationDef.channels) {
+      const pointer = channel.target?.extensions?.KHR_animation_pointer?.pointer
+      const match = typeof pointer === 'string'
+        ? pointer.match(/^\/materials\/(\d+)\/pbrMetallicRoughness\/baseColorFactor$/)
+        : null
+      if (!match) continue
+
+      const samplerIndex = channel.sampler
+      const sampler = typeof samplerIndex === 'number' ? animationDef.samplers[samplerIndex] : undefined
+      if (!sampler || sampler.interpolation === 'CUBICSPLINE' || typeof sampler.input !== 'number' || typeof sampler.output !== 'number') continue
+
+      const materialIndex = Number.parseInt(match[1], 10)
+      const targets = materialAnimationTargets(gltf, parser, materialIndex)
+      if (targets.length === 0) continue
+
+      const [inputAccessor, outputAccessor] = await Promise.all([
+        parser.getDependency('accessor', sampler.input),
+        parser.getDependency('accessor', sampler.output),
+      ])
+      const times = inputAccessor.array
+      const values = outputAccessor.array
+      const itemSize = outputAccessor.itemSize ?? 0
+      if (!times || !values || itemSize < 3) continue
+
+      const colorValues = animationPointerColorValues(times.length, values, itemSize)
+      const interpolation = sampler.interpolation === 'STEP' ? InterpolateDiscrete : InterpolateLinear
+      for (const target of targets) {
+        clip.tracks.push(new ColorKeyframeTrack(`${target}.material.color`, times, colorValues, interpolation))
+      }
+      clip.resetDuration?.()
+    }
+  }
+}
+
+function materialAnimationTargets(gltf: unknown, parser: GltfAnimationPointerParser, materialIndex: number): string[] {
+  const associations = parser.associations
+  if (!associations) return []
+
+  const targets: string[] = []
+  const seen = new Set<string>()
+  for (const root of gltfRootScenes(gltf)) {
+    root.traverse?.((object) => {
+      const mesh = object as MeshLike
+      if (mesh.isMesh !== true) return
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      if (!materials.some((material) => associations.get(material)?.materials === materialIndex)) return
+
+      const target = mesh.name || mesh.uuid
+      if (target && !seen.has(target)) {
+        seen.add(target)
+        targets.push(target)
+      }
+    })
+  }
+  return targets
+}
+
+function animationPointerColorValues(keyframeCount: number, values: ArrayLike<number>, itemSize: number): Float32Array {
+  const colors = new Float32Array(keyframeCount * 3)
+  for (let keyframe = 0; keyframe < keyframeCount; keyframe++) {
+    const source = keyframe * itemSize
+    const target = keyframe * 3
+    colors[target] = Number(values[source] ?? 0)
+    colors[target + 1] = Number(values[source + 1] ?? 0)
+    colors[target + 2] = Number(values[source + 2] ?? 0)
+  }
+  return colors
 }
 
 function applyNodeVisibilityExtension(gltf: unknown, parser: GltfNodeVisibilityParser): void {
