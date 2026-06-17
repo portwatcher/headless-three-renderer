@@ -54,6 +54,7 @@ const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'C
 const SAMPLE_ASSET_COMPARE_METALLIC = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareMetallic', 'glTF', 'CompareMetallic.gltf')
 const SAMPLE_ASSET_COMPARE_NORMAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareNormal', 'glTF', 'CompareNormal.gltf')
 const SAMPLE_ASSET_COMPARE_ROUGHNESS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareRoughness', 'glTF', 'CompareRoughness.gltf')
+const SAMPLE_ASSET_COMPARE_SPECULAR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareSpecular', 'glTF', 'CompareSpecular.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
@@ -749,6 +750,82 @@ test('committed Khronos glTF Sample Assets CompareRoughness fixture loads roughn
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.045, 'CompareRoughness should render visible roughness comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareSpecular fixture loads specular extension comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_SPECULAR, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_specular'])
+  assert.equal(source.buffers[0].uri, 'CompareSpecular.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Specular_img0.jpg',
+    'Compare_Specular_img1.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.extensions?.KHR_materials_specular?.specularFactor ?? null,
+    material.extensions?.KHR_materials_specular?.specularTexture?.index ?? null,
+    material.extensions?.KHR_materials_specular?.specularColorTexture?.index ?? null,
+  ]), [
+    ['glTF Logo', 0, null, null, null],
+    ['glTF Logo Specular', 0, 1, 1, 1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_SPECULAR)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['GeoSphere001', 'GeoSphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['glTF Logo', 'glTF Logo Specular'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [2625, 2625])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [2625, 2625])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [2625, 2625])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [15360, 15360])
+
+  const [baseline, specular] = meshes.map((mesh) => mesh.material)
+  assert.equal(baseline.isMeshStandardMaterial, true)
+  assert.equal(specular.isMeshPhysicalMaterial, true)
+  assert.equal(baseline.roughness, 0.4)
+  assert.equal(specular.roughness, 0.4)
+  assert.equal(baseline.map, specular.map, 'both specular comparison materials should share the base-color texture')
+  assert.equal(Buffer.isBuffer(baseline.map?.image), true, 'base-color JPEG should load as an encoded Buffer')
+  assert.equal(baseline.map.name, 'Compare_Specular_img0.jpg')
+  assert.equal(baseline.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(baseline.map.flipY, false)
+
+  assert.equal(baseline.specularIntensityMap ?? null, null)
+  assert.equal(baseline.specularColorMap ?? null, null)
+  assert.equal(specular.specularIntensity, 1)
+  assertVectorClose(specular.specularColor.toArray(), [10, 10, 10], 'CompareSpecular specularColorFactor')
+  assert.equal(specular.specularIntensityMap, specular.specularColorMap, 'specular intensity and color should share the extension texture')
+  assert.equal(Buffer.isBuffer(specular.specularColorMap?.image), true, 'specular PNG should load as an encoded Buffer')
+  assert.equal(specular.specularColorMap.name, 'Compare_Specular_img1.png')
+  assert.deepEqual(pngDimensions(specular.specularColorMap.image), [1024, 512])
+  assert.equal(specular.specularColorMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(specular.specularColorMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const light = new THREE.DirectionalLight(0xffffff, 4)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -3, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'CompareSpecular should render visible specular comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-map comparison variants', async () => {
