@@ -38,6 +38,7 @@ const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-a
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyRotationTest', 'glTF', 'AnisotropyRotationTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyStrengthTest', 'glTF', 'AnisotropyStrengthTest.gltf')
+const SAMPLE_ASSET_ATTENUATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AttenuationTest', 'glTF', 'AttenuationTest.gltf')
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
 const SAMPLE_ASSET_BOOM_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBox', 'glTF', 'BoomBox.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
@@ -1614,6 +1615,114 @@ test('committed Khronos glTF Sample Assets CompareVolume fixture loads transmiss
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.35, 'CompareVolume should render visible volume comparison geometry')
+})
+
+test('committed Khronos glTF Sample Assets AttenuationTest fixture loads volume attenuation and thickness cases', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ATTENUATION_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_materials_volume'])
+  assert.deepEqual(source.buffers, [{ byteLength: 10584, uri: 'AttenuationTest.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'AttenuationLabels.png',
+    'ThicknessTexture.png',
+    'PlainGrid.png',
+  ])
+  assert.equal(source.materials.length, 18)
+  assert.deepEqual(source.materials.slice(0, 5).map((material) => [
+    material.name,
+    material.extensions?.KHR_materials_transmission?.transmissionFactor,
+    material.extensions?.KHR_materials_volume?.thicknessFactor,
+    material.extensions?.KHR_materials_volume?.attenuationDistance,
+    material.extensions?.KHR_materials_volume?.attenuationColor,
+  ]), [
+    ['R2_and_R4_ThicknessFac_1.0', 1, 1, 1, [0.1, 0.5, 0.9]],
+    ['R2_ThicknessFac_1.5', 1, 1.5, 1, [0.1, 0.5, 0.9]],
+    ['R2_ThicknessFac_2.0', 1, 2, 1, [0.1, 0.5, 0.9]],
+    ['R2_ThicknessFac_0.50', 1, 0.5, 1, [0.1, 0.5, 0.9]],
+    ['R2_ThicknessFac_0.25', 1, 0.25, 1, [0.1, 0.5, 0.9]],
+  ])
+  assert.deepEqual(source.materials.slice(7, 12).map((material) => [
+    material.name,
+    material.extensions?.KHR_materials_volume?.thicknessFactor,
+    material.extensions?.KHR_materials_volume?.attenuationDistance,
+  ]), [
+    ['R5_Attenuation_1.0', 1, 1],
+    ['R5_Attenuation_1.5', 1, 0.6666666667],
+    ['R5_Attenuation_2.0', 1, 0.5],
+    ['R5_Attenuation_0.50', 1, 2],
+    ['R5_Attenuation_0.25', 1, 4],
+  ])
+  assert.equal(source.materials[6].extensions.KHR_materials_volume.thicknessTexture.index, 1)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ATTENUATION_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 23)
+  assert.deepEqual(meshes.slice(0, 6).map((mesh) => mesh.name), [
+    'R2_Block_10',
+    'R2_Block_15',
+    'R2_Block_20',
+    'R2_Block_050',
+    'R2_Block_025',
+    'Labels',
+  ])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const thicknessOne = materials.get('R2_and_R4_ThicknessFac_1.0')
+  assert.equal(thicknessOne.isMeshPhysicalMaterial, true)
+  assert.equal(thicknessOne.transmission, 1)
+  assert.equal(thicknessOne.thickness, 1)
+  assert.equal(thicknessOne.attenuationDistance, 1)
+  assertVectorClose(thicknessOne.attenuationColor.toArray(), [0.1, 0.5, 0.9], 'AttenuationTest attenuation color')
+  assert.equal(materials.get('R2_ThicknessFac_2.0').thickness, 2)
+  assert.equal(materials.get('R2_ThicknessFac_0.25').thickness, 0.25)
+  assert.equal(materials.get('R5_Attenuation_2.0').attenuationDistance, 0.5)
+  assert.equal(materials.get('R5_Attenuation_0.25').attenuationDistance, 4)
+
+  const textureMaterial = materials.get('R3_ThicknessTex_Mat')
+  assert.equal(textureMaterial.thickness, 2)
+  assert.equal(Buffer.isBuffer(textureMaterial.thicknessMap?.image), true, 'thickness texture PNG should load as an encoded Buffer')
+  assert.equal(textureMaterial.thicknessMap.name, 'ThicknessTexture')
+  assert.deepEqual(pngDimensions(textureMaterial.thicknessMap.image), [256, 256])
+  assert.equal(textureMaterial.thicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(textureMaterial.thicknessMap.flipY, false)
+
+  const labelMaterial = materials.get('LabelMaterial')
+  assert.equal(Buffer.isBuffer(labelMaterial.map?.image), true, 'attenuation label PNG should load as an encoded Buffer')
+  assert.equal(labelMaterial.map.name, 'AttenuationLabels')
+  assert.deepEqual(pngDimensions(labelMaterial.map.image), [512, 512])
+  assert.equal(labelMaterial.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(labelMaterial.map.flipY, false)
+
+  const backdrop = materials.get('FlatBackdrop')
+  assert.equal(Buffer.isBuffer(backdrop.map?.image), true, 'plain grid PNG should load as an encoded Buffer')
+  assert.equal(backdrop.map.name, 'PlainGrid')
+  assert.deepEqual(pngDimensions(backdrop.map.image), [256, 256])
+  assert.equal(backdrop.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(backdrop.map.flipY, false)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.85))
+  const light = new THREE.DirectionalLight(0xffffff, 1.3)
+  light.position.set(2, 3, 8)
+  gltf.scene.add(light)
+  const camera = new THREE.OrthographicCamera(-10.8, 10.8, 10.8, -10.8, 0.01, 50)
+  camera.position.set(0, 0, 22)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.75, 'AttenuationTest should render visible attenuation and thickness panels')
+  const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
+  assert.ok(center.r > 100 && center.g > 100 && center.b > 100, `AttenuationTest center panels should render visible transmission output (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-map comparison variants', async () => {
