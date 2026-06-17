@@ -89,7 +89,9 @@ const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
 const SAMPLE_ASSET_FLIGHT_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'FlightHelmet', 'glTF', 'FlightHelmet.gltf')
 const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'glTF', 'Fox.gltf')
+const SAMPLE_ASSET_GLAM_VELVET_SOFA = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlamVelvetSofa', 'glTF', 'GlamVelvetSofa.gltf')
 const SAMPLE_ASSET_GLASS_BROKEN_WINDOW = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlassBrokenWindow', 'glTF', 'GlassBrokenWindow.gltf')
+const SAMPLE_ASSET_GLASS_HURRICANE_CANDLE_HOLDER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlassHurricaneCandleHolder', 'glTF', 'GlassHurricaneCandleHolder.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_ABALONE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceAbalone', 'glTF', 'IridescenceAbalone.gltf')
 const SAMPLE_ASSET_IOR_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IORTestGrid', 'glTF', 'IORTestGrid.gltf')
@@ -2491,6 +2493,122 @@ test('committed Khronos glTF Sample Assets GlassBrokenWindow fixture loads trans
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'GlassBrokenWindow should render visible frame and transmission glass')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 20 && mean.g > 20 && mean.b > 20, `GlassBrokenWindow should render lit window pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets GlassHurricaneCandleHolder fixture loads volume thickness texture', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_GLASS_HURRICANE_CANDLE_HOLDER, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_materials_volume'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'GlassHurricaneCandleHolder.bin', byteLength: 101108 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'GlassHurricaneCandleHolder_orm.png',
+    'GlassHurricaneCandleHolder_basecolor.png',
+    'GlassHurricaneCandleHolder_thickness.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'GlassHurricaneCandleHolder-opaque',
+    'GlassHurricaneCandleHolder-glass',
+  ])
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+    KHR_materials_volume: {
+      thicknessFactor: 0.1,
+      thicknessTexture: { index: 2 },
+      attenuationColor: [0.8, 0.95, 1],
+      attenuationDistance: 0.001,
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_GLASS_HURRICANE_CANDLE_HOLDER)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_volume'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'GlassHurricaneCandleHolder-opaque',
+    'GlassHurricaneCandleHolder-glass',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [1006, 1380])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [1006, 1380])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [1006, 1380])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [5082, 7296])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const opaque = materials.get('GlassHurricaneCandleHolder-opaque')
+  assert.equal(opaque?.isMeshStandardMaterial, true)
+  assert.deepEqual(opaque.color.toArray(), [1, 1, 1])
+  assert.equal(opaque.metalness, 1)
+  assert.equal(opaque.roughness, 1)
+  assert.equal(opaque.map.name, 'GlassHurricaneCandleHolder_basecolor.png')
+  assert.equal(opaque.aoMap.name, 'GlassHurricaneCandleHolder_orm.png')
+  assert.equal(opaque.roughnessMap.name, 'GlassHurricaneCandleHolder_orm.png')
+  assert.equal(opaque.metalnessMap.name, 'GlassHurricaneCandleHolder_orm.png')
+
+  const glass = materials.get('GlassHurricaneCandleHolder-glass')
+  assert.equal(glass?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(glass.color.toArray(), [1, 1, 1])
+  assert.equal(glass.metalness, 1)
+  assert.equal(glass.roughness, 1)
+  assert.equal(glass.transmission, 1)
+  assert.equal(glass.thickness, 0.1)
+  assert.equal(glass.attenuationDistance, 0.001)
+  assert.deepEqual(glass.attenuationColor.toArray(), [0.8, 0.95, 1])
+  assert.equal(glass.map.name, 'GlassHurricaneCandleHolder_basecolor.png')
+  assert.equal(glass.aoMap.name, 'GlassHurricaneCandleHolder_orm.png')
+  assert.equal(glass.roughnessMap.name, 'GlassHurricaneCandleHolder_orm.png')
+  assert.equal(glass.metalnessMap.name, 'GlassHurricaneCandleHolder_orm.png')
+  assert.equal(glass.thicknessMap.name, 'GlassHurricaneCandleHolder_thickness.png')
+
+  for (const texture of [
+    opaque.map,
+    opaque.aoMap,
+    opaque.roughnessMap,
+    opaque.metalnessMap,
+    glass.map,
+    glass.aoMap,
+    glass.roughnessMap,
+    glass.metalnessMap,
+    glass.thicknessMap,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 2048])
+    assert.equal(texture.flipY, false)
+  }
+  assert.equal(opaque.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(glass.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(opaque.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(glass.thicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(opaque.aoMap.channel, 0)
+  assert.equal(glass.aoMap.channel, 0)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'GlassHurricaneCandleHolder should render visible metal and volume glass')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.b > 10 && mean.g > 10, `GlassHurricaneCandleHolder should render lit blue-tinted glass pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets TransmissionOrderTest fixture loads alpha and transmission ordering cases', async () => {
@@ -6534,6 +6652,170 @@ test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_material
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'SheenChair should render visible sheen material geometry')
+})
+
+test('committed Khronos glTF Sample Assets GlamVelvetSofa fixture loads sheen variants and normal texture transforms', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_GLAM_VELVET_SOFA, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_texture_transform'])
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_texture_transform',
+    'KHR_materials_sheen',
+    'KHR_materials_specular',
+    'KHR_materials_variants',
+    'KHR_lights_punctual',
+  ])
+  assert.deepEqual(source.extensions?.KHR_materials_variants?.variants?.map((variant) => variant.name), [
+    'Champagne',
+    'Navy',
+    'Gray',
+    'Black',
+    'Pale Pink',
+  ])
+  assert.deepEqual(source.extensions?.KHR_lights_punctual?.lights, [
+    { type: 'directional', intensity: 3 },
+  ])
+  assert.deepEqual(source.buffers, [
+    { uri: 'GlamVelvetSofa.bin', byteLength: 124952 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'GlamVelvetSofa_occlusion.png',
+    'GlamVelvetSofa_normal.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'GlamVelvetSofa_legs',
+    'GlamVelvetSofa_feet',
+    'GlamVelvetSofa_fabric_champagne',
+    'GlamVelvetSofa_fabric_navy',
+    'GlamVelvetSofa_fabric_gray',
+    'GlamVelvetSofa_fabric_black',
+    'GlamVelvetSofa_fabric_palepink',
+  ])
+  assert.deepEqual(source.materials[3].normalTexture, {
+    index: 1,
+    scale: 0.75,
+    extensions: {
+      KHR_texture_transform: {
+        rotation: 0.36,
+        scale: [5, 5],
+        texCoord: 0,
+      },
+    },
+  })
+  assert.deepEqual(source.materials[3].extensions, {
+    KHR_materials_specular: {
+      specularColorFactor: [0.1, 0.34, 1],
+    },
+    KHR_materials_sheen: {
+      sheenColorFactor: [0.05, 0.17, 0.5],
+      sheenRoughnessFactor: 0.6,
+    },
+  })
+  assert.deepEqual(source.meshes[1].primitives[0].extensions?.KHR_materials_variants?.mappings, [
+    { material: 2, variants: [0] },
+    { material: 3, variants: [1] },
+    { material: 4, variants: [2] },
+    { material: 5, variants: [3] },
+    { material: 6, variants: [4] },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_GLAM_VELVET_SOFA)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_sheen'))
+  assert.deepEqual(gltf.parser?.json?.extensionsRequired, ['KHR_texture_transform'])
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'GlamVelvetSofa_legs',
+    'GlamVelvetSofa_fabric',
+    'GlamVelvetSofa_feet',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [342, 2092, 684])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [342, 2092, 684])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [342, 2092, 684])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [918, 9726, 1944])
+  assert.deepEqual(lights.map((light) => [light.name, light.type, light.intensity]), [
+    ['Key_Light', 'DirectionalLight', 3],
+  ])
+
+  const fabric = meshes.find((mesh) => mesh.name === 'GlamVelvetSofa_fabric')
+  assert.deepEqual(fabric.userData.gltfExtensions?.KHR_materials_variants?.mappings, [
+    { material: 2, variants: [0] },
+    { material: 3, variants: [1] },
+    { material: 4, variants: [2] },
+    { material: 5, variants: [3] },
+    { material: 6, variants: [4] },
+  ])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const legs = materials.get('GlamVelvetSofa_legs')
+  assert.equal(legs?.isMeshStandardMaterial, true)
+  assert.deepEqual(legs.color.toArray(), [0.02, 0.02, 0.02])
+  assert.equal(legs.metalness, 0)
+  assert.equal(legs.roughness, 0.4)
+  assert.equal(legs.aoMap.name, 'GlamVelvetSofa_occlusion.png')
+  assert.equal(legs.aoMap.channel, 0)
+
+  const fabricMaterial = materials.get('GlamVelvetSofa_fabric_navy')
+  assert.equal(fabricMaterial?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(fabricMaterial.color.toArray(), [0.01, 0.01, 0.01])
+  assert.equal(fabricMaterial.metalness, 0)
+  assert.equal(fabricMaterial.roughness, 0.7)
+  assert.equal(fabricMaterial.sheen, 1)
+  assert.deepEqual(fabricMaterial.sheenColor.toArray(), [0.05, 0.17, 0.5])
+  assert.equal(fabricMaterial.sheenRoughness, 0.6)
+  assert.deepEqual(fabricMaterial.specularColor.toArray(), [0.1, 0.34, 1])
+  assert.equal(fabricMaterial.specularIntensity, 1)
+  assert.equal(fabricMaterial.normalMap.name, 'GlamVelvetSofa_normal.png')
+  assert.deepEqual(fabricMaterial.normalScale.toArray(), [0.75, -0.75])
+  assert.deepEqual(fabricMaterial.normalMap.repeat.toArray(), [5, 5])
+  assert.equal(fabricMaterial.normalMap.rotation, 0.36)
+  assert.equal(fabricMaterial.aoMap.name, 'GlamVelvetSofa_occlusion.png')
+  assert.equal(fabricMaterial.aoMap.channel, 0)
+
+  const feet = materials.get('GlamVelvetSofa_feet')
+  assert.equal(feet?.isMeshStandardMaterial, true)
+  assert.deepEqual(feet.color.toArray(), [1, 0.8, 0.7])
+  assert.equal(feet.metalness, 1)
+  assert.equal(feet.roughness, 0.4)
+  assert.equal(feet.aoMap.name, 'GlamVelvetSofa_occlusion.png')
+
+  for (const texture of [
+    legs.aoMap,
+    fabricMaterial.aoMap,
+    fabricMaterial.normalMap,
+    feet.aoMap,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [1024, 1024])
+    assert.equal(texture.colorSpace, THREE.NoColorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.6))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'GlamVelvetSofa should render visible dark velvet furniture geometry')
 })
 
 test('committed Khronos glTF Sample Assets SheenCloth fixture loads transformed sheen texture inputs', async () => {
