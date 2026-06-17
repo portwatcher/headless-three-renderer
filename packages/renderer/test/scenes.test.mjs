@@ -14925,6 +14925,66 @@ test('multiple shadow-casting directional lights render separate shadow maps', (
   assert.ok(bothRight < firstRight - 30, `dual shadow maps should add the second light's right shadow (${bothRight} vs ${firstRight})`)
 })
 
+test('point and directional shadow lights render within the expanded layer budget', () => {
+  function renderMixedShadow(castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        colorWrite: false,
+        depthWrite: false,
+      }),
+    )
+    caster.position.y = 1
+    caster.castShadow = castShadow
+    scene.add(caster)
+
+    const point = new THREE.PointLight(0xffffff, 2.5, 16)
+    point.position.set(0, 5, 4)
+    point.castShadow = true
+    point.shadow.mapSize.set(256, 256)
+    point.shadow.camera.near = 0.1
+    point.shadow.camera.far = 16
+    scene.add(point)
+
+    const directional = new THREE.DirectionalLight(0xffffff, 2)
+    directional.position.set(5, 6, 0)
+    directional.target.position.set(0, 0, 0)
+    directional.castShadow = true
+    directional.shadow.mapSize.set(256, 256)
+    directional.shadow.camera.left = -7
+    directional.shadow.camera.right = 7
+    directional.shadow.camera.top = 7
+    directional.shadow.camera.bottom = -7
+    directional.shadow.camera.near = 0.1
+    directional.shadow.camera.far = 16
+    scene.add(directional)
+    scene.add(directional.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 7, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  const unshadowed = renderMixedShadow(false)
+  const shadowed = renderMixedShadow(true)
+  const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+  const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+  assert.ok(shadowedLum < unshadowedLum - 20, `mixed point/directional shadows should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
+})
+
 test('shadow lights over the native layer budget fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -14933,10 +14993,12 @@ test('shadow lights over the native layer budget fail clearly', () => {
     new THREE.MeshStandardMaterial({ color: 0xffffff }),
   ))
 
-  const point = new THREE.PointLight(0xffffff, 1)
-  point.position.set(0, 4, 0)
-  point.castShadow = true
-  scene.add(point)
+  for (const x of [-2, 2]) {
+    const point = new THREE.PointLight(0xffffff, 1)
+    point.position.set(x, 4, 0)
+    point.castShadow = true
+    scene.add(point)
+  }
 
   const directional = new THREE.DirectionalLight(0xffffff, 1)
   directional.position.set(4, 6, 3)
@@ -14947,7 +15009,7 @@ test('shadow lights over the native layer budget fail clearly', () => {
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /more than 6 shadow map layers.*7 requested/i,
+    /more than 12 shadow map layers.*13 requested/i,
   )
 })
 

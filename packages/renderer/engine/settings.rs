@@ -20,7 +20,7 @@ pub enum ShadowKind {
     Cascaded,
 }
 
-pub const MAX_SHADOW_LAYERS: usize = 6;
+pub const MAX_SHADOW_LAYERS: usize = 12;
 
 /// Shadow caster resolved from a directional, spot, or point light with
 /// `castShadow = true`.

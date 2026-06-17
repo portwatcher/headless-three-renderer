@@ -1131,6 +1131,12 @@ impl GpuRenderer {
             make_shadow_pipeline("vs_shadow3", "headless-three-renderer shadow pipeline 3"),
             make_shadow_pipeline("vs_shadow4", "headless-three-renderer shadow pipeline 4"),
             make_shadow_pipeline("vs_shadow5", "headless-three-renderer shadow pipeline 5"),
+            make_shadow_pipeline("vs_shadow6", "headless-three-renderer shadow pipeline 6"),
+            make_shadow_pipeline("vs_shadow7", "headless-three-renderer shadow pipeline 7"),
+            make_shadow_pipeline("vs_shadow8", "headless-three-renderer shadow pipeline 8"),
+            make_shadow_pipeline("vs_shadow9", "headless-three-renderer shadow pipeline 9"),
+            make_shadow_pipeline("vs_shadow10", "headless-three-renderer shadow pipeline 10"),
+            make_shadow_pipeline("vs_shadow11", "headless-three-renderer shadow pipeline 11"),
         ];
 
         let vertex_buffers = [Vertex::layout()];

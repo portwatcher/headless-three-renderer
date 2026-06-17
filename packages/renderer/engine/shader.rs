@@ -1,7 +1,7 @@
 pub const SHADER: &str = r#"
 const PI: f32 = 3.14159265359;
 const MAX_LIGHTS: u32 = 64u;
-const MAX_SHADOW_LAYERS: u32 = 6u;
+const MAX_SHADOW_LAYERS: u32 = 12u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -87,7 +87,7 @@ struct Uniforms {
   fog_color: vec4<f32>,
   // x = mode (0=off, 1=linear, 2=exp2), y = near, z = far, w = density
   fog_params: vec4<f32>,
-  light_space_matrices: array<mat4x4<f32>, 6>,
+  light_space_matrices: array<mat4x4<f32>, 12>,
   // x = shadow count, y = first bias, z = first normal_bias, w = receive_shadow
   shadow_params: vec4<f32>,
   // x = first shadow light index, y = 1/map_width, z = 1/map_height, w = first shadow kind (0=2D, 1=point, 2=cascaded)
@@ -97,11 +97,11 @@ struct Uniforms {
   // x = first PCF radius multiplier, y = clip shadow caster fragments by clipping_planes, z = explicit shadow side (0=double/no-cull, 1=front, 2=back), w = shadow-only alpha cutoff.
   shadow_params4: vec4<f32>,
   // x = light index, y = layer base, z = layer count, w = shadow kind.
-  shadow_infos: array<vec4<f32>, 6>,
+  shadow_infos: array<vec4<f32>, 12>,
   // x = bias, y = normal_bias, z = PCF radius multiplier, w = reserved.
-  shadow_biases: array<vec4<f32>, 6>,
+  shadow_biases: array<vec4<f32>, 12>,
   // x/y/z = cascade split distances, w = reserved.
-  shadow_cascade_splits: array<vec4<f32>, 6>,
+  shadow_cascade_splits: array<vec4<f32>, 12>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
   // xyz = sheen color, w = sheen roughness
@@ -274,6 +274,36 @@ fn vs_shadow4(input: VertexInput) -> ShadowVertexOutput {
 @vertex
 fn vs_shadow5(input: VertexInput) -> ShadowVertexOutput {
   return shadow_vertex(input, 5u);
+}
+
+@vertex
+fn vs_shadow6(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 6u);
+}
+
+@vertex
+fn vs_shadow7(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 7u);
+}
+
+@vertex
+fn vs_shadow8(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 8u);
+}
+
+@vertex
+fn vs_shadow9(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 9u);
+}
+
+@vertex
+fn vs_shadow10(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 10u);
+}
+
+@vertex
+fn vs_shadow11(input: VertexInput) -> ShadowVertexOutput {
+  return shadow_vertex(input, 11u);
 }
 
 @fragment
@@ -1458,7 +1488,7 @@ pub fn custom_shader_source(fragment_body: &str) -> String {
 
 const CUSTOM_FRAGMENT_SHADER: &str = r#"
 const MAX_LIGHTS: u32 = 64u;
-const MAX_SHADOW_LAYERS: u32 = 6u;
+const MAX_SHADOW_LAYERS: u32 = 12u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -1506,14 +1536,14 @@ struct Uniforms {
   clipping_params: vec4<f32>,
   fog_color: vec4<f32>,
   fog_params: vec4<f32>,
-  light_space_matrices: array<mat4x4<f32>, 6>,
+  light_space_matrices: array<mat4x4<f32>, 12>,
   shadow_params: vec4<f32>,
   shadow_params2: vec4<f32>,
   shadow_params3: vec4<f32>,
   shadow_params4: vec4<f32>,
-  shadow_infos: array<vec4<f32>, 6>,
-  shadow_biases: array<vec4<f32>, 6>,
-  shadow_cascade_splits: array<vec4<f32>, 6>,
+  shadow_infos: array<vec4<f32>, 12>,
+  shadow_biases: array<vec4<f32>, 12>,
+  shadow_cascade_splits: array<vec4<f32>, 12>,
   physical_params1: vec4<f32>,
   physical_params2: vec4<f32>,
   physical_params3: vec4<f32>,
