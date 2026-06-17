@@ -110,6 +110,7 @@ const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sa
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
 const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedFigure', 'glTF', 'RiggedFigure.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
+const SAMPLE_ASSET_SCIFI_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SciFiHelmet', 'glTF', 'SciFiHelmet.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SHEEN_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenTestGrid', 'glTF', 'SheenTestGrid.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
@@ -602,6 +603,93 @@ test('committed Khronos glTF Sample Assets Corset fixture loads tangent-space OR
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'Corset should render visible textured geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.g && mean.g > mean.b, `Corset texture should render warm fabric colors (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets SciFiHelmet fixture loads separate AO and PBR texture maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SCIFI_HELMET, 'utf8'))
+  assert.deepEqual(source.buffers, [
+    { byteLength: 3643848, uri: 'SciFiHelmet.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'SciFiHelmet_BaseColor.png',
+    'SciFiHelmet_MetallicRoughness.png',
+    'SciFiHelmet_Normal.png',
+    'SciFiHelmet_AmbientOcclusion.png',
+  ])
+  assert.equal(source.meshes[0].name, 'SciFiHelmet')
+  assert.deepEqual(source.meshes[0].primitives[0].attributes, {
+    NORMAL: 2,
+    POSITION: 1,
+    TANGENT: 3,
+    TEXCOORD_0: 4,
+  })
+  assert.deepEqual(source.materials[0], {
+    name: 'SciFiHelmet',
+    normalTexture: { index: 2 },
+    occlusionTexture: { index: 3 },
+    pbrMetallicRoughness: {
+      baseColorTexture: { index: 0 },
+      metallicRoughnessTexture: { index: 1 },
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SCIFI_HELMET)
+  assert.deepEqual(gltf.scene.children.map((child) => child.name), ['Camera', 'SciFiHelmet'])
+  const mesh = gltf.scene.getObjectByName('SciFiHelmet')
+  assert.ok(mesh?.isMesh, 'SciFiHelmet should load its mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 70074)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 70074)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 70074)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 70074)
+  assert.equal(mesh.geometry.index?.count, 70074)
+
+  const material = mesh.material
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.name, 'SciFiHelmet')
+  assert.deepEqual(material.color.toArray(), [1, 1, 1])
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+
+  const assertSciFiTexture = (texture, name, colorSpace) => {
+    assert.ok(texture?.isTexture, `${name} should load as a texture`)
+    assert.equal(texture.name, name)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 2048])
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assertSciFiTexture(material.map, 'SciFiHelmet_BaseColor.png', THREE.SRGBColorSpace)
+  assertSciFiTexture(material.roughnessMap, 'SciFiHelmet_MetallicRoughness.png', THREE.NoColorSpace)
+  assert.equal(material.metalnessMap, material.roughnessMap, 'SciFiHelmet should reuse the metallic-roughness map for metalness')
+  assertSciFiTexture(material.normalMap, 'SciFiHelmet_Normal.png', THREE.NoColorSpace)
+  assertSciFiTexture(material.aoMap, 'SciFiHelmet_AmbientOcclusion.png', THREE.NoColorSpace)
+  assert.notEqual(material.aoMap, material.roughnessMap, 'SciFiHelmet should keep AO separate from metallic-roughness')
+
+  gltf.scene.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(mesh)
+  const center = box.getCenter(new THREE.Vector3())
+  const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.45, 1).normalize().multiplyScalar(4))
+  renderCamera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.copy(center).add(new THREE.Vector3(3, 4, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  renderCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, renderCamera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.32, 'SciFiHelmet should render visible textured geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b && mean.g > mean.b, `SciFiHelmet texture should render neutral metal colors (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alpha modes and JPEG textures', async () => {
