@@ -38,6 +38,7 @@ const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxInterleaved', 'glTF', 'BoxInterleaved.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
+const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
@@ -463,6 +464,62 @@ test('committed Khronos glTF Sample Assets BoxVertexColors fixture renders COLOR
   assert.ok(topLeft.g > bottomLeft.g + 80, `vertex color gradient should make the upper-left face greener than lower-left (${topLeft.g} vs ${bottomLeft.g})`)
   assert.ok(bottomRight.r > bottomLeft.r + 80, `vertex color gradient should make the lower-right face redder than lower-left (${bottomRight.r} vs ${bottomLeft.r})`)
   assert.ok(bottomLeft.b > 170 && bottomRight.b > 170, `vertex color gradient should keep blue channel visible (${bottomLeft.b}, ${bottomRight.b})`)
+})
+
+test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CLEARCOAT_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 27)
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const simpleCoated = materials.get('Simple_Coated')
+  assert.equal(simpleCoated?.isMeshPhysicalMaterial, true)
+  assert.equal(simpleCoated.clearcoat, 1)
+  assert.equal(simpleCoated.clearcoatRoughness, 0.03)
+
+  const partialCoated = materials.get('Partial_Coated')
+  assert.equal(partialCoated?.isMeshPhysicalMaterial, true)
+  assert.equal(Buffer.isBuffer(partialCoated.clearcoatMap?.image), true, 'clearcoat factor PNG should load as an encoded Buffer')
+  assert.equal(partialCoated.clearcoatMap.colorSpace, THREE.NoColorSpace)
+
+  const roughCoated = materials.get('RoughVariations_Coated')
+  assert.equal(roughCoated?.isMeshPhysicalMaterial, true)
+  assert.equal(roughCoated.clearcoatRoughness, 1)
+  assert.equal(Buffer.isBuffer(roughCoated.clearcoatRoughnessMap?.image), true, 'clearcoat roughness PNG should load as an encoded Buffer')
+  assert.equal(roughCoated.clearcoatRoughnessMap.colorSpace, THREE.NoColorSpace)
+
+  const coatNormal = materials.get('CoatNorm_Coated')
+  assert.equal(coatNormal?.isMeshPhysicalMaterial, true)
+  assert.equal(Buffer.isBuffer(coatNormal.clearcoatNormalMap?.image), true, 'clearcoat normal PNG should load as an encoded Buffer')
+  assert.equal(coatNormal.clearcoatNormalMap.colorSpace, THREE.NoColorSpace)
+
+  const sharedNormal = materials.get('SharedNorm_Coated')
+  assert.equal(sharedNormal?.isMeshPhysicalMaterial, true)
+  assert.equal(Buffer.isBuffer(sharedNormal.clearcoatNormalMap?.image), true, 'shared clearcoat normal JPEG should load as an encoded Buffer')
+  assert.equal(sharedNormal.clearcoatNormalMap.colorSpace, THREE.NoColorSpace)
+
+  const camera = new THREE.PerspectiveCamera(35, 4 / 3, 0.01, 40)
+  camera.position.set(0, 1.2, 12)
+  camera.lookAt(0, 0.6, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 1.4)
+  light.position.set(2, 4, 6)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 120,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'ClearCoatTest should render visible clearcoat panels')
 })
 
 test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin animation', async () => {
