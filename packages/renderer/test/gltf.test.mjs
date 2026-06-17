@@ -116,6 +116,7 @@ const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
+const SAMPLE_ASSET_XMP_METADATA_ROUNDED_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'XmpMetadataRoundedCube', 'glTF', 'XmpMetadataRoundedCube.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -6186,6 +6187,59 @@ test('committed skinned glTF fixture applies JOINTS_0 and WEIGHTS_0 attributes',
   assert.ok(base.height > 20, `base skinned quad should render visible bounds (${base.height})`)
   assert.ok(moved.minY < base.minY - 12, `joint translation should move the skinned quad upward (${moved.minY} vs ${base.minY})`)
   assert.ok(Math.abs(moved.height - base.height) <= 4, `single-joint translation should preserve quad height (${moved.height} vs ${base.height})`)
+})
+
+test('committed Khronos glTF Sample Assets XmpMetadataRoundedCube fixture preserves XMP extension metadata and split buffers', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_XMP_METADATA_ROUNDED_CUBE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_xmp_json_ld'])
+  assert.deepEqual(source.asset.extensions, { KHR_xmp_json_ld: { packet: 0 } })
+  assert.equal(source.extensions.KHR_xmp_json_ld.packets[0]['dc:title']['rdf:_1']['@value'], 'Sample glTF with XMP metadata')
+  assert.equal(source.extensions.KHR_xmp_json_ld.packets[1]['dc:title']['rdf:_1']['@value'], 'My Cube Mesh')
+  assert.deepEqual(source.buffers.map((buffer) => buffer.uri), [
+    'MODEL_ROUNDED_CUBE_PART_1/positions.bin',
+    'MODEL_ROUNDED_CUBE_PART_1/normals.bin',
+    'MODEL_ROUNDED_CUBE_PART_1/indices.bin',
+  ])
+  assert.deepEqual(source.buffers.map((buffer) => buffer.byteLength), [41472, 41472, 20688])
+  assert.deepEqual(source.meshes[0].extensions, { KHR_xmp_json_ld: { packet: 1 } })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_XMP_METADATA_ROUNDED_CUBE)
+  assert.deepEqual(gltf.parser.json.extensionsUsed, ['KHR_xmp_json_ld'])
+  assert.deepEqual(gltf.parser.json.asset.extensions, { KHR_xmp_json_ld: { packet: 0 } })
+  const mesh = gltf.scene.getObjectByName('MODEL_ROUNDED_CUBE_PART_1model_N3D')
+  assert.ok(mesh?.isMesh, 'XmpMetadataRoundedCube should load its rounded cube mesh')
+  assert.deepEqual(mesh.userData.gltfExtensions, { KHR_xmp_json_ld: { packet: 1 } })
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3456)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 3456)
+  assert.equal(mesh.geometry.index?.count, 5172)
+  assert.equal(mesh.material.name, 'Rounded Cube Material')
+  assert.equal(mesh.material.side, THREE.DoubleSide)
+  assertVectorClose(mesh.material.color.toArray(), [0.6307567954063416, 0.6307567954063416, 0.6307567954063416], 'XmpMetadataRoundedCube material color')
+  assert.equal(mesh.material.metalness, 0)
+  assert.equal(mesh.material.roughness, 0.503000020980835)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.7)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y, size.z) / 2 + 0.1
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.01, 20)
+  camera.position.set(center.x + 2, center.y + 2, center.z + 3)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.9, 'XmpMetadataRoundedCube should render visible rounded cube geometry')
 })
 
 test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
