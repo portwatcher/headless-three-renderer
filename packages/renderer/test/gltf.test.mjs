@@ -47,6 +47,7 @@ const SAMPLE_ASSET_BOX_TEXTURED_NPOT = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
+const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
@@ -316,6 +317,108 @@ test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alph
   assert.ok(nonBackgroundRatio(rgba, [10, 10, 10], 4) > 0.4, 'AlphaBlendModeTest should render visible alpha-mode geometry')
   const center = meanRegion(rgba, 160, 120, 60, 40, 100, 80)
   assert.ok(center.r > 80 && center.g > 80 && center.b > 70, `AlphaBlendModeTest render should include the textured material bed (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets CompareAlphaCoverage fixture loads alpha coverage material variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'CompareAlphaCoverage.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'FurBaseColorAlpha.png',
+    'FurNormal.png',
+    'FurEmissive.jpg',
+    'FurORM.jpg',
+    'FloorBaseColor.jpg',
+    'FloorNormal.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [material.name, material.alphaMode ?? 'OPAQUE', material.alphaCutoff ?? null]), [
+    ['fur_opaque', 'OPAQUE', null],
+    ['fur floor', 'OPAQUE', null],
+    ['fur_mask', 'MASK', 0.2],
+    ['fur_blend', 'BLEND', null],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Fur001_0',
+    'Fur001_1',
+    'Fur002_0',
+    'Fur002_1',
+    'Fur003_0',
+    'Fur003_1',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [32, 4, 32, 4, 4, 32])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [48, 6, 48, 6, 6, 48])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const opaque = materials.get('fur_opaque')
+  const mask = materials.get('fur_mask')
+  const blend = materials.get('fur_blend')
+  const floor = materials.get('fur floor')
+  assert.equal(opaque?.transparent, false)
+  assert.equal(mask?.transparent, false)
+  assert.equal(mask.alphaTest, 0.2)
+  assert.equal(blend?.transparent, true)
+  assert.equal(blend.alphaTest, 0)
+  assert.equal(floor?.transparent, false)
+  assert.ok([opaque, mask, blend, floor].every((material) => material.side === THREE.DoubleSide))
+
+  for (const material of [opaque, mask, blend]) {
+    assert.equal(Buffer.isBuffer(material.map?.image), true, `${material.name} base color/alpha PNG should load as an encoded Buffer`)
+    assert.equal(material.map.name, 'FurBaseColorAlpha.png')
+    assert.deepEqual(pngDimensions(material.map.image), [1024, 1024])
+    assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.map.flipY, false)
+
+    assert.equal(Buffer.isBuffer(material.normalMap?.image), true, `${material.name} normal PNG should load as an encoded Buffer`)
+    assert.equal(material.normalMap.name, 'FurNormal.png')
+    assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.normalMap.flipY, false)
+
+    assert.equal(Buffer.isBuffer(material.emissiveMap?.image), true, `${material.name} emissive JPEG should load as an encoded Buffer`)
+    assert.equal(material.emissiveMap.name, 'FurEmissive.jpg')
+    assert.equal(material.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.emissiveMap.flipY, false)
+
+    assert.equal(material.roughnessMap, material.metalnessMap, `${material.name} roughness and metalness should share the packed ORM texture`)
+    assert.equal(material.aoMap, material.roughnessMap, `${material.name} occlusion and roughness should share the packed ORM texture`)
+    assert.equal(Buffer.isBuffer(material.roughnessMap?.image), true, `${material.name} ORM JPEG should load as an encoded Buffer`)
+    assert.equal(material.roughnessMap.name, 'FurORM.jpg')
+    assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.roughnessMap.flipY, false)
+  }
+
+  assert.equal(Buffer.isBuffer(floor.map?.image), true, 'floor base color JPEG should load as an encoded Buffer')
+  assert.equal(floor.map.name, 'FloorBaseColor.jpg')
+  assert.equal(floor.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(floor.map.flipY, false)
+  assert.equal(Buffer.isBuffer(floor.normalMap?.image), true, 'floor normal JPEG should load as an encoded Buffer')
+  assert.equal(floor.normalMap.name, 'FloorNormal.jpg')
+  assert.equal(floor.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(floor.normalMap.flipY, false)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 10 / 7, 0.01, 20)
+  camera.position.set(0, -7, 3.5)
+  camera.lookAt(0, 0, 1)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 112,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.03, 'CompareAlphaCoverage should render visible alpha coverage panels')
 })
 
 test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture maps', async () => {
