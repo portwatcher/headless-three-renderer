@@ -33,6 +33,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
+const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
@@ -803,6 +804,38 @@ test('committed Khronos glTF Sample Assets MultipleScenes fixture preserves defa
   assert.ok(triangleRatio > 0.25, `alternate triangle scene should render visible pixels (${triangleRatio})`)
   assert.ok(squareRatio > 0.6, `default square scene should render visible pixels (${squareRatio})`)
   assert.ok(squareRatio > triangleRatio + 0.25, `default square scene should cover more pixels than alternate triangle scene (${squareRatio} vs ${triangleRatio})`)
+})
+
+test('committed Khronos glTF Sample Assets SimpleMaterial fixture loads scalar PBR material factors', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_MATERIAL)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos SimpleMaterial sample should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3)
+  assert.equal(mesh.geometry.index?.count, 3)
+  assert.equal(mesh.material.isMeshStandardMaterial, true)
+  assert.deepEqual(mesh.material.color.toArray(), [1, 0.766, 0.336])
+  assert.equal(mesh.material.metalness, 0.5)
+  assert.equal(mesh.material.roughness, 0.1)
+
+  mesh.position.set(-0.5, -0.5, 0)
+  const camera = new THREE.OrthographicCamera(-0.6, 0.6, 0.6, -0.6, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'SimpleMaterial sample should render visible PBR geometry')
+  const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
+  assert.ok(center.r > center.b + 50 && center.g > center.b + 35, `SimpleMaterial sample should render warm base-color pixels (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets UnlitTest fixture loads KHR_materials_unlit', async () => {
