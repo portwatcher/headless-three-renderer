@@ -73,6 +73,7 @@ const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
+const SAMPLE_ASSET_MORPH_PRIMITIVES_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphPrimitivesTest', 'glTF', 'MorphPrimitivesTest.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
@@ -4253,6 +4254,104 @@ test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and 
   assert.ok(points.r > 60 && points.g > 60 && points.b > 60, `POINTS primitive should render visible pixels (${points.r}, ${points.g}, ${points.b})`)
   assert.ok(lineLoop.r > 40 && lineLoop.g > 40 && lineLoop.b > 40, `LINE_LOOP primitive should render visible pixels (${lineLoop.r}, ${lineLoop.g}, ${lineLoop.b})`)
   assert.ok(triangleFan.r > 120 && triangleFan.g > 120 && triangleFan.b > 120, `TRIANGLE_FAN primitive should render visible pixels (${triangleFan.r}, ${triangleFan.g}, ${triangleFan.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MorphPrimitivesTest fixture preserves morph targets across split primitives', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_MORPH_PRIMITIVES_TEST, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'MorphPrimitivesTest.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), ['uv_texture.jpg'])
+  assert.deepEqual(source.meshes[0].weights, [0.5])
+  assert.deepEqual(source.meshes[0].primitives.map((primitive) => ({
+    mode: primitive.mode,
+    material: primitive.material,
+    targetAttributes: Object.keys(primitive.targets[0]),
+  })), [
+    { mode: 4, material: 0, targetAttributes: ['POSITION'] },
+    { mode: 4, material: 1, targetAttributes: ['POSITION'] },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MORPH_PRIMITIVES_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => ({
+    name: mesh.name,
+    material: mesh.material.name,
+    positions: mesh.geometry.getAttribute('position')?.count,
+    normals: mesh.geometry.getAttribute('normal')?.count,
+    uvs: mesh.geometry.getAttribute('uv')?.count,
+    index: mesh.geometry.index?.count,
+    morphPositions: mesh.geometry.morphAttributes.position?.map((attribute) => attribute.count),
+    influences: mesh.morphTargetInfluences,
+    morphTargetsRelative: mesh.geometry.morphTargetsRelative,
+  })), [
+    {
+      name: 'mesh_1',
+      material: 'red',
+      positions: 21,
+      normals: 21,
+      uvs: 21,
+      index: 72,
+      morphPositions: [21],
+      influences: [0.5],
+      morphTargetsRelative: true,
+    },
+    {
+      name: 'mesh_2',
+      material: 'green',
+      positions: 9,
+      normals: 9,
+      uvs: 9,
+      index: 24,
+      morphPositions: [9],
+      influences: [0.5],
+      morphTargetsRelative: true,
+    },
+  ])
+
+  assertVectorClose(meshes[0].material.color.toArray(), [1, 0, 0], 'MorphPrimitivesTest red material')
+  assertVectorClose(meshes[1].material.color.toArray(), [0, 1, 0], 'MorphPrimitivesTest green material')
+  for (const mesh of meshes) {
+    assert.equal(mesh.material.isMeshStandardMaterial, true)
+    assert.equal(mesh.material.map?.name, 'uv_texture.jpg')
+    assert.equal(Buffer.isBuffer(mesh.material.map.image), true, `${mesh.name} should load the external JPEG as an encoded Buffer`)
+    assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(mesh.material.map.flipY, false)
+
+    const position = mesh.geometry.getAttribute('position')
+    const morphPosition = mesh.geometry.morphAttributes.position[0]
+    let morphedMaxY = -Infinity
+    for (let i = 0; i < position.count; i += 1) {
+      morphedMaxY = Math.max(morphedMaxY, position.getY(i) + morphPosition.getY(i))
+    }
+    assert.ok(Math.abs(morphedMaxY - 0.20000000298023224) < 1e-8, `${mesh.name} should preserve its upward morph target`)
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
+  camera.position.set(1.8, 1.4, 3.2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  const light = new THREE.DirectionalLight(0xffffff, 1.2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.03, 'MorphPrimitivesTest should render visible morphed primitive meshes')
+  const redRegion = meanRegion(rgba, 128, 128, 52, 52, 76, 76)
+  const greenRegion = meanRegion(rgba, 128, 128, 76, 52, 100, 76)
+  assert.ok(redRegion.r > redRegion.g + 70 && redRegion.r > redRegion.b + 90, `MorphPrimitivesTest should render the red primitive (${redRegion.r}, ${redRegion.g}, ${redRegion.b})`)
+  assert.ok(greenRegion.g > greenRegion.r && greenRegion.g > greenRegion.b + 10, `MorphPrimitivesTest should render the green primitive (${greenRegion.r}, ${greenRegion.g}, ${greenRegion.b})`)
 })
 
 test('committed Khronos glTF Sample Assets NegativeScaleTest fixture preserves negative node determinants', async () => {
