@@ -14857,7 +14857,75 @@ test('invalid directional shadow cascade hints fail clearly', () => {
   }
 })
 
-test('multiple shadow-casting lights fail clearly', () => {
+test('multiple shadow-casting directional lights render separate shadow maps', () => {
+  function renderDirectionalShadows(lightXs) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        colorWrite: false,
+        depthWrite: false,
+      }),
+    )
+    caster.position.y = 0.75
+    caster.castShadow = true
+    scene.add(caster)
+
+    for (const x of lightXs) {
+      const light = new THREE.DirectionalLight(0xffffff, 2)
+      light.position.set(x, 5, 0)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(512, 512)
+      light.shadow.camera.left = -6
+      light.shadow.camera.right = 6
+      light.shadow.camera.top = 6
+      light.shadow.camera.bottom = -6
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 12
+      scene.add(light)
+      scene.add(light.target)
+    }
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 10, 0)
+    camera.up.set(0, 0, -1)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 128, height: 128 })
+  }
+
+  const firstOnly = renderDirectionalShadows([5])
+  const secondOnly = renderDirectionalShadows([-5])
+  const both = renderDirectionalShadows([5, -5])
+  const luminance = (mean) => mean.r + mean.g + mean.b
+  const left = [28, 54, 48, 74]
+  const right = [80, 54, 100, 74]
+
+  const firstLeft = luminance(meanRegion(firstOnly, 128, 128, ...left))
+  const firstRight = luminance(meanRegion(firstOnly, 128, 128, ...right))
+  const secondLeft = luminance(meanRegion(secondOnly, 128, 128, ...left))
+  const secondRight = luminance(meanRegion(secondOnly, 128, 128, ...right))
+  const bothLeft = luminance(meanRegion(both, 128, 128, ...left))
+  const bothRight = luminance(meanRegion(both, 128, 128, ...right))
+
+  assert.ok(firstLeft < firstRight - 30, `first light should cast the left shadow (${firstLeft} vs ${firstRight})`)
+  assert.ok(secondRight < secondLeft - 30, `second light should cast the right shadow (${secondRight} vs ${secondLeft})`)
+  assert.ok(bothLeft < secondLeft - 30, `dual shadow maps should keep the first light's left shadow (${bothLeft} vs ${secondLeft})`)
+  assert.ok(bothRight < firstRight - 30, `dual shadow maps should add the second light's right shadow (${bothRight} vs ${firstRight})`)
+})
+
+test('shadow lights over the native layer budget fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
   scene.add(new THREE.Mesh(
@@ -14865,22 +14933,25 @@ test('multiple shadow-casting lights fail clearly', () => {
     new THREE.MeshStandardMaterial({ color: 0xffffff }),
   ))
 
-  for (const x of [-3, 3]) {
-    const light = new THREE.DirectionalLight(0xffffff, 1)
-    light.position.set(x, 4, 3)
-    light.target.position.set(0, 0, 0)
-    light.castShadow = true
-    scene.add(light)
-    scene.add(light.target)
-  }
+  const point = new THREE.PointLight(0xffffff, 1)
+  point.position.set(0, 4, 0)
+  point.castShadow = true
+  scene.add(point)
+
+  const directional = new THREE.DirectionalLight(0xffffff, 1)
+  directional.position.set(4, 6, 3)
+  directional.target.position.set(0, 0, 0)
+  directional.castShadow = true
+  scene.add(directional)
+  scene.add(directional.target)
 
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /multiple shadow-casting lights.*not supported/i,
+    /more than 6 shadow map layers.*7 requested/i,
   )
 })
 
-test('camera-layer-filtered shadow lights do not count toward the shadow light limit', () => {
+test('camera-layer-filtered shadow lights are omitted before native shadow packing', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
   camera.layers.set(1)

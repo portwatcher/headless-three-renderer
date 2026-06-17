@@ -11,7 +11,7 @@ use crate::mesh::{
     TextureFilter, TextureSamplerSettings, Topology, Vertex, WrapMode, prepare_meshes,
 };
 use crate::settings::{
-    BackgroundTexture, BackgroundTextureMapping, OutputColorSpace, OutputFormat,
+    BackgroundTexture, BackgroundTextureMapping, MAX_SHADOW_LAYERS, OutputColorSpace, OutputFormat,
     PostProcessingSettings, RenderSettings, ShadowKind,
 };
 use crate::shader::{BACKGROUND_SHADER, POST_SHADER, SHADER, custom_shader_source};
@@ -71,15 +71,21 @@ pub struct Uniforms {
     pub fog_color: [f32; 4],
     /// x = mode (0=off, 1=linear, 2=exp2), y = near, z = far, w = density
     pub fog_params: [f32; 4],
-    pub light_space_matrices: [[[f32; 4]; 4]; 6],
-    /// x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
+    pub light_space_matrices: [[[f32; 4]; 4]; MAX_SHADOW_LAYERS],
+    /// x = shadow count, y = first bias, z = first normal_bias, w = receive_shadow
     pub shadow_params: [f32; 4],
-    /// x = shadow light index, y = 1/map_width, z = 1/map_height, w = shadow kind.
+    /// x = first shadow light index, y = 1/map_width, z = 1/map_height, w = first shadow kind.
     pub shadow_params2: [f32; 4],
-    /// x/y/z = cascade split distances, w = shadow layer count.
+    /// x/y/z = first cascade split distances, w = shadow layer count.
     pub shadow_params3: [f32; 4],
     /// x = PCF radius multiplier, y = clip shadow caster fragments by clipping planes, z = explicit shadow side (0 double/no-cull, 1 front, 2 back), w = shadow-only alpha cutoff.
     pub shadow_params4: [f32; 4],
+    /// x = light index, y = layer base, z = layer count, w = shadow kind.
+    pub shadow_infos: [[f32; 4]; MAX_SHADOW_LAYERS],
+    /// x = bias, y = normal_bias, z = PCF radius multiplier, w = reserved.
+    pub shadow_biases: [[f32; 4]; MAX_SHADOW_LAYERS],
+    /// x/y/z = cascade split distances, w = reserved.
+    pub shadow_cascade_splits: [[f32; 4]; MAX_SHADOW_LAYERS],
     /// x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
     pub physical_params1: [f32; 4],
     /// xyz = sheen color, w = sheen roughness
@@ -146,7 +152,7 @@ pub struct GpuRenderer {
     ao_map_layout: wgpu::BindGroupLayout,
     shadow_layout: wgpu::BindGroupLayout,
     /// Depth-only pipeline used to render the shadow map.
-    shadow_pipelines: [wgpu::RenderPipeline; 6],
+    shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
     sampler: wgpu::Sampler,
     shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
@@ -1785,23 +1791,23 @@ impl GpuRenderer {
         Ok(rgba)
     }
 
-    /// Render the scene's shadow casters into a depth-only texture array from
-    /// the shadow light's POV and return a bind group referencing it.
+    /// Render the scene's shadow casters into a shared depth-only texture array
+    /// and return a bind group referencing it.
     fn render_shadow_pass(
         &self,
         settings: &RenderSettings,
         gpu_meshes: &[GpuMesh],
     ) -> (wgpu::BindGroup, wgpu::Texture) {
-        let shadow = settings
+        let shadow_maps = settings
             .shadow
             .as_ref()
-            .expect("render_shadow_pass requires a configured shadow caster");
+            .expect("render_shadow_pass requires configured shadow maps");
         let shadow_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("headless-three-renderer shadow map"),
             size: wgpu::Extent3d {
-                width: shadow.map_width,
-                height: shadow.map_height,
-                depth_or_array_layers: shadow.layer_count,
+                width: shadow_maps.map_width,
+                height: shadow_maps.map_height,
+                depth_or_array_layers: shadow_maps.layer_count,
             },
             mip_level_count: 1,
             sample_count: 1,
@@ -1812,7 +1818,7 @@ impl GpuRenderer {
         });
         let shadow_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2Array),
-            array_layer_count: Some(shadow.layer_count),
+            array_layer_count: Some(shadow_maps.layer_count),
             ..Default::default()
         });
 
@@ -1822,47 +1828,50 @@ impl GpuRenderer {
                 label: Some("headless-three-renderer shadow encoder"),
             });
 
-        for layer in 0..shadow.layer_count {
-            let layer_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
-                dimension: Some(wgpu::TextureViewDimension::D2),
-                base_array_layer: layer,
-                array_layer_count: Some(1),
-                ..Default::default()
-            });
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("headless-three-renderer shadow pass"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &layer_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
+        for caster in &shadow_maps.casters {
+            for local_layer in 0..caster.layer_count {
+                let layer = caster.layer_base + local_layer;
+                let layer_view = shadow_texture.create_view(&wgpu::TextureViewDescriptor {
+                    dimension: Some(wgpu::TextureViewDimension::D2),
+                    base_array_layer: layer,
+                    array_layer_count: Some(1),
+                    ..Default::default()
+                });
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("headless-three-renderer shadow pass"),
+                    color_attachments: &[],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &layer_view,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
                     }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-                multiview_mask: None,
-            });
-            pass.set_pipeline(&self.shadow_pipelines[layer as usize]);
-            for mesh in gpu_meshes.iter() {
-                // Only triangle meshes flagged as shadow casters contribute.
-                if !mesh.cast_shadow || mesh.topology != Topology::Triangles {
-                    continue;
-                }
-                pass.set_bind_group(0, &mesh.bind_group, &[]);
-                pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
-                pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
-                pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
-                pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
-                pass.set_bind_group(5, &self.default_ibl_bind_group, &[]);
-                pass.set_bind_group(6, &mesh.ao_map_bind_group, &[]);
-                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                if let Some(index_buffer) = &mesh.index_buffer {
-                    pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                    pass.draw_indexed(0..mesh.index_count, 0, 0..1);
-                } else {
-                    pass.draw(0..mesh.vertex_count, 0..1);
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                pass.set_pipeline(&self.shadow_pipelines[layer as usize]);
+                for mesh in gpu_meshes.iter() {
+                    // Only triangle meshes flagged as shadow casters contribute.
+                    if !mesh.cast_shadow || mesh.topology != Topology::Triangles {
+                        continue;
+                    }
+                    pass.set_bind_group(0, &mesh.bind_group, &[]);
+                    pass.set_bind_group(1, &mesh.texture_bind_group, &[]);
+                    pass.set_bind_group(2, &mesh.normal_map_bind_group, &[]);
+                    pass.set_bind_group(3, &mesh.mr_map_bind_group, &[]);
+                    pass.set_bind_group(4, &mesh.emissive_map_bind_group, &[]);
+                    pass.set_bind_group(5, &self.default_ibl_bind_group, &[]);
+                    pass.set_bind_group(6, &mesh.ao_map_bind_group, &[]);
+                    pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    if let Some(index_buffer) = &mesh.index_buffer {
+                        pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                        pass.draw_indexed(0..mesh.index_count, 0, 0..1);
+                    } else {
+                        pass.draw(0..mesh.vertex_count, 0..1);
+                    }
                 }
             }
         }
@@ -1894,7 +1903,6 @@ impl GpuRenderer {
                 },
             ],
         });
-        let _ = &shadow.light_dir; // silence unused warning; direction baked into light_vp
         (bind_group, shadow_texture)
     }
 
@@ -2598,53 +2606,26 @@ impl GpuRenderer {
                 settings.fog.far,
                 settings.fog.density,
             ],
-            light_space_matrices: settings
-                .shadow
-                .as_ref()
-                .map(|s| s.light_vps.map(|matrix| matrix.to_cols_array_2d()))
-                .unwrap_or_else(|| [Mat4::IDENTITY.to_cols_array_2d(); 6]),
-            shadow_params: match &settings.shadow {
-                Some(s) => [
-                    1.0,
-                    s.bias,
-                    s.normal_bias,
-                    if mesh.receive_shadow { 1.0 } else { 0.0 },
-                ],
-                None => [0.0, 0.0, 0.0, 0.0],
-            },
-            shadow_params2: match &settings.shadow {
-                Some(s) => [
-                    s.light_index as f32,
-                    1.0 / s.map_width as f32,
-                    1.0 / s.map_height as f32,
-                    match s.kind {
-                        ShadowKind::DirectionalOrSpot => 0.0,
-                        ShadowKind::Point => 1.0,
-                        ShadowKind::Cascaded => 2.0,
-                    },
-                ],
-                None => [0.0, 0.0, 0.0, 0.0],
-            },
-            shadow_params3: settings.shadow.as_ref().map_or([f32::MAX; 4], |s| {
-                [
-                    s.cascade_splits[0],
-                    s.cascade_splits[1],
-                    s.cascade_splits[2],
-                    s.layer_count as f32,
-                ]
-            }),
+            light_space_matrices: shadow_light_space_matrices(settings),
+            shadow_params: shadow_params(settings, mesh.receive_shadow),
+            shadow_params2: shadow_params2(settings),
+            shadow_params3: shadow_params3(settings),
             shadow_params4: settings
                 .shadow
                 .as_ref()
                 .map(|s| {
+                    let radius = s.casters.first().map_or(1.0, |caster| caster.radius);
                     [
-                        s.radius,
+                        radius,
                         if mesh.clip_shadows { 1.0 } else { 0.0 },
                         shadow_side_mode(mesh.shadow_side),
                         shadow_alpha_cutoff(mesh),
                     ]
                 })
                 .unwrap_or([1.0, 0.0, 0.0, 0.0]),
+            shadow_infos: shadow_infos(settings),
+            shadow_biases: shadow_biases(settings),
+            shadow_cascade_splits: shadow_cascade_splits(settings),
             physical_params1: [
                 mesh.clearcoat,
                 mesh.clearcoat_roughness,
@@ -3285,6 +3266,112 @@ fn side_index(side: MeshSide) -> usize {
         MeshSide::Back => 1,
         MeshSide::Double => 2,
     }
+}
+
+fn shadow_kind_mode(kind: ShadowKind) -> f32 {
+    match kind {
+        ShadowKind::DirectionalOrSpot => 0.0,
+        ShadowKind::Point => 1.0,
+        ShadowKind::Cascaded => 2.0,
+    }
+}
+
+fn shadow_light_space_matrices(settings: &RenderSettings) -> [[[f32; 4]; 4]; MAX_SHADOW_LAYERS] {
+    let mut matrices = [Mat4::IDENTITY.to_cols_array_2d(); MAX_SHADOW_LAYERS];
+    if let Some(shadow_maps) = &settings.shadow {
+        for caster in &shadow_maps.casters {
+            for local_layer in 0..caster.layer_count as usize {
+                let global_layer = caster.layer_base as usize + local_layer;
+                matrices[global_layer] = caster.light_vps[local_layer].to_cols_array_2d();
+            }
+        }
+    }
+    matrices
+}
+
+fn shadow_params(settings: &RenderSettings, receive_shadow: bool) -> [f32; 4] {
+    let Some(shadow_maps) = &settings.shadow else {
+        return [0.0; 4];
+    };
+    let Some(first) = shadow_maps.casters.first() else {
+        return [0.0; 4];
+    };
+    [
+        shadow_maps.casters.len() as f32,
+        first.bias,
+        first.normal_bias,
+        if receive_shadow { 1.0 } else { 0.0 },
+    ]
+}
+
+fn shadow_params2(settings: &RenderSettings) -> [f32; 4] {
+    let Some(shadow_maps) = &settings.shadow else {
+        return [0.0; 4];
+    };
+    let Some(first) = shadow_maps.casters.first() else {
+        return [0.0; 4];
+    };
+    [
+        first.light_index as f32,
+        1.0 / shadow_maps.map_width as f32,
+        1.0 / shadow_maps.map_height as f32,
+        shadow_kind_mode(first.kind),
+    ]
+}
+
+fn shadow_params3(settings: &RenderSettings) -> [f32; 4] {
+    let Some(shadow_maps) = &settings.shadow else {
+        return [f32::MAX; 4];
+    };
+    let Some(first) = shadow_maps.casters.first() else {
+        return [f32::MAX; 4];
+    };
+    [
+        first.cascade_splits[0],
+        first.cascade_splits[1],
+        first.cascade_splits[2],
+        first.layer_count as f32,
+    ]
+}
+
+fn shadow_infos(settings: &RenderSettings) -> [[f32; 4]; MAX_SHADOW_LAYERS] {
+    let mut infos = [[0.0; 4]; MAX_SHADOW_LAYERS];
+    if let Some(shadow_maps) = &settings.shadow {
+        for (slot, caster) in shadow_maps.casters.iter().enumerate() {
+            infos[slot] = [
+                caster.light_index as f32,
+                caster.layer_base as f32,
+                caster.layer_count as f32,
+                shadow_kind_mode(caster.kind),
+            ];
+        }
+    }
+    infos
+}
+
+fn shadow_biases(settings: &RenderSettings) -> [[f32; 4]; MAX_SHADOW_LAYERS] {
+    let mut biases = [[0.0; 4]; MAX_SHADOW_LAYERS];
+    if let Some(shadow_maps) = &settings.shadow {
+        for (slot, caster) in shadow_maps.casters.iter().enumerate() {
+            biases[slot] = [caster.bias, caster.normal_bias, caster.radius, 0.0];
+        }
+    }
+    biases
+}
+
+fn shadow_cascade_splits(settings: &RenderSettings) -> [[f32; 4]; MAX_SHADOW_LAYERS] {
+    let mut splits = [[f32::MAX; 4]; MAX_SHADOW_LAYERS];
+    if let Some(shadow_maps) = &settings.shadow {
+        for (slot, caster) in shadow_maps.casters.iter().enumerate() {
+            splits[slot] = [
+                caster.cascade_splits[0],
+                caster.cascade_splits[1],
+                caster.cascade_splits[2],
+                0.0,
+            ];
+        }
+    }
+    splits
 }
 
 fn shadow_side_mode(side: MeshSide) -> f32 {

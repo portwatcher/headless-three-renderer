@@ -1,6 +1,7 @@
 pub const SHADER: &str = r#"
 const PI: f32 = 3.14159265359;
 const MAX_LIGHTS: u32 = 64u;
+const MAX_SHADOW_LAYERS: u32 = 6u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -87,14 +88,20 @@ struct Uniforms {
   // x = mode (0=off, 1=linear, 2=exp2), y = near, z = far, w = density
   fog_params: vec4<f32>,
   light_space_matrices: array<mat4x4<f32>, 6>,
-  // x = has_shadow, y = bias, z = normal_bias, w = receive_shadow
+  // x = shadow count, y = first bias, z = first normal_bias, w = receive_shadow
   shadow_params: vec4<f32>,
-  // x = shadow light index, y = 1/map_width, z = 1/map_height, w = shadow kind (0=2D, 1=point, 2=cascaded)
+  // x = first shadow light index, y = 1/map_width, z = 1/map_height, w = first shadow kind (0=2D, 1=point, 2=cascaded)
   shadow_params2: vec4<f32>,
-  // x/y/z = cascade split distances, w = shadow layer count.
+  // x/y/z = first cascade split distances, w = first shadow layer count.
   shadow_params3: vec4<f32>,
-  // x = PCF radius multiplier, y = clip shadow caster fragments by clipping_planes, z = explicit shadow side (0=double/no-cull, 1=front, 2=back), w = shadow-only alpha cutoff.
+  // x = first PCF radius multiplier, y = clip shadow caster fragments by clipping_planes, z = explicit shadow side (0=double/no-cull, 1=front, 2=back), w = shadow-only alpha cutoff.
   shadow_params4: vec4<f32>,
+  // x = light index, y = layer base, z = layer count, w = shadow kind.
+  shadow_infos: array<vec4<f32>, 6>,
+  // x = bias, y = normal_bias, z = PCF radius multiplier, w = reserved.
+  shadow_biases: array<vec4<f32>, 6>,
+  // x/y/z = cascade split distances, w = reserved.
+  shadow_cascade_splits: array<vec4<f32>, 6>,
   // x = clearcoat, y = clearcoat roughness, z = transmission, w = ior
   physical_params1: vec4<f32>,
   // xyz = sheen color, w = sheen roughness
@@ -302,8 +309,9 @@ fn fs_shadow(input: ShadowVertexOutput, @builtin(front_facing) front_facing: boo
   }
 }
 
-fn sample_shadow_layer(world_pos: vec3<f32>, layer: u32, world_normal: vec3<f32>) -> f32 {
-  let biased_pos = world_pos + world_normal * uniforms.shadow_params.z;
+fn sample_shadow_layer(shadow_slot: u32, world_pos: vec3<f32>, layer: u32, world_normal: vec3<f32>) -> f32 {
+  let bias = uniforms.shadow_biases[shadow_slot];
+  let biased_pos = world_pos + world_normal * bias.y;
   let light_ndc = uniforms.light_space_matrices[layer] * vec4<f32>(biased_pos, 1.0);
   let proj = light_ndc.xyz / light_ndc.w;
 
@@ -315,14 +323,14 @@ fn sample_shadow_layer(world_pos: vec3<f32>, layer: u32, world_normal: vec3<f32>
     return 1.0;
   }
 
-  let reference = proj.z - uniforms.shadow_params.y;
+  let reference = proj.z - bias.x;
   let texel = uniforms.shadow_params2.yz;
 
   // 3x3 PCF.
   var sum: f32 = 0.0;
   for (var dy = -1; dy <= 1; dy = dy + 1) {
     for (var dx = -1; dx <= 1; dx = dx + 1) {
-      let offset = vec2<f32>(f32(dx), f32(dy)) * texel * uniforms.shadow_params4.x;
+      let offset = vec2<f32>(f32(dx), f32(dy)) * texel * bias.z;
       sum = sum + textureSampleCompareLevel(t_shadow, s_shadow, uv + offset, layer, reference);
     }
   }
@@ -340,34 +348,67 @@ fn point_shadow_layer(light_vec: vec3<f32>) -> u32 {
   return select(5u, 4u, light_vec.z >= 0.0);
 }
 
+fn sample_shadow_slot(shadow_slot: u32, world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
+  let info = uniforms.shadow_infos[shadow_slot];
+  let layer_base = u32(info.y);
+  let layer_count = max(u32(info.z), 1u);
+  let kind = info.w;
+  if kind > 0.5 {
+    if kind > 1.5 {
+      let splits = uniforms.shadow_cascade_splits[shadow_slot];
+      let camera_dist = distance(world_pos, uniforms.camera_pos.xyz);
+      var local_layer = 0u;
+      if camera_dist > splits.x {
+        local_layer = 1u;
+      }
+      if camera_dist > splits.y {
+        local_layer = 2u;
+      }
+      if camera_dist > splits.z {
+        local_layer = 3u;
+      }
+      local_layer = min(local_layer, layer_count - 1u);
+      return sample_shadow_layer(shadow_slot, world_pos, layer_base + local_layer, world_normal);
+    }
+    let light_index = u32(info.x);
+    let light_pos = uniforms.lights[light_index].position.xyz;
+    let local_layer = point_shadow_layer(world_pos - light_pos);
+    return sample_shadow_layer(shadow_slot, world_pos, layer_base + local_layer, world_normal);
+  }
+  return sample_shadow_layer(shadow_slot, world_pos, layer_base, world_normal);
+}
+
 // 3x3 PCF shadow sampling. Returns the fraction of samples NOT in shadow
-// (i.e. 1.0 = fully lit, 0.0 = fully occluded).
-fn sample_shadow(world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
+// for the requested light (i.e. 1.0 = fully lit, 0.0 = fully occluded).
+fn sample_shadow_for_light(light_index: u32, world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
   if uniforms.shadow_params.x < 0.5 || uniforms.shadow_params.w < 0.5 {
     return 1.0;
   }
-  if uniforms.shadow_params2.w > 0.5 {
-    if uniforms.shadow_params2.w > 1.5 {
-      let camera_dist = distance(world_pos, uniforms.camera_pos.xyz);
-      var layer = 0u;
-      if camera_dist > uniforms.shadow_params3.x {
-        layer = 1u;
-      }
-      if camera_dist > uniforms.shadow_params3.y {
-        layer = 2u;
-      }
-      if camera_dist > uniforms.shadow_params3.z {
-        layer = 3u;
-      }
-      layer = min(layer, max(u32(uniforms.shadow_params3.w), 1u) - 1u);
-      return sample_shadow_layer(world_pos, layer, world_normal);
+  let shadow_count = min(u32(uniforms.shadow_params.x), MAX_SHADOW_LAYERS);
+  for (var shadow_slot = 0u; shadow_slot < MAX_SHADOW_LAYERS; shadow_slot = shadow_slot + 1u) {
+    if shadow_slot >= shadow_count {
+      break;
     }
-    let light_index = u32(uniforms.shadow_params2.x);
-    let light_pos = uniforms.lights[light_index].position.xyz;
-    let layer = point_shadow_layer(world_pos - light_pos);
-    return sample_shadow_layer(world_pos, layer, world_normal);
+    if u32(uniforms.shadow_infos[shadow_slot].x) == light_index {
+      return sample_shadow_slot(shadow_slot, world_pos, world_normal);
+    }
   }
-  return sample_shadow_layer(world_pos, 0u, world_normal);
+  return 1.0;
+}
+
+fn sample_combined_shadow(world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 {
+  if uniforms.shadow_params.x < 0.5 || uniforms.shadow_params.w < 0.5 {
+    return 1.0;
+  }
+  let shadow_count = min(u32(uniforms.shadow_params.x), MAX_SHADOW_LAYERS);
+  var visibility = 1.0;
+  for (var shadow_slot = 0u; shadow_slot < MAX_SHADOW_LAYERS; shadow_slot = shadow_slot + 1u) {
+    if shadow_slot >= shadow_count {
+      break;
+    }
+    visibility = min(visibility, sample_shadow_slot(shadow_slot, world_pos, world_normal));
+  }
+  return visibility;
 }
 
 // GGX/Trowbridge-Reitz normal distribution
@@ -1045,7 +1086,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let attenuation_distance = max(uniforms.physical_params3.w, 0.0);
 
   if use_shadow_material {
-    let shadow_alpha = alpha * (1.0 - sample_shadow(input.world_pos, N));
+    let shadow_alpha = alpha * (1.0 - sample_combined_shadow(input.world_pos, N));
     let mapped_shadow = apply_output_color_space(aces_filmic_tone_mapping(albedo));
     let fogged_shadow = apply_fog(mapped_shadow, fog_depth(input.world_pos));
     return output_color(fogged_shadow, shadow_alpha);
@@ -1119,8 +1160,6 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     lo = albedo * total_ambient * ao + light_map_diffuse;
   } else {
     // Direct lighting from scene lights
-    let shadow_factor = sample_shadow(input.world_pos, N);
-    let shadow_light_index = u32(uniforms.shadow_params2.x);
     for (var i = 0u; i < uniforms.num_lights && i < MAX_LIGHTS; i = i + 1u) {
       let light = uniforms.lights[i];
 
@@ -1140,9 +1179,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       if light.light_type == 0u {
         // Directional
         L = normalize(-light.direction.xyz);
-        if i == shadow_light_index {
-          attenuation *= shadow_factor;
-        }
+        attenuation *= sample_shadow_for_light(i, input.world_pos, N);
       } else if light.light_type == 4u {
         // RectAreaLight approximation: finite one-sided area emitter from the
         // light center. This is intentionally cheaper than Three.js' LUT path.
@@ -1171,9 +1208,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
           let penumbra_cos = light.params.y;
           attenuation *= get_spot_attenuation(cone_cos, penumbra_cos, cos_angle);
         }
-        if i == shadow_light_index {
-          attenuation *= shadow_factor;
-        }
+        attenuation *= sample_shadow_for_light(i, input.world_pos, N);
       }
 
       let H = normalize(V + L);
@@ -1423,6 +1458,7 @@ pub fn custom_shader_source(fragment_body: &str) -> String {
 
 const CUSTOM_FRAGMENT_SHADER: &str = r#"
 const MAX_LIGHTS: u32 = 64u;
+const MAX_SHADOW_LAYERS: u32 = 6u;
 const MAX_CLIPPING_PLANES: u32 = 8u;
 
 struct GpuLight {
@@ -1475,6 +1511,9 @@ struct Uniforms {
   shadow_params2: vec4<f32>,
   shadow_params3: vec4<f32>,
   shadow_params4: vec4<f32>,
+  shadow_infos: array<vec4<f32>, 6>,
+  shadow_biases: array<vec4<f32>, 6>,
+  shadow_cascade_splits: array<vec4<f32>, 6>,
   physical_params1: vec4<f32>,
   physical_params2: vec4<f32>,
   physical_params3: vec4<f32>,

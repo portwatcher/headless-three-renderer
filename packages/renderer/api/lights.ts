@@ -13,7 +13,6 @@ export function extractLights(scene: ThreeObject3DLike, camera?: ThreeCameraLike
   const lights: NativeSceneLight[] = []
   visitLights(scene, camera, lights)
   assertSupportedLightCount(lights)
-  assertSupportedShadowLightCount(lights)
   return lights.length > 0 ? lights : undefined
 }
 
@@ -490,18 +489,6 @@ function optionalPositiveFiniteNumber(value: unknown, label: string): number | u
 function requiredFiniteNumber(value: unknown, label: string): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
-}
-
-function assertSupportedShadowLightCount(lights: NativeSceneLight[]): void {
-  let shadowCasters = 0
-  for (const light of lights) {
-    if (light.castShadow === true) shadowCasters += 1
-  }
-  if (shadowCasters > 1) {
-    throw new Error(
-      'Multiple shadow-casting lights are not supported by @headless-three/renderer yet. Keep one visible directional, spot, or point light with castShadow enabled, or render separate passes until multiple shadow maps are supported.',
-    )
-  }
 }
 
 function assertSupportedLightCount(lights: NativeSceneLight[]): void {
