@@ -136,6 +136,7 @@ const SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'g
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformMultiTest', 'glTF', 'TextureTransformMultiTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
+const SAMPLE_ASSET_TOY_CAR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ToyCar', 'glTF', 'ToyCar.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ORDER_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionOrderTest', 'glTF', 'TransmissionOrderTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionTest', 'glTF', 'TransmissionTest.gltf')
@@ -6935,6 +6936,173 @@ test('committed Khronos glTF Sample Assets SunglassesKhronos fixture loads trans
   assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.15, 'SunglassesKhronos should render visible glasses geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r < 250 && mean.g < 250 && mean.b < 250, `SunglassesKhronos should render darker lens and frame pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets ToyCar fixture loads clearcoat, fabric sheen, and transmission glass materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TOY_CAR, 'utf8'))
+  assert.equal(source.extensionsRequired, undefined)
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_texture_transform',
+    'KHR_materials_clearcoat',
+    'KHR_materials_transmission',
+    'KHR_materials_sheen',
+  ])
+  assert.deepEqual(source.buffers, [
+    { uri: 'ToyCar.bin', byteLength: 3664368 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'ToyCar_normal.png',
+    'ToyCar_emissive.png',
+    'ToyCar_basecolor.png',
+    'ToyCar_occlusion_roughness_metallic.png',
+    'Fabric_normal.png',
+    'Fabric_occlusion.png',
+    'Fabric_baseColor.png',
+    'ToyCar_clearcoat.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), ['ToyCar', 'Fabric', 'Glass'])
+  assert.deepEqual(source.materials[0].extensions, {
+    KHR_materials_clearcoat: {
+      clearcoatFactor: 1,
+      clearcoatTexture: {
+        index: 7,
+        texCoord: 0,
+      },
+    },
+  })
+  assert.deepEqual(source.materials[1].pbrMetallicRoughness.baseColorTexture.extensions?.KHR_texture_transform, {
+    offset: [0, 0],
+    scale: [3, 3],
+    texCoord: 0,
+  })
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_sheen: {
+      sheenRoughnessFactor: 0.5,
+      sheenColorFactor: [1, 0, 0],
+    },
+  })
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+  })
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), ['ToyCar', 'Fabric', 'Glass'])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TOY_CAR)
+  assert.deepEqual(gltf.parser?.json?.extensionsUsed, source.extensionsUsed)
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 3)
+
+  const expectedMeshes = [
+    ['ToyCar', 66951, 266511, 'ToyCar'],
+    ['Fabric', 8959, 52815, 'Fabric'],
+    ['Glass', 1519, 7482, 'Glass'],
+  ]
+  for (const [name, vertexCount, indexCount, materialName] of expectedMeshes) {
+    const mesh = meshes.find((candidate) => candidate.name === name)
+    assert.ok(mesh, `${name} should load`)
+    assert.equal(mesh.geometry.getAttribute('position')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('normal')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('uv')?.count, vertexCount)
+    assert.equal(mesh.geometry.index?.count, indexCount)
+    assert.equal(mesh.material.name, materialName)
+  }
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const car = materials.get('ToyCar')
+  assert.equal(car?.isMeshPhysicalMaterial, true)
+  assert.equal(car.metalness, 1)
+  assert.equal(car.roughness, 1)
+  assert.deepEqual(car.emissive.toArray(), [1, 1, 1])
+  assert.equal(car.clearcoat, 1)
+  assert.equal(car.map.name, 'ToyCar_basecolor.png')
+  assert.equal(car.normalMap.name, 'ToyCar_normal.png')
+  assert.equal(car.aoMap.name, 'ToyCar_occlusion_roughness_metallic.png')
+  assert.equal(car.roughnessMap.name, 'ToyCar_occlusion_roughness_metallic.png')
+  assert.equal(car.metalnessMap.name, 'ToyCar_occlusion_roughness_metallic.png')
+  assert.equal(car.emissiveMap.name, 'ToyCar_emissive.png')
+  assert.equal(car.clearcoatMap.name, 'ToyCar_clearcoat.png')
+  assert.equal(car.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(car.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(car.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(car.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(car.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(car.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(car.clearcoatMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(car.aoMap.channel, 0)
+
+  const fabric = materials.get('Fabric')
+  assert.equal(fabric?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(fabric.color.toArray(), [0.15, 0.15, 0.15])
+  assert.equal(fabric.metalness, 0)
+  assert.equal(fabric.roughness, 1)
+  assert.equal(fabric.sheen, 1)
+  assert.deepEqual(fabric.sheenColor.toArray(), [1, 0, 0])
+  assert.equal(fabric.sheenRoughness, 0.5)
+  assert.equal(fabric.map.name, 'Fabric_baseColor.png')
+  assert.equal(fabric.normalMap.name, 'Fabric_normal.png')
+  assert.equal(fabric.aoMap.name, 'Fabric_occlusion.png')
+  assert.equal(fabric.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fabric.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fabric.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fabric.aoMap.channel, 0)
+  assert.deepEqual(fabric.map.repeat.toArray(), [3, 3])
+  assert.deepEqual(fabric.normalMap.repeat.toArray(), [3, 3])
+  assert.deepEqual(fabric.aoMap.repeat.toArray(), [1, 1])
+
+  const glass = materials.get('Glass')
+  assert.equal(glass?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(glass.color.toArray(), [0.3, 0.8, 0.3])
+  assert.equal(glass.metalness, 0)
+  assert.equal(glass.roughness, 0)
+  assert.equal(glass.transmission, 1)
+
+  const textureExpectations = [
+    [car.map, [1024, 1024]],
+    [car.normalMap, [1024, 1024]],
+    [car.aoMap, [1024, 1024]],
+    [car.roughnessMap, [1024, 1024]],
+    [car.metalnessMap, [1024, 1024]],
+    [car.emissiveMap, [1024, 1024]],
+    [car.clearcoatMap, [1024, 1024]],
+    [fabric.map, [512, 512]],
+    [fabric.normalMap, [512, 512]],
+    [fabric.aoMap, [1024, 1024]],
+  ]
+  for (const [texture, dimensions] of textureExpectations) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), dimensions)
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1.2, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.35, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.06, 'ToyCar should render visible clearcoated car geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g && mean.r > mean.b, `ToyCar should render red car pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets EmissiveStrengthTest fixture loads KHR_materials_emissive_strength factors', async () => {
