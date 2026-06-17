@@ -113,6 +113,7 @@ const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-s
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ORDER_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionOrderTest', 'glTF', 'TransmissionOrderTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
+const SAMPLE_ASSET_TRANSMISSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionTest', 'glTF', 'TransmissionTest.gltf')
 const SAMPLE_ASSET_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Triangle', 'glTF', 'Triangle.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TwoSidedPlane', 'glTF', 'TwoSidedPlane.gltf')
@@ -1644,6 +1645,94 @@ test('committed Khronos glTF Sample Assets TransmissionOrderTest fixture loads a
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'TransmissionOrderTest should render visible transparent/transmissive ordering panels')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 15 && mean.g > 10 && mean.b > 10, `TransmissionOrderTest should render non-black layered output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TransmissionTest fixture loads texture-driven transmission grid', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TRANSMISSION_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_xmp'])
+  assert.deepEqual(source.asset.extensions, { KHR_xmp: { packet: 0 } })
+  assert.equal(source.buffers[0].uri, 'TransmissionTest_binary.bin')
+  assert.equal(source.buffers[0].byteLength, 1441156)
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'TransmissionTest_images/texture28577.png',
+    'TransmissionTest_images/texture14184.png',
+    'TransmissionTest_images/texture214190.png',
+    'TransmissionTest_images/texture4086.png',
+    'TransmissionTest_images/texture177328.png',
+    'TransmissionTest_images/texture6807.png',
+    'TransmissionTest_images/texture175763.png',
+    'TransmissionTest_images/texture10487.png',
+    'TransmissionTest_images/texture15366.png',
+  ])
+  assert.equal(source.materials.length, 14)
+  assert.equal(source.materials.filter((material) => material.extensions?.KHR_materials_transmission).length, 12)
+  assert.equal(source.materials.filter((material) => material.alphaMode === 'MASK').length, 6)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TRANSMISSION_TEST)
+  assert.deepEqual(gltf.parser.json.extensionsUsed, ['KHR_materials_transmission', 'KHR_xmp'])
+  assert.equal(gltf.cameras.length, 1)
+  const importedCamera = gltf.cameras[0]
+  assert.equal(importedCamera.name, 'render_camera_n3d')
+  assert.equal(importedCamera.isPerspectiveCamera, true)
+  assert.ok(Math.abs(importedCamera.fov - 34.515876027228366) < 1e-6, `TransmissionTest camera fov should load (${importedCamera.fov})`)
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 22)
+  assert.equal(meshes[0].name, 'Cloth_Backdrop_01')
+  assert.equal(meshes[0].geometry.getAttribute('position')?.count, 22202)
+  assert.equal(meshes[0].geometry.index?.count, 131337)
+  assert.equal(meshes.filter((mesh) => mesh.name.startsWith('RedTransTexture')).length, 3)
+  assert.equal(meshes.filter((mesh) => mesh.name.startsWith('BlueTransWithMask')).length, 3)
+  assert.ok(meshes.slice(1, 13).every((mesh) => mesh.geometry.getAttribute('position')?.count === 3719), 'TransmissionTest sphere samples should share geometry density')
+  assert.ok(meshes.slice(1, 13).every((mesh) => mesh.geometry.index?.count === 21240), 'TransmissionTest sphere samples should share indexed sphere geometry')
+
+  const materials = [...new Set(meshes.map((mesh) => mesh.material))]
+  assert.equal(materials.length, 14)
+  assert.equal(materials.filter((material) => material.isMeshPhysicalMaterial === true).length, 12)
+  assert.ok(materials.filter((material) => material.transmission === 1).length >= 12)
+  assert.equal(materials.filter((material) => material.alphaTest === 0.5).length, 6)
+  assert.equal(materials.filter((material) => material.transmissionMap?.name === 'texture14184').length, 6)
+  assert.equal(materials.filter((material) => material.roughnessMap?.name === 'texture177328').length, 2)
+  assert.equal(materials.filter((material) => material.roughnessMap?.name === 'texture175763').length, 3)
+
+  const byName = new Map(materials.map((material) => [material.name, material]))
+  const red = byName.get('RedTransTexture')
+  const yellow = byName.get('YellowTrans')
+  const blue = materials.find((material) => material.name === 'BlueTransWithMask' && material.map?.name === 'texture214190')
+  const green = byName.get('GreenMask')
+  assert.equal(red.transmission, 1)
+  assert.equal(red.transmissionMap.name, 'texture14184')
+  assert.equal(red.transmissionMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(red.transmissionMap.image), [256, 256])
+  assert.equal(yellow.transmission, 1)
+  assert.equal(yellow.transmissionMap ?? null, null)
+  assert.equal(blue.alphaTest, 0.5)
+  assert.equal(blue.map.name, 'texture214190')
+  assert.equal(blue.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(green.alphaTest, 0.5)
+  assert.equal(green.map.name, 'texture4086')
+  assert.equal(green.transmission, 1)
+
+  importedCamera.aspect = 4 / 3
+  importedCamera.updateProjectionMatrix()
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.7)
+  light.position.set(0, 2, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  importedCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, importedCamera, {
+    width: 160,
+    height: 120,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.8, 'TransmissionTest should render visible texture-driven transmission grid')
 })
 
 test('committed Khronos glTF Sample Assets CompareVolume fixture loads transmission volume variants', async () => {
