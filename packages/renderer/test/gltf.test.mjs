@@ -43,6 +43,7 @@ const SAMPLE_ASSET_ATTENUATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
 const SAMPLE_ASSET_BARRAMUNDI_FISH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BarramundiFish', 'glTF', 'BarramundiFish.gltf')
 const SAMPLE_ASSET_BOOM_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBox', 'glTF', 'BoomBox.gltf')
+const SAMPLE_ASSET_BOOM_BOX_WITH_AXES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBoxWithAxes', 'glTF', 'BoomBoxWithAxes.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box With Spaces', 'glTF', 'Box With Spaces.gltf')
@@ -2133,6 +2134,79 @@ test('committed Khronos glTF Sample Assets BoomBox fixture loads emissive and pa
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'Khronos BoomBox sample should render visible textured pixels')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 8 && mean.g > 8 && mean.b > 8, `BoomBox textures should contribute non-black output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets BoomBoxWithAxes fixture loads coordinate-system meshes and shared materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_BOOM_BOX_WITH_AXES, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'BoomBoxWithAxes.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'BoomBoxWithAxes_baseColor.png',
+    'BoomBoxWithAxes_roughnessMetallic.png',
+    'BoomBoxWithAxes_normal.png',
+    'BoomBoxWithAxes_emissive.png',
+    'BoomBoxWithAxes_baseColor1.png',
+  ])
+  assert.deepEqual(source.nodes[5].children, [0, 1, 2, 3, 4])
+  assert.deepEqual(source.nodes[5].rotation, [0, 1, 0, 0])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOOM_BOX_WITH_AXES)
+  const root = gltf.scene.getObjectByName('BoomBox_Coordinates')
+  assert.deepEqual(root.children.map((child) => child.name), ['BoomBox', 'CoordinateSystem', 'X_axis', 'Y_axis', 'Z_axis'])
+  assertVectorClose(root.quaternion.toArray(), [0, 1, 0, 0], 'BoomBoxWithAxes root rotation')
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['BoomBox', 'CoordinateSystem', 'X_axis', 'Y_axis', 'Z_axis'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [3575, 875, 2252, 1820, 1708])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [3575, 875, 2252, 1820, 1708])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('tangent')?.count), [3575, 875, 2252, 1820, 1708])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [3575, 875, 2252, 1820, 1708])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [18108, 3420, 11064, 8976, 8496])
+  assert.ok(meshes.slice(2).every((mesh) => Math.abs(mesh.scale.x - 0.06) < 1e-12), 'axis meshes should retain imported scale transforms')
+
+  const [boombox, coordinateSystem, xAxis, yAxis, zAxis] = meshes
+  assert.equal(boombox.material.name, 'M_BoomBox')
+  assert.ok([coordinateSystem, xAxis, yAxis, zAxis].every((mesh) => mesh.material.name === 'M_Coordinates'))
+  const boomboxMaterial = boombox.material
+  assert.equal(boomboxMaterial.map.name, 'BoomBoxWithAxes_baseColor.png')
+  assert.deepEqual(pngDimensions(boomboxMaterial.map.image), [2048, 2048])
+  assert.equal(boomboxMaterial.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(boomboxMaterial.roughnessMap, boomboxMaterial.metalnessMap)
+  assert.equal(boomboxMaterial.roughnessMap.name, 'BoomBoxWithAxes_roughnessMetallic.png')
+  assert.deepEqual(pngDimensions(boomboxMaterial.roughnessMap.image), [2048, 2048])
+  assert.equal(boomboxMaterial.normalMap.name, 'BoomBoxWithAxes_normal.png')
+  assert.deepEqual(pngDimensions(boomboxMaterial.normalMap.image), [2048, 2048])
+  const coordinateMaterial = coordinateSystem.material
+  assert.equal(coordinateMaterial.map.name, 'BoomBoxWithAxes_baseColor1.png')
+  assert.deepEqual(pngDimensions(coordinateMaterial.map.image), [32, 32])
+  assert.equal(coordinateMaterial.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(coordinateMaterial.metalness, 0)
+  assert.equal(coordinateMaterial.roughness, 0.735)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y, size.z) / 2 + 0.03
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.01, 20)
+  camera.position.set(center.x + 0.3, center.y + 0.5, center.z + 0.9)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.018, 'BoomBoxWithAxes should render visible boombox and coordinate-system geometry')
 })
 
 test('committed Khronos glTF Sample Assets BoxInterleaved fixture loads byteStride attributes', async () => {
