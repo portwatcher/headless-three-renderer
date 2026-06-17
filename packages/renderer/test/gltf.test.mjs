@@ -117,6 +117,7 @@ const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SCIFI_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SciFiHelmet', 'glTF', 'SciFiHelmet.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
+const SAMPLE_ASSET_SHEEN_CLOTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenCloth', 'glTF', 'SheenCloth.gltf')
 const SAMPLE_ASSET_SHEEN_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenTestGrid', 'glTF', 'SheenTestGrid.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
@@ -6138,6 +6139,142 @@ test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_material
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'SheenChair should render visible sheen material geometry')
+})
+
+test('committed Khronos glTF Sample Assets SheenCloth fixture loads transformed sheen texture inputs', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SHEEN_CLOTH, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_texture_transform'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_texture_transform', 'KHR_materials_sheen'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'SheenCloth.bin', byteLength: 3479088 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'technicalFabricSmall_normal_256.png',
+    'technicalFabricSmall_orm_256.png',
+    'technicalFabricSmall_basecolor_256.png',
+    'technicalFabricSmall_sheen_256.png',
+    'SheenCloth_AO.jpg',
+  ])
+  assert.deepEqual(source.textures.map((texture) => [texture.name, texture.source]), [
+    ['technicalFabricSmall_normal_256.png', 0],
+    ['technicalFabricSmall_orm_256.png', 1],
+    ['technicalFabricSmall_basecolor_256.png', 2],
+    ['technicalFabricSmall_sheen_256.png', 3],
+    ['SheenCloth_AO.jpg', 4],
+  ])
+  assert.deepEqual(source.meshes[0].primitives[0].attributes, {
+    POSITION: 1,
+    TANGENT: 2,
+    NORMAL: 3,
+    TEXCOORD_0: 4,
+  })
+  assert.deepEqual(source.materials[0].pbrMetallicRoughness.baseColorTexture.extensions?.KHR_texture_transform, {
+    scale: [30, -30],
+  })
+  assert.deepEqual(source.materials[0].extensions?.KHR_materials_sheen, {
+    sheenColorFactor: [1, 1, 1],
+    sheenRoughnessFactor: 1,
+    sheenColorTexture: {
+      index: 3,
+      extensions: {
+        KHR_texture_transform: {
+          scale: [30, -30],
+        },
+      },
+    },
+    sheenRoughnessTexture: {
+      index: 3,
+      extensions: {
+        KHR_texture_transform: {
+          scale: [30, -30],
+        },
+      },
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SHEEN_CLOTH)
+  assert.deepEqual(gltf.parser?.json?.extensionsRequired, ['KHR_texture_transform'])
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_sheen'))
+
+  const mesh = gltf.scene.getObjectByName('SheenCloth_mesh')
+  assert.ok(mesh?.isMesh, 'SheenCloth should load a named mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 58081)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 58081)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 58081)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 58081)
+  assert.equal(mesh.geometry.index?.count, 345600)
+
+  const material = mesh.material
+  assert.equal(material.name, 'SheenClothMat')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+  assert.equal(material.sheen, 1)
+  assert.deepEqual(material.sheenColor.toArray(), [1, 1, 1])
+  assert.equal(material.sheenRoughness, 1)
+  assert.equal(material.map.name, 'technicalFabricSmall_basecolor_256.png')
+  assert.equal(material.normalMap.name, 'technicalFabricSmall_normal_256.png')
+  assert.equal(material.roughnessMap.name, 'technicalFabricSmall_orm_256.png')
+  assert.equal(material.metalnessMap.name, 'technicalFabricSmall_orm_256.png')
+  assert.equal(material.sheenColorMap.name, 'technicalFabricSmall_sheen_256.png')
+  assert.equal(material.sheenRoughnessMap.name, 'technicalFabricSmall_sheen_256.png')
+  assert.equal(material.aoMap.name, 'SheenCloth_AO.jpg')
+  assert.equal(material.aoMap.channel, 0)
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.sheenColorMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.sheenRoughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(material.map.repeat.toArray(), [30, -30])
+  assert.deepEqual(material.normalMap.repeat.toArray(), [30, -30])
+  assert.deepEqual(material.roughnessMap.repeat.toArray(), [30, -30])
+  assert.deepEqual(material.metalnessMap.repeat.toArray(), [30, -30])
+  assert.deepEqual(material.sheenColorMap.repeat.toArray(), [30, -30])
+  assert.deepEqual(material.sheenRoughnessMap.repeat.toArray(), [30, -30])
+  assert.deepEqual(material.aoMap.repeat.toArray(), [1, 1])
+
+  const pngTextureExpectations = [
+    material.map,
+    material.normalMap,
+    material.roughnessMap,
+    material.metalnessMap,
+    material.sheenColorMap,
+    material.sheenRoughnessMap,
+  ]
+  for (const texture of pngTextureExpectations) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [256, 256])
+    assert.equal(texture.flipY, false)
+  }
+  assert.equal(Buffer.isBuffer(material.aoMap.image), true, 'SheenCloth AO JPEG should load as an encoded Buffer')
+  assert.equal(material.aoMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.25, Math.max(size.x, size.y, size.z) * 1.9))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(1.5, 2, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'SheenCloth should render visible textured cloth geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.b > 8 && mean.g > 1, `SheenCloth should render lit blue sheen pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets MaterialsVariantsShoe fixture preserves KHR_materials_variants mappings', async () => {
