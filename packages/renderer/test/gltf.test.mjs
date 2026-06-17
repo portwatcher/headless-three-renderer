@@ -55,6 +55,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CARBON_FIBRE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CarbonFibre', 'glTF', 'CarbonFibre.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
+const SAMPLE_ASSET_CESIUM_MILK_TRUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMilkTruck', 'glTF', 'CesiumMilkTruck.gltf')
 const SAMPLE_ASSET_CLEARCOAT_CAR_PAINT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatCarPaint', 'glTF', 'ClearCoatCarPaint.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_CLEARCOAT_WICKER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearcoatWicker', 'glTF', 'ClearcoatWicker.gltf')
@@ -6113,6 +6114,111 @@ test('committed Khronos glTF Sample Assets CesiumMan fixture loads textured skin
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'CesiumMan should render visible textured skinned character geometry')
+})
+
+test('committed Khronos glTF Sample Assets Cesium Milk Truck fixture loads textured wheel animation', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CESIUM_MILK_TRUCK, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'CesiumMilkTruck_data.bin', byteLength: 146092 }])
+  assert.deepEqual(source.images, [{ name: 'CesiumMilkTruck.jpg', uri: 'CesiumMilkTruck.jpg' }])
+  assert.deepEqual(source.materials.map((material) => material.name), ['wheels', 'truck', 'glass', 'window_trim'])
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), ['Wheels', 'Cesium_Milk_Truck'])
+  assert.equal(source.animations.length, 1)
+  assert.equal(source.animations[0].name, 'Wheels')
+  assert.equal(source.animations[0].channels.length, 2)
+  assert.equal(source.animations[0].samplers.length, 2)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CESIUM_MILK_TRUCK)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Cesium_Milk_Truck_1',
+    'Cesium_Milk_Truck_2',
+    'Cesium_Milk_Truck_3',
+    'Wheels',
+    'Wheels001',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), [
+    'truck',
+    'glass',
+    'window_trim',
+    'wheels',
+    'wheels',
+  ])
+  assert.deepEqual(
+    meshes.map((mesh) => [
+      mesh.geometry.getAttribute('position')?.count,
+      mesh.geometry.getAttribute('normal')?.count,
+      mesh.geometry.getAttribute('uv')?.count,
+      mesh.geometry.index?.count,
+    ]),
+    [
+      [2366, 2366, 2366, 5232],
+      [151, 151, 151, 168],
+      [650, 650, 650, 864],
+      [828, 828, 828, 2304],
+      [828, 828, 828, 2304],
+    ],
+  )
+
+  const truck = meshes.find((mesh) => mesh.material.name === 'truck')
+  const wheels = meshes.find((mesh) => mesh.name === 'Wheels')
+  for (const mesh of [truck, wheels]) {
+    const texture = mesh.material.map
+    assert.ok(texture?.isTexture, `${mesh.material.name} should load a base-color texture`)
+    assert.equal(texture.name, 'CesiumMilkTruck.jpg')
+    assert.equal(Buffer.isBuffer(texture.image), true, 'CesiumMilkTruck JPEG should load as an encoded Buffer')
+    assert.equal(texture.image[0], 0xff, 'CesiumMilkTruck texture should start with a JPEG marker')
+    assert.equal(texture.image[1], 0xd8, 'CesiumMilkTruck texture should start with a JPEG marker')
+    assert.equal(texture.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(texture.flipY, false)
+    assert.equal(mesh.material.metalness, 0)
+    assert.equal(mesh.material.roughness, 1)
+  }
+
+  const glass = meshes.find((mesh) => mesh.material.name === 'glass')
+  assert.deepEqual(glass.material.color.toArray().map((value) => Number(value.toFixed(6))), [0, 0.040506, 0.021241])
+  const trim = meshes.find((mesh) => mesh.material.name === 'window_trim')
+  assert.deepEqual(trim.material.color.toArray().map((value) => Number(value.toFixed(6))), [0.064, 0.064, 0.064])
+
+  assert.equal(gltf.animations.length, 1)
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'Wheels')
+  assert.equal(clip.duration, 1.25)
+  assert.deepEqual(clip.tracks.map((track) => track.name), ['Wheels.quaternion', 'Wheels001.quaternion'])
+  assert.ok(clip.tracks.every((track) => track.times.length === 31), 'every CesiumMilkTruck track should contain 31 keyframes')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(clip.duration / 2)
+  gltf.scene.updateMatrixWorld(true)
+  assert.ok(gltf.scene.getObjectByName('Wheels').quaternion.y > 0.99, 'CesiumMilkTruck front wheels should rotate at mid animation')
+  assert.ok(gltf.scene.getObjectByName('Wheels001').quaternion.y > 0.99, 'CesiumMilkTruck rear wheels should rotate at mid animation')
+
+  const box = new THREE.Box3().setFromObject(gltf.scene)
+  const center = box.getCenter(new THREE.Vector3())
+  const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  renderCamera.position.copy(center).add(new THREE.Vector3(0.9, 0.45, 1).normalize().multiplyScalar(7))
+  renderCamera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.copy(center).add(new THREE.Vector3(4, 5, 6))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  renderCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, renderCamera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.4, 'CesiumMilkTruck should render visible textured vehicle geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.g > mean.r && mean.b > mean.r, `CesiumMilkTruck texture should contribute cool label colors (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets Fox fixture loads textured multi-clip skinned animal animation', async () => {
