@@ -40,6 +40,7 @@ const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
+const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
@@ -327,6 +328,61 @@ test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imp
   const orthographicCenter = meanRegion(orthographicRgba, 96, 96, 24, 24, 72, 72)
   assert.ok(perspectiveCenter.r > 80 && perspectiveCenter.g > 80 && perspectiveCenter.b > 80, `perspective camera should see the white mesh (${perspectiveCenter.r}, ${perspectiveCenter.g}, ${perspectiveCenter.b})`)
   assert.ok(orthographicCenter.r > 80 && orthographicCenter.g > 80 && orthographicCenter.b > 80, `orthographic camera should see the white mesh (${orthographicCenter.r}, ${orthographicCenter.g}, ${orthographicCenter.b})`)
+})
+
+test('committed Khronos glTF Sample Assets DirectionalLight fixture loads KHR_lights_punctual and renders with imported camera', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DIRECTIONAL_LIGHT)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_lights_punctual'))
+  assert.ok(gltf.parser?.json?.extensionsRequired?.includes('KHR_lights_punctual'))
+
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['m0%_r0%', 'm0%_r16%', 'm0%_r33%'])
+  assert.equal(lights.length, 1)
+
+  const light = lights[0]
+  assert.equal(light.isDirectionalLight, true)
+  assert.equal(light.name, 'Sun_Orientation')
+  assert.deepEqual(light.color.toArray(), [0.9, 0.8, 0.1])
+  assert.equal(light.intensity, 1)
+
+  const camera = gltf.cameras[0]
+  assert.equal(camera?.isPerspectiveCamera, true)
+  assert.equal(camera.name, 'Generated_Camera')
+  assert.equal(camera.near, 0.3)
+  assert.equal(camera.far, 5)
+  assert.ok(Math.abs(camera.fov - THREE.MathUtils.radToDeg(0.65)) < 1e-10, `directional-light sample should preserve imported yfov (${camera.fov})`)
+  assert.deepEqual(camera.position.toArray(), [0, 0, 2])
+
+  const roughnesses = meshes.map((mesh) => mesh.material.roughness)
+  assert.deepEqual(roughnesses, [0, 0.16, 0.33])
+  for (const mesh of meshes) {
+    assert.equal(mesh.geometry.getAttribute('position')?.count, 5374)
+    assert.equal(mesh.geometry.getAttribute('normal')?.count, 5374)
+    assert.equal(mesh.geometry.index?.count, 31800)
+  }
+
+  camera.aspect = 16 / 9
+  camera.updateProjectionMatrix()
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 90,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'DirectionalLight sample should render visible imported-light geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 1 && mean.g > mean.b + 1, `imported yellow light should tint the rendered samples (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets InterpolationTest fixture applies animation interpolation modes', async () => {
