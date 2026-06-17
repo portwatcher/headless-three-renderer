@@ -36,6 +36,7 @@ const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyRotationTest', 'glTF', 'AnisotropyRotationTest.gltf')
+const SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyStrengthTest', 'glTF', 'AnisotropyStrengthTest.gltf')
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
 const SAMPLE_ASSET_BOOM_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBox', 'glTF', 'BoomBox.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
@@ -1395,6 +1396,77 @@ test('committed Khronos glTF Sample Assets AnisotropyRotationTest fixture loads 
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.5, 'AnisotropyRotationTest should render visible rotated anisotropy bands')
+})
+
+test('committed Khronos glTF Sample Assets AnisotropyStrengthTest fixture loads anisotropy strength grid', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_anisotropy'])
+  assert.equal(source.buffers[0].uri, 'AnisotropyStrengthTest_data.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), ['AnisotropySpheresLabels.png'])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_anisotropy'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 50)
+  const spheres = meshes.filter((mesh) => /^mesh_\d+$/.test(mesh.name))
+  assert.equal(spheres.length, 49)
+  assert.ok(spheres.every((mesh) => mesh.material.isMeshPhysicalMaterial === true), 'all anisotropy-grid spheres should use MeshPhysicalMaterial')
+  assert.ok(spheres.every((mesh) => mesh.geometry.getAttribute('position')?.count === 1087))
+  assert.ok(spheres.every((mesh) => mesh.geometry.getAttribute('normal')?.count === 1087))
+  assert.ok(spheres.every((mesh) => mesh.geometry.getAttribute('tangent')?.count === 1087))
+  assert.ok(spheres.every((mesh) => mesh.geometry.index?.count === 5952))
+
+  assert.deepEqual(spheres.slice(0, 7).map((mesh) => mesh.material.anisotropy), [
+    0,
+    1 / 6,
+    1 / 3,
+    0.5,
+    2 / 3,
+    5 / 6,
+    1,
+  ])
+  assert.deepEqual([0, 7, 14, 21, 28, 35, 42].map((index) => spheres[index].material.roughness), [
+    0,
+    1 / 6,
+    1 / 3,
+    0.5,
+    2 / 3,
+    5 / 6,
+    1,
+  ])
+  assert.equal(spheres[48].material.anisotropy, 1)
+  assert.equal(spheres[48].material.roughness, 1)
+
+  const label = meshes.find((mesh) => mesh.name === 'Labels')
+  assert.equal(label?.material.name, 'Label Mat')
+  assert.equal(label.material.map.name, 'AnisotropySpheresLabels')
+  assert.equal(label.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(label.material.map.flipY, false)
+  assert.deepEqual(pngDimensions(label.material.map.image), [512, 512])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.set(0, 2, 8)
+  gltf.scene.add(light)
+  const camera = new THREE.OrthographicCamera(-3.8, 3.8, 7.0, -0.8, 0.01, 30)
+  camera.position.set(0, 3, 10)
+  camera.lookAt(0, 3, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'AnisotropyStrengthTest should render visible anisotropy-strength grid spheres')
 })
 
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
