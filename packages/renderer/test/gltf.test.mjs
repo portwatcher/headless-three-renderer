@@ -80,6 +80,7 @@ const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
 const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'glTF', 'Fox.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
+const SAMPLE_ASSET_IOR_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IORTestGrid', 'glTF', 'IORTestGrid.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceDielectricSpheres', 'glTF', 'IridescenceDielectricSpheres.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceMetallicSpheres', 'glTF', 'IridescenceMetallicSpheres.gltf')
@@ -4594,6 +4595,148 @@ test('committed Khronos glTF Sample Assets CompareIor fixture loads transmission
   const right = meanRegion(rgba, 128, 128, 76, 48, 108, 82)
   assert.ok(left.g > left.b + 15 && left.r > left.b + 5, `baseline transmission sphere should render lit textured pixels (${left.r}, ${left.g}, ${left.b})`)
   assert.ok(right.g > right.b + 15 && right.r > right.b + 5, `IOR transmission sphere should render lit textured pixels (${right.r}, ${right.g}, ${right.b})`)
+})
+
+test('committed Khronos glTF Sample Assets IORTestGrid fixture loads IOR, transmission, volume, and specular grids', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_IOR_TEST_GRID, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_specular',
+    'KHR_materials_ior',
+  ])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 2599860, uri: 'IORTestGrid.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), ['checker.png'])
+
+  const sourcePhysicalMaterials = source.materials.filter((material) => material.name.startsWith('IOR'))
+  assert.deepEqual(sourcePhysicalMaterials.map((material) => [
+    material.name,
+    material.extensions?.KHR_materials_ior?.ior ?? 1.5,
+    material.extensions?.KHR_materials_transmission?.transmissionFactor ?? 0,
+    material.extensions?.KHR_materials_specular?.specularFactor ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessFactor ?? 0,
+  ]), [
+    ['IOR1.0_Black_R0_M0_T0_S0.25', 1, 0, 0.25, 0.1],
+    ['IOR1.33_Black_R0_M0_T0_S0.25', 1.33, 0, 0.25, 0.1],
+    ['IOR1.5_Black_R0_M0_T0_S0.25', 1.5, 0, 0.25, 0.1],
+    ['IOR1.76_Black_R0_M0_T0_S0.25', 1.76, 0, 0.25, 0.1],
+    ['IOR2.42_Black_R0_M0_T0_S0.25', 2.42, 0, 0.25, 0.1],
+    ['IOR2.42_Black_R0_M0_T0_S1', 2.42, 0, 1, 0.1],
+    ['IOR1.76_Black_R0_M0_T0_S1', 1.76, 0, 1, 0.1],
+    ['IOR1.5_Black_R0_M0_T0_S1', 1.5, 0, 1, 0.1],
+    ['IOR1.33_Black_R0_M0_T0_S1', 1.33, 0, 1, 0.1],
+    ['IOR1.0_Black_R0_M0_T0_S1', 1, 0, 1, 0.1],
+    ['IOR2.42_White_R0_M0_T1_S0.25', 2.42, 1, 0.25, 0.1],
+    ['IOR1.76_White_R0_M0_T1_S0.25', 1.76, 1, 0.25, 0.1],
+    ['IOR1.5_White_R0_M0_T1_S0.25', 1.5, 1, 0.25, 0.1],
+    ['IOR1.33_White_R0_M0_T1_S0.25', 1.33, 1, 0.25, 0.1],
+    ['IOR1.0_White_R0_M0_T1_S0.25', 1, 1, 0.25, 0.1],
+    ['IOR2.42_White_R0_M0_T1_S1', 2.42, 1, 1, 0.1],
+    ['IOR1.76_White_R0_M0_T1_S1', 1.76, 1, 1, 0.1],
+    ['IOR1.5_White_R0_M0_T1_S1', 1.5, 1, 1, 0.1],
+    ['IOR1.33_White_R0_M0_T1_S1', 1.33, 1, 1, 0.1],
+    ['IOR1.0_White_R0_M0_T1_S1', 1, 1, 1, 0.1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_IOR_TEST_GRID)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_ior'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_specular'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 23)
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Backdrop',
+    'IOR242_Black_R0_M0_T0_S025',
+    'IOR242_Black_R0_M0_T0_S1',
+    'IOR242_White_R0_M0_T1_S025',
+    'IOR242_White_R0_M0_T1_S1',
+    'IOR176_Black_R0_M0_T0_S025',
+    'IOR176_Black_R0_M0_T0_S1',
+    'IOR176_White_R0_M0_T1_S025',
+    'IOR176_White_R0_M0_T1_S1',
+    'IOR15_Black_R0_M0_T0_S025',
+    'IOR15_Black_R0_M0_T0_S1',
+    'IOR15_White_R0_M0_T1_S025',
+    'IOR15_White_R0_M0_T1_S1',
+    'IOR133_Black_R0_M0_T0_S025',
+    'IOR133_Black_R0_M0_T0_S1',
+    'IOR133_White_R0_M0_T1_S025',
+    'IOR133_White_R0_M0_T1_S1',
+    'IOR10_Black_R0_M0_T0_S025',
+    'IOR10_Black_R0_M0_T0_S1',
+    'IOR10_White_R0_M0_T1_S025',
+    'IOR10_White_R0_M0_T1_S1',
+    'Text',
+    'Text_Backdrop',
+  ])
+
+  const samples = meshes.filter((mesh) => mesh.material.isMeshPhysicalMaterial === true)
+  assert.equal(samples.length, 20)
+  assert.ok(samples.every((mesh) => mesh.geometry.getAttribute('position')?.count === 3840))
+  assert.ok(samples.every((mesh) => mesh.geometry.getAttribute('normal')?.count === 3840))
+  assert.ok(samples.every((mesh) => mesh.geometry.index?.count === 3840))
+  assert.deepEqual(samples.map((mesh) => mesh.material.ior), [
+    2.42, 2.42, 2.42, 2.42,
+    1.76, 1.76, 1.76, 1.76,
+    1.5, 1.5, 1.5, 1.5,
+    1.33, 1.33, 1.33, 1.33,
+    1, 1, 1, 1,
+  ])
+  assert.deepEqual(samples.map((mesh) => mesh.material.transmission), [
+    0, 0, 1, 1,
+    0, 0, 1, 1,
+    0, 0, 1, 1,
+    0, 0, 1, 1,
+    0, 0, 1, 1,
+  ])
+  assert.deepEqual(samples.map((mesh) => mesh.material.specularIntensity), [
+    0.25, 1, 0.25, 1,
+    0.25, 1, 0.25, 1,
+    0.25, 1, 0.25, 1,
+    0.25, 1, 0.25, 1,
+    0.25, 1, 0.25, 1,
+  ])
+  assert.ok(samples.every((mesh) => mesh.material.thickness === 0.1))
+  assert.ok(samples.every((mesh) => mesh.material.roughness === 0))
+  assert.ok(samples.every((mesh) => mesh.material.metalness === 0))
+
+  const backdrop = meshes[0]
+  assert.equal(backdrop.material.name, 'Backdrop')
+  assert.equal(Buffer.isBuffer(backdrop.material.map?.image), true, 'IORTestGrid checker PNG should load as an encoded Buffer')
+  assert.equal(backdrop.material.map.name, 'checker.png')
+  assert.deepEqual(pngDimensions(backdrop.material.map.image), [256, 256])
+  assert.equal(backdrop.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(backdrop.material.map.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 1.6))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 2.2)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.5, 'IORTestGrid should render visible physical material grid')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 50 && mean.g > 50 && mean.b > 50, `IORTestGrid should render lit grid pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets TransmissionRoughnessTest fixture loads IOR and roughness texture inputs', async () => {
