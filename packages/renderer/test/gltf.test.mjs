@@ -23,6 +23,7 @@ const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
 const SKINNED_QUAD = path.join(FIXTURE_DIR, 'skinned-quad.gltf')
 const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
+const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -63,6 +64,37 @@ test('committed glTF fixture loads through GLTFLoader and renders', async () => 
   const mean = meanRgba(rgba)
   assert.ok(mean.b > mean.r, `loaded blue PBR material should contribute blue output (${mean.b} vs ${mean.r})`)
   assert.ok(mean.a > 240, `loaded glTF output should be opaque (${mean.a})`)
+})
+
+test('committed Khronos glTF Sample Assets Box fixture loads external buffer and renders', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOX)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Box sample should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.material.name, 'Red')
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(1.4, 1.1, 2.2)
+  camera.lookAt(0, 0, 0)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos Box sample should render visible pixels')
+  const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
+  assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `Khronos Box sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
