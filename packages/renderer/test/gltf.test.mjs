@@ -103,6 +103,7 @@ const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedFigure', 'glTF', 'RiggedFigure.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
+const SAMPLE_ASSET_SHEEN_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenTestGrid', 'glTF', 'SheenTestGrid.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
@@ -4803,6 +4804,176 @@ test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_material
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'SheenChair should render visible sheen material geometry')
+})
+
+test('committed Khronos glTF Sample Assets SheenTestGrid fixture loads sheen color and roughness grid factors', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SHEEN_TEST_GRID, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_sheen'])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 1818312, uri: 'SheenTestGrid.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), ['checker.png'])
+
+  const sourceSheenMaterials = source.materials.filter((material) => material.name.startsWith('sheen'))
+  assert.deepEqual(sourceSheenMaterials.map((material) => [
+    material.name,
+    material.extensions?.KHR_materials_sheen?.sheenColorFactor ?? null,
+    material.extensions?.KHR_materials_sheen?.sheenRoughnessFactor ?? null,
+  ]), [
+    ['sheenColor0_sheenRough0', [0, 0, 0], 0],
+    ['sheenColor0_sheenRough0.33', [0, 0, 0], 0.33],
+    ['sheenColor0_sheenRough0.66', [0, 0, 0], 0.66],
+    ['sheenColor0_sheenRough1', [0, 0, 0], 1],
+    ['sheenColor0.33_sheenRough0', [0, 0.33, 0.33], 0],
+    ['sheenColor0.33_sheenRough0.33', [0, 0.33, 0.33], 0.33],
+    ['sheenColor0.33_sheenRough0.66', [0, 0.33, 0.33], 0.66],
+    ['sheenColor0.33_sheenRough1', [0, 0.33, 0.33], 1],
+    ['sheenColor0.66_sheenRough0', [0, 0.66, 0.66], 0],
+    ['sheenColor0.66_sheenRough0.33', [0, 0.66, 0.66], 0.33],
+    ['sheenColor0.66_sheenRough0.66', [0, 0.66, 0.66], 0.66],
+    ['sheenColor0.66_sheenRough1', [0, 0.66, 0.66], 1],
+    ['sheenColor1_sheenRough0', [0, 1, 1], 0],
+    ['sheenColor1_sheenRough0.33', [0, 1, 1], 0.33],
+    ['sheenColor1_sheenRough0.66', [0, 1, 1], 0.66],
+    ['sheenColor1_sheenRough1', [0, 1, 1], 1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SHEEN_TEST_GRID)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'CheckerBackdrop',
+    'sheenColor0_sheenRough0',
+    'sheenColor033_sheenRough0',
+    'sheenColor066_sheenRough0',
+    'sheenColor1_sheenRough0',
+    'sheenColor0_sheenRough033',
+    'sheenColor033_sheenRough033',
+    'sheenColor066_sheenRough0_1',
+    'sheenColor1_sheenRough033',
+    'sheenColor0_sheenRough066',
+    'sheenColor033_sheenRough066',
+    'sheenColor066_sheenRough066',
+    'sheenColor1_sheenRough066',
+    'sheenColor0_sheenRough1',
+    'sheenColor033_sheenRough1',
+    'sheenColor066_sheenRough1',
+    'sheenColor1_sheenRough1',
+    'TextBackdrop',
+    'TextXaxis',
+    'TextYaxis',
+  ])
+
+  const byName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  const sampleNames = [
+    'sheenColor0_sheenRough0',
+    'sheenColor033_sheenRough0',
+    'sheenColor066_sheenRough0',
+    'sheenColor1_sheenRough0',
+    'sheenColor0_sheenRough033',
+    'sheenColor033_sheenRough033',
+    'sheenColor066_sheenRough0_1',
+    'sheenColor1_sheenRough033',
+    'sheenColor0_sheenRough066',
+    'sheenColor033_sheenRough066',
+    'sheenColor066_sheenRough066',
+    'sheenColor1_sheenRough066',
+    'sheenColor0_sheenRough1',
+    'sheenColor033_sheenRough1',
+    'sheenColor066_sheenRough1',
+    'sheenColor1_sheenRough1',
+  ]
+  const samples = sampleNames.map((name) => byName.get(name))
+  assert.ok(samples.every(Boolean), 'SheenTestGrid should load all sheen color/roughness samples')
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.getAttribute('position')?.count), Array(16).fill(3840))
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.getAttribute('normal')?.count), Array(16).fill(3840))
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.index?.count), Array(16).fill(3840))
+
+  const sampleMaterials = samples.map((mesh) => mesh.material)
+  assert.ok(sampleMaterials.every((material) => material.isMeshPhysicalMaterial === true), 'all sheen-grid samples should load as MeshPhysicalMaterial')
+  assert.deepEqual(sampleMaterials.map((material) => material.name), [
+    'sheenColor0_sheenRough0',
+    'sheenColor0.33_sheenRough0',
+    'sheenColor0.66_sheenRough0',
+    'sheenColor1_sheenRough0',
+    'sheenColor0_sheenRough0.33',
+    'sheenColor0.33_sheenRough0.33',
+    'sheenColor0.66_sheenRough0.33',
+    'sheenColor1_sheenRough0.33',
+    'sheenColor0_sheenRough0.66',
+    'sheenColor0.33_sheenRough0.66',
+    'sheenColor0.66_sheenRough0.66',
+    'sheenColor1_sheenRough0.66',
+    'sheenColor0_sheenRough1',
+    'sheenColor0.33_sheenRough1',
+    'sheenColor0.66_sheenRough1',
+    'sheenColor1_sheenRough1',
+  ])
+  assert.deepEqual(sampleMaterials.map((material) => material.sheen), Array(16).fill(1))
+  assert.deepEqual(sampleMaterials.map((material) => material.sheenRoughness), [
+    0, 0, 0, 0,
+    0.33, 0.33, 0.33, 0.33,
+    0.66, 0.66, 0.66, 0.66,
+    1, 1, 1, 1,
+  ])
+  assert.deepEqual(sampleMaterials.map((material) => material.sheenColor.toArray()), [
+    [0, 0, 0],
+    [0, 0.33, 0.33],
+    [0, 0.66, 0.66],
+    [0, 1, 1],
+    [0, 0, 0],
+    [0, 0.33, 0.33],
+    [0, 0.66, 0.66],
+    [0, 1, 1],
+    [0, 0, 0],
+    [0, 0.33, 0.33],
+    [0, 0.66, 0.66],
+    [0, 1, 1],
+    [0, 0, 0],
+    [0, 0.33, 0.33],
+    [0, 0.66, 0.66],
+    [0, 1, 1],
+  ])
+  assert.ok(sampleMaterials.every((material) => material.roughness === 0.75))
+  assert.ok(sampleMaterials.every((material) => material.metalness === 0))
+
+  const checker = byName.get('CheckerBackdrop')
+  assert.equal(checker.geometry.getAttribute('position')?.count, 6)
+  assert.equal(checker.geometry.getAttribute('uv')?.count, 6)
+  assert.equal(checker.geometry.index?.count, 6)
+  assert.equal(checker.material.name, 'Backdrop')
+  assert.equal(Buffer.isBuffer(checker.material.map?.image), true, 'SheenTestGrid checker PNG should load as an encoded Buffer')
+  assert.equal(checker.material.map.name, 'checker.png')
+  assert.deepEqual(pngDimensions(checker.material.map.image), [256, 256])
+  assert.equal(checker.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(checker.material.map.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 1.6))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 2.2)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.35, 'SheenTestGrid should render visible sheen color and roughness samples')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 20 && mean.g > 20 && mean.b > 35, `SheenTestGrid should render lit sheen grid pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materials_specular scalar and texture inputs', async () => {
