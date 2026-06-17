@@ -34,6 +34,7 @@ const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
+const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_WITH_SPACES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box With Spaces', 'glTF', 'Box With Spaces.gltf')
@@ -309,6 +310,70 @@ test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alph
   assert.ok(nonBackgroundRatio(rgba, [10, 10, 10], 4) > 0.4, 'AlphaBlendModeTest should render visible alpha-mode geometry')
   const center = meanRegion(rgba, 160, 120, 60, 40, 100, 80)
   assert.ok(center.r > 80 && center.g > 80 && center.b > 70, `AlphaBlendModeTest render should include the textured material bed (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_AVOCADO, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'Avocado.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Avocado_baseColor.png',
+    'Avocado_roughnessMetallic.png',
+    'Avocado_normal.png',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_AVOCADO)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Avocado sample should load a mesh')
+  assert.equal(mesh.name, 'Avocado')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 406)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 406)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 406)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 406)
+  assert.equal(mesh.geometry.index?.count, 2046)
+  assert.equal(mesh.material.name, '2256_Avocado_d')
+
+  const { map, roughnessMap, metalnessMap, normalMap } = mesh.material
+  assert.ok(map?.isTexture, 'Avocado sample should load a base color texture')
+  assert.ok(roughnessMap?.isTexture, 'Avocado sample should load a roughness texture')
+  assert.ok(metalnessMap?.isTexture, 'Avocado sample should load a metalness texture')
+  assert.ok(normalMap?.isTexture, 'Avocado sample should load a normal texture')
+  assert.equal(roughnessMap, metalnessMap, 'Avocado metallic/roughness channels should share the packed texture')
+  assert.deepEqual(pngDimensions(map.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(roughnessMap.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(normalMap.image), [2048, 2048])
+  assert.equal(map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(map.flipY, false)
+  assert.equal(roughnessMap.flipY, false)
+  assert.equal(normalMap.flipY, false)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y, size.z) * 0.75
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.001, 10)
+  camera.position.set(center.x, center.y + 0.04, center.z + 0.14)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'Khronos Avocado sample should render visible PBR textured pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 10 && mean.g > mean.b + 10, `Avocado texture should contribute green/yellow output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxInterleaved fixture loads byteStride attributes', async () => {
