@@ -72,6 +72,7 @@ const SAMPLE_ASSET_COMPARE_TRANSMISSION = path.join(FIXTURE_DIR, 'gltf-sample-as
 const SAMPLE_ASSET_COMPARE_VOLUME = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareVolume', 'glTF', 'CompareVolume.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
+const SAMPLE_ASSET_DISPERSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DispersionTest', 'glTF', 'DispersionTest.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
@@ -965,6 +966,86 @@ test('committed Khronos glTF Sample Assets CompareDispersion fixture loads dispe
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'CompareDispersion should render visible dispersion comparison geometry')
+})
+
+test('committed Khronos glTF Sample Assets DispersionTest fixture loads IOR and dispersion prism grid', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DISPERSION_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_ior',
+    'KHR_materials_dispersion',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 2276324, uri: 'DispersionTest.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'CheckerWithLines.png',
+    'Dispersion_Labels2.png',
+  ])
+  assert.deepEqual(source.samplers, [{ magFilter: 9729, minFilter: 9987 }])
+  assert.equal(source.materials.length, 27)
+  assert.equal(source.meshes.length, 27)
+
+  const prismMaterials = source.materials.filter((material) => material.extensions?.KHR_materials_dispersion)
+  assert.equal(prismMaterials.length, 25)
+  assert.deepEqual([...new Set(prismMaterials.map((material) => material.extensions.KHR_materials_dispersion.dispersion))].sort((a, b) => a - b), [0, 0.5, 1, 2, 5])
+  assert.deepEqual([...new Set(prismMaterials.map((material) => Number((material.extensions.KHR_materials_ior?.ior ?? 1.5).toFixed(2))))].sort((a, b) => a - b), [1, 1.33, 1.5, 1.76, 2.42])
+  assert.ok(prismMaterials.every((material) => material.extensions?.KHR_materials_transmission?.transmissionFactor === 1))
+  assert.ok(prismMaterials.every((material) => material.extensions?.KHR_materials_volume?.thicknessFactor === 0.018478000536561012))
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DISPERSION_TEST)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_dispersion'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 27)
+
+  const prismMeshes = meshes.filter((mesh) => mesh.name.startsWith('Prism_IOR'))
+  assert.equal(prismMeshes.length, 25)
+  assert.ok(prismMeshes.every((mesh) => mesh.material.isMeshPhysicalMaterial === true), 'all dispersion prisms should use MeshPhysicalMaterial')
+  assert.deepEqual([...new Set(prismMeshes.map((mesh) => mesh.material.dispersion))].sort((a, b) => a - b), [0, 0.5, 1, 2, 5])
+  assert.deepEqual([...new Set(prismMeshes.map((mesh) => Number(mesh.material.ior.toFixed(2))))].sort((a, b) => a - b), [1, 1.33, 1.5, 1.76, 2.42])
+  assert.ok(prismMeshes.every((mesh) => mesh.material.transmission === 1))
+  assert.ok(prismMeshes.every((mesh) => mesh.material.thickness === 0.018478000536561012))
+
+  const firstPrism = prismMeshes[0]
+  assert.equal(firstPrism.geometry.getAttribute('position')?.count, 162)
+  assert.equal(firstPrism.geometry.getAttribute('normal')?.count, 162)
+  assert.equal(firstPrism.geometry.index?.count, 960)
+
+  const backdrop = meshes.find((mesh) => mesh.name === 'Cloth_Backdrop')
+  assert.equal(backdrop?.material.name, 'Cloth Backdrop')
+  assert.equal(Buffer.isBuffer(backdrop.material.map?.image), true, 'dispersion checker PNG should load as an encoded Buffer')
+  assert.equal(backdrop.material.map.name, 'CheckerWithLines')
+  assert.deepEqual(pngDimensions(backdrop.material.map.image), [256, 256])
+  assert.equal(backdrop.material.map.colorSpace, THREE.SRGBColorSpace)
+
+  const label = meshes.find((mesh) => mesh.name === 'IOR_Labels')
+  assert.equal(label?.material.name, 'LabelMat')
+  assert.equal(Buffer.isBuffer(label.material.map?.image), true, 'dispersion label PNG should load as an encoded Buffer')
+  assert.equal(label.material.map.name, 'Dispersion_Labels2')
+  assert.deepEqual(pngDimensions(label.material.map.image), [512, 512])
+  assert.equal(label.material.map.colorSpace, THREE.SRGBColorSpace)
+
+  const camera = new THREE.OrthographicCamera(-0.09, 0.09, 0.065, -0.055, 0.001, 5)
+  camera.position.set(0, 0, 0.6)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(1, 2, 3)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 120,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.55, 'DispersionTest should render visible IOR and dispersion grid geometry')
 })
 
 test('committed Khronos glTF Sample Assets CompareEmissiveStrength fixture loads emissive strength variants', async () => {
