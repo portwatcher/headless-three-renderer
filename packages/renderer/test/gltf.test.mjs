@@ -84,6 +84,7 @@ const SAMPLE_ASSET_DISPERSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
+const SAMPLE_ASSET_FLIGHT_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'FlightHelmet', 'glTF', 'FlightHelmet.gltf')
 const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'glTF', 'Fox.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IOR_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IORTestGrid', 'glTF', 'IORTestGrid.gltf')
@@ -692,6 +693,123 @@ test('committed Khronos glTF Sample Assets SciFiHelmet fixture loads separate AO
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.32, 'SciFiHelmet should render visible textured geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b && mean.g > mean.b, `SciFiHelmet texture should render neutral metal colors (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets FlightHelmet fixture loads transmission lens and PBR texture sets', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_FLIGHT_HELMET, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission'])
+  assert.deepEqual(source.buffers, [{ uri: 'FlightHelmet.bin', byteLength: 3227148 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'FlightHelmet_Materials_RubberWoodMat_Normal.png',
+    'FlightHelmet_Materials_RubberWoodMat_OcclusionRoughMetal.png',
+    'FlightHelmet_Materials_RubberWoodMat_BaseColor.png',
+    'FlightHelmet_Materials_GlassPlasticMat_Normal.png',
+    'FlightHelmet_Materials_GlassPlasticMat_OcclusionRoughMetal.png',
+    'FlightHelmet_Materials_GlassPlasticMat_BaseColor.png',
+    'FlightHelmet_Materials_MetalPartsMat_Normal.png',
+    'FlightHelmet_Materials_MetalPartsMat_OcclusionRoughMetal.png',
+    'FlightHelmet_Materials_MetalPartsMat_BaseColor.png',
+    'FlightHelmet_Materials_LeatherPartsMat_Normal.png',
+    'FlightHelmet_Materials_LeatherPartsMat_OcclusionRoughMetal.png',
+    'FlightHelmet_Materials_LeatherPartsMat_BaseColor.png',
+    'FlightHelmet_Materials_LensesMat_Normal.png',
+    'FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.png',
+    'FlightHelmet_Materials_LensesMat_BaseColor.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'HoseMat',
+    'RubberWoodMat',
+    'GlassPlasticMat',
+    'MetalPartsMat',
+    'LeatherPartsMat',
+    'LensesMat',
+  ])
+  assert.deepEqual(source.materials[5].extensions, {
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+  })
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), [
+    'Hose_low',
+    'RubberWood_low',
+    'GlassPlastic_low',
+    'MetalParts_low',
+    'LeatherParts_low',
+    'Lenses_low',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_FLIGHT_HELMET)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Hose_low',
+    'RubberWood_low',
+    'GlassPlastic_low',
+    'MetalParts_low',
+    'LeatherParts_low',
+    'Lenses_low',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [10472, 13638, 4676, 13636, 12534, 436])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('tangent')?.count), [10472, 13638, 4676, 13636, 12534, 436])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [59040, 72534, 24408, 60288, 65688, 2208])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const assertTextureSet = (material, prefix, dimensions) => {
+    assert.equal(material.map.name, `${prefix}_BaseColor.png`)
+    assert.equal(material.roughnessMap.name, `${prefix}_OcclusionRoughMetal.png`)
+    assert.equal(material.metalnessMap, material.roughnessMap)
+    assert.equal(material.aoMap, material.roughnessMap)
+    assert.equal(material.normalMap.name, `${prefix}_Normal.png`)
+    assert.equal(Buffer.isBuffer(material.map.image), true, `${prefix} base-color PNG should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(material.map.image), dimensions)
+    assert.deepEqual(pngDimensions(material.roughnessMap.image), dimensions)
+    assert.deepEqual(pngDimensions(material.normalMap.image), dimensions)
+    assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.map.flipY, false)
+  }
+
+  const hose = materials.get('HoseMat')
+  const rubber = materials.get('RubberWoodMat')
+  assertTextureSet(hose, 'FlightHelmet_Materials_RubberWoodMat', [2048, 2048])
+  assertTextureSet(rubber, 'FlightHelmet_Materials_RubberWoodMat', [2048, 2048])
+  assert.equal(hose.map, rubber.map, 'FlightHelmet HoseMat should share RubberWood base-color texture')
+  assertTextureSet(materials.get('GlassPlasticMat'), 'FlightHelmet_Materials_GlassPlasticMat', [2048, 2048])
+  assertTextureSet(materials.get('MetalPartsMat'), 'FlightHelmet_Materials_MetalPartsMat', [2048, 2048])
+  assertTextureSet(materials.get('LeatherPartsMat'), 'FlightHelmet_Materials_LeatherPartsMat', [2048, 2048])
+
+  const lenses = materials.get('LensesMat')
+  assert.equal(lenses.isMeshPhysicalMaterial, true)
+  assert.equal(lenses.transmission, 1)
+  assertTextureSet(lenses, 'FlightHelmet_Materials_LensesMat', [1024, 1024])
+
+  gltf.scene.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(gltf.scene)
+  const center = box.getCenter(new THREE.Vector3())
+  const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.001, 10)
+  renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.35, 1).normalize().multiplyScalar(1.0))
+  renderCamera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.85))
+  const light = new THREE.DirectionalLight(0xffffff, 1.9)
+  light.position.copy(center).add(new THREE.Vector3(0.5, 0.8, 1))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  renderCamera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, renderCamera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'FlightHelmet should render visible textured helmet geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g && mean.g > mean.b, `FlightHelmet textures should render warm leather/metal colors (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alpha modes and JPEG textures', async () => {
