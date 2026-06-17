@@ -34,6 +34,7 @@ const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-as
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
+const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
@@ -836,6 +837,43 @@ test('committed Khronos glTF Sample Assets SimpleMaterial fixture loads scalar P
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'SimpleMaterial sample should render visible PBR geometry')
   const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
   assert.ok(center.r > center.b + 50 && center.g > center.b + 35, `SimpleMaterial sample should render warm base-color pixels (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets SimpleMeshes fixture reuses a mesh across nodes', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_MESHES)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['mesh_0_instance_0', 'mesh_0_instance_1'])
+  assert.equal(meshes[0].geometry, meshes[1].geometry, 'SimpleMeshes nodes should share one loaded geometry')
+  assert.deepEqual(meshes[0].position.toArray(), [0, 0, 0])
+  assert.deepEqual(meshes[1].position.toArray(), [1, 0, 0])
+  assert.equal(meshes[0].geometry.getAttribute('position')?.count, 3)
+  assert.equal(meshes[0].geometry.getAttribute('normal')?.count, 3)
+  assert.equal(meshes[0].geometry.index?.count, 3)
+
+  for (const mesh of meshes) mesh.material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  gltf.scene.position.set(-0.75, -0.5, 0)
+  const camera = new THREE.OrthographicCamera(-0.85, 0.85, 0.65, -0.65, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.35, 'SimpleMeshes sample should render both shared-geometry mesh instances')
+  const left = meanRegion(rgba, 128, 96, 20, 45, 48, 75)
+  const right = meanRegion(rgba, 128, 96, 80, 45, 108, 75)
+  assert.ok(left.r > 120 && left.g > 120 && left.b > 120, `first shared mesh instance should render visibly (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.r > 120 && right.g > 120 && right.b > 120, `second shared mesh instance should render visibly (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed Khronos glTF Sample Assets UnlitTest fixture loads KHR_materials_unlit', async () => {
