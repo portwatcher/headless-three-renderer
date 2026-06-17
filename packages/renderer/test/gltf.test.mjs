@@ -102,6 +102,7 @@ const SAMPLE_ASSET_MATERIALS_VARIANTS_SHOE = path.join(FIXTURE_DIR, 'gltf-sample
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheresNoTextures', 'glTF', 'MetalRoughSpheresNoTextures.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
+const SAMPLE_ASSET_MESHOPT_CUBE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshoptCubeTest', 'glTF', 'MeshoptCubeTest.gltf')
 const SAMPLE_ASSET_MORPH_PRIMITIVES_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphPrimitivesTest', 'glTF', 'MorphPrimitivesTest.gltf')
 const SAMPLE_ASSET_MORPH_STRESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphStressTest', 'glTF', 'MorphStressTest.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
@@ -9234,6 +9235,133 @@ test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and 
   assert.ok(points.r > 60 && points.g > 60 && points.b > 60, `POINTS primitive should render visible pixels (${points.r}, ${points.g}, ${points.b})`)
   assert.ok(lineLoop.r > 40 && lineLoop.g > 40 && lineLoop.b > 40, `LINE_LOOP primitive should render visible pixels (${lineLoop.r}, ${lineLoop.g}, ${lineLoop.b})`)
   assert.ok(triangleFan.r > 120 && triangleFan.g > 120 && triangleFan.b > 120, `TRIANGLE_FAN primitive should render visible pixels (${triangleFan.r}, ${triangleFan.g}, ${triangleFan.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MeshoptCubeTest fixture loads quantized fallback cube grid', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_MESHOPT_CUBE_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_mesh_quantization'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_mesh_quantization', 'KHR_meshopt_compression'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'MeshoptCubeTest.bin', byteLength: 10528 },
+    {
+      uri: 'MeshoptCubeTestFallback.bin',
+      byteLength: 9984,
+      extensions: {
+        KHR_meshopt_compression: {
+          fallback: true,
+        },
+      },
+    },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'row0.png',
+    'row1.png',
+    'row2.png',
+    'row3.png',
+    'row4.png',
+    'col0.png',
+    'col1.png',
+    'col2.png',
+    'col3.png',
+    'col4.png',
+  ])
+  assert.equal(source.meshes.length, 35)
+  assert.equal(source.animations.length, 1)
+  assert.equal(source.animations[0].channels.length, 5)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MESHOPT_CUBE_TEST)
+  assert.deepEqual(gltf.parser?.json?.extensionsRequired, ['KHR_mesh_quantization'])
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_meshopt_compression'))
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].name, 'RotateCubes')
+  assert.equal(gltf.animations[0].duration, 2)
+  assert.deepEqual(gltf.animations[0].tracks.map((track) => track.name), [
+    'Cube_4_animated_rotation.quaternion',
+    'Cube_9_animated_rotation_compressed_indices.quaternion',
+    'Cube_14_animated_rotation_compressed_triangles.quaternion',
+    'Cube_19_animated_rotation_compressed_filtered.quaternion',
+    'Cube_24_animated_rotation_compressed_filtered_v1.quaternion',
+  ])
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 35)
+
+  const labels = meshes.filter((mesh) => mesh.name.includes('Label'))
+  assert.equal(labels.length, 10)
+  assert.deepEqual(labels.map((mesh) => mesh.name), [
+    'RowLabel_0',
+    'RowLabel_1',
+    'RowLabel_2',
+    'RowLabel_3',
+    'RowLabel_4',
+    'ColLabel_0',
+    'ColLabel_1',
+    'ColLabel_2',
+    'ColLabel_3',
+    'ColLabel_4',
+  ])
+  for (const label of labels) {
+    assert.equal(label.geometry.getAttribute('position')?.count, 4)
+    assert.equal(label.geometry.getAttribute('normal')?.count, 4)
+    assert.equal(label.geometry.getAttribute('uv')?.count, 4)
+    assert.equal(label.geometry.index?.count, 6)
+    assert.equal(Buffer.isBuffer(label.material.map?.image), true, `${label.name} label PNG should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(label.material.map.image), [256, 128])
+    assert.equal(label.material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(label.material.map.flipY, false)
+  }
+
+  const cubes = meshes.filter((mesh) => mesh.name.startsWith('Cube_'))
+  assert.equal(cubes.length, 25)
+  assert.equal(cubes.filter((mesh) => mesh.geometry.getAttribute('color')).length, 20)
+  assert.equal(cubes.filter((mesh) => !mesh.geometry.getAttribute('color')).length, 5)
+  assert.deepEqual(cubes.slice(0, 5).map((mesh) => mesh.name), [
+    'Cube_0_interleaved_u8norm_u8color_u16index',
+    'Cube_1_deinterleaved_u8norm_u8color_u16index',
+    'Cube_2_deinterleaved_u16norm_u16color_u16index',
+    'Cube_3_deinterleaved_u8norm_u8color_u32index',
+    'Cube_4_animated_rotation',
+  ])
+  assert.deepEqual(cubes.slice(-5).map((mesh) => mesh.name), [
+    'Cube_20_interleaved_u8norm_u8color_u16index_compressed_filtered_v1',
+    'Cube_21_deinterleaved_u8norm_u8color_u16index_compressed_filtered_v1',
+    'Cube_22_deinterleaved_u16norm_u16color_u16index_compressed_filtered_v1',
+    'Cube_23_deinterleaved_u8norm_u8color_u32index_compressed_filtered_v1',
+    'Cube_24_animated_rotation_compressed_filtered_v1',
+  ])
+  for (const cube of cubes) {
+    assert.equal(cube.geometry.getAttribute('position')?.count, 24)
+    assert.equal(cube.geometry.getAttribute('normal')?.count, 24)
+    assert.equal(cube.geometry.index?.count, 36)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 1.9))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.2)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.07, 'MeshoptCubeTest should render visible quantized cube grid')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 10 && mean.g > 10 && mean.b > 10, `MeshoptCubeTest should render lit cube-grid pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets PrimitiveModeNormalsTest fixture loads primitive modes with normals and colors', async () => {
