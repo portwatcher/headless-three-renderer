@@ -31,6 +31,7 @@ const REAL_VRM_EXPRESSION_SAMPLE = path.join(
 )
 const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
 const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
+const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
@@ -777,6 +778,58 @@ test('committed Khronos glTF Sample Assets InterpolationTest fixture applies ani
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'InterpolationTest animated fixture should render visible geometry')
+})
+
+test('committed Khronos glTF Sample Assets AnimatedTriangle fixture loads external animation buffer', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANIMATED_TRIANGLE, 'utf8'))
+  assert.deepEqual(source.buffers.map((buffer) => buffer.uri), [
+    'AnimatedTriangle_geometry.bin',
+    'AnimatedTriangle_animation.bin',
+  ])
+  assert.equal(source.accessors[2].count, 5)
+  assert.equal(source.accessors[3].type, 'VEC4')
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANIMATED_TRIANGLE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'AnimatedTriangle should load a mesh')
+  assert.equal(mesh.name, 'mesh_0')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3)
+  assert.equal(mesh.geometry.index?.count, 3)
+  assert.equal(mesh.material.isMeshStandardMaterial, true)
+
+  assert.equal(gltf.animations.length, 1)
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'animation_0')
+  assert.equal(clip.duration, 1)
+  assert.equal(clip.tracks.length, 1)
+  const track = clip.tracks[0]
+  assert.equal(track.name, 'mesh_0.quaternion')
+  assert.equal(track.getInterpolation(), THREE.InterpolateLinear)
+  assert.equal(track.getValueSize(), 4)
+  assert.deepEqual(Array.from(track.times), [0, 0.25, 0.5, 0.75, 1])
+  assertVectorClose(Array.from(track.values.slice(4, 8)), [0, 0, 0.7070000171661377, 0.7070000171661377], 'quarter-turn quaternion key')
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(0.5)
+  assertVectorClose(mesh.quaternion.toArray(), [0, 0, 1, 0], 'AnimatedTriangle half-turn pose')
+  mixer.setTime(0)
+
+  const camera = new THREE.OrthographicCamera(-0.2, 1.2, 1.2, -0.2, 0.01, 10)
+  camera.position.set(0.5, 0.5, 2)
+  camera.lookAt(0.5, 0.5, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'AnimatedTriangle should render visible animated geometry')
 })
 
 test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform animation', async () => {
