@@ -148,7 +148,7 @@ function safeReaddir(dir) {
 }
 
 function run(command, args, cwd) {
-  execFileSync(command, args, {
+  execFileSync(resolveCommand(command), args, {
     cwd,
     stdio: 'inherit',
     env: {
@@ -157,4 +157,9 @@ function run(command, args, cwd) {
       npm_config_ignore_scripts: 'false',
     },
   })
+}
+
+function resolveCommand(command) {
+  if (process.platform === 'win32' && command === 'npm') return 'npm.cmd'
+  return command
 }
