@@ -128,6 +128,8 @@ interface MeshSortInfo {
 
 type SortKeyOverride = Partial<MeshSortInfo['keys']>
 
+const MAX_POINT_SPRITE_SIZE = 64
+
 export function flattenScene(
   scene: ThreeObject3DLike,
   camera?: ThreeCameraLike,
@@ -1786,16 +1788,24 @@ function pointWorldSize(
 
   const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
   if (camera?.isPerspectiveCamera === true && sizeAttenuation !== false) {
-    return pointSize / projectionY
+    const viewZ = viewSpaceZ(worldPosition, camera)
+    const depth = Number.isFinite(viewZ) ? Math.max(0.0001, Math.abs(viewZ)) : 1
+    const pixelSize = clampPointSpriteSize(pointSize * Math.max(1, viewportHeight) / (2 * depth))
+    return pixelSize * 2 * depth / Math.max(1, viewportHeight) / projectionY
   }
 
+  const cappedPointSize = clampPointSpriteSize(pointSize)
   if (camera?.isPerspectiveCamera !== true) {
-    return pointSize * 2 / Math.max(1, viewportHeight) / projectionY
+    return cappedPointSize * 2 / Math.max(1, viewportHeight) / projectionY
   }
 
   const viewZ = camera ? viewSpaceZ(worldPosition, camera) : -1
   const depth = Number.isFinite(viewZ) ? Math.max(0.0001, Math.abs(viewZ)) : 1
-  return pointSize * 2 * depth / Math.max(1, viewportHeight) / projectionY
+  return cappedPointSize * 2 * depth / Math.max(1, viewportHeight) / projectionY
+}
+
+function clampPointSpriteSize(pixelSize: number): number {
+  return Math.min(pixelSize, MAX_POINT_SPRITE_SIZE)
 }
 
 function finiteOrDefault(value: unknown, fallback: number): number {

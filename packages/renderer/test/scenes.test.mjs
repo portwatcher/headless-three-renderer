@@ -17133,6 +17133,33 @@ test('PointsMaterial size controls billboard pixel bounds', () => {
   assert.ok(large.height > small.height * 2, `larger point should produce taller bounds (${large.height} vs ${small.height})`)
 })
 
+test('PointsMaterial clamps oversized billboard bounds to a WebGL-style point size cap', () => {
+  function renderPoint(size) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      size,
+      sizeAttenuation: false,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return nonBackgroundBounds(renderRgba(scene, camera, { width: 128, height: 128 }), 128, 128, [0, 0, 0])
+  }
+
+  const capped = renderPoint(64)
+  const oversized = renderPoint(200)
+  assert.ok(capped.width >= 60 && capped.width <= 68, `64px point should render near the cap (${capped.width})`)
+  assert.ok(capped.height >= 60 && capped.height <= 68, `64px point should render near the cap (${capped.height})`)
+  assert.ok(oversized.width <= capped.width + 2, `oversized point width should clamp near cap (${oversized.width} vs ${capped.width})`)
+  assert.ok(oversized.height <= capped.height + 2, `oversized point height should clamp near cap (${oversized.height} vs ${capped.height})`)
+})
+
 test('PointsMaterial orthographic size is depth independent', () => {
   function renderPoint(z) {
     const geometry = new THREE.BufferGeometry()
