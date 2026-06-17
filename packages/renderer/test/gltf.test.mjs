@@ -49,6 +49,7 @@ const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Camer
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
+const SAMPLE_ASSET_COMPARE_ANISOTROPY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAnisotropy', 'glTF', 'CompareAnisotropy.gltf')
 const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
 const SAMPLE_ASSET_COMPARE_CLEARCOAT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareClearcoat', 'glTF', 'CompareClearcoat.gltf')
 const SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareEmissiveStrength', 'glTF', 'CompareEmissiveStrength.gltf')
@@ -518,6 +519,120 @@ test('committed Khronos glTF Sample Assets CompareAmbientOcclusion fixture loads
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'CompareAmbientOcclusion should render visible paired AO samples')
+})
+
+test('committed Khronos glTF Sample Assets CompareAnisotropy fixture loads anisotropy comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_ANISOTROPY, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_texture_transform', 'KHR_materials_anisotropy'])
+  assert.equal(source.buffers[0].uri, 'CompareAnisotropy.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Anisotropy_img0.jpg',
+    'Compare_Anisotropy_img1.png',
+    'Compare_Anisotropy_img2.jpg',
+    'Compare_Anisotropy_img3.png',
+    'Compare_Anisotropy_img4.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+    material.extensions?.KHR_materials_anisotropy?.anisotropyStrength ?? null,
+    material.extensions?.KHR_materials_anisotropy?.anisotropyTexture?.index ?? null,
+  ]), [
+    ['grooved-anisotropy', 1, 3, 0.5, null],
+    ['spiral-anisotropy', null, null, 0.5, 4],
+    ['grooved', 1, 3, null, null],
+    ['spiral', null, null, null, null],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_ANISOTROPY)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Spheroid002_primitive0',
+    'Spheroid002_primitive1',
+    'Spheroid001_primitive0',
+    'Spheroid001_primitive1',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), [
+    'grooved-anisotropy',
+    'spiral-anisotropy',
+    'grooved',
+    'spiral',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [5313, 4258, 5313, 4258])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [5313, 4258, 5313, 4258])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [5313, 4258, 5313, 4258])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [30720, 24576, 30720, 24576])
+
+  const [groovedAniso, spiralAniso, grooved, spiral] = meshes.map((mesh) => mesh.material)
+  assert.equal(groovedAniso.isMeshPhysicalMaterial, true)
+  assert.equal(spiralAniso.isMeshPhysicalMaterial, true)
+  assert.equal(grooved.isMeshStandardMaterial, true)
+  assert.equal(spiral.isMeshStandardMaterial, true)
+  assert.equal(groovedAniso.anisotropy, 0.5)
+  assert.equal(groovedAniso.anisotropyRotation, 0)
+  assert.equal(groovedAniso.anisotropyMap ?? null, null)
+  assert.equal(spiralAniso.anisotropy, 0.5)
+  assert.equal(spiralAniso.anisotropyRotation, 0)
+  assert.equal(Buffer.isBuffer(spiralAniso.anisotropyMap?.image), true, 'anisotropy direction PNG should load as an encoded Buffer')
+  assert.equal(spiralAniso.anisotropyMap.name, 'Compare_Anisotropy_img4.png')
+  assert.deepEqual(pngDimensions(spiralAniso.anisotropyMap.image), [256, 256])
+  assert.equal(spiralAniso.anisotropyMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(spiralAniso.anisotropyMap.flipY, false)
+  assert.equal(grooved.anisotropyMap ?? null, null)
+  assert.equal(spiral.anisotropyMap ?? null, null)
+
+  assert.equal(groovedAniso.map, grooved.map, 'grooved anisotropy pair should share the base-color texture')
+  assert.equal(Buffer.isBuffer(grooved.map?.image), true, 'grooved base-color PNG should load as an encoded Buffer')
+  assert.equal(grooved.map.name, 'Compare_Anisotropy_img1.png')
+  assert.deepEqual(pngDimensions(grooved.map.image), [2048, 1024])
+  assert.equal(grooved.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(grooved.map.flipY, false)
+
+  assert.equal(groovedAniso.roughnessMap, groovedAniso.metalnessMap)
+  assert.equal(grooved.roughnessMap, grooved.metalnessMap)
+  assert.equal(groovedAniso.roughnessMap, grooved.roughnessMap)
+  assert.equal(Buffer.isBuffer(grooved.roughnessMap?.image), true, 'grooved metallic-roughness PNG should load as an encoded Buffer')
+  assert.equal(grooved.roughnessMap.name, 'Compare_Anisotropy_img3.png')
+  assert.deepEqual(pngDimensions(grooved.roughnessMap.image), [2048, 1024])
+  assert.equal(grooved.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(grooved.roughnessMap.flipY, false)
+
+  assertVectorClose(spiralAniso.color.toArray(), [
+    0.5795467495918274,
+    0.2715774476528168,
+    0.18354901671409607,
+  ], 'CompareAnisotropy spiral anisotropic baseColorFactor')
+  assert.deepEqual(spiralAniso.color.toArray(), spiral.color.toArray())
+  assert.equal(spiralAniso.roughness, 0.1)
+  assert.equal(spiral.roughness, 0.1)
+  assert.equal(spiralAniso.metalness, 1)
+  assert.equal(spiral.metalness, 1)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.6, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -3.2, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 100,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'CompareAnisotropy should render visible anisotropy comparison geometry')
 })
 
 test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-color comparison variants', async () => {
