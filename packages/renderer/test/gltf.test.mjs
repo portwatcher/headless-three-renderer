@@ -102,6 +102,7 @@ const SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'g
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformMultiTest', 'glTF', 'TextureTransformMultiTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
+const SAMPLE_ASSET_TRANSMISSION_ORDER_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionOrderTest', 'glTF', 'TransmissionOrderTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
@@ -1506,6 +1507,131 @@ test('committed Khronos glTF Sample Assets CompareTransmission fixture loads alp
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.4, 'CompareTransmission should render visible alpha/transmission comparison geometry')
+})
+
+test('committed Khronos glTF Sample Assets TransmissionOrderTest fixture loads alpha and transmission ordering cases', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TRANSMISSION_ORDER_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_materials_volume'])
+  assert.deepEqual(source.buffers, [{ byteLength: 2291932, uri: 'TransmissionOrderTest.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'checkerboard.png',
+    'alphaInACircle.png',
+    'BlendMaskOpaqueLabels.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.alphaMode ?? 'OPAQUE',
+    material.alphaCutoff ?? null,
+    material.doubleSided ?? false,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.extensions?.KHR_materials_transmission?.transmissionFactor ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessFactor ?? null,
+  ]), [
+    ['Cloth Backdrop', 'OPAQUE', null, false, 0, null, null],
+    ['Alpha Blend Material', 'BLEND', null, true, 1, null, null],
+    ['Blue Glass Material', 'OPAQUE', null, false, null, 1, 0.4000000059604645],
+    ['Alpha Mask Material', 'MASK', null, true, 2, null, null],
+    ['Label Material', 'OPAQUE', null, false, 3, null, null],
+    ['Opaque Material', 'OPAQUE', null, true, null, null, null],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TRANSMISSION_ORDER_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 20)
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Cloth_Backdrop',
+    'AlphaBlend',
+    'Glass',
+    'Glass001',
+    'Glass002',
+    'Glass003',
+    'Glass004',
+    'Glass005',
+    'AlphaBlend001',
+    'AlphaBlend002',
+    'AlphaMask',
+    'AlphaMask001',
+    'AlphaMask002',
+    'Labels',
+    'Glass006',
+    'Glass007',
+    'Glass008',
+    'Opaque',
+    'Opaque001',
+    'Opaque002',
+  ])
+  assert.deepEqual(meshes.slice(0, 4).map((mesh) => mesh.geometry.getAttribute('position')?.count), [62658, 4, 296, 296])
+  assert.deepEqual(meshes.slice(0, 4).map((mesh) => mesh.geometry.index?.count), [131337, 6, 1764, 1764])
+
+  const materials = new Map()
+  for (const mesh of meshes) materials.set(mesh.material.name, mesh.material)
+
+  const backdrop = materials.get('Cloth Backdrop')
+  assert.equal(Buffer.isBuffer(backdrop.map?.image), true, 'checkerboard PNG should load as an encoded Buffer')
+  assert.equal(backdrop.map.name, 'checkerboard')
+  assert.deepEqual(pngDimensions(backdrop.map.image), [2048, 2048])
+  assert.equal(backdrop.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(backdrop.map.flipY, false)
+
+  const alphaBlend = materials.get('Alpha Blend Material')
+  assert.equal(alphaBlend.transparent, true)
+  assert.equal(alphaBlend.depthWrite, false)
+  assert.equal(alphaBlend.side, THREE.DoubleSide)
+  assert.equal(alphaBlend.alphaTest, 0)
+  assert.equal(alphaBlend.map.name, 'alphaInACircle')
+  assert.deepEqual(pngDimensions(alphaBlend.map.image), [256, 256])
+  assert.equal(alphaBlend.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(alphaBlend.map.flipY, false)
+
+  const alphaMask = materials.get('Alpha Mask Material')
+  assert.equal(alphaMask.transparent, false)
+  assert.equal(alphaMask.depthWrite, true)
+  assert.equal(alphaMask.side, THREE.DoubleSide)
+  assert.equal(alphaMask.alphaTest, 0.5)
+  assert.equal(alphaMask.map.name, 'alphaInACircle')
+
+  const glass = materials.get('Blue Glass Material')
+  assert.equal(glass.isMeshPhysicalMaterial, true)
+  assert.equal(glass.transmission, 1)
+  assert.equal(glass.thickness, 0.4000000059604645)
+  assert.equal(glass.attenuationDistance, 1)
+  assertVectorClose(glass.attenuationColor.toArray(), [1, 1, 1], 'TransmissionOrderTest glass attenuation color')
+
+  const label = materials.get('Label Material')
+  assert.equal(Buffer.isBuffer(label.map?.image), true, 'label PNG should load as an encoded Buffer')
+  assert.equal(label.map.name, 'BlendMaskOpaqueLabels')
+  assert.deepEqual(pngDimensions(label.map.image), [256, 256])
+
+  const opaque = materials.get('Opaque Material')
+  assert.equal(opaque.side, THREE.DoubleSide)
+  assert.equal(opaque.transparent, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.4)
+  light.position.set(3, 4, 6)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(45, 1.5, 0.01, 100)
+  camera.position.set(center.x, center.y - 6, center.z + 4)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 64,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'TransmissionOrderTest should render visible transparent/transmissive ordering panels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 15 && mean.g > 10 && mean.b > 10, `TransmissionOrderTest should render non-black layered output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets CompareVolume fixture loads transmission volume variants', async () => {
