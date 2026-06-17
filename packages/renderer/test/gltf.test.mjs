@@ -81,6 +81,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceDielectricSpheres', 'glTF', 'IridescenceDielectricSpheres.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceMetallicSpheres', 'glTF', 'IridescenceMetallicSpheres.gltf')
+const SAMPLE_ASSET_LANTERN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Lantern', 'glTF', 'Lantern.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
@@ -2800,6 +2801,120 @@ test('committed Khronos glTF Sample Assets WaterBottle fixture loads textured PB
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'WaterBottle should render visible textured PBR geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 15 && mean.g > mean.b + 15, `WaterBottle texture should contribute warm label pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Lantern fixture loads multi-mesh textured PBR asset', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_LANTERN, 'utf8'))
+  assert.equal(source.asset.generator, 'glTF Tools for Unity')
+  assert.deepEqual(source.buffers, [{ uri: 'Lantern.bin', byteLength: 231324 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Lantern_baseColor.png',
+    'Lantern_roughnessMetallic.png',
+    'Lantern_normal.png',
+    'Lantern_emissive.png',
+  ])
+  assert.equal(source.materials.length, 1)
+  assert.equal(source.materials[0].name, 'LanternPost_Mat')
+  assert.deepEqual(source.materials[0].pbrMetallicRoughness, {
+    baseColorTexture: { index: 0 },
+    metallicRoughnessTexture: { index: 1 },
+  })
+  assert.deepEqual(source.materials[0].normalTexture, { index: 2 })
+  assert.deepEqual(source.materials[0].emissiveFactor, [1, 1, 1])
+  assert.deepEqual(source.materials[0].emissiveTexture, { index: 3 })
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), [
+    'LanternPole_Body',
+    'LanternPole_Chain',
+    'LanternPole_Lantern',
+  ])
+  assert.deepEqual(source.nodes.map((node) => node.name), [
+    'LanternPole_Body',
+    'LanternPole_Chain',
+    'LanternPole_Lantern',
+    'Lantern',
+  ])
+  assert.deepEqual(source.nodes[3].children, [0, 1, 2])
+  assert.deepEqual(source.nodes[3].rotation, [0, 1, 0, 0])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_LANTERN)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'LanternPole_Body',
+    'LanternPole_Chain',
+    'LanternPole_Lantern',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [926, 756, 2463])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [926, 756, 2463])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('tangent')?.count), [926, 756, 2463])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [926, 756, 2463])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [2616, 3744, 9822])
+  assert.deepEqual(meshes.map((mesh) => mesh.position.toArray()), [
+    [-3.82315421, 13.01603, 0],
+    [-9.582001, 21.0378723, 0],
+    [-9.582007, 18.0091515, 0],
+  ])
+
+  const material = meshes[0].material
+  assert.ok(meshes.every((mesh) => mesh.material === material), 'Lantern meshes should share one PBR material')
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.name, 'LanternPost_Mat')
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+  assert.deepEqual(material.emissive.toArray(), [1, 1, 1])
+
+  const assertLoadedTexture = (texture, name, colorSpace) => {
+    assert.ok(texture?.isTexture, `${name} should load a texture`)
+    assert.equal(texture.name, name)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 2048])
+    assert.equal(texture.wrapS, THREE.RepeatWrapping)
+    assert.equal(texture.wrapT, THREE.RepeatWrapping)
+    assert.equal(texture.magFilter, THREE.LinearFilter)
+    assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter)
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assertLoadedTexture(material.map, 'Lantern_baseColor.png', THREE.SRGBColorSpace)
+  assertLoadedTexture(material.metalnessMap, 'Lantern_roughnessMetallic.png', THREE.NoColorSpace)
+  assertLoadedTexture(material.normalMap, 'Lantern_normal.png', THREE.NoColorSpace)
+  assertLoadedTexture(material.emissiveMap, 'Lantern_emissive.png', THREE.SRGBColorSpace)
+  assert.equal(material.metalnessMap, material.roughnessMap, 'Lantern should reuse the packed metallic-roughness texture for roughness')
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(5, 8, 6)
+  gltf.scene.add(light)
+  const camera = new THREE.OrthographicCamera(
+    -size.x / 2 - 2,
+    size.x / 2 + 2,
+    size.y / 2 + 2,
+    -size.y / 2 - 2,
+    0.01,
+    50,
+  )
+  camera.position.copy(center).add(new THREE.Vector3(0, 0, 30))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'Lantern should render visible multi-mesh textured PBR geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g && mean.g > mean.b, `Lantern texture should contribute warm metal and emissive pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets PointLightIntensityTest fixture loads KHR_lights_punctual point lights', async () => {
