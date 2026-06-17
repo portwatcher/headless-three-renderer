@@ -119,6 +119,7 @@ const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
 const SAMPLE_ASSET_PLAYSET_LIGHT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PlaysetLightTest', 'glTF', 'PlaysetLightTest.gltf')
 const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
+const SAMPLE_ASSET_POT_OF_COALS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PotOfCoals', 'glTF', 'PotOfCoals.gltf')
 const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PrimitiveModeNormalsTest', 'glTF', 'PrimitiveModeNormalsTest.gltf')
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
 const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedFigure', 'glTF', 'RiggedFigure.gltf')
@@ -6376,6 +6377,127 @@ test('committed Khronos glTF Sample Assets ClearcoatWicker fixture loads texture
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'ClearcoatWicker should render visible textured clearcoat geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.g + 5 && mean.g > mean.b, `ClearcoatWicker texture should contribute warm wicker pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets PotOfCoals fixture loads emissive coals and copper clearcoat maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_POT_OF_COALS, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_clearcoat'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'PotOfCoals.bin', byteLength: 1968084 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'HotCoals_basecolor.jpg',
+    'HotCoals_normal.jpg',
+    'HotCoals_emissive.jpg',
+    'HotCoals_occlusion.jpg',
+    'CopperPot_basecolor.jpg',
+    'CopperPot_normal.png',
+    'CopperPot_orm.jpg',
+    'CopperPot_clearcoat.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'HotCoals',
+    'CopperPot',
+  ])
+  assert.deepEqual(source.materials[0].emissiveTexture, { index: 2 })
+  assert.deepEqual(source.materials[0].emissiveFactor, [1, 1, 1])
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_clearcoat: {
+      clearcoatFactor: 1,
+      clearcoatTexture: { index: 7 },
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_POT_OF_COALS)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_clearcoat'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'HotCoals',
+    'CopperPot',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [38733, 15936])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [38733, 15936])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [38733, 15936])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [38733, 15936])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const coals = materials.get('HotCoals')
+  assert.equal(coals?.isMeshStandardMaterial, true)
+  assert.equal(coals.metalness, 0)
+  assert.equal(coals.roughness, 0.712)
+  assert.deepEqual(coals.emissive.toArray(), [1, 1, 1])
+  assert.equal(coals.map.name, 'HotCoals_basecolor.jpg')
+  assert.equal(coals.normalMap.name, 'HotCoals_normal.jpg')
+  assert.equal(coals.emissiveMap.name, 'HotCoals_emissive.jpg')
+  assert.equal(coals.aoMap.name, 'HotCoals_occlusion.jpg')
+  assert.deepEqual(coals.normalScale.toArray(), [1, -1])
+
+  const copper = materials.get('CopperPot')
+  assert.equal(copper?.isMeshPhysicalMaterial, true)
+  assert.equal(copper.metalness, 1)
+  assert.equal(copper.roughness, 1)
+  assert.equal(copper.clearcoat, 1)
+  assert.equal(copper.clearcoatRoughness, 0)
+  assert.equal(copper.map.name, 'CopperPot_basecolor.jpg')
+  assert.equal(copper.normalMap.name, 'CopperPot_normal.png')
+  assert.equal(copper.aoMap.name, 'CopperPot_orm.jpg')
+  assert.equal(copper.roughnessMap.name, 'CopperPot_orm.jpg')
+  assert.equal(copper.metalnessMap.name, 'CopperPot_orm.jpg')
+  assert.equal(copper.clearcoatMap.name, 'CopperPot_clearcoat.jpg')
+  assert.equal(copper.aoMap, copper.roughnessMap)
+  assert.equal(copper.aoMap, copper.metalnessMap)
+
+  for (const texture of [
+    coals.map,
+    coals.normalMap,
+    coals.emissiveMap,
+    coals.aoMap,
+    copper.map,
+    copper.normalMap,
+    copper.aoMap,
+    copper.clearcoatMap,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.equal(texture.flipY, false)
+  }
+  assert.equal(coals.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(coals.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(coals.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(coals.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(copper.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(copper.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(copper.normalMap.image), [2048, 2048])
+  assert.equal(copper.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(copper.clearcoatMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(copper.aoMap.channel, 0)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.4))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.8)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'PotOfCoals should render visible emissive coals and copper pot')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 10 && mean.g > 4, `PotOfCoals should render warm coal and copper pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets IridescenceLamp fixture loads physical iridescence inputs', async () => {
