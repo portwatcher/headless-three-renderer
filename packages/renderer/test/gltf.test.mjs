@@ -127,6 +127,7 @@ const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_SPECULAR_SILK_POUF = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularSilkPouf', 'glTF', 'SpecularSilkPouf.gltf')
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
+const SAMPLE_ASSET_SUNGLASSES_KHRONOS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SunglassesKhronos', 'glTF', 'SunglassesKhronos.gltf')
 const SAMPLE_ASSET_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Suzanne', 'glTF', 'Suzanne.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_ENCODING_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureEncodingTest', 'glTF', 'TextureEncodingTest.gltf')
@@ -6633,6 +6634,170 @@ test('committed Khronos glTF Sample Assets Suzanne fixture loads dense textured 
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'Suzanne should render visible dense textured PBR geometry')
+})
+
+test('committed Khronos glTF Sample Assets SunglassesKhronos fixture loads transmission, volume, IOR, and iridescence lenses', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SUNGLASSES_KHRONOS, 'utf8'))
+  assert.equal(source.extensionsRequired, undefined)
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_ior',
+    'KHR_materials_iridescence',
+  ])
+  assert.deepEqual(source.buffers, [
+    { uri: 'SunglassesKhronos_data.bin', byteLength: 277272 },
+  ])
+  assert.deepEqual(source.images, [{ uri: 'SunglassesKhronos.png' }])
+  assert.deepEqual(source.textures, [{ source: 0 }])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'earhooks',
+    'temples',
+    'nose_pads',
+    'lens_interior',
+    'lens_exterior',
+  ])
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+    KHR_materials_volume: {
+      attenuationColor: [1, 1, 1],
+      attenuationDistance: 0.006999999999999999,
+      thicknessFactor: 0.01,
+    },
+  })
+  assert.deepEqual(source.materials[4].extensions, {
+    KHR_materials_ior: {
+      ior: 1,
+    },
+    KHR_materials_iridescence: {
+      iridescenceFactor: 1,
+      iridescenceIor: 2,
+      iridescenceThicknessMaximum: 300.01,
+    },
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+  })
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), [
+    'EarhookRight',
+    'TempleRight',
+    'EarhookLeft',
+    'TempleLeft',
+    'Nosepads',
+    'Frames',
+    'LensesInterior',
+    'LensesExterior',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SUNGLASSES_KHRONOS)
+  assert.deepEqual(gltf.parser?.json?.extensionsUsed, source.extensionsUsed)
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 8)
+
+  const expectedMeshes = [
+    ['EarhookRight_1', 1176, 6696, 'earhooks', true],
+    ['TempleRight_1', 212, 858, 'temples', false],
+    ['EarhookLeft_1', 1176, 6696, 'earhooks', true],
+    ['TempleLeft_1', 212, 858, 'temples', false],
+    ['Nosepads_1', 452, 2688, 'nose_pads', false],
+    ['Frames_1', 3036, 16248, 'temples', false],
+    ['LensesInterior_1', 578, 3072, 'lens_interior', false],
+    ['LensesExterior_1', 578, 3072, 'lens_exterior', false],
+  ]
+  for (const [name, vertexCount, indexCount, materialName, hasUv] of expectedMeshes) {
+    const mesh = meshes.find((candidate) => candidate.name === name)
+    assert.ok(mesh, `${name} should load`)
+    assert.equal(mesh.geometry.getAttribute('position')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('normal')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('uv')?.count, hasUv ? vertexCount : undefined)
+    assert.equal(mesh.geometry.index?.count, indexCount)
+    assert.equal(mesh.material.name, materialName)
+  }
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const earhooks = materials.get('earhooks')
+  assert.equal(earhooks?.isMeshStandardMaterial, true)
+  assert.deepEqual(earhooks.color.toArray(), [1, 1, 1])
+  assert.equal(earhooks.metalness, 0)
+  assert.equal(earhooks.roughness, 0.20000022649765015)
+  assert.equal(Buffer.isBuffer(earhooks.map?.image), true, 'SunglassesKhronos PNG should load as an encoded Buffer')
+  assert.equal(earhooks.map.name, 'SunglassesKhronos.png')
+  assert.deepEqual(pngDimensions(earhooks.map.image), [1024, 128])
+  assert.equal(earhooks.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(earhooks.map.flipY, false)
+
+  const temples = materials.get('temples')
+  assert.equal(temples?.isMeshStandardMaterial, true)
+  assert.deepEqual(temples.color.toArray(), [
+    0.9159365892410278,
+    0.9159365892410278,
+    0.9159365892410278,
+  ])
+  assert.equal(temples.metalness, 1)
+  assert.equal(temples.roughness, 0.050000011920928955)
+
+  const nosePads = materials.get('nose_pads')
+  assert.equal(nosePads?.isMeshPhysicalMaterial, true)
+  assert.equal(nosePads.transmission, 1)
+  assert.equal(nosePads.thickness, 0.01)
+  assert.equal(nosePads.attenuationDistance, 0.006999999999999999)
+  assert.deepEqual(nosePads.attenuationColor.toArray(), [1, 1, 1])
+  assert.equal(nosePads.ior, 1.5)
+
+  const lensInterior = materials.get('lens_interior')
+  assert.equal(lensInterior?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(lensInterior.color.toArray(), [
+    0.01606770046055317,
+    0.01606770046055317,
+    0.01606770046055317,
+  ])
+  assert.equal(lensInterior.transmission, 1)
+  assert.equal(lensInterior.thickness, 0)
+  assert.equal(lensInterior.ior, 1.5)
+
+  const lensExterior = materials.get('lens_exterior')
+  assert.equal(lensExterior?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(lensExterior.color.toArray(), [
+    0.009021490812301636,
+    0.009021490812301636,
+    0.009021490812301636,
+  ])
+  assert.equal(lensExterior.transmission, 1)
+  assert.equal(lensExterior.ior, 1)
+  assert.equal(lensExterior.iridescence, 1)
+  assert.equal(lensExterior.iridescenceIOR, 2)
+  assert.deepEqual(lensExterior.iridescenceThicknessRange, [100, 300.01])
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1.4, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.25, Math.max(size.x, size.y, size.z) * 2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.copy(center).add(new THREE.Vector3(1, 2, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 120,
+    format: 'rgba',
+    background: [1, 1, 1],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.15, 'SunglassesKhronos should render visible glasses geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 250 && mean.g < 250 && mean.b < 250, `SunglassesKhronos should render darker lens and frame pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets EmissiveStrengthTest fixture loads KHR_materials_emissive_strength factors', async () => {
