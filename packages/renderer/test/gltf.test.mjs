@@ -92,6 +92,7 @@ const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'gl
 const SAMPLE_ASSET_GLAM_VELVET_SOFA = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlamVelvetSofa', 'glTF', 'GlamVelvetSofa.gltf')
 const SAMPLE_ASSET_GLASS_BROKEN_WINDOW = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlassBrokenWindow', 'glTF', 'GlassBrokenWindow.gltf')
 const SAMPLE_ASSET_GLASS_HURRICANE_CANDLE_HOLDER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlassHurricaneCandleHolder', 'glTF', 'GlassHurricaneCandleHolder.gltf')
+const SAMPLE_ASSET_GLASS_VASE_FLOWERS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlassVaseFlowers', 'glTF', 'GlassVaseFlowers.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_ABALONE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceAbalone', 'glTF', 'IridescenceAbalone.gltf')
 const SAMPLE_ASSET_IOR_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IORTestGrid', 'glTF', 'IORTestGrid.gltf')
@@ -99,6 +100,7 @@ const SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES = path.join(FIXTURE_DIR, 'gltf
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceMetallicSpheres', 'glTF', 'IridescenceMetallicSpheres.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceSuzanne', 'glTF', 'IridescenceSuzanne.gltf')
+const SAMPLE_ASSET_IRIDESCENT_DISH_WITH_OLIVES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescentDishWithOlives', 'glTF', 'IridescentDishWithOlives.gltf')
 const SAMPLE_ASSET_LANTERN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Lantern', 'glTF', 'Lantern.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
@@ -1757,6 +1759,192 @@ test('committed Khronos glTF Sample Assets IridescenceAbalone fixture loads real
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 10, `IridescenceAbalone should render lit shell pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('committed Khronos glTF Sample Assets IridescentDishWithOlives fixture loads iridescent glass and textured food materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_IRIDESCENT_DISH_WITH_OLIVES, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_ior',
+    'KHR_materials_iridescence',
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+  ])
+  assert.deepEqual(source.buffers, [
+    { uri: 'IridescentDishWithOlives.bin', byteLength: 830680 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'glassdish_irid.png',
+    'olives_nrm.png',
+    'olives_orm.png',
+    'olives_col.png',
+    'glasscover_nrm.png',
+    'glasscover_thick.png',
+    'glasscover_irid.png',
+    'goldleaf_nrm.png',
+    'goldleaf_orm.png',
+    'goldleaf_col.png',
+    'glasscover_orm.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'glassDish',
+    'olives',
+    'glassCover',
+    'goldLeaf',
+  ])
+  assert.deepEqual(source.materials[0].extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_iridescence: {
+      iridescenceFactor: 1,
+      iridescenceTexture: { index: 0 },
+      iridescenceThicknessMaximum: 550,
+      iridescenceThicknessMinimum: 500,
+      iridescenceThicknessTexture: { index: 0 },
+    },
+    KHR_materials_volume: { thicknessFactor: 0.01 },
+  })
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_ior: { ior: 1.5 },
+    KHR_materials_iridescence: {
+      iridescenceFactor: 1,
+      iridescenceTexture: { index: 6 },
+      iridescenceThicknessMaximum: 550,
+      iridescenceThicknessMinimum: 500,
+      iridescenceThicknessTexture: { index: 6 },
+    },
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: { thicknessFactor: 0.1, thicknessTexture: { index: 5 } },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_IRIDESCENT_DISH_WITH_OLIVES)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_iridescence'))
+  assert.deepEqual(gltf.animations.map((animation) => [
+    animation.name,
+    animation.tracks.map((track) => track.name),
+  ]), [
+    ['glassCover rotation', ['glassCover_animation.quaternion']],
+  ])
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'glassDish',
+    'olives',
+    'glassCover',
+    'goldLeaf',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [1090, 10992, 1857, 924])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [1090, 10992, 1857, 924])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [1090, 10992, 1857, 924])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [6144, 51840, 10752, 4608])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const dish = materials.get('glassDish')
+  assert.equal(dish?.isMeshPhysicalMaterial, true)
+  assert.equal(dish.transmission, 1)
+  assert.equal(dish.thickness, 0.01)
+  assert.equal(dish.ior, 1.5)
+  assert.equal(dish.iridescence, 1)
+  assert.deepEqual(dish.iridescenceThicknessRange, [500, 550])
+  assert.equal(dish.iridescenceMap.name, 'glassdish_irid.png')
+  assert.equal(dish.iridescenceThicknessMap.name, 'glassdish_irid.png')
+
+  const olives = materials.get('olives')
+  assert.equal(olives?.isMeshStandardMaterial, true)
+  assert.equal(olives.map.name, 'olives_col.png')
+  assert.equal(olives.normalMap.name, 'olives_nrm.png')
+  assert.equal(olives.aoMap.name, 'olives_orm.png')
+  assert.equal(olives.roughnessMap.name, 'olives_orm.png')
+  assert.equal(olives.metalnessMap.name, 'olives_orm.png')
+  assert.deepEqual(olives.normalScale.toArray(), [1, -1])
+
+  const cover = materials.get('glassCover')
+  assert.equal(cover?.isMeshPhysicalMaterial, true)
+  assert.equal(cover.transmission, 1)
+  assert.equal(cover.thickness, 0.1)
+  assert.equal(cover.ior, 1.5)
+  assert.equal(cover.iridescence, 1)
+  assert.deepEqual(cover.iridescenceThicknessRange, [500, 550])
+  assert.deepEqual(cover.normalScale.toArray(), [2, -2])
+  assert.equal(cover.normalMap.name, 'glasscover_nrm.png')
+  assert.equal(cover.roughnessMap.name, 'glasscover_orm.png')
+  assert.equal(cover.metalnessMap.name, 'glasscover_orm.png')
+  assert.equal(cover.thicknessMap.name, 'glasscover_thick.png')
+  assert.equal(cover.iridescenceMap.name, 'glasscover_irid.png')
+  assert.equal(cover.iridescenceThicknessMap.name, 'glasscover_irid.png')
+
+  const goldLeaf = materials.get('goldLeaf')
+  assert.equal(goldLeaf?.isMeshStandardMaterial, true)
+  assert.equal(goldLeaf.alphaTest, 0.5)
+  assert.equal(goldLeaf.map.name, 'goldleaf_col.png')
+  assert.equal(goldLeaf.normalMap.name, 'goldleaf_nrm.png')
+  assert.equal(goldLeaf.aoMap.name, 'goldleaf_orm.png')
+  assert.equal(goldLeaf.roughnessMap.name, 'goldleaf_orm.png')
+  assert.equal(goldLeaf.metalnessMap.name, 'goldleaf_orm.png')
+
+  const smallPngTextures = [
+    olives.map,
+    olives.normalMap,
+    olives.aoMap,
+    olives.roughnessMap,
+    olives.metalnessMap,
+  ]
+  for (const texture of smallPngTextures) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [512, 512])
+    assert.equal(texture.flipY, false)
+  }
+  assert.equal(olives.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(olives.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(olives.aoMap.colorSpace, THREE.NoColorSpace)
+
+  const widePngTextures = [
+    dish.iridescenceMap,
+    dish.iridescenceThicknessMap,
+    cover.normalMap,
+    cover.roughnessMap,
+    cover.metalnessMap,
+    cover.thicknessMap,
+    cover.iridescenceMap,
+    cover.iridescenceThicknessMap,
+    goldLeaf.map,
+    goldLeaf.normalMap,
+    goldLeaf.aoMap,
+    goldLeaf.roughnessMap,
+    goldLeaf.metalnessMap,
+  ]
+  for (const texture of widePngTextures) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [2048, 1024])
+    assert.equal(texture.flipY, false)
+  }
+  assert.equal(goldLeaf.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(cover.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(cover.thicknessMap.colorSpace, THREE.NoColorSpace)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.4))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.8)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'IridescentDishWithOlives should render visible dish and food geometry')
+})
+
 test('committed Khronos glTF Sample Assets iridescence sphere-grid fixtures load dielectric and metallic variants', async () => {
   const cases = [
     {
@@ -2609,6 +2797,128 @@ test('committed Khronos glTF Sample Assets GlassHurricaneCandleHolder fixture lo
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'GlassHurricaneCandleHolder should render visible metal and volume glass')
   const mean = meanRgba(rgba)
   assert.ok(mean.b > 10 && mean.g > 10, `GlassHurricaneCandleHolder should render lit blue-tinted glass pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets GlassVaseFlowers fixture loads alpha flowers and transmission vase', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_GLASS_VASE_FLOWERS, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_materials_volume'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'GlassVaseFlowers.bin', byteLength: 178908 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'shrub_sorrel_01_normal_1k.jpg',
+    'shrub_sorrel_01_color_1k.png',
+    'shrub_sorrel_01_rough_1k.jpg',
+    'glass_vase_thickness_1k.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.alphaMode ?? 'OPAQUE',
+    material.doubleSided ?? false,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.normalTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+    material.extensions?.KHR_materials_transmission?.transmissionFactor ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessFactor ?? null,
+  ]), [
+    ['Flowers', 'MASK', true, 1, 0, 2, null, null],
+    ['GlassAlpha', 'BLEND', false, null, null, null, null, null],
+    ['GlassTransmission', 'OPAQUE', false, null, null, null, 1, 0.075],
+  ])
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: { thicknessFactor: 0.075, thicknessTexture: { index: 3 } },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_GLASS_VASE_FLOWERS)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_volume'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Flowers1',
+    'GlassAlpha',
+    'Flowers2',
+    'GlassTransmission',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [2561, 1714, 2561, 1714])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [2561, 1714, 2561, 1714])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [2561, 1714, 2561, 1714])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [11454, 9600, 11454, 9600])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const flowers = materials.get('Flowers')
+  assert.equal(flowers?.isMeshStandardMaterial, true)
+  assert.equal(flowers.metalness, 0)
+  assert.equal(flowers.roughness, 1)
+  assert.equal(flowers.alphaTest, 0.5)
+  assert.equal(flowers.side, THREE.DoubleSide)
+  assert.equal(flowers.transparent, false)
+  assert.equal(flowers.map.name, 'shrub_sorrel_01_color_1k.png')
+  assert.equal(flowers.normalMap.name, 'shrub_sorrel_01_normal_1k.jpg')
+  assert.deepEqual(flowers.normalScale.toArray(), [1, -1])
+  assert.equal(flowers.roughnessMap.name, 'shrub_sorrel_01_rough_1k.jpg')
+  assert.equal(flowers.metalnessMap.name, 'shrub_sorrel_01_rough_1k.jpg')
+
+  const alphaGlass = materials.get('GlassAlpha')
+  assert.equal(alphaGlass?.isMeshStandardMaterial, true)
+  assert.deepEqual(alphaGlass.color.toArray(), [0.15, 0.15, 0.15])
+  assert.equal(alphaGlass.transparent, true)
+  assert.equal(alphaGlass.roughness, 0)
+  assert.equal(alphaGlass.metalness, 0)
+
+  const transmissionGlass = materials.get('GlassTransmission')
+  assert.equal(transmissionGlass?.isMeshPhysicalMaterial, true)
+  assert.equal(transmissionGlass.transmission, 1)
+  assert.equal(transmissionGlass.thickness, 0.075)
+  assert.equal(transmissionGlass.ior, 1.5)
+  assert.equal(transmissionGlass.roughness, 0)
+  assert.equal(transmissionGlass.metalness, 0)
+  assert.equal(transmissionGlass.thicknessMap.name, 'glass_vase_thickness_1k.jpg')
+
+  assert.equal(Buffer.isBuffer(flowers.map.image), true, 'flower base-color PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(flowers.map.image), [1024, 1024])
+  assert.equal(flowers.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(Buffer.isBuffer(flowers.normalMap.image), true, 'flower normal JPEG should load as an encoded Buffer')
+  assert.equal(flowers.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(Buffer.isBuffer(flowers.roughnessMap.image), true, 'flower roughness JPEG should load as an encoded Buffer')
+  assert.equal(flowers.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(Buffer.isBuffer(transmissionGlass.thicknessMap.image), true, 'vase thickness PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(transmissionGlass.thicknessMap.image), [1024, 1024])
+  assert.equal(transmissionGlass.thicknessMap.colorSpace, THREE.NoColorSpace)
+  for (const texture of [
+    flowers.map,
+    flowers.normalMap,
+    flowers.roughnessMap,
+    flowers.metalnessMap,
+    transmissionGlass.thicknessMap,
+  ]) {
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.3))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.8)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'GlassVaseFlowers should render visible alpha flowers and glass vase')
 })
 
 test('committed Khronos glTF Sample Assets TransmissionOrderTest fixture loads alpha and transmission ordering cases', async () => {
