@@ -77,6 +77,7 @@ const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheresNoTextures', 'glTF', 'MetalRoughSpheresNoTextures.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MORPH_PRIMITIVES_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphPrimitivesTest', 'glTF', 'MorphPrimitivesTest.gltf')
+const SAMPLE_ASSET_MORPH_STRESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphStressTest', 'glTF', 'MorphStressTest.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
@@ -4076,6 +4077,110 @@ test('committed Khronos glTF Sample Assets AnimatedMorphCube fixture applies ani
   assert.ok(base.width > 45 && base.height > 45, `AnimatedMorphCube base pose should render a broad cube (${base.width}x${base.height})`)
   assert.ok(animated.width < base.width - 10, `AnimatedMorphCube morph animation should narrow the rendered cube (${animated.width} vs ${base.width})`)
   assert.ok(animated.height < base.height - 10, `AnimatedMorphCube morph animation should shorten the rendered cube (${animated.height} vs ${base.height})`)
+})
+
+test('committed Khronos glTF Sample Assets MorphStressTest fixture loads dense morph weight tracks', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_MORPH_STRESS_TEST, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'MorphStressTest.bin')
+  assert.equal(source.buffers[0].byteLength, 388084)
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Base_AO.png',
+    'TinyGrid.png',
+    'ColorSwatches.png',
+  ])
+  const primitive = source.meshes[0].primitives[0]
+  assert.equal(primitive.targets.length, 8)
+  assert.equal(source.meshes[0].weights.length, 8)
+  assert.deepEqual(source.animations.map((animation) => [
+    animation.name,
+    animation.channels.length,
+    animation.samplers.length,
+    animation.channels[0].target.path,
+  ]), [
+    ['Individuals', 1, 1, 'weights'],
+    ['TheWave', 1, 1, 'weights'],
+    ['Pulse', 1, 1, 'weights'],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MORPH_STRESS_TEST)
+  const mesh = gltf.scene.getObjectByName('Cube')
+  assert.ok(mesh?.isMesh, 'MorphStressTest should load its cube mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.geometry.morphAttributes.position?.length, 8)
+  assert.equal(mesh.geometry.morphAttributes.normal?.length, 8)
+  assert.deepEqual(mesh.geometry.morphAttributes.position.map((attribute) => attribute.count), [24, 24, 24, 24, 24, 24, 24, 24])
+  assert.deepEqual(mesh.morphTargetInfluences, [0, 0, 0, 0, 0, 0, 0, 0])
+  assert.deepEqual(mesh.morphTargetDictionary, {
+    'Key 1': 0,
+    'Key 2': 1,
+    'Key 3': 2,
+    'Key 4': 3,
+    'Key 5': 4,
+    'Key 6': 5,
+    'Key 7': 6,
+    'Key 8': 7,
+  })
+
+  assert.equal(Buffer.isBuffer(mesh.material.map?.image), true, 'MorphStressTest tiny grid PNG should load as an encoded Buffer')
+  assert.equal(mesh.material.map.name, 'TinyGrid')
+  assert.deepEqual(pngDimensions(mesh.material.map.image), [64, 64])
+  assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(mesh.material.map.flipY, false)
+  assert.equal(Buffer.isBuffer(mesh.material.aoMap?.image), true, 'MorphStressTest AO PNG should load as an encoded Buffer')
+  assert.equal(mesh.material.aoMap.name, 'Base_AO')
+  assert.deepEqual(pngDimensions(mesh.material.aoMap.image), [1024, 1024])
+  assert.equal(mesh.material.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(mesh.material.aoMap.flipY, false)
+
+  assert.deepEqual(gltf.animations.map((clip) => [clip.name, clip.tracks.length]), [
+    ['Individuals', 2],
+    ['TheWave', 2],
+    ['Pulse', 2],
+  ])
+  const waveTrack = gltf.animations.find((clip) => clip.name === 'TheWave').tracks[0]
+  assert.equal(waveTrack.name, 'Cube.morphTargetInfluences')
+  assert.equal(waveTrack.getValueSize(), 8)
+  assert.equal(waveTrack.times.length, 59)
+  assert.equal(waveTrack.values.length, 472)
+  const pulseTrack = gltf.animations.find((clip) => clip.name === 'Pulse').tracks[0]
+  assert.equal(pulseTrack.times.length, 191)
+  assert.equal(pulseTrack.values.length, 1528)
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  const wave = gltf.animations.find((clip) => clip.name === 'TheWave')
+  mixer.clipAction(wave).play()
+  mixer.setTime(wave.duration / 2)
+  assert.ok(mesh.morphTargetInfluences[3] > 0.9, `MorphStressTest wave should strongly activate middle targets (${mesh.morphTargetInfluences.join(', ')})`)
+  assert.ok(mesh.morphTargetInfluences[0] < 0.1 && mesh.morphTargetInfluences[7] < 0.1, `MorphStressTest wave should leave edge targets low (${mesh.morphTargetInfluences.join(', ')})`)
+  mixer.stopAllAction()
+  mesh.morphTargetInfluences.fill(0)
+  const pulse = gltf.animations.find((clip) => clip.name === 'Pulse')
+  mixer.clipAction(pulse).play()
+  mixer.setTime(pulse.duration / 2)
+  assert.deepEqual(mesh.morphTargetInfluences, [1, 1, 1, 1, 1, 1, 1, 1])
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(3, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, -8, 5))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'MorphStressTest should render visible morphed geometry')
 })
 
 test('committed Khronos glTF Sample Assets SimpleSparseAccessor fixture applies sparse POSITION overrides', async () => {
