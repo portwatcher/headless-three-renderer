@@ -40,6 +40,7 @@ const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
+const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
@@ -793,6 +794,91 @@ test('committed Khronos glTF Sample Assets IridescenceLamp fixture loads physica
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'IridescenceLamp should render visible physical-material geometry')
+})
+
+test('committed Khronos glTF Sample Assets CompareIor fixture loads transmission, volume, and IOR inputs', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_IOR, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_ior',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_IOR)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 3, 'CompareIor should load two spheres plus checker backdrop')
+
+  const meshesByName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  const baseline = meshesByName.get('GeoSphere001')
+  const iorSphere = meshesByName.get('GeoSphere002')
+  const checker = meshesByName.get('Checker')
+  assert.equal(baseline?.geometry.getAttribute('position')?.count, 673)
+  assert.equal(baseline.geometry.getAttribute('normal')?.count, 673)
+  assert.equal(baseline.geometry.getAttribute('uv')?.count, 673)
+  assert.equal(baseline.geometry.index?.count, 3840)
+  assert.equal(iorSphere?.geometry.getAttribute('position')?.count, 673)
+  assert.equal(iorSphere.geometry.index?.count, 3840)
+  assert.equal(checker?.geometry.getAttribute('position')?.count, 4)
+  assert.equal(checker.geometry.index?.count, 6)
+
+  assert.equal(baseline.material.isMeshPhysicalMaterial, true)
+  assert.equal(baseline.material.name, 'glTF Logo Transmission')
+  assert.equal(baseline.material.transmission, 1)
+  assert.equal(baseline.material.ior, 1.5)
+  assert.equal(baseline.material.thickness, 0)
+  assert.equal(baseline.material.roughness, 0.69999)
+  assert.equal(iorSphere.material.isMeshPhysicalMaterial, true)
+  assert.equal(iorSphere.material.name, 'glTF Logo Transmission IOR')
+  assert.equal(iorSphere.material.transmission, 1)
+  assert.equal(iorSphere.material.ior, 2.42)
+  assert.equal(iorSphere.material.thickness, 1)
+  assert.equal(iorSphere.material.attenuationDistance, 1)
+
+  for (const material of [baseline.material, iorSphere.material]) {
+    assert.equal(Buffer.isBuffer(material.map?.image), true, `${material.name} base color JPG should load as an encoded Buffer`)
+    assert.equal(Buffer.isBuffer(material.roughnessMap?.image), true, `${material.name} roughness JPG should load as an encoded Buffer`)
+    assert.equal(Buffer.isBuffer(material.metalnessMap?.image), true, `${material.name} metalness JPG should load as an encoded Buffer`)
+    assert.equal(Buffer.isBuffer(material.transmissionMap?.image), true, `${material.name} transmission JPG should load as an encoded Buffer`)
+    assert.equal(material.map.name, 'Compare_Ior_img1.jpg')
+    assert.equal(material.roughnessMap.name, 'Compare_Ior_img2.jpg')
+    assert.equal(material.metalnessMap.name, 'Compare_Ior_img2.jpg')
+    assert.equal(material.transmissionMap.name, 'Compare_Ior_img3.jpg')
+    assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.metalnessMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.transmissionMap.colorSpace, THREE.NoColorSpace)
+    assert.equal(material.map.flipY, false)
+    assert.equal(material.transmissionMap.flipY, false)
+  }
+  assert.equal(Buffer.isBuffer(checker.material.map?.image), true, 'CompareIor checker JPG should load as an encoded Buffer')
+  assert.equal(checker.material.map.name, 'Compare_Ior_img0.jpg')
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
+  camera.position.set(0, 0.1, 4)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.4, 'CompareIor should render visible physical material spheres')
+  const left = meanRegion(rgba, 128, 128, 20, 48, 52, 82)
+  const right = meanRegion(rgba, 128, 128, 76, 48, 108, 82)
+  assert.ok(left.g > left.b + 15 && left.r > left.b + 5, `baseline transmission sphere should render lit textured pixels (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.g > right.b + 15 && right.r > right.b + 5, `IOR transmission sphere should render lit textured pixels (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_materials_sheen and variants metadata', async () => {
