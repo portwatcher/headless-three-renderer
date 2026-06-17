@@ -156,6 +156,7 @@ export interface ThreeMaterialLike {
   blendColor?: ThreeColorLike
   blendAlpha?: number
   premultipliedAlpha?: boolean
+  toneMapped?: boolean
   map?: ThreeTextureLike | null
   envMap?: ThreeTextureLike | null
   envMapIntensity?: number
@@ -937,6 +938,7 @@ export interface NativeSceneMesh {
   alphaHash?: boolean
   alphaToCoverage?: boolean
   premultipliedAlpha?: boolean
+  toneMapped?: boolean
   flatShading?: boolean
   fog?: boolean
   /** Flattened world-space clipping planes `[nx, ny, nz, constant, ...]`, up to 8 planes. */
@@ -1329,6 +1331,7 @@ export interface PbrProperties {
   alphaHash?: boolean
   alphaToCoverage?: boolean
   premultipliedAlpha?: boolean
+  toneMapped?: boolean
   flatShading?: boolean
   fog?: boolean
   transparent?: boolean

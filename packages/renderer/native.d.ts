@@ -787,6 +787,8 @@ export interface SceneMesh {
   alphaToCoverage?: boolean
   /** Whether fragment RGB output is multiplied by output alpha before blending. */
   premultipliedAlpha?: boolean
+  /** Whether material output is tone mapped before output color-space conversion. Defaults to true. */
+  toneMapped?: boolean
   /**
    * Flattened world-space clipping planes `[nx, ny, nz, constant, ...]`, up to 8 planes.
    * Fragments with `dot(normal, worldPosition) + constant < 0` are clipped.

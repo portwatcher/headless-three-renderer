@@ -1005,6 +1005,9 @@ export function extractPbrProperties(
   if (optionalBoolean(material.premultipliedAlpha, 'material.premultipliedAlpha') === true) {
     props.premultipliedAlpha = true
   }
+  if (optionalBoolean(material.toneMapped, 'material.toneMapped') === false) {
+    props.toneMapped = false
+  }
   const transparent = optionalBoolean(material.transparent, 'material.transparent')
   if (transparent !== undefined) {
     props.transparent = transparent

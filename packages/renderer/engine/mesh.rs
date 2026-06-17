@@ -92,6 +92,7 @@ pub struct PreparedMesh {
     pub alpha_hash: bool,
     pub alpha_to_coverage: bool,
     pub premultiplied_alpha: bool,
+    pub tone_mapped: bool,
     pub fog: bool,
     pub clipping_planes: [[f32; 4]; MAX_CLIPPING_PLANES],
     pub clipping_plane_count: u32,
@@ -1361,6 +1362,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let alpha_hash = mesh.alpha_hash.unwrap_or(false);
     let alpha_to_coverage = mesh.alpha_to_coverage.unwrap_or(false);
     let premultiplied_alpha = mesh.premultiplied_alpha.unwrap_or(false);
+    let tone_mapped = mesh.tone_mapped.unwrap_or(true);
     let fog = mesh.fog.unwrap_or(true);
     let (clipping_planes, clipping_plane_count, clipping_union_count) = parse_clipping_planes(
         mesh.clipping_planes.as_deref(),
@@ -1494,6 +1496,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         alpha_hash,
         alpha_to_coverage,
         premultiplied_alpha,
+        tone_mapped,
         fog,
         clipping_planes,
         clipping_plane_count,

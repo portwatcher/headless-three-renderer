@@ -5502,6 +5502,9 @@ test('invalid material render-state boolean values fail clearly', () => {
     ['premultipliedAlpha', (material) => {
       material.premultipliedAlpha = 'yes'
     }, /material\.premultipliedAlpha must be a boolean/i],
+    ['toneMapped', (material) => {
+      material.toneMapped = 'yes'
+    }, /material\.toneMapped must be a boolean/i],
     ['transparent', (material) => {
       material.transparent = 'yes'
     }, /material\.transparent must be a boolean/i],
@@ -10136,6 +10139,37 @@ test('outputColorSpace controls material and texture background output conversio
     srgbBackground.r > linearBackground.r + 40,
     `sRGB background output should apply display conversion (${srgbBackground.r} vs ${linearBackground.r})`,
   )
+})
+
+test('material.toneMapped=false skips material tone mapping before output conversion', () => {
+  function renderToneMapped(toneMapped) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 4),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(1, 1, 1),
+        toneMapped,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const mapped = renderToneMapped(true)
+  const unmapped = renderToneMapped(false)
+  assert.ok(
+    unmapped.r > mapped.r + 35,
+    `toneMapped=false should keep brighter linear white (${unmapped.r} vs ${mapped.r})`,
+  )
+  assert.ok(unmapped.r > 245, `toneMapped=false should preserve white output (${unmapped.r})`)
 })
 
 test('outputColorSpace string aliases match Three.js constants', () => {

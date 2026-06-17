@@ -44,7 +44,7 @@ pub struct RenderScene {
     pub background_texture_blurriness: Option<f64>,
     /// Output format. Supported values are `"png"` (default) and `"rgba"`.
     pub format: Option<String>,
-    /// Output color space. Supported values are `"srgb"` (default) and `"srgb-linear"`.
+    /// Output color space. Supported values are `"srgb"` (default), `"srgb-linear"`, `"linear-srgb"`, `"linearsrgb"`, and `"linear"`.
     pub output_color_space: Option<String>,
     /// MSAA sample count. Supports `4`; omitted, `0`, or `1` use the single-sample path.
     pub sample_count: Option<u32>,
@@ -745,6 +745,8 @@ pub struct SceneMesh {
     pub alpha_to_coverage: Option<bool>,
     /// Whether fragment RGB output is multiplied by output alpha before blending.
     pub premultiplied_alpha: Option<bool>,
+    /// Whether material output is tone mapped before output color-space conversion. Defaults to true.
+    pub tone_mapped: Option<bool>,
     /// Flattened world-space clipping planes `[nx, ny, nz, constant, ...]`, up to 8 planes.
     /// Fragments with `dot(normal, worldPosition) + constant < 0` are clipped.
     pub clipping_planes: Option<Vec<f64>>,
