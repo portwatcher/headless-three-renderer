@@ -50,6 +50,7 @@ const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets',
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
+const SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareEmissiveStrength', 'glTF', 'CompareEmissiveStrength.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_COMPARE_METALLIC = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareMetallic', 'glTF', 'CompareMetallic.gltf')
 const SAMPLE_ASSET_COMPARE_NORMAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareNormal', 'glTF', 'CompareNormal.gltf')
@@ -606,6 +607,64 @@ test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-c
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'CompareBaseColor should render visible base-color comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareEmissiveStrength fixture loads emissive strength variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_emissive_strength'])
+  assert.equal(source.buffers[0].uri, 'CompareEmissiveStrength.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), ['Compare_Emissive-Strength_img0.jpg'])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.emissiveTexture?.index ?? null,
+    material.extensions?.KHR_materials_emissive_strength?.emissiveStrength ?? null,
+  ]), [
+    ['glTF Logo Emissive', 0, null],
+    ['glTF Logo Emissive Strength', 0, 3],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['GeoSphere001', 'GeoSphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['glTF Logo Emissive', 'glTF Logo Emissive Strength'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [3840, 3840])
+
+  const [baseline, strengthened] = meshes.map((mesh) => mesh.material)
+  assert.deepEqual(baseline.color.toArray(), [0, 0, 0])
+  assert.deepEqual(strengthened.color.toArray(), [0, 0, 0])
+  assert.deepEqual(baseline.emissive.toArray(), [1, 1, 1])
+  assert.deepEqual(strengthened.emissive.toArray(), [1, 1, 1])
+  assert.equal(baseline.emissiveIntensity, 1)
+  assert.equal(strengthened.emissiveIntensity, 3)
+  assert.equal(baseline.emissiveMap, strengthened.emissiveMap, 'both emissive-strength materials should share the emissive texture')
+  assert.equal(Buffer.isBuffer(baseline.emissiveMap?.image), true, 'emissive JPEG should load as an encoded Buffer')
+  assert.equal(baseline.emissiveMap.name, 'Compare_Emissive-Strength_img0.jpg')
+  assert.equal(baseline.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(baseline.emissiveMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -2.7, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02, 'CompareEmissiveStrength should render visible emissive comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets CompareMetallic fixture loads metallic texture comparison variants', async () => {
