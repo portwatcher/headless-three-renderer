@@ -25,6 +25,7 @@ const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
+const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxInterleaved', 'glTF', 'BoxInterleaved.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
@@ -105,6 +106,46 @@ test('committed Khronos glTF Sample Assets Box fixture loads external buffer and
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos Box sample should render visible pixels')
   const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
   assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `Khronos Box sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets BoxInterleaved fixture loads byteStride attributes', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOX_INTERLEAVED)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos BoxInterleaved sample should load a mesh')
+  const position = mesh.geometry.getAttribute('position')
+  const normal = mesh.geometry.getAttribute('normal')
+  assert.equal(position?.count, 24)
+  assert.equal(normal?.count, 24)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(position.isInterleavedBufferAttribute, true)
+  assert.equal(normal.isInterleavedBufferAttribute, true)
+  assert.equal(position.data.stride, 6)
+  assert.deepEqual(vectorFromAttribute(position, 0), [-0.5, -0.5, 0.5])
+  assert.deepEqual(vectorFromAttribute(normal, 0), [0, 0, 1])
+  assert.equal(mesh.material.color.r, 0.800000011920929)
+  assert.equal(mesh.material.color.g, 0)
+  assert.equal(mesh.material.color.b, 0)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(1.4, 1.1, 2.2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos BoxInterleaved sample should render visible pixels')
+  const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
+  assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `BoxInterleaved sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imported cameras', async () => {
