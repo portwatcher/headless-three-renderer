@@ -9277,7 +9277,7 @@ test('unsupported array and 3D texture inputs fail clearly', () => {
         new THREE.PlaneGeometry(2, 2),
         new THREE.MeshBasicMaterial({ map: dataArrayTexture() }),
       ))
-    }, /texture uses an array or 3D texture/i],
+    }, /material\.map uses an array or 3D texture/i],
     ['background DataArrayTexture', (scene) => {
       scene.background = dataArrayTexture()
     }, /background uses an array or 3D texture/i],

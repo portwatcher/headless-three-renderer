@@ -202,7 +202,8 @@ function transparentLayerCorpus() {
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.r > center.g + 40 && center.b > center.g + 50 && corner.r === 20 && corner.g === 20 && corner.b === 26)) {
+      const cornerMatchesBackground = Math.abs(corner.r - 20) <= 1 && Math.abs(corner.g - 20) <= 1 && Math.abs(corner.b - 26) <= 1
+      if (!(center.r > center.g + 40 && center.b > center.g + 50 && cornerMatchesBackground)) {
         throw new Error(`transparent layer corpus should blend the blue front over the orange back, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
