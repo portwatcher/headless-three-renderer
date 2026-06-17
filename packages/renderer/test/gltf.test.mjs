@@ -41,6 +41,7 @@ const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sampl
 const SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyStrengthTest', 'glTF', 'AnisotropyStrengthTest.gltf')
 const SAMPLE_ASSET_ATTENUATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AttenuationTest', 'glTF', 'AttenuationTest.gltf')
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
+const SAMPLE_ASSET_BARRAMUNDI_FISH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BarramundiFish', 'glTF', 'BarramundiFish.gltf')
 const SAMPLE_ASSET_BOOM_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBox', 'glTF', 'BoomBox.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
@@ -1990,6 +1991,75 @@ test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture map
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'Khronos Avocado sample should render visible PBR textured pixels')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 10 && mean.g > mean.b + 10, `Avocado texture should contribute green/yellow output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets BarramundiFish fixture loads organic mesh packed PBR maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_BARRAMUNDI_FISH, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'BarramundiFish.bin', byteLength: 128208 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'BarramundiFish_baseColor.png',
+    'BarramundiFish_occlusionRoughnessMetallic.png',
+    'BarramundiFish_normal.png',
+  ])
+  assert.equal(source.meshes[0].name, 'barramundi_fish_Hero')
+  assert.equal(source.materials[0].name, '7288_barramundi fish_col')
+  assert.equal(source.materials[0].normalTexture.index, 2)
+  assert.equal(source.materials[0].occlusionTexture.index, 1)
+  assert.equal(source.materials[0].pbrMetallicRoughness.baseColorTexture.index, 0)
+  assert.equal(source.materials[0].pbrMetallicRoughness.metallicRoughnessTexture.index, 1)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BARRAMUNDI_FISH)
+  const mesh = gltf.scene.getObjectByName('BarramundiFish')
+  assert.ok(mesh?.isMesh, 'BarramundiFish sample should load a named fish mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 2188)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 2188)
+  assert.equal(mesh.geometry.getAttribute('tangent')?.count, 2188)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 2188)
+  assert.equal(mesh.geometry.index?.count, 11592)
+  assertVectorClose(mesh.quaternion.toArray(), [0, 1, 0, 0], 'BarramundiFish node rotation')
+  assert.equal(mesh.material.name, '7288_barramundi fish_col')
+
+  const { map, aoMap, roughnessMap, metalnessMap, normalMap } = mesh.material
+  assert.ok(map?.isTexture, 'BarramundiFish sample should load a base color texture')
+  assert.ok(aoMap?.isTexture, 'BarramundiFish sample should load an occlusion texture')
+  assert.ok(roughnessMap?.isTexture, 'BarramundiFish sample should load a roughness texture')
+  assert.ok(metalnessMap?.isTexture, 'BarramundiFish sample should load a metalness texture')
+  assert.ok(normalMap?.isTexture, 'BarramundiFish sample should load a normal texture')
+  assert.equal(aoMap, roughnessMap, 'BarramundiFish occlusion/roughness channels should share the packed texture')
+  assert.equal(roughnessMap, metalnessMap, 'BarramundiFish metallic/roughness channels should share the packed texture')
+  assert.equal(map.name, 'BarramundiFish_baseColor.png')
+  assert.equal(aoMap.name, 'BarramundiFish_occlusionRoughnessMetallic.png')
+  assert.equal(normalMap.name, 'BarramundiFish_normal.png')
+  assert.deepEqual(pngDimensions(map.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(aoMap.image), [2048, 2048])
+  assert.deepEqual(pngDimensions(normalMap.image), [2048, 2048])
+  assert.equal(map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(normalMap.colorSpace, THREE.NoColorSpace)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfHeight = Math.max(size.y, size.z) / 2 + 0.04
+  const halfWidth = halfHeight * 1.5
+  const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, 0.01, 20)
+  camera.position.set(center.x + 3, center.y, center.z)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.07, 'BarramundiFish should render visible packed-PBR textured organic geometry')
 })
 
 test('committed Khronos glTF Sample Assets BoomBox fixture loads emissive and packed ORM maps', async () => {
