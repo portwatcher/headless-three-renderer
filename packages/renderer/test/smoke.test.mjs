@@ -1,12 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { assertValidPng, parsePngDimensions } from './helpers.mjs'
+
+const require = createRequire(import.meta.url)
+const native = require('../native.js')
 
 const {
   Renderer,
@@ -31,6 +35,25 @@ test('module exports Renderer class and render function', () => {
   assert.equal(typeof loadVrmAnimationFromFile, 'function')
   assert.equal(typeof loadVrmFromFile, 'function')
   assert.equal(typeof resolveLocalAssetPath, 'function')
+})
+
+test('native color-space diagnostics list accepted linear aliases', () => {
+  const camera = { width: 1, height: 1 }
+  assert.throws(
+    () => native.renderNative({ width: 1, height: 1, outputColorSpace: 'display-p3' }, camera),
+    /unsupported scene\.outputColorSpace `display-p3`; expected `srgb`, `srgb-linear`, `linear-srgb`, `linearsrgb`, or `linear`/i,
+  )
+  assert.throws(
+    () => native.renderNative({
+      width: 1,
+      height: 1,
+      environmentMap: Buffer.from([255, 255, 255, 255]),
+      environmentMapWidth: 1,
+      environmentMapHeight: 1,
+      environmentMapColorSpace: 'display-p3',
+    }, camera),
+    /unsupported scene\.environmentMapColorSpace `display-p3`; expected `srgb`, `srgb-linear`, `linear-srgb`, `linearsrgb`, or `linear`/i,
+  )
 })
 
 test('Node loader helpers expose encoded image buffers and local file fetch', async () => {

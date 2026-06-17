@@ -526,7 +526,7 @@ impl OutputColorSpace {
             "srgb" => Ok(Self::Srgb),
             "srgb-linear" | "linear-srgb" | "linearsrgb" | "linear" => Ok(Self::LinearSrgb),
             other => bail!(
-                "unsupported scene.outputColorSpace `{other}`; expected `srgb` or `srgb-linear`"
+                "unsupported scene.outputColorSpace `{other}`; expected `srgb`, `srgb-linear`, `linear-srgb`, `linearsrgb`, or `linear`"
             ),
         }
     }
@@ -545,7 +545,7 @@ fn parse_environment_color_space(value: Option<&str>) -> Result<bool> {
         "srgb" => Ok(true),
         "srgb-linear" | "linear-srgb" | "linearsrgb" | "linear" => Ok(false),
         other => bail!(
-            "unsupported scene.environmentMapColorSpace `{other}`; expected `srgb` or `srgb-linear`"
+            "unsupported scene.environmentMapColorSpace `{other}`; expected `srgb`, `srgb-linear`, `linear-srgb`, `linearsrgb`, or `linear`"
         ),
     }
 }
