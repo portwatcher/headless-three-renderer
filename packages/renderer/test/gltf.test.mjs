@@ -74,6 +74,7 @@ const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
+const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'glTF', 'Fox.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
@@ -4438,6 +4439,114 @@ test('committed Khronos glTF Sample Assets CesiumMan fixture loads textured skin
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'CesiumMan should render visible textured skinned character geometry')
+})
+
+test('committed Khronos glTF Sample Assets Fox fixture loads textured multi-clip skinned animal animation', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_FOX, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'Fox.bin', byteLength: 119904 }])
+  assert.deepEqual(source.images, [{ uri: 'Texture.png', mimeType: 'image/png' }])
+  assert.equal(source.meshes[0].name, 'fox1')
+  assert.equal(source.skins.length, 1)
+  assert.equal(source.skins[0].joints.length, 24)
+  assert.equal(source.skins[0].skeleton, 2)
+  assert.deepEqual(source.animations.map((animation) => animation.name), ['Survey', 'Walk', 'Run'])
+  assert.ok(source.animations.every((animation) => animation.channels.length === 21), 'every Fox animation should have 21 channels')
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_FOX)
+  const skinnedMeshes = []
+  const bones = []
+  gltf.scene.traverse((object) => {
+    if (object.isSkinnedMesh === true) skinnedMeshes.push(object)
+    if (object.isBone === true) bones.push(object)
+  })
+
+  assert.equal(skinnedMeshes.length, 1)
+  const mesh = skinnedMeshes[0]
+  assert.equal(mesh.name, 'fox')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('skinIndex')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('skinWeight')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('normal') ?? null, null)
+  assert.equal(mesh.geometry.index ?? null, null)
+  assert.equal(mesh.material.name, 'fox_material')
+  assert.equal(mesh.material.metalness, 0)
+  assert.equal(mesh.material.roughness, 0.58)
+  assert.equal(Buffer.isBuffer(mesh.material.map?.image), true, 'Fox base-color PNG should load as an encoded Buffer')
+  assert.equal(mesh.material.map.name, 'Texture.png')
+  assert.deepEqual(pngDimensions(mesh.material.map.image), [1024, 1024])
+  assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(mesh.skeleton.bones.length, 24)
+  assert.deepEqual(bones.map((bone) => bone.name), [
+    '_rootJoint',
+    'b_Root_00',
+    'b_Hip_01',
+    'b_Spine01_02',
+    'b_Spine02_03',
+    'b_Neck_04',
+    'b_Head_05',
+    'b_RightUpperArm_06',
+    'b_RightForeArm_07',
+    'b_RightHand_08',
+    'b_LeftUpperArm_09',
+    'b_LeftForeArm_010',
+    'b_LeftHand_011',
+    'b_Tail01_012',
+    'b_Tail02_013',
+    'b_Tail03_014',
+    'b_LeftLeg01_015',
+    'b_LeftLeg02_016',
+    'b_LeftFoot01_017',
+    'b_LeftFoot02_018',
+    'b_RightLeg01_019',
+    'b_RightLeg02_020',
+    'b_RightFoot01_021',
+    'b_RightFoot02_022',
+  ])
+
+  assert.deepEqual(gltf.animations.map((clip) => clip.name), ['Survey', 'Walk', 'Run'])
+  assert.deepEqual(gltf.animations.map((clip) => clip.tracks.length), [21, 21, 21])
+  assert.deepEqual(gltf.animations.map((clip) => Number(clip.duration.toFixed(6))), [3.416667, 0.708333, 1.158333])
+  for (const clip of gltf.animations) {
+    assert.equal(clip.tracks.filter((track) => track.name.endsWith('.quaternion')).length, 20)
+    assert.equal(clip.tracks.filter((track) => track.name.endsWith('.position')).length, 1)
+  }
+
+  const runClip = gltf.animations.find((clip) => clip.name === 'Run')
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(runClip).play()
+  mixer.setTime(runClip.duration / 2)
+  gltf.scene.updateMatrixWorld(true)
+  const head = gltf.scene.getObjectByName('b_Head_05')
+  const tail = gltf.scene.getObjectByName('b_Tail02_013')
+  const leftLeg = gltf.scene.getObjectByName('b_LeftLeg02_016')
+  assert.ok(Math.abs(head.quaternion.z) > 0.1, `Fox run pose should rotate the head (${head.quaternion.z})`)
+  assert.ok(tail.quaternion.z > 0.06, `Fox run pose should rotate the tail (${tail.quaternion.z})`)
+  assert.ok(leftLeg.quaternion.z < -0.8, `Fox run pose should rotate the left leg (${leftLeg.quaternion.z})`)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.4))
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfHeight = Math.max(size.x, size.y, size.z) / 2 + 5
+  const halfWidth = halfHeight * 1.4
+  const camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, 0.01, 500)
+  camera.position.set(center.x + 150, center.y + 90, center.z + 120)
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 140,
+    height: 100,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'Fox should render visible textured skinned animal geometry')
 })
 
 test('committed Khronos glTF Sample Assets RecursiveSkeletons fixture loads recursive skinned hierarchies', async () => {
