@@ -107,6 +107,7 @@ const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentMirrorTest', 'glTF', 'NormalTangentMirrorTest.gltf')
 const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
+const SAMPLE_ASSET_PLAYSET_LIGHT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PlaysetLightTest', 'glTF', 'PlaysetLightTest.gltf')
 const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
 const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PrimitiveModeNormalsTest', 'glTF', 'PrimitiveModeNormalsTest.gltf')
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
@@ -3670,6 +3671,142 @@ test('committed Khronos glTF Sample Assets Lantern fixture loads multi-mesh text
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'Lantern should render visible multi-mesh textured PBR geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.g && mean.g > mean.b, `Lantern texture should contribute warm metal and emissive pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets PlaysetLightTest fixture loads textured punctual-light scene', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_PLAYSET_LIGHT_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_lights_punctual', 'KHR_materials_emissive_strength'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_lights_punctual', 'KHR_materials_emissive_strength'])
+  assert.deepEqual(source.buffers, [{ uri: 'PlaysetLightTest_data.bin', byteLength: 3630672 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'PlaysetLightTest_img00.png',
+    'PlaysetLightTest_img01.png',
+    'PlaysetLightTest_img02.png',
+    'PlaysetLightTest_img03.png',
+    'PlaysetLightTest_img04.png',
+    'PlaysetLightTest_img05.png',
+    'PlaysetLightTest_img06.png',
+    'PlaysetLightTest_img07.png',
+    'PlaysetLightTest_img08.jpg',
+    'PlaysetLightTest_img09.jpg',
+    'PlaysetLightTest_img10.jpg',
+    'PlaysetLightTest_img11.png',
+    'PlaysetLightTest_img12.png',
+    'PlaysetLightTest_img13.png',
+    'PlaysetLightTest_img14.png',
+    'PlaysetLightTest_img15.png',
+    'PlaysetLightTest_img16.png',
+    'PlaysetLightTest_img17.png',
+    'PlaysetLightTest_img18.png',
+  ])
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), [
+    'Mesh_0.001',
+    'Mesh_0.002',
+    'ProcessedGeometry',
+    'Mesh_0',
+    'Mesh_0.003',
+    'Mesh_0.3065',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'Material_0.001',
+    'Material_0.002',
+    'SimplygonCastMaterial.002',
+    'Material_0',
+    'emissive',
+    'Material_0.3065',
+  ])
+  assert.deepEqual(source.materials[4].extensions, {
+    KHR_materials_emissive_strength: {
+      emissiveStrength: 1500,
+    },
+  })
+  assert.equal(source.cameras.length, 1)
+  assert.deepEqual(source.extensions.KHR_lights_punctual.lights.map((light) => light.type), ['directional', 'point'])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_PLAYSET_LIGHT_TEST)
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'abacus',
+    'ball',
+    'carpet',
+    'giraffe',
+    'lamp',
+    'lamp_emissive',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [42410, 17056, 112, 17502, 8121, 3940])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [42410, 17056, 112, 17502, 8121, 3940])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [168693, 86346, 330, 88224, 23790, 21696])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), [
+    'Material_0.001',
+    'Material_0.002',
+    'SimplygonCastMaterial.002',
+    'Material_0',
+    'Material_0.3065',
+    'emissive',
+  ])
+
+  const abacus = gltf.scene.getObjectByName('abacus')
+  assert.ok(abacus?.isMesh, 'PlaysetLightTest should load abacus mesh')
+  assert.equal(abacus.material.map.name, 'Image_0')
+  assert.equal(abacus.material.normalMap.name, 'Image_1')
+  assert.equal(abacus.material.roughnessMap.name, 'Image_2')
+  assert.equal(abacus.material.metalnessMap, abacus.material.roughnessMap)
+  assert.equal(abacus.material.aoMap.name, 'Image_3')
+  assert.equal(Buffer.isBuffer(abacus.material.map.image), true, 'PlaysetLightTest PNG base-color texture should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(abacus.material.map.image), [1210, 1210])
+  assert.equal(abacus.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(abacus.material.normalMap.colorSpace, THREE.NoColorSpace)
+
+  const carpet = gltf.scene.getObjectByName('carpet')
+  assert.ok(carpet?.isMesh, 'PlaysetLightTest should load carpet mesh')
+  assert.equal(carpet.material.map.name, 'Basecolor_0')
+  assert.equal(carpet.material.aoMap, carpet.material.roughnessMap, 'carpet should reuse its packed metallic-roughness map for AO')
+  assert.equal(Buffer.isBuffer(carpet.material.map.image), true, 'PlaysetLightTest JPEG texture should load as an encoded Buffer')
+  assert.equal(carpet.material.map.colorSpace, THREE.SRGBColorSpace)
+
+  const emissive = gltf.scene.getObjectByName('lamp_emissive')
+  assert.ok(emissive?.isMesh, 'PlaysetLightTest should load emissive lamp mesh')
+  assert.equal(emissive.material.name, 'emissive')
+  assert.deepEqual(emissive.material.emissive.toArray(), [1, 1, 1])
+  assert.equal(emissive.material.emissiveIntensity, 1500)
+  assert.equal(emissive.material.roughness, 0.5)
+
+  assert.equal(gltf.cameras.length, 1)
+  const camera = gltf.cameras[0]
+  assert.equal(camera.isPerspectiveCamera, true)
+  assert.equal(camera.name, 'Camera')
+  assert.ok(Math.abs(camera.fov - 22.895193663949186) < 1e-10, `Playset camera should preserve imported yfov (${camera.fov})`)
+  assert.equal(camera.near, 0.10000000149011612)
+  assert.equal(camera.far, 1000)
+
+  assert.deepEqual(lights.map((light) => light.name), ['light1', 'LEDlight'])
+  assert.equal(lights[0].isDirectionalLight, true)
+  assert.equal(lights[0].intensity, 512.25)
+  assert.equal(lights[1].isPointLight, true)
+  assert.ok(Math.abs(lights[1].intensity - 1500.0000192775694) < 1e-6, `LEDlight should preserve imported point-light intensity (${lights[1].intensity})`)
+
+  camera.aspect = 16 / 9
+  camera.updateProjectionMatrix()
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 90,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.5, 'PlaysetLightTest should render visible imported-light scene through its camera')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 120 && mean.g > 120 && mean.b > 120, `PlaysetLightTest imported lights should strongly illuminate the scene (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets PointLightIntensityTest fixture loads KHR_lights_punctual point lights', async () => {
