@@ -48,10 +48,10 @@ function makeEncodedTexture(index) {
   return texture
 }
 
-function addSupportedLightBudget(scene) {
+function addSupportedLightBudget(scene, count = 24) {
   scene.add(new THREE.AmbientLight(0xffffff, 0.08))
-  for (let i = 0; i < 64; i += 1) {
-    const angle = (i / 64) * Math.PI * 2
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * Math.PI * 2
     const light = new THREE.PointLight(new THREE.Color().setHSL(i / 64, 0.55, 0.65), 0.12, 6, 1.6)
     light.position.set(Math.cos(angle) * 2.2, 1.2 + (i % 4) * 0.28, Math.sin(angle) * 2.2)
     scene.add(light)

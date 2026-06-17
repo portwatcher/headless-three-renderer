@@ -25,9 +25,11 @@ function addLights(scene) {
   scene.add(dir)
 }
 
+let sharedRenderer
+
 function renderRgba(scene, camera, options = {}) {
-  const r = new Renderer()
-  return r.render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
+  sharedRenderer ??= new Renderer()
+  return sharedRenderer.render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
 }
 
 function makeEnvironmentTexture() {
