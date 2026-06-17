@@ -51,6 +51,7 @@ const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'S
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
+const SAMPLE_ASSET_TEXTURE_ENCODING_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureEncodingTest', 'glTF', 'TextureEncodingTest.gltf')
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
@@ -670,6 +671,90 @@ test('committed Khronos glTF Sample Assets TextureSettingsTest fixture loads wra
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.75, 'TextureSettingsTest should render visible sampler and sidedness panels')
+})
+
+test('committed Khronos glTF Sample Assets TextureEncodingTest fixture preserves texture color roles', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TEXTURE_ENCODING_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 14, 'TextureEncodingTest should load 12 spheres plus two label panels')
+
+  const textures = []
+  const addTexture = (texture) => {
+    if (texture?.isTexture === true && !textures.includes(texture)) textures.push(texture)
+  }
+  for (const mesh of meshes) {
+    addTexture(mesh.material.map)
+    addTexture(mesh.material.emissiveMap)
+    addTexture(mesh.material.roughnessMap)
+    addTexture(mesh.material.metalnessMap)
+  }
+
+  assert.deepEqual(textures.map((texture) => texture.name), [
+    '0_136_0.png',
+    '0_136_0_gamma.png',
+    '0_136_0_icc.png',
+    '0_136_255.png',
+    '0_136_255_gamma.png',
+    '0_136_255_icc.png',
+    'TestLabels.png',
+    'SlotLabels.png',
+  ])
+  assert.deepEqual(textures.map((texture) => texture.colorSpace), [
+    THREE.SRGBColorSpace,
+    THREE.SRGBColorSpace,
+    THREE.SRGBColorSpace,
+    THREE.NoColorSpace,
+    THREE.NoColorSpace,
+    THREE.NoColorSpace,
+    THREE.SRGBColorSpace,
+    THREE.SRGBColorSpace,
+  ])
+  assert.deepEqual(textures.map((texture) => Buffer.isBuffer(texture.image)), Array.from({ length: 8 }, () => true))
+  assert.deepEqual(textures.map((texture) => texture.flipY), Array.from({ length: 8 }, () => false))
+  assert.equal(textures[6].wrapS, THREE.ClampToEdgeWrapping)
+  assert.equal(textures[6].wrapT, THREE.ClampToEdgeWrapping)
+  assert.equal(textures[7].wrapS, THREE.RepeatWrapping)
+  assert.equal(textures[7].wrapT, THREE.RepeatWrapping)
+
+  for (const index of [1, 2, 3]) {
+    assert.equal(meshes[index].material.map.colorSpace, THREE.SRGBColorSpace, `base color texture ${index} should decode as sRGB`)
+  }
+  for (const index of [5, 6, 7]) {
+    assert.equal(meshes[index].material.emissiveMap.colorSpace, THREE.SRGBColorSpace, `emissive texture ${index} should decode as sRGB`)
+  }
+  for (const index of [9, 10, 11]) {
+    assert.equal(meshes[index].material.roughnessMap, meshes[index].material.metalnessMap)
+    assert.equal(meshes[index].material.metalnessMap.colorSpace, THREE.NoColorSpace, `metallic-roughness texture ${index} should stay non-color`)
+  }
+  assert.equal(meshes[12].material.alphaTest, 0.5)
+  assert.equal(meshes[12].material.side, THREE.DoubleSide)
+  assert.equal(meshes[13].material.alphaTest, 0.5)
+  assert.equal(meshes[13].material.side, THREE.DoubleSide)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.3)
+  light.position.set(0, 4, 8)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+
+  const camera = new THREE.OrthographicCamera(-4.5, 8.5, 4.5, -5.5, 0.01, 50)
+  camera.position.set(1.5, -0.5, 18)
+  camera.lookAt(1.5, -0.5, 0)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 208,
+    height: 160,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'TextureEncodingTest should render visible texture encoding panels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.g > mean.r + 8 && mean.g > mean.b + 8, `TextureEncodingTest render should preserve the green sample hue (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets NormalTangentTest fixture loads normal and ORM texture maps', async () => {
