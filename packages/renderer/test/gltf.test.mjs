@@ -87,6 +87,7 @@ const SAMPLE_ASSET_IRIDESCENCE_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_LANTERN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Lantern', 'glTF', 'Lantern.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
+const SAMPLE_ASSET_MATERIALS_VARIANTS_SHOE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MaterialsVariantsShoe', 'glTF', 'MaterialsVariantsShoe.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheresNoTextures', 'glTF', 'MetalRoughSpheresNoTextures.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
@@ -4893,6 +4894,111 @@ test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_material
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'SheenChair should render visible sheen material geometry')
+})
+
+test('committed Khronos glTF Sample Assets MaterialsVariantsShoe fixture preserves KHR_materials_variants mappings', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_MATERIALS_VARIANTS_SHOE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_variants'])
+  assert.deepEqual(source.extensions?.KHR_materials_variants?.variants?.map((variant) => variant.name), [
+    'midnight',
+    'beach',
+    'street',
+  ])
+  assert.deepEqual(source.buffers, [
+    { name: 'shoes-processed', byteLength: 705680, uri: 'MaterialsVariantsShoe.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => [image.mimeType, image.uri]), [
+    ['image/jpeg', 'occlusionRougnessMetalness.jpg'],
+    ['image/jpeg', 'diffuseMidnight.jpg'],
+    ['image/jpeg', 'normal.jpg'],
+    ['image/jpeg', 'diffuseBeach.jpg'],
+    ['image/jpeg', 'diffuseStreet.jpg'],
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.pbrMetallicRoughness?.baseColorTexture?.index,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index,
+    material.normalTexture?.index,
+    material.occlusionTexture?.index,
+  ]), [
+    [1, 0, 2, 0],
+    [3, 0, 2, 0],
+    [4, 0, 2, 0],
+  ])
+  assert.deepEqual(source.meshes[0].primitives[0].extensions?.KHR_materials_variants?.mappings, [
+    { material: 0, variants: [0] },
+    { material: 1, variants: [1] },
+    { material: 2, variants: [2] },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MATERIALS_VARIANTS_SHOE)
+  assert.deepEqual(gltf.parser?.json?.extensions?.KHR_materials_variants?.variants?.map((variant) => variant.name), [
+    'midnight',
+    'beach',
+    'street',
+  ])
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 1)
+  const mesh = meshes[0]
+  assert.equal(mesh.name, 'Shoe')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 13540)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 13540)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 13540)
+  assert.equal(mesh.geometry.index?.count, 68100)
+  assert.deepEqual(mesh.userData.gltfExtensions?.KHR_materials_variants?.mappings, [
+    { material: 0, variants: [0] },
+    { material: 1, variants: [1] },
+    { material: 2, variants: [2] },
+  ])
+
+  const material = mesh.material
+  assert.equal(material.name, 'phong1SG')
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+  assert.equal(material.map.name, 'diffuseMidnight.jpg')
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.map.flipY, false)
+  assert.equal(material.normalMap.name, 'normal.jpg')
+  assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.normalMap.flipY, false)
+  assert.equal(material.aoMap.name, 'occlusionRougnessMetalness.jpg')
+  assert.equal(material.roughnessMap, material.aoMap)
+  assert.equal(material.metalnessMap, material.aoMap)
+  assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.aoMap.flipY, false)
+  assert.equal(material.aoMap.channel, 0)
+  for (const texture of [material.map, material.normalMap, material.aoMap]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1.2, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.35, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2.5)
+  light.position.copy(center).add(new THREE.Vector3(2, 4, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 120,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'MaterialsVariantsShoe should render visible textured shoe geometry')
+  const centerSample = meanRegion(rgba, 144, 120, 54, 42, 90, 78)
+  assert.ok(centerSample.b > centerSample.g && centerSample.g > centerSample.r, `MaterialsVariantsShoe center should render the midnight diffuse texture (${centerSample.r}, ${centerSample.g}, ${centerSample.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SheenTestGrid fixture loads sheen color and roughness grid factors', async () => {
