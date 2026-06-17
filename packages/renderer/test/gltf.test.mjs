@@ -54,6 +54,7 @@ const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_COMPARE_CLEARCOAT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareClearcoat', 'glTF', 'CompareClearcoat.gltf')
 const SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareEmissiveStrength', 'glTF', 'CompareEmissiveStrength.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
+const SAMPLE_ASSET_COMPARE_IRIDESCENCE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIridescence', 'glTF', 'CompareIridescence.gltf')
 const SAMPLE_ASSET_COMPARE_METALLIC = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareMetallic', 'glTF', 'CompareMetallic.gltf')
 const SAMPLE_ASSET_COMPARE_NORMAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareNormal', 'glTF', 'CompareNormal.gltf')
 const SAMPLE_ASSET_COMPARE_ROUGHNESS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareRoughness', 'glTF', 'CompareRoughness.gltf')
@@ -868,6 +869,92 @@ test('committed Khronos glTF Sample Assets CompareEmissiveStrength fixture loads
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02, 'CompareEmissiveStrength should render visible emissive comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareIridescence fixture loads iridescence comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_IRIDESCENCE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_iridescence'])
+  assert.equal(source.buffers[0].uri, 'CompareIridescence.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Iridescence_img0.jpg',
+    'Compare_Iridescence_img1.jpg',
+    'Compare_Iridescence_img2.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index ?? null,
+    material.extensions?.KHR_materials_iridescence?.iridescenceFactor ?? null,
+    material.extensions?.KHR_materials_iridescence?.iridescenceIor ?? null,
+    material.extensions?.KHR_materials_iridescence?.iridescenceTexture?.index ?? null,
+  ]), [
+    ['glTF Logo', 0, 1, null, null, null],
+    ['glTF Logo Iridescence', 0, 1, 1, 1.5, 2],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_IRIDESCENCE)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['GeoSphere001', 'GeoSphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['glTF Logo', 'glTF Logo Iridescence'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [3840, 3840])
+
+  const [baseline, iridescent] = meshes.map((mesh) => mesh.material)
+  assert.equal(baseline.isMeshStandardMaterial, true)
+  assert.equal(iridescent.isMeshPhysicalMaterial, true)
+  assert.equal(baseline.metalness, 1)
+  assert.equal(iridescent.metalness, 1)
+  assert.equal(baseline.roughness, 0.69999)
+  assert.equal(iridescent.roughness, 0.69999)
+  assert.equal(iridescent.iridescence, 1)
+  assert.equal(iridescent.iridescenceIOR, 1.5)
+  assert.deepEqual(iridescent.iridescenceThicknessRange, [100, 400])
+  assert.equal(baseline.iridescenceMap ?? null, null)
+  assert.equal(Buffer.isBuffer(iridescent.iridescenceMap?.image), true, 'iridescence JPEG should load as an encoded Buffer')
+  assert.equal(iridescent.iridescenceMap.name, 'Compare_Iridescence_img2.jpg')
+  assert.equal(iridescent.iridescenceMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(iridescent.iridescenceMap.flipY, false)
+
+  assert.equal(baseline.map, iridescent.map, 'iridescence comparison materials should share the base-color texture')
+  assert.equal(Buffer.isBuffer(baseline.map?.image), true, 'iridescence base-color JPEG should load as an encoded Buffer')
+  assert.equal(baseline.map.name, 'Compare_Iridescence_img0.jpg')
+  assert.equal(baseline.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(baseline.map.flipY, false)
+
+  assert.equal(baseline.roughnessMap, baseline.metalnessMap)
+  assert.equal(iridescent.roughnessMap, iridescent.metalnessMap)
+  assert.equal(baseline.roughnessMap, iridescent.roughnessMap)
+  assert.equal(Buffer.isBuffer(baseline.roughnessMap?.image), true, 'iridescence metallic-roughness JPEG should load as an encoded Buffer')
+  assert.equal(baseline.roughnessMap.name, 'Compare_Iridescence_img1.jpg')
+  assert.equal(baseline.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(baseline.roughnessMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  const light = new THREE.DirectionalLight(0xffffff, 4)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -2.7, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02, 'CompareIridescence should render visible iridescence comparison geometry')
 })
 
 test('committed Khronos glTF Sample Assets CompareMetallic fixture loads metallic texture comparison variants', async () => {
