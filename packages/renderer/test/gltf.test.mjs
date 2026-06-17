@@ -23,6 +23,13 @@ const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
 const SKINNED_QUAD = path.join(FIXTURE_DIR, 'skinned-quad.gltf')
 const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
+const REAL_VRM_EXPRESSION_SAMPLE = path.join(
+  FIXTURE_DIR,
+  'vrm-specification',
+  'VRMC_vrm_expressions_isBinary_Overridden',
+  'VRMC_vrm_expressions_isBinary_Overridden.vrm',
+)
+const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
@@ -1331,6 +1338,67 @@ test('VRM loader helpers register supplied Pixiv-style plugins', async () => {
     animationPluginParser.json?.extensionsUsed?.includes('VRMC_vrm_animation'),
     'VRMA fixture should expose VRMC_vrm_animation metadata to the plugin',
   )
+})
+
+test('real external VRM and VRMA fixtures expose extension metadata through loader helpers', async () => {
+  let vrmPluginParser = null
+  let animationPluginParser = null
+
+  class CaptureVRMLoaderPlugin {
+    constructor(parser) {
+      this.name = 'CaptureVRMLoaderPlugin'
+      vrmPluginParser = parser
+    }
+  }
+
+  class CaptureVRMAnimationLoaderPlugin {
+    constructor(parser) {
+      this.name = 'CaptureVRMAnimationLoaderPlugin'
+      animationPluginParser = parser
+    }
+  }
+
+  const vrmGltf = await loadVrmFromFile(REAL_VRM_EXPRESSION_SAMPLE, {
+    VRMLoaderPlugin: CaptureVRMLoaderPlugin,
+  })
+  assert.ok(findFirst(vrmGltf.scene, (object) => object.isMesh === true), 'real VRM fixture should parse renderable meshes')
+  assert.ok(vrmPluginParser, 'real VRM fixture should initialize the supplied VRM loader plugin')
+  assert.ok(vrmPluginParser.json?.extensionsUsed?.includes('VRMC_vrm'), 'real VRM fixture should expose VRMC_vrm metadata')
+  assert.ok(
+    vrmPluginParser.json?.extensionsUsed?.includes('KHR_texture_transform'),
+    'real VRM fixture should expose its texture transform extension metadata',
+  )
+  assert.equal(vrmPluginParser.json?.meshes?.length, 4)
+
+  const vrmExtension = vrmPluginParser.json?.extensions?.VRMC_vrm
+  assert.equal(vrmExtension?.specVersion, '1.0')
+  assert.equal(vrmExtension?.meta?.name, 'isBinary overridden')
+  assert.equal(vrmExtension?.meta?.licenseUrl, 'https://vrm.dev/licenses/1.0/')
+  assert.equal(vrmExtension?.meta?.allowRedistribution, true)
+  assert.equal(vrmExtension?.expressions?.preset?.happy?.overrideBlink, 'blend')
+  assert.equal(vrmExtension?.expressions?.preset?.blink?.isBinary, true)
+
+  const animationGltf = await loadVrmAnimationFromFile(REAL_VRMA_ANIMATION_SAMPLE, {
+    VRMAnimationLoaderPlugin: CaptureVRMAnimationLoaderPlugin,
+  })
+  assert.equal(animationGltf.animations.length, 1)
+  assert.ok(animationPluginParser, 'real VRMA fixture should initialize the supplied VRM animation loader plugin')
+  assert.ok(
+    animationPluginParser.json?.extensionsUsed?.includes('VRMC_vrm_animation'),
+    'real VRMA fixture should expose VRMC_vrm_animation metadata',
+  )
+  assert.equal(animationPluginParser.json?.nodes?.length, 53)
+  assert.equal(animationPluginParser.json?.animations?.[0]?.channels?.length, 3)
+  assert.equal(animationPluginParser.json?.animations?.[0]?.samplers?.length, 3)
+
+  const vrmaExtension = animationPluginParser.json?.extensions?.VRMC_vrm_animation
+  const humanBones = vrmaExtension?.humanoid?.humanBones ?? {}
+  assert.equal(vrmaExtension?.specVersion, '1.0')
+  assert.ok('hips' in humanBones, 'real VRMA fixture should map humanoid hips')
+  assert.ok('leftUpperArm' in humanBones, 'real VRMA fixture should map humanoid upper-body bones')
+  assert.ok('rightFoot' in humanBones, 'real VRMA fixture should map humanoid lower-body bones')
+  assert.equal(vrmaExtension?.lookAt?.node, 52)
+  assert.equal(vrmaExtension?.expressions?.preset?.happy?.node, 51)
 })
 
 test('loadGltfFromFile resolves external glTF image files from the model directory', async () => {
