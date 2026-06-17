@@ -26,6 +26,7 @@ const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
+const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
@@ -101,6 +102,57 @@ test('committed Khronos glTF Sample Assets Box fixture loads external buffer and
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos Box sample should render visible pixels')
   const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
   assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `Khronos Box sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imported cameras', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CAMERAS)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Cameras sample should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 4)
+  assert.equal(mesh.geometry.index?.count, 6)
+  assert.equal(gltf.cameras.length, 2)
+
+  const [perspective, orthographic] = gltf.cameras
+  assert.equal(perspective.isPerspectiveCamera, true)
+  assert.equal(perspective.near, 0.01)
+  assert.equal(perspective.far, 100)
+  assert.equal(perspective.aspect, 1)
+  assert.ok(Math.abs(perspective.fov - THREE.MathUtils.radToDeg(0.7)) < 1e-10, `perspective camera should preserve glTF yfov (${perspective.fov})`)
+  assert.deepEqual(perspective.position.toArray(), [0.5, 0.5, 3])
+
+  assert.equal(orthographic.isOrthographicCamera, true)
+  assert.equal(orthographic.near, 0.01)
+  assert.equal(orthographic.far, 100)
+  assert.equal(orthographic.left, -1)
+  assert.equal(orthographic.right, 1)
+  assert.equal(orthographic.top, 1)
+  assert.equal(orthographic.bottom, -1)
+  assert.deepEqual(orthographic.position.toArray(), [0.5, 0.5, 3])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+
+  const renderer = new Renderer()
+  const renderWithCamera = (camera) => {
+    camera.updateMatrixWorld(true)
+    return renderer.render(gltf.scene, camera, {
+      width: 96,
+      height: 96,
+      format: 'rgba',
+      background: [0, 0, 0],
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const perspectiveRgba = renderWithCamera(perspective)
+  const orthographicRgba = renderWithCamera(orthographic)
+
+  assert.ok(nonBackgroundRatio(perspectiveRgba, [0, 0, 0], 3) > 0.1, 'Cameras sample should render through imported perspective camera')
+  assert.ok(nonBackgroundRatio(orthographicRgba, [0, 0, 0], 3) > 0.15, 'Cameras sample should render through imported orthographic camera')
+  const perspectiveCenter = meanRegion(perspectiveRgba, 96, 96, 24, 24, 72, 72)
+  const orthographicCenter = meanRegion(orthographicRgba, 96, 96, 24, 24, 72, 72)
+  assert.ok(perspectiveCenter.r > 80 && perspectiveCenter.g > 80 && perspectiveCenter.b > 80, `perspective camera should see the white mesh (${perspectiveCenter.r}, ${perspectiveCenter.g}, ${perspectiveCenter.b})`)
+  assert.ok(orthographicCenter.r > 80 && orthographicCenter.g > 80 && orthographicCenter.b > 80, `orthographic camera should see the white mesh (${orthographicCenter.r}, ${orthographicCenter.g}, ${orthographicCenter.b})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform animation', async () => {
