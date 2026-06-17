@@ -45,6 +45,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
+const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
@@ -815,6 +816,71 @@ test('committed Khronos glTF Sample Assets LightVisibility fixture applies KHR_n
   assert.ok(left.r < 10, `invisible red light branch should not tint the left panel red (${left.r}, ${left.g}, ${left.b})`)
   assert.ok(center.g > 80 && center.g > center.r + 80, `visible green light should tint the center panel (${center.r}, ${center.g}, ${center.b})`)
   assert.ok(right.b > 20 && right.b > right.r + 20, `visible animated blue light should tint the right panel (${right.r}, ${right.g}, ${right.b})`)
+})
+
+test('committed Khronos glTF Sample Assets CubeVisibility fixture applies KHR_node_visibility to meshes', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CUBE_VISIBILITY, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_node_visibility'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_animation_pointer', 'KHR_node_visibility'])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CUBE_VISIBILITY)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_node_visibility'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'InvisibleCube',
+    'ChildOfInvisibleShouldBeInvisible',
+    'DescendantOfInvisibleShouldBeInvisible',
+    'VisibleCube',
+    'AnimatedVisibility',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.color.toArray()), [
+    [0.855, 0, 0],
+    [0.855, 0, 0],
+    [0.855, 0, 0],
+    [0, 0.855, 0],
+    [0, 0, 0.855],
+  ])
+  assert.ok(meshes.every((mesh) => mesh.geometry.getAttribute('position')?.count === 24))
+  assert.ok(meshes.every((mesh) => mesh.geometry.index?.count === 36))
+
+  assert.equal(meshes[0].visible, false, 'InvisibleCube should import KHR_node_visibility false')
+  assert.equal(meshes[1].visible, true, 'child mesh should keep its own default visible flag')
+  assert.equal(meshes[2].visible, true, 'descendant mesh should keep its own default visible flag')
+  assert.equal(meshes[3].visible, true)
+  assert.equal(meshes[4].visible, true)
+  assert.equal(isEffectivelyVisible(meshes[0]), false, 'InvisibleCube should be effectively hidden')
+  assert.equal(isEffectivelyVisible(meshes[1]), false, 'child mesh should be hidden by its invisible parent')
+  assert.equal(isEffectivelyVisible(meshes[2]), false, 'descendant mesh should be hidden by its invisible ancestor')
+  assert.equal(isEffectivelyVisible(meshes[3]), true)
+  assert.equal(isEffectivelyVisible(meshes[4]), true)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  const camera = new THREE.OrthographicCamera(-2.4, 2.4, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 80,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'CubeVisibility should render the visible green and blue cubes')
+  const left = meanRegion(rgba, 160, 80, 0, 25, 45, 55)
+  const center = meanRegion(rgba, 160, 80, 55, 25, 105, 55)
+  const right = meanRegion(rgba, 160, 80, 115, 25, 160, 55)
+  assert.ok(left.r < 5 && left.g < 5 && left.b < 5, `invisible red branch should not render (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(center.g > center.r + 50 && center.g > center.b + 50, `visible green cube should render in the center (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(right.b > right.r + 50 && right.b > right.g + 50, `visible blue cube should render on the right (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed Khronos glTF Sample Assets LightsPunctualLamp fixture loads textured point-light scene', async () => {
