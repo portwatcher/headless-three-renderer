@@ -53,6 +53,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
+const SAMPLE_ASSET_CLEARCOAT_WICKER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearcoatWicker', 'glTF', 'ClearcoatWicker.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_ANISOTROPY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAnisotropy', 'glTF', 'CompareAnisotropy.gltf')
@@ -3759,6 +3760,105 @@ test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_mater
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'ClearCoatTest should render visible clearcoat panels')
+})
+
+test('committed Khronos glTF Sample Assets ClearcoatWicker fixture loads textured clearcoat normal maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CLEARCOAT_WICKER, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_clearcoat'])
+  assert.deepEqual(source.buffers, [{ uri: 'ClearcoatWicker.bin', byteLength: 73728 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'wicker_basecolor.png',
+    'wicker_normal.png',
+    'wicker_occlusion-rough-metal.png',
+    'clearcoat_normal.png',
+  ])
+  assert.deepEqual(source.samplers, [{ magFilter: 9729, minFilter: 9987 }])
+  assert.deepEqual(source.meshes[0].primitives[0], {
+    attributes: {
+      POSITION: 1,
+      NORMAL: 2,
+      TEXCOORD_0: 3,
+    },
+    indices: 0,
+    material: 0,
+  })
+
+  const materialSource = source.materials[0]
+  assert.equal(materialSource.name, 'ClearcoatWicker')
+  assert.deepEqual(materialSource.pbrMetallicRoughness, {
+    baseColorTexture: { index: 0 },
+    metallicFactor: 1,
+    roughnessFactor: 1,
+    metallicRoughnessTexture: { index: 2 },
+  })
+  assert.deepEqual(materialSource.normalTexture, { index: 1, scale: 1 })
+  assert.deepEqual(materialSource.occlusionTexture, { index: 2 })
+  assert.deepEqual(materialSource.extensions.KHR_materials_clearcoat, {
+    clearcoatFactor: 1,
+    clearcoatNormalTexture: { index: 3 },
+    clearcoatRoughnessFactor: 0.1,
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CLEARCOAT_WICKER)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_clearcoat'))
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos ClearcoatWicker sample should load a mesh')
+  assert.equal(mesh.name, 'Sphere')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 1728)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 1728)
+  assert.equal(mesh.geometry.index?.count, 9216)
+  assert.deepEqual(mesh.position.toArray(), [0, 0.5, 0])
+
+  const material = mesh.material
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.name, 'ClearcoatWicker')
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+  assert.equal(material.clearcoat, 1)
+  assert.equal(material.clearcoatRoughness, 0.1)
+
+  const assertLoadedTexture = (texture, name, colorSpace) => {
+    assert.ok(texture?.isTexture, `${name} should load a texture`)
+    assert.equal(texture.name, name)
+    assert.equal(Buffer.isBuffer(texture.image), true, `${name} should load as an encoded Buffer`)
+    assert.deepEqual(pngDimensions(texture.image), [512, 512])
+    assert.equal(texture.wrapS, THREE.RepeatWrapping)
+    assert.equal(texture.wrapT, THREE.RepeatWrapping)
+    assert.equal(texture.magFilter, THREE.LinearFilter)
+    assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter)
+    assert.equal(texture.colorSpace, colorSpace)
+    assert.equal(texture.flipY, false)
+  }
+
+  assertLoadedTexture(material.map, 'wicker_basecolor.png', THREE.SRGBColorSpace)
+  assertLoadedTexture(material.normalMap, 'wicker_normal.png', THREE.NoColorSpace)
+  assertLoadedTexture(material.metalnessMap, 'wicker_occlusion-rough-metal.png', THREE.NoColorSpace)
+  assertLoadedTexture(material.clearcoatNormalMap, 'clearcoat_normal.png', THREE.NoColorSpace)
+  assert.equal(material.metalnessMap, material.roughnessMap, 'ClearcoatWicker should reuse the ORM texture for roughness')
+  assert.equal(material.metalnessMap, material.aoMap, 'ClearcoatWicker should reuse the ORM texture for occlusion')
+
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'ClearcoatWicker should render visible textured clearcoat geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g + 5 && mean.g > mean.b, `ClearcoatWicker texture should contribute warm wicker pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets IridescenceLamp fixture loads physical iridescence inputs', async () => {
