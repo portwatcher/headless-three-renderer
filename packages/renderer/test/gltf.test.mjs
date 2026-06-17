@@ -33,6 +33,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
+const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
@@ -878,6 +879,62 @@ test('committed Khronos glTF Sample Assets NegativeScaleTest fixture preserves n
   )
 })
 
+test('committed Khronos glTF Sample Assets OrientationTest fixture preserves quaternion and matrix rotations', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ORIENTATION_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 13)
+
+  const arrowX1 = gltf.scene.getObjectByName('ArrowX1')
+  const arrowY1 = gltf.scene.getObjectByName('ArrowY1')
+  const arrowZ1 = gltf.scene.getObjectByName('ArrowZ1')
+  const arrowX2 = gltf.scene.getObjectByName('ArrowX2')
+  const arrowY2 = gltf.scene.getObjectByName('ArrowY2')
+  const arrowZ2 = gltf.scene.getObjectByName('ArrowZ2')
+  for (const arrow of [arrowX1, arrowY1, arrowZ1, arrowX2, arrowY2, arrowZ2]) {
+    assert.ok(arrow?.isMesh, 'OrientationTest should load all quaternion and matrix arrow meshes')
+  }
+
+  assertVectorClose(arrowX1.position.toArray(), [5, 0, 0], 'ArrowX1 quaternion translation')
+  assertVectorClose(arrowY1.position.toArray(), [0, 5, 0], 'ArrowY1 quaternion translation')
+  assertVectorClose(arrowZ1.position.toArray(), [0, 0, 5], 'ArrowZ1 quaternion translation')
+  assertVectorClose(arrowX2.position.toArray(), [-5, 0, 0], 'ArrowX2 matrix translation')
+  assertVectorClose(arrowY2.position.toArray(), [0, -5, 0], 'ArrowY2 matrix translation')
+  assertVectorClose(arrowZ2.position.toArray(), [0, 0, -5], 'ArrowZ2 matrix translation')
+
+  assert.ok(arrowX1.quaternion.x < -0.29 && Math.abs(arrowX1.quaternion.y) < 1e-6 && Math.abs(arrowX1.quaternion.z) < 1e-6, 'ArrowX1 should keep its X-axis quaternion rotation')
+  assert.ok(arrowY1.quaternion.y < -0.57 && Math.abs(arrowY1.quaternion.x) < 1e-6 && Math.abs(arrowY1.quaternion.z) < 1e-6, 'ArrowY1 should keep its Y-axis quaternion rotation')
+  assert.ok(arrowZ1.quaternion.z > 0.13 && Math.abs(arrowZ1.quaternion.x) < 1e-6 && Math.abs(arrowZ1.quaternion.y) < 1e-6, 'ArrowZ1 should keep its Z-axis quaternion rotation')
+  assert.ok(arrowX2.quaternion.x > 0.04 && Math.abs(arrowX2.quaternion.y) < 1e-6 && Math.abs(arrowX2.quaternion.z) < 1e-6, 'ArrowX2 should decompose its matrix into an X-axis rotation')
+  assert.ok(arrowY2.quaternion.y < -0.10 && Math.abs(arrowY2.quaternion.x) < 1e-6 && Math.abs(arrowY2.quaternion.z) < 1e-6, 'ArrowY2 should decompose its matrix into a Y-axis rotation')
+  assert.ok(arrowZ2.quaternion.z < -0.14 && Math.abs(arrowZ2.quaternion.x) < 1e-6 && Math.abs(arrowZ2.quaternion.y) < 1e-6, 'ArrowZ2 should decompose its matrix into a Z-axis rotation')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 1.0)
+  light.position.set(4, 5, 6)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const halfExtent = Math.max(size.x, size.y, size.z) / 2 + 0.5
+  const camera = new THREE.OrthographicCamera(-halfExtent, halfExtent, halfExtent, -halfExtent, 0.01, 40)
+  camera.position.set(center.x + 6, center.y + 4, center.z + 6)
+  camera.lookAt(center)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 160,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.9, 'OrientationTest should render visible rotated arrows and targets')
+})
+
 test('committed Khronos glTF Sample Assets MultipleScenes fixture preserves default and alternate scenes', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_MULTIPLE_SCENES)
   assert.equal(gltf.scenes.length, 2)
@@ -1383,6 +1440,13 @@ async function loadGltfFixture(filePath, options) {
 
 function vectorFromAttribute(attribute, index) {
   return [attribute.getX(index), attribute.getY(index), attribute.getZ(index)]
+}
+
+function assertVectorClose(actual, expected, label, tolerance = 1e-6) {
+  assert.equal(actual.length, expected.length, `${label} should have ${expected.length} components`)
+  for (let i = 0; i < expected.length; i++) {
+    assert.ok(Math.abs(actual[i] - expected[i]) <= tolerance, `${label}[${i}] should be close to ${expected[i]} (${actual[i]})`)
+  }
 }
 
 function worldDeterminant(object) {
