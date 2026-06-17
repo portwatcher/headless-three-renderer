@@ -51,6 +51,7 @@ const SAMPLE_ASSET_BOX_INTERLEAVED = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_BOX_TEXTURED_NPOT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxTexturedNonPowerOfTwo', 'glTF', 'BoxTexturedNonPowerOfTwo.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
+const SAMPLE_ASSET_CARBON_FIBRE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CarbonFibre', 'glTF', 'CarbonFibre.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
 const SAMPLE_ASSET_CLEARCOAT_CAR_PAINT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatCarPaint', 'glTF', 'ClearCoatCarPaint.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
@@ -4121,6 +4122,94 @@ test('committed Khronos glTF Sample Assets AnisotropyStrengthTest fixture loads 
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'AnisotropyStrengthTest should render visible anisotropy-strength grid spheres')
+})
+
+test('committed Khronos glTF Sample Assets CarbonFibre fixture loads real anisotropy material maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CARBON_FIBRE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_anisotropy'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'CarbonFibre.bin', byteLength: 91936 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'CarbonFibre_occlusion.png',
+    'CarbonFibre_normal.png',
+    'CarbonFibre_anisotropy.png',
+  ])
+  assert.deepEqual(source.samplers, [
+    { magFilter: 9729, minFilter: 9987 },
+  ])
+  assert.deepEqual(source.materials[0].extensions?.KHR_materials_anisotropy, {
+    anisotropyStrength: 0.5,
+    anisotropyRotation: 0,
+    anisotropyTexture: { index: 2 },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CARBON_FIBRE)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_anisotropy'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 1)
+  const mesh = meshes[0]
+  assert.equal(mesh.name, 'CarbonFibre')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 2129)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 2129)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 2129)
+  assert.equal(mesh.geometry.index?.count, 11904)
+
+  const material = mesh.material
+  assert.equal(material.name, 'CarbonFibre')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.deepEqual(material.color.toArray(), [0.009, 0.009, 0.009])
+  assert.equal(material.metalness, 0)
+  assert.equal(material.roughness, 0.4)
+  assert.equal(material.anisotropy, 0.5)
+  assert.equal(material.anisotropyRotation, 0)
+  assert.deepEqual(material.normalScale.toArray(), [2, -2])
+
+  const textureExpectations = [
+    [material.aoMap, 'CarbonFibre_occlusion.png', [256, 256]],
+    [material.normalMap, 'CarbonFibre_normal.png', [512, 512]],
+    [material.anisotropyMap, 'CarbonFibre_anisotropy.png', [128, 128]],
+  ]
+  for (const [texture, name, dimensions] of textureExpectations) {
+    assert.equal(Buffer.isBuffer(texture?.image), true, `${name} should load as an encoded Buffer`)
+    assert.equal(texture.name, name)
+    assert.deepEqual(pngDimensions(texture.image), dimensions)
+    assert.equal(texture.colorSpace, THREE.NoColorSpace)
+    assert.equal(texture.flipY, false)
+    assert.equal(texture.wrapS, THREE.RepeatWrapping)
+    assert.equal(texture.wrapT, THREE.RepeatWrapping)
+    assert.equal(texture.magFilter, THREE.LinearFilter)
+    assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.3, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 4)
+  light.position.copy(center).add(new THREE.Vector3(2, 4, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.35, 'CarbonFibre should render visible dark anisotropic material against white background')
+  const centerSample = meanRegion(rgba, 128, 128, 48, 48, 80, 80)
+  assert.ok(centerSample.r < 20 && centerSample.g < 20 && centerSample.b < 20, `CarbonFibre center should render the near-black material (${centerSample.r}, ${centerSample.g}, ${centerSample.b})`)
 })
 
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
