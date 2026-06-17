@@ -73,6 +73,7 @@ const SAMPLE_ASSET_COMPARE_SPECULAR = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_COMPARE_TRANSMISSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareTransmission', 'glTF', 'CompareTransmission.gltf')
 const SAMPLE_ASSET_COMPARE_VOLUME = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareVolume', 'glTF', 'CompareVolume.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
+const SAMPLE_ASSET_DAMAGED_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DamagedHelmet', 'glTF', 'DamagedHelmet.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DISPERSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DispersionTest', 'glTF', 'DispersionTest.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
@@ -2813,6 +2814,96 @@ test('committed Khronos glTF Sample Assets Duck fixture loads textured external 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'Khronos Duck sample should render visible textured pixels')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 8 && mean.g > mean.b + 6, `Duck texture should contribute warm yellow output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets DamagedHelmet fixture loads canonical packed PBR texture set', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DAMAGED_HELMET, 'utf8'))
+  assert.equal(source.extensionsUsed, undefined)
+  assert.deepEqual(source.buffers, [
+    { byteLength: 558504, uri: 'DamagedHelmet.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Default_albedo.jpg',
+    'Default_metalRoughness.jpg',
+    'Default_emissive.jpg',
+    'Default_AO.jpg',
+    'Default_normal.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index,
+    material.pbrMetallicRoughness?.metallicRoughnessTexture?.index,
+    material.emissiveTexture?.index,
+    material.occlusionTexture?.index,
+    material.normalTexture?.index,
+  ]), [
+    ['Material_MR', 0, 1, 2, 3, 4],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DAMAGED_HELMET)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 1)
+  const mesh = meshes[0]
+  assert.equal(mesh.name, 'node_damagedHelmet_-6514')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 14556)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 14556)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 14556)
+  assert.equal(mesh.geometry.index?.count, 46356)
+
+  const material = mesh.material
+  assert.equal(material.name, 'Material_MR')
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.deepEqual(material.color.toArray(), [1, 1, 1])
+  assert.equal(material.metalness, 1)
+  assert.equal(material.roughness, 1)
+  assert.deepEqual(material.emissive.toArray(), [1, 1, 1])
+  assert.equal(material.emissiveIntensity, 1)
+  assert.deepEqual(material.normalScale.toArray(), [1, -1])
+  assert.equal(material.aoMapIntensity, 1)
+
+  assert.equal(material.map.name, 'Default_albedo.jpg')
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.emissiveMap.name, 'Default_emissive.jpg')
+  assert.equal(material.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.roughnessMap.name, 'Default_metalRoughness.jpg')
+  assert.equal(material.metalnessMap, material.roughnessMap)
+  assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.aoMap.name, 'Default_AO.jpg')
+  assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.normalMap.name, 'Default_normal.jpg')
+  assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+  for (const texture of [material.map, material.emissiveMap, material.roughnessMap, material.aoMap, material.normalMap]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.1, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+  const light = new THREE.DirectionalLight(0xffffff, 2.5)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'DamagedHelmet should render visible textured PBR geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.g > mean.r && mean.b > mean.r, `DamagedHelmet should render cool lit PBR output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets WaterBottle fixture loads textured PBR maps', async () => {
