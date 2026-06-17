@@ -28,6 +28,7 @@ const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'gl
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
+const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -256,6 +257,45 @@ test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph wei
   assert.ok(base.height > 10, `SimpleMorph base triangle should render visible bounds (${base.height})`)
   assert.ok(animated.height > base.height + 35, `SimpleMorph animation should expand rendered height (${animated.height} vs ${base.height})`)
   assert.ok(animated.minY < base.minY - 35, `SimpleMorph animation should lift the triangle top (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders external PNG UV quadrants', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TEXTURE_COORDINATE_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 5, 'Khronos TextureCoordinateTest sample should load four textured planes plus a back plane')
+  assert.equal(meshes.filter((mesh) => mesh.material.map?.isTexture === true).length, 4)
+  assert.ok(
+    meshes.filter((mesh) => mesh.material.map?.isTexture === true).every((mesh) => Buffer.isBuffer(mesh.material.map.image)),
+    'external PNG textures should be exposed as encoded Buffers',
+  )
+
+  const camera = new THREE.OrthographicCamera(-1.45, 1.45, 1.45, -1.45, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.4, 'TextureCoordinateTest sample should render visible textured planes')
+  const topLeft = meanRegion(rgba, 96, 96, 18, 18, 38, 38)
+  const topRight = meanRegion(rgba, 96, 96, 58, 18, 78, 38)
+  const bottomLeft = meanRegion(rgba, 96, 96, 18, 58, 38, 78)
+  const bottomRight = meanRegion(rgba, 96, 96, 58, 58, 78, 78)
+  assert.ok(topLeft.r > 130 && topLeft.g > 120 && topLeft.b < 50, `top-left UV quadrant should sample yellow texels (${topLeft.r}, ${topLeft.g}, ${topLeft.b})`)
+  assert.ok(topRight.r > topRight.g + 140 && topRight.r > topRight.b + 140, `top-right UV quadrant should sample red texels (${topRight.r}, ${topRight.g}, ${topRight.b})`)
+  assert.ok(bottomLeft.b > bottomLeft.r + 120 && bottomLeft.b > bottomLeft.g + 120, `bottom-left UV quadrant should sample blue texels (${bottomLeft.r}, ${bottomLeft.g}, ${bottomLeft.b})`)
+  assert.ok(bottomRight.g > bottomRight.r + 100 && bottomRight.g > bottomRight.b + 100, `bottom-right UV quadrant should sample green texels (${bottomRight.r}, ${bottomRight.g}, ${bottomRight.b})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
