@@ -89,7 +89,9 @@ const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
 const SAMPLE_ASSET_FLIGHT_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'FlightHelmet', 'glTF', 'FlightHelmet.gltf')
 const SAMPLE_ASSET_FOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Fox', 'glTF', 'Fox.gltf')
+const SAMPLE_ASSET_GLASS_BROKEN_WINDOW = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'GlassBrokenWindow', 'glTF', 'GlassBrokenWindow.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
+const SAMPLE_ASSET_IRIDESCENCE_ABALONE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceAbalone', 'glTF', 'IridescenceAbalone.gltf')
 const SAMPLE_ASSET_IOR_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IORTestGrid', 'glTF', 'IORTestGrid.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceDielectricSpheres', 'glTF', 'IridescenceDielectricSpheres.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
@@ -1661,6 +1663,98 @@ test('committed Khronos glTF Sample Assets CompareIridescence fixture loads irid
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02, 'CompareIridescence should render visible iridescence comparison geometry')
 })
 
+test('committed Khronos glTF Sample Assets IridescenceAbalone fixture loads real iridescence and thickness maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_IRIDESCENCE_ABALONE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_iridescence'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'IridescenceAbalone.bin', byteLength: 162576 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'IridescenceAbalone_BaseColor.jpg',
+    'IridescenceAbalone_Iridescence.jpg',
+    'IridescenceAbalone_NormalBump.png',
+    'IridescenceAbalone_ORM.jpg',
+  ])
+  assert.deepEqual(source.materials[0].extensions?.KHR_materials_iridescence, {
+    iridescenceFactor: 1,
+    iridescenceTexture: { index: 1 },
+    iridescenceThicknessTexture: { index: 1 },
+    iridescenceThicknessMinimum: 600,
+    iridescenceThicknessMaximum: 800,
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_IRIDESCENCE_ABALONE)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_iridescence'))
+  const mesh = gltf.scene.getObjectByName('IridescenceAbalone')
+  assert.ok(mesh?.isMesh, 'IridescenceAbalone should load a named mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3159)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 3159)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 3159)
+  assert.equal(mesh.geometry.index?.count, 18108)
+
+  const material = mesh.material
+  assert.equal(material.name, 'IridescenceAbalone')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.metalness, 0.5)
+  assert.equal(material.roughness, 1)
+  assert.equal(material.iridescence, 1)
+  assert.equal(material.iridescenceIOR, 1.3)
+  assert.deepEqual(material.iridescenceThicknessRange, [600, 800])
+  assert.equal(material.map.name, 'IridescenceAbalone_BaseColor.jpg')
+  assert.equal(material.normalMap.name, 'IridescenceAbalone_NormalBump.png')
+  assert.deepEqual(material.normalScale.toArray(), [1, -1])
+  assert.equal(material.aoMap.name, 'IridescenceAbalone_ORM.jpg')
+  assert.equal(material.roughnessMap.name, 'IridescenceAbalone_ORM.jpg')
+  assert.equal(material.metalnessMap.name, 'IridescenceAbalone_ORM.jpg')
+  assert.equal(material.iridescenceMap.name, 'IridescenceAbalone_Iridescence.jpg')
+  assert.equal(material.iridescenceThicknessMap.name, 'IridescenceAbalone_Iridescence.jpg')
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.iridescenceMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.iridescenceThicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(material.aoMap.channel, 0)
+  assert.equal(Buffer.isBuffer(material.normalMap.image), true, 'IridescenceAbalone normal PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(material.normalMap.image), [2048, 1024])
+  for (const texture of [
+    material.map,
+    material.aoMap,
+    material.roughnessMap,
+    material.metalnessMap,
+    material.iridescenceMap,
+    material.iridescenceThicknessMap,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'IridescenceAbalone should render visible iridescent shell geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 10, `IridescenceAbalone should render lit shell pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('committed Khronos glTF Sample Assets iridescence sphere-grid fixtures load dielectric and metallic variants', async () => {
   const cases = [
     {
@@ -2287,6 +2381,116 @@ test('committed Khronos glTF Sample Assets CompareTransmission fixture loads alp
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.4, 'CompareTransmission should render visible alpha/transmission comparison geometry')
+})
+
+test('committed Khronos glTF Sample Assets GlassBrokenWindow fixture loads transmission glass with color-alpha texture', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_GLASS_BROKEN_WINDOW, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'GlassBrokenWindow.bin', byteLength: 37412 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'WindowGlass_Normal.png',
+    'WindowGlass_ColorAlpha.png',
+    'WindowGlass_OcclusionRoughMetal.jpg',
+    'WindowFrame_Occlusion.jpg',
+    'WindowClasp_Occlusion.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'WindowFrame',
+    'WindowGlass',
+    'WindowClasp',
+  ])
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_GLASS_BROKEN_WINDOW)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_transmission'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'WindowFrame',
+    'WindowsGlass',
+    'WindowClasp',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [776, 4, 204])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [2208, 6, 747])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const frame = materials.get('WindowFrame')
+  assert.equal(frame?.isMeshStandardMaterial, true)
+  assert.deepEqual(frame.color.toArray(), [0.86, 0.86, 0.86])
+  assert.equal(frame.metalness, 0)
+  assert.equal(frame.roughness, 0.5)
+  assert.equal(frame.aoMap.name, 'WindowFrame_Occlusion.jpg')
+  assert.equal(frame.aoMap.channel, 0)
+
+  const glass = materials.get('WindowGlass')
+  assert.equal(glass?.isMeshPhysicalMaterial, true)
+  assert.deepEqual(glass.color.toArray(), [0.6, 0.85, 1])
+  assert.equal(glass.metalness, 1)
+  assert.equal(glass.roughness, 0.05)
+  assert.equal(glass.transmission, 1)
+  assert.equal(glass.map.name, 'WindowGlass_ColorAlpha.png')
+  assert.equal(glass.normalMap.name, 'WindowGlass_Normal.png')
+  assert.deepEqual(glass.normalScale.toArray(), [1, -1])
+  assert.equal(glass.roughnessMap.name, 'WindowGlass_OcclusionRoughMetal.jpg')
+  assert.equal(glass.metalnessMap.name, 'WindowGlass_OcclusionRoughMetal.jpg')
+  assert.equal(glass.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(glass.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(glass.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(glass.map.image), [1024, 1024])
+  assert.deepEqual(pngDimensions(glass.normalMap.image), [1024, 1024])
+
+  const clasp = materials.get('WindowClasp')
+  assert.equal(clasp?.isMeshStandardMaterial, true)
+  assert.deepEqual(clasp.color.toArray(), [0.18, 0.14, 0.09])
+  assert.equal(clasp.metalness, 1)
+  assert.equal(clasp.roughness, 0.5)
+  assert.equal(clasp.aoMap.name, 'WindowClasp_Occlusion.jpg')
+  assert.equal(clasp.aoMap.channel, 0)
+
+  for (const texture of [
+    frame.aoMap,
+    glass.map,
+    glass.normalMap,
+    glass.roughnessMap,
+    glass.metalnessMap,
+    clasp.aoMap,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12, 'GlassBrokenWindow should render visible frame and transmission glass')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 20 && mean.g > 20 && mean.b > 20, `GlassBrokenWindow should render lit window pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets TransmissionOrderTest fixture loads alpha and transmission ordering cases', async () => {
