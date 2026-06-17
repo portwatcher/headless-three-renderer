@@ -5933,6 +5933,52 @@ test('InstancedBufferGeometry expands per-instance offsets and colors', () => {
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `instance colors should avoid blue contribution (${mean.b})`)
 })
 
+test('normalized integer vertex colors render at full intensity', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.8, -0.5, 0,
+    0, -0.5, 0,
+    -0.8, 0.5, 0,
+    0, -0.5, 0,
+    0, 0.5, 0,
+    -0.8, 0.5, 0,
+    0, -0.5, 0,
+    0.8, -0.5, 0,
+    0, 0.5, 0,
+    0.8, -0.5, 0,
+    0.8, 0.5, 0,
+    0, 0.5, 0,
+  ]), 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Uint8Array([
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+    0, 255, 0, 255,
+  ]), 4, true))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const left = meanRegion(rgba, 96, 96, 28, 36, 42, 60)
+  const right = meanRegion(rgba, 96, 96, 54, 36, 68, 60)
+  assert.ok(left.r > 140 && left.r > left.g + 120, `normalized red vertex colors should stay bright (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.g > 200 && right.g > right.r + 50, `normalized green vertex colors should stay bright (${right.r}, ${right.g}, ${right.b})`)
+})
+
 test('InstancedBufferGeometry honors meshPerAttribute repeat values for offsets and colors', () => {
   const base = new THREE.PlaneGeometry(0.35, 0.5)
   const geometry = new THREE.InstancedBufferGeometry()

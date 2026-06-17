@@ -89,6 +89,7 @@ export function attributeComponent(
   if (component >= itemSize) return 0
 
   let value: number | undefined
+  let readFromRawArray = false
   if (component === 0 && typeof attribute.getX === 'function') value = attribute.getX(index)
   else if (component === 1 && typeof attribute.getY === 'function') value = attribute.getY(index)
   else if (component === 2 && typeof attribute.getZ === 'function') value = attribute.getZ(index)
@@ -99,13 +100,16 @@ export function attributeComponent(
     const stride = attributeStride(attribute, label) ?? itemSize
     const offset = attributeOffset(attribute, label)
     value = array?.[index * stride + offset + component]
+    readFromRawArray = true
   }
 
   if (!Number.isFinite(value)) {
     throw new TypeError(`${label}[${index}].${COMPONENT_LABELS[component] ?? component} must be a finite number.`)
   }
 
-  return attributeNormalized(attribute, label) ? normalizeAttributeValue(value!, attribute.array ?? attributeData(attribute, label)?.array) : value!
+  return attributeNormalized(attribute, label) && readFromRawArray
+    ? normalizeAttributeValue(value!, attribute.array ?? attributeData(attribute, label)?.array)
+    : value!
 }
 
 function attributeItemSize(attribute: ThreeBufferAttributeLike, label: string): number | undefined {

@@ -81,6 +81,7 @@ const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sam
 const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
 const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
+const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
@@ -3391,6 +3392,86 @@ test('committed Khronos glTF Sample Assets RiggedSimple fixture applies skinned 
   assert.ok(base.width > 80 && base.height < 30, `RiggedSimple base pose should render a long straight cylinder (${base.width}x${base.height})`)
   assert.ok(animated.height > base.height + 25, `RiggedSimple bone animation should bend the cylinder taller in side view (${animated.height} vs ${base.height})`)
   assert.ok(animated.minY < base.minY - 25, `RiggedSimple bone animation should lift the bent tip upward (${animated.minY} vs ${base.minY})`)
+})
+
+test('committed Khronos glTF Sample Assets RecursiveSkeletons fixture loads recursive skinned hierarchies', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_RECURSIVE_SKELETONS, 'utf8'))
+  assert.equal(source.buffers[0].uri, 'RecursiveSkeletons.bin')
+  assert.equal(source.nodes.length, 924)
+  assert.equal(source.skins.length, 84)
+  assert.equal(source.skins.every((skin) => skin.joints.length === 10), true)
+  assert.equal(source.animations[0].channels.length, 840)
+  assert.equal(source.animations[0].samplers.length, 840)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_RECURSIVE_SKELETONS)
+  const skinnedMeshes = []
+  const bones = []
+  gltf.scene.traverse((object) => {
+    if (object.isSkinnedMesh === true) skinnedMeshes.push(object)
+    if (object.isBone === true) bones.push(object)
+  })
+
+  assert.equal(skinnedMeshes.length, 84, 'RecursiveSkeletons should load every skinned mesh instance')
+  assert.equal(bones.length, 840, 'RecursiveSkeletons should load every recursive bone')
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].tracks.length, 840)
+
+  const first = skinnedMeshes[0]
+  assert.equal(first.name, 'skinned_mesh_instance_0')
+  assert.equal(first.skeleton.bones.length, 10)
+  assert.equal(first.geometry.getAttribute('position')?.count, 40)
+  assert.equal(first.geometry.getAttribute('skinIndex')?.count, 40)
+  assert.equal(first.geometry.getAttribute('skinWeight')?.count, 40)
+  assert.equal(first.geometry.index?.count, 228)
+  assert.equal(first.geometry.getAttribute('color')?.itemSize, 4)
+  assert.equal(first.geometry.getAttribute('color')?.normalized, true)
+  assert.equal(first.material.vertexColors, true)
+
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(gltf.animations[0]).play()
+  const skinnedBounds = (time) => {
+    mixer.setTime(time)
+    gltf.scene.updateMatrixWorld(true)
+    const box = new THREE.Box3()
+    const vertex = new THREE.Vector3()
+    for (const mesh of skinnedMeshes) {
+      assert.equal(typeof mesh.applyBoneTransform, 'function', `${mesh.name} should expose Three.js skinning transforms`)
+      mesh.skeleton.update()
+      const position = mesh.geometry.getAttribute('position')
+      for (let i = 0; i < position.count; i += 1) {
+        vertex.fromBufferAttribute(position, i)
+        mesh.applyBoneTransform(i, vertex)
+        vertex.applyMatrix4(mesh.matrixWorld)
+        box.expandByPoint(vertex)
+      }
+    }
+    return box.getSize(new THREE.Vector3())
+  }
+
+  const baseSize = skinnedBounds(0)
+  const animatedSize = skinnedBounds(1)
+  assert.ok(baseSize.x < 70 && baseSize.z < 70, `RecursiveSkeletons base pose should stay compact (${baseSize.x}, ${baseSize.z})`)
+  assert.ok(animatedSize.x > baseSize.x + 100, `RecursiveSkeletons animation should spread recursively in X (${animatedSize.x} vs ${baseSize.x})`)
+  assert.ok(animatedSize.z > baseSize.z + 100, `RecursiveSkeletons animation should spread recursively in Z (${animatedSize.z} vs ${baseSize.z})`)
+
+  mixer.setTime(0)
+  const camera = new THREE.OrthographicCamera(-80, 80, 140, -20, 0.1, 500)
+  camera.position.set(0, 62, 180)
+  camera.lookAt(0, 62, 0)
+  camera.updateProjectionMatrix()
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 160,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04, 'RecursiveSkeletons should render visible normalized-color skinned meshes')
 })
 
 test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph weight animation', async () => {
