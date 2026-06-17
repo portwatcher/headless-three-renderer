@@ -49,6 +49,7 @@ const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Camer
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
+const SAMPLE_ASSET_COMPARE_BASE_COLOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareBaseColor', 'glTF', 'CompareBaseColor.gltf')
 const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareIor', 'glTF', 'CompareIor.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
@@ -510,6 +511,97 @@ test('committed Khronos glTF Sample Assets CompareAmbientOcclusion fixture loads
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'CompareAmbientOcclusion should render visible paired AO samples')
+})
+
+test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-color comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_BASE_COLOR, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_texture_transform'])
+  assert.equal(source.buffers[0].uri, 'CompareBasecolor.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Basecolor_img0.png',
+    'Compare_Basecolor_img1.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.emissiveTexture?.index ?? null,
+  ]), [
+    ['baseColor plain dielectric', null, 0],
+    ['baseColor texture dielectric', 1, 0],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_BASE_COLOR)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Sphere001', 'Sphere002', 'Sphere003'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), [
+    'baseColor plain dielectric',
+    'baseColor texture dielectric',
+    'baseColor texture dielectric',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [9216, 9216, 9216])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [9216, 9216, 9216])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('color')?.count ?? null), [null, null, 9216])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [9216, 9216, 9216])
+
+  const [plain, textured, vertexColored] = meshes
+  assert.equal(plain.material.vertexColors, false)
+  assert.equal(textured.material.vertexColors, false)
+  assert.equal(vertexColored.material.vertexColors, true)
+  assertVectorClose(plain.material.color.toArray(), [
+    0.23882800340652466,
+    0.10615606606006622,
+    0.0477757565677166,
+  ], 'CompareBaseColor baseColorFactor')
+  assert.deepEqual(textured.material.color.toArray(), [1, 1, 1])
+  assert.deepEqual(vertexColored.material.color.toArray(), [1, 1, 1])
+
+  for (const material of [plain.material, textured.material, vertexColored.material]) {
+    assert.equal(material.metalness, 0)
+    assert.equal(material.roughness, 0.25)
+    assert.equal(Buffer.isBuffer(material.emissiveMap?.image), true, `${material.name} emissive PNG should load as an encoded Buffer`)
+    assert.equal(material.emissiveMap.name, 'Compare_Basecolor_img0.png')
+    assert.deepEqual(pngDimensions(material.emissiveMap.image), [2048, 1024])
+    assert.equal(material.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.emissiveMap.flipY, false)
+    assertVectorClose(material.emissiveMap.offset.toArray(), [0.324, 0.137], `${material.name} emissive texture offset`)
+    assertVectorClose(material.emissiveMap.repeat.toArray(), [0.349, 0.725], `${material.name} emissive texture scale`)
+  }
+
+  for (const material of [textured.material, vertexColored.material]) {
+    assert.equal(Buffer.isBuffer(material.map?.image), true, `${material.name} base-color PNG should load as an encoded Buffer`)
+    assert.equal(material.map.name, 'Compare_Basecolor_img1.png')
+    assert.deepEqual(pngDimensions(material.map.image), [512, 512])
+    assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+    assert.equal(material.map.flipY, false)
+    assertVectorClose(material.map.offset.toArray(), [0.25, 0.25], `${material.name} base-color texture offset`)
+    assertVectorClose(material.map.repeat.toArray(), [0.5, 0.5], `${material.name} base-color texture scale`)
+  }
+  assert.equal(plain.material.map ?? null, null)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -5, 2))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'CompareBaseColor should render visible base-color comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture maps', async () => {
