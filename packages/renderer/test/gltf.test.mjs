@@ -30,6 +30,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
+const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
@@ -711,6 +712,48 @@ test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and 
   assert.ok(points.r > 60 && points.g > 60 && points.b > 60, `POINTS primitive should render visible pixels (${points.r}, ${points.g}, ${points.b})`)
   assert.ok(lineLoop.r > 40 && lineLoop.g > 40 && lineLoop.b > 40, `LINE_LOOP primitive should render visible pixels (${lineLoop.r}, ${lineLoop.g}, ${lineLoop.b})`)
   assert.ok(triangleFan.r > 120 && triangleFan.g > 120 && triangleFan.b > 120, `TRIANGLE_FAN primitive should render visible pixels (${triangleFan.r}, ${triangleFan.g}, ${triangleFan.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MultipleScenes fixture preserves default and alternate scenes', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MULTIPLE_SCENES)
+  assert.equal(gltf.scenes.length, 2)
+  assert.equal(gltf.scene, gltf.scenes[1], 'MultipleScenes should select glTF scene index 1 as the default scene')
+
+  const triangleMesh = findFirst(gltf.scenes[0], (object) => object.isMesh === true)
+  const squareMesh = findFirst(gltf.scenes[1], (object) => object.isMesh === true)
+  assert.ok(triangleMesh, 'MultipleScenes first scene should load a triangle mesh')
+  assert.ok(squareMesh, 'MultipleScenes default scene should load a square mesh')
+  assert.equal(triangleMesh.geometry.getAttribute('position')?.count, 3)
+  assert.equal(triangleMesh.geometry.index?.count, 3)
+  assert.equal(squareMesh.geometry.getAttribute('position')?.count, 4)
+  assert.equal(squareMesh.geometry.index?.count, 6)
+
+  triangleMesh.material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  squareMesh.material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+
+  const camera = new THREE.OrthographicCamera(-0.6, 0.6, 0.6, -0.6, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  const renderer = new Renderer()
+  const renderScene = (scene) => {
+    scene.position.set(-0.5, -0.5, 0)
+    scene.updateMatrixWorld(true)
+    return renderer.render(scene, camera, {
+      width: 96,
+      height: 96,
+      format: 'rgba',
+      background: [0, 0, 0],
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const triangleRatio = nonBackgroundRatio(renderScene(gltf.scenes[0]), [0, 0, 0], 3)
+  const squareRatio = nonBackgroundRatio(renderScene(gltf.scene), [0, 0, 0], 3)
+  assert.ok(triangleRatio > 0.25, `alternate triangle scene should render visible pixels (${triangleRatio})`)
+  assert.ok(squareRatio > 0.6, `default square scene should render visible pixels (${squareRatio})`)
+  assert.ok(squareRatio > triangleRatio + 0.25, `default square scene should cover more pixels than alternate triangle scene (${squareRatio} vs ${triangleRatio})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
