@@ -56,6 +56,7 @@ const SAMPLE_ASSET_COMPARE_IOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'C
 const SAMPLE_ASSET_COMPARE_METALLIC = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareMetallic', 'glTF', 'CompareMetallic.gltf')
 const SAMPLE_ASSET_COMPARE_NORMAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareNormal', 'glTF', 'CompareNormal.gltf')
 const SAMPLE_ASSET_COMPARE_ROUGHNESS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareRoughness', 'glTF', 'CompareRoughness.gltf')
+const SAMPLE_ASSET_COMPARE_SHEEN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareSheen', 'glTF', 'CompareSheen.gltf')
 const SAMPLE_ASSET_COMPARE_SPECULAR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareSpecular', 'glTF', 'CompareSpecular.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
@@ -894,6 +895,94 @@ test('committed Khronos glTF Sample Assets CompareRoughness fixture loads roughn
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.045, 'CompareRoughness should render visible roughness comparison spheres')
+})
+
+test('committed Khronos glTF Sample Assets CompareSheen fixture loads sheen comparison variants', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_SHEEN, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_sheen'])
+  assert.equal(source.buffers[0].uri, 'CompareSheen.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Compare_Sheen_img0.jpg',
+    'Compare_Sheen_img1.jpg',
+    'Compare_Sheen_img2.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => [
+    material.name,
+    material.normalTexture?.index ?? null,
+    material.normalTexture?.scale ?? null,
+    material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+    material.extensions?.KHR_materials_sheen?.sheenColorFactor ?? null,
+    material.extensions?.KHR_materials_sheen?.sheenRoughnessFactor ?? null,
+  ]), [
+    ['glTF Logo', 1, 0.5, 2, null, null],
+    ['glTF Logo Sheen', 1, 0.5, 0, [1, 0, 0], 0.3],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMPARE_SHEEN)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['GeoSphere001', 'GeoSphere002'])
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name), ['glTF Logo', 'glTF Logo Sheen'])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [673, 673])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [3840, 3840])
+
+  const [baseline, sheen] = meshes.map((mesh) => mesh.material)
+  assert.equal(baseline.isMeshStandardMaterial, true)
+  assert.equal(sheen.isMeshPhysicalMaterial, true)
+  assert.equal(baseline.metalness, 0)
+  assert.equal(sheen.metalness, 0)
+  assert.equal(baseline.roughness, 0.75)
+  assert.equal(sheen.roughness, 0.75)
+  assert.equal(sheen.sheen, 1)
+  assertVectorClose(sheen.sheenColor.toArray(), [1, 0, 0], 'CompareSheen sheenColorFactor')
+  assert.equal(sheen.sheenRoughness, 0.3)
+  assert.equal(baseline.sheenColorMap ?? null, null)
+  assert.equal(sheen.sheenColorMap ?? null, null)
+  assert.equal(sheen.sheenRoughnessMap ?? null, null)
+
+  assert.notEqual(baseline.map, sheen.map, 'sheen comparison materials intentionally use different base-color textures')
+  assert.equal(Buffer.isBuffer(baseline.map?.image), true, 'baseline base-color JPEG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(sheen.map?.image), true, 'sheen base-color JPEG should load as an encoded Buffer')
+  assert.equal(baseline.map.name, 'Compare_Sheen_img2.jpg')
+  assert.equal(sheen.map.name, 'Compare_Sheen_img0.jpg')
+  assert.equal(baseline.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(sheen.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(baseline.map.flipY, false)
+  assert.equal(sheen.map.flipY, false)
+
+  assert.equal(baseline.normalMap, sheen.normalMap, 'both sheen comparison materials should share the normal map')
+  assert.equal(Buffer.isBuffer(baseline.normalMap?.image), true, 'shared normal JPEG should load as an encoded Buffer')
+  assert.equal(baseline.normalMap.name, 'Compare_Sheen_img1.jpg')
+  assert.equal(baseline.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(baseline.normalMap.flipY, false)
+  assertVectorClose(baseline.normalScale.toArray(), [0.5, -0.5], 'CompareSheen baseline normal scale')
+  assertVectorClose(sheen.normalScale.toArray(), [0.5, -0.5], 'CompareSheen sheen normal scale')
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  const light = new THREE.DirectionalLight(0xffffff, 4)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = new THREE.PerspectiveCamera(35, 1.5, 0.01, 20)
+  camera.position.copy(center).add(new THREE.Vector3(0, -2.7, 1.4))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.SRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'CompareSheen should render visible sheen comparison spheres')
 })
 
 test('committed Khronos glTF Sample Assets CompareSpecular fixture loads specular extension comparison variants', async () => {
