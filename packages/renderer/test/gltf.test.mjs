@@ -121,6 +121,7 @@ const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_TRANSMISSION_ORDER_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionOrderTest', 'glTF', 'TransmissionOrderTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionRoughnessTest', 'glTF', 'TransmissionRoughnessTest.gltf')
 const SAMPLE_ASSET_TRANSMISSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionTest', 'glTF', 'TransmissionTest.gltf')
+const SAMPLE_ASSET_TRANSMISSION_THINWALL_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TransmissionThinwallTestGrid', 'glTF', 'TransmissionThinwallTestGrid.gltf')
 const SAMPLE_ASSET_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Triangle', 'glTF', 'Triangle.gltf')
 const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TwoSidedPlane', 'glTF', 'TwoSidedPlane.gltf')
@@ -4605,6 +4606,137 @@ test('committed Khronos glTF Sample Assets TransmissionRoughnessTest fixture loa
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.55, 'TransmissionRoughnessTest should render visible roughness and IOR samples')
   const center = meanRegion(rgba, 160, 96, 64, 24, 96, 72)
   assert.ok(center.r > 110 && center.g > 110 && center.b > 110, `TransmissionRoughnessTest center samples should render visible panels (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TransmissionThinwallTestGrid fixture loads thin-wall and volume IOR grids', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TRANSMISSION_THINWALL_TEST_GRID, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_ior',
+  ])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 1174536, uri: 'TransmissionThinwallTestGrid.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), ['checker.png'])
+
+  const sourcePhysicalMaterials = source.materials.filter((material) => /^(ThinWall|Volume)_IOR/.test(material.name))
+  assert.deepEqual(sourcePhysicalMaterials.map((material) => [
+    material.name,
+    material.extensions?.KHR_materials_ior?.ior ?? null,
+    material.extensions?.KHR_materials_transmission?.transmissionFactor ?? null,
+    material.extensions?.KHR_materials_volume?.thicknessFactor ?? 0,
+  ]), [
+    ['ThinWall_IOR1.00', 1, 1, 0],
+    ['ThinWall_IOR1.33', 1.33, 1, 0],
+    ['ThinWall_IOR1.50', null, 1, 0],
+    ['ThinWall_IOR1.76', 1.75999, 1, 0],
+    ['ThinWall_IOR2.42', 2.42, 1, 0],
+    ['Volume_IOR2.42', 2.42, 1, 1],
+    ['Volume_IOR1.76', 1.75999, 1, 1],
+    ['Volume_IOR1.50', null, 1, 1],
+    ['Volume_IOR1.33', 1.33, 1, 1],
+    ['Volume_IOR1.00', 1, 1, 1],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TRANSMISSION_THINWALL_TEST_GRID)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'CheckerBackdrop',
+    'ThinWall_IOR100',
+    'ThinWall_IOR133',
+    'ThinWall_IOR150',
+    'ThinWall_IOR176',
+    'Volume_IOR100',
+    'Volume_IOR133',
+    'Volume_IOR150',
+    'Volume_IOR176',
+    'TextBackdrop',
+    'TextXaxis',
+    'TextYaxis',
+    'ThinWall_IOR242',
+    'Volume_IOR242',
+  ])
+
+  const byName = new Map(meshes.map((mesh) => [mesh.name, mesh]))
+  const sampleNames = [
+    'ThinWall_IOR100',
+    'ThinWall_IOR133',
+    'ThinWall_IOR150',
+    'ThinWall_IOR176',
+    'Volume_IOR100',
+    'Volume_IOR133',
+    'Volume_IOR150',
+    'Volume_IOR176',
+    'ThinWall_IOR242',
+    'Volume_IOR242',
+  ]
+  const samples = sampleNames.map((name) => byName.get(name))
+  assert.ok(samples.every(Boolean), 'TransmissionThinwallTestGrid should load all thin-wall and volume samples')
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.getAttribute('position')?.count), Array(10).fill(3840))
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.getAttribute('normal')?.count), Array(10).fill(3840))
+  assert.deepEqual(samples.map((mesh) => mesh.geometry.index?.count), Array(10).fill(3840))
+
+  const sampleMaterials = samples.map((mesh) => mesh.material)
+  assert.ok(sampleMaterials.every((material) => material.isMeshPhysicalMaterial === true), 'all grid samples should load as MeshPhysicalMaterial')
+  assert.deepEqual(sampleMaterials.map((material) => material.name), [
+    'ThinWall_IOR1.00',
+    'ThinWall_IOR1.33',
+    'ThinWall_IOR1.50',
+    'ThinWall_IOR1.76',
+    'Volume_IOR1.00',
+    'Volume_IOR1.33',
+    'Volume_IOR1.50',
+    'Volume_IOR1.76',
+    'ThinWall_IOR2.42',
+    'Volume_IOR2.42',
+  ])
+  assert.deepEqual(sampleMaterials.map((material) => material.ior), [1, 1.33, 1.5, 1.75999, 1, 1.33, 1.5, 1.75999, 2.42, 2.42])
+  assert.deepEqual(sampleMaterials.map((material) => material.transmission), Array(10).fill(1))
+  assert.deepEqual(sampleMaterials.map((material) => material.thickness), [0, 0, 0, 0, 1, 1, 1, 1, 0, 1])
+  assert.ok(sampleMaterials.every((material) => material.roughness === 0))
+  assert.ok(sampleMaterials.every((material) => material.metalness === 0))
+
+  const checker = byName.get('CheckerBackdrop')
+  assert.equal(checker.geometry.getAttribute('position')?.count, 6)
+  assert.equal(checker.geometry.getAttribute('uv')?.count, 6)
+  assert.equal(checker.geometry.index?.count, 6)
+  assert.equal(checker.material.name, 'Backdrop')
+  assert.equal(Buffer.isBuffer(checker.material.map?.image), true, 'TransmissionThinwallTestGrid checker PNG should load as an encoded Buffer')
+  assert.equal(checker.material.map.name, 'checker.png')
+  assert.deepEqual(pngDimensions(checker.material.map.image), [256, 256])
+  assert.equal(checker.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(checker.material.map.flipY, false)
+  assert.equal(checker.material.map.wrapS, THREE.RepeatWrapping)
+  assert.equal(checker.material.map.wrapT, THREE.RepeatWrapping)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 1.6))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 2.2)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'TransmissionThinwallTestGrid should render visible thin-wall and volume samples')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 30 && mean.g > 30 && mean.b > 30, `TransmissionThinwallTestGrid should render lit grid pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_materials_sheen and variants metadata', async () => {
