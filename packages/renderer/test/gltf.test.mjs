@@ -35,6 +35,7 @@ const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_ANIMATED_TRIANGLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedTriangle', 'glTF', 'AnimatedTriangle.gltf')
 const SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AlphaBlendModeTest', 'glTF', 'AlphaBlendModeTest.gltf')
 const SAMPLE_ASSET_ANISOTROPY_DISC_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyDiscTest', 'glTF', 'AnisotropyDiscTest.gltf')
+const SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnisotropyRotationTest', 'glTF', 'AnisotropyRotationTest.gltf')
 const SAMPLE_ASSET_AVOCADO = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Avocado', 'glTF', 'Avocado.gltf')
 const SAMPLE_ASSET_BOOM_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoomBox', 'glTF', 'BoomBox.gltf')
 const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
@@ -1296,6 +1297,104 @@ test('committed Khronos glTF Sample Assets AnisotropyDiscTest fixture loads KHR_
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'AnisotropyDiscTest should render visible anisotropic material panels')
+})
+
+test('committed Khronos glTF Sample Assets AnisotropyRotationTest fixture loads anisotropy rotations and direction textures', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_anisotropy'])
+  assert.equal(source.buffers[0].uri, 'AnisoDonuts.bin')
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'GridWithMarkers.png',
+    'GridWithMarkers_30deg.png',
+    'AnisoRotation30_Linear.png',
+    'AnisoRotation10_Linear.png',
+    'Heights_1d_Normals_v2.png',
+    'AnisoDonutLabels.png',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_anisotropy'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Band_1L',
+    'Band_2L',
+    'Band_4L',
+    'Band_5L',
+    'Band_1R',
+    'Band_2R',
+    'Band_4R',
+    'Band_5R',
+    'Band_3L',
+    'Band_3R',
+    'Labels',
+  ])
+  assert.ok(meshes.slice(0, 10).every((mesh) => mesh.geometry.getAttribute('position')?.count === 715))
+  assert.ok(meshes.slice(0, 10).every((mesh) => mesh.geometry.getAttribute('normal')?.count === 715))
+  assert.ok(meshes.slice(0, 10).every((mesh) => mesh.geometry.getAttribute('tangent')?.count === 715))
+  assert.ok(meshes.slice(0, 10).every((mesh) => mesh.geometry.index?.count === 3840))
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const base = materials.get('Aniso Tangents')
+  const rotated = materials.get('Aniso Tan + Rotation')
+  const textured = materials.get('Aniso Tan + Texture')
+  const rotatedTextured = materials.get('Aniso Tan + Rotation + Texture')
+  const normalSimulation = materials.get('Simulation via normal')
+  assert.equal(base?.isMeshPhysicalMaterial, true)
+  assert.equal(rotated?.isMeshPhysicalMaterial, true)
+  assert.equal(textured?.isMeshPhysicalMaterial, true)
+  assert.equal(rotatedTextured?.isMeshPhysicalMaterial, true)
+  assert.equal(base.anisotropy, 0.5)
+  assert.equal(base.anisotropyRotation, 0)
+  assert.ok(Math.abs(rotated.anisotropyRotation - 0.523598775598) < 1e-12)
+  assert.ok(Math.abs(rotatedTextured.anisotropyRotation - 0.349065850398866) < 1e-12)
+
+  assert.equal(Buffer.isBuffer(base.map?.image), true, 'base anisotropy sample grid should load as an encoded Buffer')
+  assert.equal(base.map.name, 'GridWithMarkers')
+  assert.deepEqual(pngDimensions(base.map.image), [1024, 1024])
+  assert.equal(rotated.map.name, 'GridWithMarkers_30deg')
+  assert.deepEqual(pngDimensions(rotated.map.image), [1024, 1024])
+
+  assert.equal(Buffer.isBuffer(textured.anisotropyMap?.image), true, '30 degree anisotropy direction map should load as an encoded Buffer')
+  assert.equal(textured.anisotropyMap.name, 'AnisoRotation30_Linear')
+  assert.equal(textured.anisotropyMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(textured.anisotropyMap.image), [4, 4])
+  assert.equal(Buffer.isBuffer(rotatedTextured.anisotropyMap?.image), true, '10 degree anisotropy direction map should load as an encoded Buffer')
+  assert.equal(rotatedTextured.anisotropyMap.name, 'AnisoRotation10_Linear')
+  assert.equal(rotatedTextured.anisotropyMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(rotatedTextured.anisotropyMap.image), [4, 4])
+
+  assert.equal(normalSimulation?.isMeshStandardMaterial, true)
+  assert.equal(normalSimulation.normalMap.name, 'Heights_1d_Normals_v2')
+  assert.equal(normalSimulation.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(pngDimensions(normalSimulation.normalMap.image), [2048, 1])
+
+  const label = meshes.find((mesh) => mesh.name === 'Labels')
+  assert.equal(label?.material.map.name, 'AnisoDonutLabels')
+  assert.deepEqual(pngDimensions(label.material.map.image), [512, 512])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  const light = new THREE.DirectionalLight(0xffffff, 3)
+  light.position.set(0, 2, 8)
+  gltf.scene.add(light)
+  const camera = new THREE.OrthographicCamera(-2.8, 2.8, 2.7, -2.7, 0.01, 30)
+  camera.position.set(0, 0, 8)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.5, 'AnisotropyRotationTest should render visible rotated anisotropy bands')
 })
 
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
