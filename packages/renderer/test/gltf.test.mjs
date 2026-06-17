@@ -58,6 +58,7 @@ const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Camer
 const SAMPLE_ASSET_CARBON_FIBRE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CarbonFibre', 'glTF', 'CarbonFibre.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
 const SAMPLE_ASSET_CESIUM_MILK_TRUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMilkTruck', 'glTF', 'CesiumMilkTruck.gltf')
+const SAMPLE_ASSET_CHAIR_DAMASK_PURPLEGOLD = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ChairDamaskPurplegold', 'glTF', 'ChairDamaskPurplegold.gltf')
 const SAMPLE_ASSET_CLEARCOAT_CAR_PAINT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatCarPaint', 'glTF', 'ClearCoatCarPaint.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_CLEARCOAT_WICKER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearcoatWicker', 'glTF', 'ClearcoatWicker.gltf')
@@ -5117,6 +5118,200 @@ test('committed Khronos glTF Sample Assets CarbonFibre fixture loads real anisot
   assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.35, 'CarbonFibre should render visible dark anisotropic material against white background')
   const centerSample = meanRegion(rgba, 128, 128, 48, 48, 80, 80)
   assert.ok(centerSample.r < 20 && centerSample.g < 20 && centerSample.b < 20, `CarbonFibre center should render the near-black material (${centerSample.r}, ${centerSample.g}, ${centerSample.b})`)
+})
+
+test('committed Khronos glTF Sample Assets ChairDamaskPurplegold fixture loads transformed damask sheen and specular materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CHAIR_DAMASK_PURPLEGOLD, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_texture_transform', 'KHR_materials_sheen', 'KHR_materials_specular'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'ChairDamaskPurplegold.bin', byteLength: 310904 },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'chair_wood_normal.jpg',
+    'chair_occlusion.jpg',
+    'chair_wood_albedo.jpg',
+    'chair_wood_roughness0.jpg',
+    'chair_metal_roughness255.jpg',
+    'chair_damask_normal.jpg',
+    'chair_damask_basecolor.jpg',
+    'chair_damask_roughmetal.jpg',
+    'chair_label.jpg',
+  ])
+  assert.deepEqual(source.textures.map((texture) => [texture.name, texture.source]), [
+    ['chair_wood_normal.jpg', 0],
+    ['chair_occlusion.jpg', 1],
+    ['chair_wood_albedo.jpg', 2],
+    ['chair_wood_roughness0.jpg', 3],
+    ['chair_metal_roughness255.jpg', 4],
+    ['damask_multicolor_normal.jpg', 5],
+    ['damask_multicolor_albedo.jpg', 6],
+    ['damask_multicolor_roughnessdamask_multicolor_metalness.jpg', 7],
+    ['chair_label.jpg', 8],
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), ['wood', 'metal', 'fabric', 'label'])
+  assert.deepEqual(source.materials[0].pbrMetallicRoughness.baseColorTexture.extensions?.KHR_texture_transform, {
+    rotation: 0.1,
+    scale: [3, 3],
+  })
+  assert.deepEqual(source.materials[2].normalTexture.extensions?.KHR_texture_transform, {
+    scale: [3, 3],
+  })
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_sheen: {
+      sheenColorFactor: [0.2, 0, 1],
+      sheenRoughnessFactor: 0.5,
+    },
+    KHR_materials_specular: {
+      specularColorFactor: [1, 0.25, 2],
+      specularFactor: 1,
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CHAIR_DAMASK_PURPLEGOLD)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_texture_transform'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_sheen'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_specular'))
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 11)
+
+  const expectedMeshes = [
+    ['oval-tufted-chair_legs-frame', 912, 4320, 'wood'],
+    ['oval-tufted-chair_legs-hardware', 792, 2880, 'metal'],
+    ['oval-tufted-chair_back-panel', 371, 1680, 'wood'],
+    ['oval-tufted-chair_back-fabric', 893, 4512, 'fabric'],
+    ['oval-tufted-chair_back-buttons', 66, 240, 'fabric'],
+    ['oval-tufted-chair_back-welt', 441, 2304, 'fabric'],
+    ['oval-tufted-chair_seat-panel', 257, 1344, 'wood'],
+    ['oval-tufted-chair_seat-label', 25, 96, 'label'],
+    ['oval-tufted-chair_seat-fabric', 1747, 9072, 'fabric'],
+    ['oval-tufted-chair_seat-buttons', 330, 1200, 'fabric'],
+    ['oval-tufted-chair_seat-welt', 441, 2304, 'fabric'],
+  ]
+  for (const [name, vertexCount, indexCount, materialName] of expectedMeshes) {
+    const mesh = meshes.find((candidate) => candidate.name === name)
+    assert.ok(mesh, `${name} should load`)
+    assert.equal(mesh.geometry.getAttribute('position')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('normal')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('uv')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('uv1')?.count, vertexCount)
+    assert.equal(mesh.geometry.index?.count, indexCount)
+    assert.equal(mesh.material.name, materialName)
+  }
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const wood = materials.get('wood')
+  assert.equal(wood?.isMeshStandardMaterial, true)
+  assert.deepEqual(wood.color.toArray(), [0.247, 0.109, 0.035])
+  assert.equal(wood.metalness, 0)
+  assert.equal(wood.roughness, 1)
+  assert.equal(wood.map.name, 'chair_wood_albedo.jpg')
+  assert.equal(wood.normalMap.name, 'chair_wood_normal.jpg')
+  assert.equal(wood.roughnessMap.name, 'chair_wood_roughness0.jpg')
+  assert.equal(wood.metalnessMap.name, 'chair_wood_roughness0.jpg')
+  assert.equal(wood.aoMap.name, 'chair_occlusion.jpg')
+  assert.equal(wood.aoMap.channel, 1)
+  assert.equal(wood.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(wood.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(wood.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(wood.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(wood.map.repeat.toArray(), [3, 3])
+  assert.equal(wood.map.rotation, 0.1)
+  assert.deepEqual(wood.roughnessMap.repeat.toArray(), [3, 3])
+  assert.deepEqual(wood.metalnessMap.repeat.toArray(), [3, 3])
+
+  const fabric = materials.get('fabric')
+  assert.equal(fabric?.isMeshPhysicalMaterial, true)
+  assert.equal(fabric.metalness, 1)
+  assert.equal(fabric.roughness, 1)
+  assert.equal(fabric.sheen, 1)
+  assert.deepEqual(fabric.sheenColor.toArray(), [0.2, 0, 1])
+  assert.equal(fabric.sheenRoughness, 0.5)
+  assert.equal(fabric.specularIntensity, 1)
+  assert.deepEqual(fabric.specularColor.toArray(), [1, 0.25, 2])
+  assert.equal(fabric.map.name, 'damask_multicolor_albedo.jpg')
+  assert.equal(fabric.normalMap.name, 'damask_multicolor_normal.jpg')
+  assert.equal(fabric.roughnessMap.name, 'damask_multicolor_roughnessdamask_multicolor_metalness.jpg')
+  assert.equal(fabric.metalnessMap.name, 'damask_multicolor_roughnessdamask_multicolor_metalness.jpg')
+  assert.equal(fabric.aoMap.name, 'chair_occlusion.jpg')
+  assert.equal(fabric.aoMap.channel, 1)
+  assert.equal(fabric.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fabric.normalMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fabric.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fabric.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(fabric.map.repeat.toArray(), [3, 3])
+  assert.deepEqual(fabric.normalMap.repeat.toArray(), [3, 3])
+  assert.deepEqual(fabric.roughnessMap.repeat.toArray(), [3, 3])
+  assert.deepEqual(fabric.metalnessMap.repeat.toArray(), [3, 3])
+
+  const metal = materials.get('metal')
+  assert.equal(metal?.isMeshStandardMaterial, true)
+  assert.equal(metal.metalness, 1)
+  assert.equal(metal.roughness, 1)
+  assert.equal(metal.roughnessMap.name, 'chair_metal_roughness255.jpg')
+  assert.equal(metal.metalnessMap.name, 'chair_metal_roughness255.jpg')
+  assert.equal(metal.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(metal.metalnessMap.colorSpace, THREE.NoColorSpace)
+  assert.deepEqual(metal.roughnessMap.repeat.toArray(), [3, 3])
+  assert.deepEqual(metal.metalnessMap.repeat.toArray(), [3, 3])
+  assert.equal(metal.aoMap.name, 'chair_occlusion.jpg')
+  assert.equal(metal.aoMap.channel, 1)
+
+  const label = materials.get('label')
+  assert.equal(label?.isMeshStandardMaterial, true)
+  assert.equal(label.map.name, 'chair_label.jpg')
+  assert.equal(label.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(label.aoMap.channel, 1)
+
+  for (const texture of [
+    wood.map,
+    wood.normalMap,
+    wood.roughnessMap,
+    wood.metalnessMap,
+    wood.aoMap,
+    fabric.map,
+    fabric.normalMap,
+    fabric.roughnessMap,
+    fabric.metalnessMap,
+    metal.roughnessMap,
+    metal.metalnessMap,
+    label.map,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.equal(texture.flipY, false)
+    assert.equal(texture.wrapS, THREE.RepeatWrapping)
+    assert.equal(texture.wrapT, THREE.RepeatWrapping)
+    assert.equal(texture.magFilter, THREE.LinearFilter)
+    assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.25, Math.max(size.x, size.y, size.z) * 2.4))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 2.4)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'ChairDamaskPurplegold should render visible textured chair geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 1 && mean.b > 1, `ChairDamaskPurplegold should render lit damask and wood pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
