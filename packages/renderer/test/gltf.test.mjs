@@ -23,6 +23,7 @@ const MORPHED_TRIANGLE = path.join(FIXTURE_DIR, 'morphed-triangle.gltf')
 const SKINNED_QUAD = path.join(FIXTURE_DIR, 'skinned-quad.gltf')
 const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
+const SAMPLE_ASSET_BOX_ANIMATED = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxAnimated', 'glTF', 'BoxAnimated.gltf')
 const SAMPLE_ASSET_BOX = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Box', 'glTF', 'Box.gltf')
 const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BoxVertexColors', 'glTF', 'BoxVertexColors.gltf')
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
@@ -98,6 +99,46 @@ test('committed Khronos glTF Sample Assets Box fixture loads external buffer and
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'Khronos Box sample should render visible pixels')
   const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
   assert.ok(center.r > center.b + 150 && center.r > center.g + 180, `Khronos Box sample should render a red cube (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform animation', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_BOX_ANIMATED)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 2, 'Khronos BoxAnimated sample should load inner and outer meshes')
+  assert.deepEqual(meshes.map((mesh) => mesh.material.name).sort(), ['inner', 'outer'])
+  assert.equal(gltf.animations.length, 1)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
+  camera.position.set(1.7, 1.7, 4.4)
+  camera.lookAt(0, 0.8, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.2)
+  light.position.set(3, 4, 5)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const renderer = new Renderer()
+  const renderBounds = () => nonBackgroundBounds(renderer.render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+  }), 96, 96, [0, 0, 0], 3)
+
+  const base = renderBounds()
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(gltf.animations[0]).play()
+  mixer.setTime(1.25)
+  gltf.scene.updateMatrixWorld(true)
+  const animated = renderBounds()
+
+  assert.ok(base.height > 25, `BoxAnimated base pose should render visible box bounds (${base.height})`)
+  assert.ok(animated.height > base.height + 40, `BoxAnimated translation track should expand vertical bounds (${animated.height} vs ${base.height})`)
+  assert.ok(animated.minY < base.minY - 40, `BoxAnimated translation track should move the animated mesh upward (${animated.minY} vs ${base.minY})`)
 })
 
 test('committed Khronos glTF Sample Assets BoxVertexColors fixture renders COLOR_0 gradients', async () => {
