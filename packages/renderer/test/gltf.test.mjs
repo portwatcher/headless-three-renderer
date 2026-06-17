@@ -82,6 +82,7 @@ const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-asse
 const SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceDielectricSpheres', 'glTF', 'IridescenceDielectricSpheres.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceMetallicSpheres', 'glTF', 'IridescenceMetallicSpheres.gltf')
+const SAMPLE_ASSET_IRIDESCENCE_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceSuzanne', 'glTF', 'IridescenceSuzanne.gltf')
 const SAMPLE_ASSET_LANTERN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Lantern', 'glTF', 'Lantern.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
@@ -1305,6 +1306,110 @@ test('committed Khronos glTF Sample Assets iridescence sphere-grid fixtures load
 
     assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > fixture.minimumVisibleRatio, `${fixture.label} should render visible iridescence sphere-grid geometry`)
   }
+})
+
+test('committed Khronos glTF Sample Assets IridescenceSuzanne fixture loads iridescence thickness texture and punctual light', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_IRIDESCENCE_SUZANNE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_lights_punctual',
+    'KHR_materials_ior',
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_iridescence',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 129888, uri: 'IridescenceSuzanne.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), ['noise.png'])
+  assert.deepEqual(source.extensions.KHR_lights_punctual.lights, [
+    {
+      color: [1, 1, 1],
+      type: 'directional',
+      intensity: 2,
+    },
+  ])
+  assert.deepEqual(source.meshes.map((mesh) => mesh.name), ['Suzanne1', 'Suzanne2', 'Suzanne3'])
+  assert.deepEqual(source.nodes.map((node) => node.name), ['Suzanne1', 'Suzanne2', 'Suzanne3', 'Light'])
+  assert.deepEqual(source.nodes.map((node) => node.translation), [
+    [-3, 0, 0],
+    [0, 0, 0],
+    [3, 0, 0],
+    [5, 5, 5],
+  ])
+
+  const materials = source.materials
+  assert.equal(materials.length, 3)
+  assert.deepEqual(materials.map((material) => material.pbrMetallicRoughness?.metallicFactor), [0, 1, 0])
+  assert.deepEqual(materials.map((material) => material.extensions?.KHR_materials_iridescence?.iridescenceIor), [1.33, 1.33, 1.8])
+  assert.deepEqual(materials.map((material) => material.extensions?.KHR_materials_volume?.thicknessFactor), [2, 2, 2])
+  assert.deepEqual(materials.map((material) => material.extensions?.KHR_materials_transmission?.transmissionFactor), [0, 0, 1])
+  assert.deepEqual(materials[2].extensions.KHR_materials_iridescence.iridescenceThicknessTexture, { index: 0 })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_IRIDESCENCE_SUZANNE)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_lights_punctual'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_iridescence'))
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Suzanne1', 'Suzanne2', 'Suzanne3'])
+  assert.equal(lights.length, 1)
+  assert.equal(lights[0].isDirectionalLight, true)
+  assert.equal(lights[0].name, 'Light')
+  assert.deepEqual(lights[0].position.toArray(), [5, 5, 5])
+  assert.deepEqual(lights[0].color.toArray(), [1, 1, 1])
+  assert.equal(lights[0].intensity, 2)
+
+  assert.ok(meshes.every((mesh) => mesh.material.isMeshPhysicalMaterial === true), 'all IridescenceSuzanne meshes should use MeshPhysicalMaterial')
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [3321, 3321, 3321])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [3321, 3321, 3321])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [3321, 3321, 3321])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [11808, 11808, 11808])
+  assert.deepEqual(meshes.map((mesh) => mesh.position.toArray()), [
+    [-3, 0, 0],
+    [0, 0, 0],
+    [3, 0, 0],
+  ])
+
+  const [dielectric, metallic, textured] = meshes.map((mesh) => mesh.material)
+  assert.deepEqual([dielectric.metalness, metallic.metalness, textured.metalness], [0, 1, 0])
+  assert.deepEqual([dielectric.ior, metallic.ior, textured.ior], [2, 1.5, 1.5])
+  assert.deepEqual([dielectric.transmission, metallic.transmission, textured.transmission], [0, 0, 1])
+  assert.deepEqual([dielectric.thickness, metallic.thickness, textured.thickness], [2, 2, 2])
+  assert.deepEqual([dielectric.iridescence, metallic.iridescence, textured.iridescence], [1, 1, 1])
+  assert.deepEqual([dielectric.iridescenceIOR, metallic.iridescenceIOR, textured.iridescenceIOR], [1.33, 1.33, 1.8])
+  assert.deepEqual([dielectric.iridescenceThicknessRange, metallic.iridescenceThicknessRange, textured.iridescenceThicknessRange], [
+    [100, 400],
+    [100, 400],
+    [200, 600],
+  ])
+
+  assert.equal(dielectric.iridescenceThicknessMap ?? null, null)
+  assert.equal(metallic.iridescenceThicknessMap ?? null, null)
+  assert.equal(Buffer.isBuffer(textured.iridescenceThicknessMap?.image), true, 'IridescenceSuzanne noise PNG should load as an encoded Buffer')
+  assert.equal(textured.iridescenceThicknessMap.name, 'noise.png')
+  assert.deepEqual(pngDimensions(textured.iridescenceThicknessMap.image), [1024, 1024])
+  assert.equal(textured.iridescenceThicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(textured.iridescenceThicknessMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  const camera = new THREE.PerspectiveCamera(40, 1.6, 0.01, 50)
+  camera.position.copy(center).add(new THREE.Vector3(0, -7, 3))
+  camera.lookAt(center)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 160,
+    height: 100,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.08, 'IridescenceSuzanne should render visible iridescence Suzanne meshes')
 })
 
 test('committed Khronos glTF Sample Assets CompareMetallic fixture loads metallic texture comparison variants', async () => {
