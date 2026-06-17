@@ -81,6 +81,7 @@ const SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST = path.join(FIXTURE_DIR, 'gltf-sam
 const SAMPLE_ASSET_NORMAL_TANGENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NormalTangentTest', 'glTF', 'NormalTangentTest.gltf')
 const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'OrientationTest', 'glTF', 'OrientationTest.gltf')
 const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
+const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PrimitiveModeNormalsTest', 'glTF', 'PrimitiveModeNormalsTest.gltf')
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
@@ -4436,6 +4437,108 @@ test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and 
   assert.ok(points.r > 60 && points.g > 60 && points.b > 60, `POINTS primitive should render visible pixels (${points.r}, ${points.g}, ${points.b})`)
   assert.ok(lineLoop.r > 40 && lineLoop.g > 40 && lineLoop.b > 40, `LINE_LOOP primitive should render visible pixels (${lineLoop.r}, ${lineLoop.g}, ${lineLoop.b})`)
   assert.ok(triangleFan.r > 120 && triangleFan.g > 120 && triangleFan.b > 120, `TRIANGLE_FAN primitive should render visible pixels (${triangleFan.r}, ${triangleFan.g}, ${triangleFan.b})`)
+})
+
+test('committed Khronos glTF Sample Assets PrimitiveModeNormalsTest fixture loads primitive modes with normals and colors', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST, 'utf8'))
+  assert.deepEqual(source.buffers.map((buffer) => buffer.uri), [
+    'Points.bin',
+    'Lines.bin',
+    'Triangles.bin',
+    'Colors.bin',
+    'Plane.bin',
+  ])
+  assert.deepEqual(source.buffers.map((buffer) => buffer.byteLength), [786432, 786432, 4380, 262144, 92])
+  assert.deepEqual(source.images.map((image) => image.uri), ['Labels.png'])
+  assert.equal(source.meshes.length, 25)
+  assert.deepEqual(source.meshes.slice(0, 6).map((mesh) => ({
+    mode: mesh.primitives[0].mode,
+    attributes: Object.keys(mesh.primitives[0].attributes),
+  })), [
+    { mode: 0, attributes: ['POSITION'] },
+    { mode: 3, attributes: ['POSITION'] },
+    { mode: 4, attributes: ['POSITION'] },
+    { mode: 0, attributes: ['POSITION', 'COLOR_0'] },
+    { mode: 3, attributes: ['POSITION', 'COLOR_0'] },
+    { mode: 4, attributes: ['POSITION', 'COLOR_0'] },
+  ])
+  assert.deepEqual(source.meshes.slice(12, 18).map((mesh) => Object.keys(mesh.primitives[0].attributes)), [
+    ['POSITION', 'NORMAL'],
+    ['POSITION', 'NORMAL'],
+    ['POSITION', 'NORMAL'],
+    ['POSITION', 'COLOR_0', 'NORMAL'],
+    ['POSITION', 'COLOR_0', 'NORMAL'],
+    ['POSITION', 'COLOR_0', 'NORMAL'],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST)
+  const renderables = []
+  gltf.scene.traverse((object) => {
+    if (
+      object.isMesh === true ||
+      object.isLine === true ||
+      object.isLineSegments === true ||
+      object.isLineLoop === true ||
+      object.isPoints === true
+    ) {
+      renderables.push(object)
+    }
+  })
+
+  assert.equal(renderables.length, 25)
+  assert.deepEqual(renderables.reduce((counts, object) => {
+    counts[object.type] = (counts[object.type] ?? 0) + 1
+    return counts
+  }, {}), { Points: 8, Line: 8, Mesh: 9 })
+
+  const points = renderables[0]
+  const coloredPoints = renderables[3]
+  const normalMesh = renderables[14]
+  const coloredNormalMesh = renderables[17]
+  const labelPlane = renderables[24]
+  assert.equal(points.geometry.getAttribute('position')?.count, 65536)
+  assert.equal(coloredPoints.geometry.getAttribute('color')?.count, 65536)
+  assert.equal(coloredPoints.geometry.getAttribute('color')?.itemSize, 4)
+  assert.equal(coloredPoints.geometry.getAttribute('color')?.normalized, true)
+  assert.equal(normalMesh.geometry.getAttribute('normal')?.count, 205)
+  assert.equal(coloredNormalMesh.geometry.getAttribute('normal')?.count, 205)
+  assert.equal(coloredNormalMesh.geometry.getAttribute('color')?.normalized, true)
+  assert.equal(labelPlane.material.map?.name, 'Labels.png')
+  assert.deepEqual(pngDimensions(labelPlane.material.map.image), [1024, 1024])
+  assert.equal(labelPlane.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(labelPlane.material.map.flipY, false)
+
+  for (const object of renderables) {
+    if (object.material?.color) object.material.color.set(0xffffff)
+    if (object.isPoints === true) object.material.size = 2.5
+    if (object.isLine === true || object.isLineSegments === true || object.isLineLoop === true) {
+      object.material.linewidth = 3
+    }
+  }
+
+  const camera = new THREE.OrthographicCamera(-7, 11, 8, -8, 0.01, 30)
+  camera.position.set(0, 0, 12)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  const light = new THREE.DirectionalLight(0xffffff, 1.2)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 180,
+    height: 180,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.45, 'PrimitiveModeNormalsTest should render visible primitive-mode grids')
+  const topLeft = meanRegion(rgba, 180, 180, 20, 20, 50, 50)
+  const center = meanRegion(rgba, 180, 180, 75, 75, 105, 105)
+  assert.ok(topLeft.r > 150 && topLeft.g > 150 && topLeft.b > 150, `upper primitive samples should render bright points/lines (${topLeft.r}, ${topLeft.g}, ${topLeft.b})`)
+  assert.ok(center.r > 50 && center.g > 45 && center.b < 20, `center primitive sample should include normalized color attributes (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets MorphPrimitivesTest fixture preserves morph targets across split primitives', async () => {
