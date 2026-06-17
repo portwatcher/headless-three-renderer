@@ -64,6 +64,7 @@ const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets',
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_ENCODING_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureEncodingTest', 'glTF', 'TextureEncodingTest.gltf')
+const SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureLinearInterpolationTest', 'glTF', 'TextureLinearInterpolationTest.gltf')
 const SAMPLE_ASSET_TEXTURE_SETTINGS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureSettingsTest', 'glTF', 'TextureSettingsTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformMultiTest', 'glTF', 'TextureTransformMultiTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
@@ -1454,6 +1455,67 @@ test('committed Khronos glTF Sample Assets TextureEncodingTest fixture preserves
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'TextureEncodingTest should render visible texture encoding panels')
   const mean = meanRgba(rgba)
   assert.ok(mean.g > mean.r + 8 && mean.g > mean.b + 8, `TextureEncodingTest render should preserve the green sample hue (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TextureLinearInterpolationTest fixture loads linear sampler filters', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST, 'utf8'))
+  assert.deepEqual(source.samplers, [{ minFilter: 9729, magFilter: 9729 }])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 3, 'TextureLinearInterpolationTest should load two spheres and one label plane')
+
+  const [solidSphere, texturedSphere, labels] = meshes
+  assert.equal(solidSphere.geometry.getAttribute('position')?.count, 205)
+  assert.equal(solidSphere.geometry.getAttribute('normal')?.count, 205)
+  assert.equal(solidSphere.geometry.getAttribute('uv'), undefined)
+  assert.equal(solidSphere.geometry.index?.count, 960)
+  assert.deepEqual(solidSphere.material.emissive.toArray(), [0, 0.5, 0])
+
+  assert.equal(texturedSphere.geometry.getAttribute('position')?.count, 205)
+  assert.equal(texturedSphere.geometry.getAttribute('normal')?.count, 205)
+  assert.equal(texturedSphere.geometry.getAttribute('uv')?.count, 205)
+  assert.equal(texturedSphere.geometry.index?.count, 960)
+  const texture = texturedSphere.material.emissiveMap
+  assert.equal(texture?.name, '0_0_0-0_255_0.png')
+  assert.equal(Buffer.isBuffer(texture.image), true, 'TextureLinearInterpolationTest tiny PNG should load as an encoded Buffer')
+  assert.equal(texture.magFilter, THREE.LinearFilter)
+  assert.equal(texture.minFilter, THREE.LinearFilter)
+  assert.equal(texture.wrapS, THREE.RepeatWrapping)
+  assert.equal(texture.wrapT, THREE.RepeatWrapping)
+  assert.equal(texture.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(texture.flipY, false)
+
+  assert.equal(labels.geometry.getAttribute('position')?.count, 4)
+  assert.equal(labels.geometry.getAttribute('uv')?.count, 4)
+  assert.equal(labels.geometry.index?.count, 6)
+  assert.equal(labels.material.alphaTest, 0.5)
+  assert.equal(labels.material.side, THREE.DoubleSide)
+  assert.equal(Buffer.isBuffer(labels.material.map?.image), true, 'TextureLinearInterpolationTest labels PNG should load as an encoded Buffer')
+
+  const camera = new THREE.OrthographicCamera(-3.6, 3.6, 1.8, -2.3, 0.01, 10)
+  camera.position.set(0, -0.35, 4)
+  camera.lookAt(0, -0.35, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'TextureLinearInterpolationTest should render visible green spheres')
+  const left = meanRegion(rgba, 144, 96, 28, 50, 58, 78)
+  const right = meanRegion(rgba, 144, 96, 86, 50, 116, 78)
+  assert.ok(left.g > left.r + 80 && left.g > left.b + 80, `solid green sphere should render visibly green (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.g > right.r + 50 && right.g > right.b + 50, `linear-sampled texture sphere should render visibly green (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed Khronos glTF Sample Assets NormalTangentTest fixture loads normal and ORM texture maps', async () => {
