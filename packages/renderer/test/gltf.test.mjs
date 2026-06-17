@@ -62,6 +62,7 @@ const SAMPLE_ASSET_CHAIR_DAMASK_PURPLEGOLD = path.join(FIXTURE_DIR, 'gltf-sample
 const SAMPLE_ASSET_CLEARCOAT_CAR_PAINT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatCarPaint', 'glTF', 'ClearCoatCarPaint.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_CLEARCOAT_WICKER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearcoatWicker', 'glTF', 'ClearcoatWicker.gltf')
+const SAMPLE_ASSET_COMMERCIAL_REFRIGERATOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CommercialRefrigerator', 'glTF', 'CommercialRefrigerator.gltf')
 const SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAlphaCoverage', 'glTF', 'CompareAlphaCoverage.gltf')
 const SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAmbientOcclusion', 'glTF', 'CompareAmbientOcclusion.gltf')
 const SAMPLE_ASSET_COMPARE_ANISOTROPY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareAnisotropy', 'glTF', 'CompareAnisotropy.gltf')
@@ -5315,6 +5316,194 @@ test('committed Khronos glTF Sample Assets ChairDamaskPurplegold fixture loads t
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.1, 'ChairDamaskPurplegold should render visible textured chair geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 1 && mean.b > 1, `ChairDamaskPurplegold should render lit damask and wood pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets CommercialRefrigerator fixture loads required transmission glass and door animation', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_COMMERCIAL_REFRIGERATOR, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_materials_transmission'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_clearcoat', 'KHR_materials_transmission'])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 8029440, uri: 'CommercialRefrigerator.data.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'ChampagneLabel_Color.jpg',
+    'Glass_Normal.jpg',
+    'ChampagneLabel_RM.jpg',
+    'ChampagneFoil_Normal.jpg',
+    'Case_ORM.jpg',
+    'Glass_RM.jpg',
+    'Interior_Color.jpg',
+    'Interior_Emissive.jpg',
+    'Interior_ORM.jpg',
+    'Case_Color.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'FridgeCase',
+    'FridgeInterior',
+    'FridgeGlass',
+    'ChampagneGlass',
+    'ChampagneFoil',
+    'ChampagneLabel',
+  ])
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_clearcoat: {
+      clearcoatFactor: 1,
+      clearcoatRoughnessFactor: 0,
+    },
+    KHR_materials_transmission: {
+      transmissionFactor: 1,
+    },
+  })
+  assert.deepEqual(source.animations.map((animation) => animation.channels.map((channel) => channel.target)), [
+    [{ node: 1, path: 'rotation' }],
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_COMMERCIAL_REFRIGERATOR)
+  assert.deepEqual(gltf.parser?.json?.extensionsRequired, ['KHR_materials_transmission'])
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].name, 'animation_0')
+  assert.ok(Math.abs(gltf.animations[0].duration - 4.666666507720947) < 1e-6)
+  assert.deepEqual(gltf.animations[0].tracks.map((track) => track.name), ['FridgeDoor.quaternion'])
+
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 8)
+
+  const expectedMeshes = [
+    ['FridgeCase', 720, 1488, 'FridgeCase', false],
+    ['FridgeDoor', 582, 1164, 'FridgeCase', false],
+    ['FridgeDoorInner', 42, 84, 'FridgeInterior', false],
+    ['FridgeGlass', 4, 6, 'FridgeGlass', false],
+    ['FridgeInterior', 2612, 6783, 'FridgeInterior', false],
+    ['ChampagneBottles_1', 58216, 322848, 'ChampagneGlass', true],
+    ['ChampagneBottles_2', 51224, 279072, 'ChampagneFoil', true],
+    ['ChampagneBottles_3', 3420, 14592, 'ChampagneLabel', true],
+  ]
+  for (const [name, vertexCount, indexCount, materialName, hasTangents] of expectedMeshes) {
+    const mesh = meshes.find((candidate) => candidate.name === name)
+    assert.ok(mesh, `${name} should load`)
+    assert.equal(mesh.geometry.getAttribute('position')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('normal')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('uv')?.count, vertexCount)
+    assert.equal(mesh.geometry.getAttribute('tangent')?.count, hasTangents ? vertexCount : undefined)
+    assert.equal(mesh.geometry.index?.count, indexCount)
+    assert.equal(mesh.material.name, materialName)
+  }
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const fridgeCase = materials.get('FridgeCase')
+  assert.equal(fridgeCase?.isMeshStandardMaterial, true)
+  assert.equal(fridgeCase.metalness, 1)
+  assert.equal(fridgeCase.roughness, 1)
+  assert.equal(fridgeCase.map.name, 'Case_Color.jpg')
+  assert.equal(fridgeCase.aoMap.name, 'Case_ORM.jpg')
+  assert.equal(fridgeCase.roughnessMap.name, 'Case_ORM.jpg')
+  assert.equal(fridgeCase.metalnessMap.name, 'Case_ORM.jpg')
+  assert.equal(fridgeCase.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fridgeCase.aoMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fridgeCase.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fridgeCase.aoMap.channel, 0)
+
+  const fridgeInterior = materials.get('FridgeInterior')
+  assert.equal(fridgeInterior?.isMeshStandardMaterial, true)
+  assert.equal(fridgeInterior.roughness, 0.75)
+  assert.deepEqual(fridgeInterior.emissive.toArray(), [1, 1, 1])
+  assert.equal(fridgeInterior.map.name, 'Interior_Color.jpg')
+  assert.equal(fridgeInterior.emissiveMap.name, 'Interior_Emissive.jpg')
+  assert.equal(fridgeInterior.aoMap.name, 'Interior_ORM.jpg')
+  assert.equal(fridgeInterior.roughnessMap.name, 'Interior_ORM.jpg')
+  assert.equal(fridgeInterior.metalnessMap.name, 'Interior_ORM.jpg')
+  assert.equal(fridgeInterior.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fridgeInterior.emissiveMap.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fridgeInterior.roughnessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(fridgeInterior.aoMap.channel, 0)
+
+  const fridgeGlass = materials.get('FridgeGlass')
+  assert.equal(fridgeGlass?.isMeshPhysicalMaterial, true)
+  assert.equal(fridgeGlass.metalness, 0)
+  assert.equal(fridgeGlass.roughness, 0.75)
+  assert.equal(fridgeGlass.clearcoat, 1)
+  assert.equal(fridgeGlass.clearcoatRoughness, 0)
+  assert.equal(fridgeGlass.transmission, 1)
+  assert.equal(fridgeGlass.roughnessMap.name, 'Glass_RM.jpg')
+  assert.equal(fridgeGlass.metalnessMap.name, 'Glass_RM.jpg')
+  assert.equal(fridgeGlass.roughnessMap.colorSpace, THREE.NoColorSpace)
+
+  const champagneGlass = materials.get('ChampagneGlass')
+  assert.equal(champagneGlass?.isMeshStandardMaterial, true)
+  assert.deepEqual(champagneGlass.color.toArray(), [
+    0.01568627543747425,
+    0.0313725508749485,
+    0.01568627543747425,
+  ])
+  assert.equal(champagneGlass.roughness, 0.5)
+  assert.equal(champagneGlass.normalMap.name, 'Glass_Normal.jpg')
+  assert.deepEqual(champagneGlass.normalScale.toArray(), [0.3, 0.3])
+  assert.equal(champagneGlass.roughnessMap.name, 'Glass_RM.jpg')
+
+  const champagneFoil = materials.get('ChampagneFoil')
+  assert.equal(champagneFoil?.isMeshStandardMaterial, true)
+  assert.deepEqual(champagneFoil.color.toArray(), [
+    0.8666666746139526,
+    0.6705882549285889,
+    0.4156862795352936,
+  ])
+  assert.equal(champagneFoil.metalness, 1)
+  assert.equal(champagneFoil.roughness, 0.4)
+  assert.equal(champagneFoil.normalMap.name, 'ChampagneFoil_Normal.jpg')
+
+  const champagneLabel = materials.get('ChampagneLabel')
+  assert.equal(champagneLabel?.isMeshStandardMaterial, true)
+  assert.equal(champagneLabel.map.name, 'ChampagneLabel_Color.jpg')
+  assert.equal(champagneLabel.normalMap.name, 'Glass_Normal.jpg')
+  assert.deepEqual(champagneLabel.normalScale.toArray(), [0.2, 0.2])
+  assert.equal(champagneLabel.roughnessMap.name, 'ChampagneLabel_RM.jpg')
+  assert.equal(champagneLabel.map.colorSpace, THREE.SRGBColorSpace)
+
+  for (const texture of [
+    fridgeCase.map,
+    fridgeCase.aoMap,
+    fridgeInterior.map,
+    fridgeInterior.emissiveMap,
+    fridgeInterior.aoMap,
+    fridgeGlass.roughnessMap,
+    champagneGlass.normalMap,
+    champagneGlass.roughnessMap,
+    champagneFoil.normalMap,
+    champagneLabel.map,
+    champagneLabel.normalMap,
+    champagneLabel.roughnessMap,
+  ]) {
+    assert.equal(Buffer.isBuffer(texture.image), true, `${texture.name} should load as an encoded Buffer`)
+    assert.equal(texture.flipY, false)
+  }
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 80)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  const light = new THREE.DirectionalLight(0xffffff, 2.8)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 144,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'CommercialRefrigerator should render visible refrigerator and bottle geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 8 && mean.g > 8 && mean.b > 8, `CommercialRefrigerator should render lit refrigerator pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
