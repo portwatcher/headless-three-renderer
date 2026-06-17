@@ -27,9 +27,13 @@ function addLights(scene) {
 
 let sharedRenderer
 
-function renderRgba(scene, camera, options = {}) {
+function getRenderer() {
   sharedRenderer ??= new Renderer()
-  return sharedRenderer.render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
+  return sharedRenderer
+}
+
+function renderRgba(scene, camera, options = {}) {
+  return getRenderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
 }
 
 function makeEnvironmentTexture() {
@@ -275,7 +279,7 @@ test('unsupported output format values fail clearly', () => {
   const camera = makeCamera()
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'webp' }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, format: 'webp' }),
     /options\.format webp is not supported.*png.*rgba/i,
   )
   assert.throws(
@@ -294,7 +298,7 @@ test('invalid render options containers fail clearly', () => {
     /options must be an options object/i,
   )
   assert.throws(
-    () => new Renderer().render(scene, camera, 'bad'),
+    () => getRenderer().render(scene, camera, 'bad'),
     /options must be an options object/i,
   )
   assert.throws(
@@ -302,7 +306,7 @@ test('invalid render options containers fail clearly', () => {
     /options must be an options object/i,
   )
   assert.throws(
-    () => new Renderer().renderToTarget(scene, camera, {}, []),
+    () => getRenderer().renderToTarget(scene, camera, {}, []),
     /options must be an options object/i,
   )
 })
@@ -316,7 +320,7 @@ test('invalid render scene and camera containers fail clearly', () => {
     /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
   )
   assert.throws(
-    () => new Renderer().render([], camera, { width: 32, height: 32, format: 'rgba' }),
+    () => getRenderer().render([], camera, { width: 32, height: 32, format: 'rgba' }),
     /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
   )
   assert.throws(
@@ -324,7 +328,7 @@ test('invalid render scene and camera containers fail clearly', () => {
     /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
   )
   assert.throws(
-    () => new Renderer().render(scene, { cameras: [] }, { width: 32, height: 32, format: 'rgba' }),
+    () => getRenderer().render(scene, { cameras: [] }, { width: 32, height: 32, format: 'rgba' }),
     /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
   )
   assert.throws(
@@ -332,7 +336,7 @@ test('invalid render scene and camera containers fail clearly', () => {
     /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
   )
   assert.throws(
-    () => new Renderer().renderToTarget(scene, [], {}, { width: 32, height: 32 }),
+    () => getRenderer().renderToTarget(scene, [], {}, { width: 32, height: 32 }),
     /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
   )
 })
@@ -348,7 +352,7 @@ test('invalid transform matrix values fail clearly', () => {
   scene.add(mesh)
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
     /mesh\.matrixWorld\.elements\[12\] must be a finite number/i,
   )
 })
@@ -366,7 +370,7 @@ test('invalid geometry attribute values fail clearly', () => {
   scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff })))
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
     /geometry\.attributes\.position\[1\]\.x must be a finite number/i,
   )
 })
@@ -588,7 +592,7 @@ test('malformed BatchedMesh inputs fail clearly', () => {
 
   const { scene } = makeBatchedScene()
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
     /THREE\.BatchedMesh instance table is not readable.*ordinary Mesh or InstancedMesh/i,
   )
 
@@ -626,7 +630,7 @@ test('malformed BatchedMesh inputs fail clearly', () => {
     const { scene, mesh } = makeBatchedScene()
     setup(mesh)
     assert.throws(
-      () => new Renderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+      () => getRenderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
       pattern,
       `${name} should fail clearly`,
     )
@@ -1196,11 +1200,11 @@ test('invalid output dimensions fail clearly', () => {
   const camera = makeCamera()
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: '64', height: 32 }),
+    () => getRenderer().render(scene, camera, { width: '64', height: 32 }),
     /options\.width must be a finite number/i,
   )
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 0 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 0 }),
     /options\.height must be a positive integer/i,
   )
   assert.throws(
@@ -1211,28 +1215,28 @@ test('invalid output dimensions fail clearly', () => {
   const userDataCamera = makeCamera()
   userDataCamera.userData.width = 32.5
   assert.throws(
-    () => new Renderer().render(scene, userDataCamera, { format: 'rgba' }),
+    () => getRenderer().render(scene, userDataCamera, { format: 'rgba' }),
     /camera\.userData\.width must be a positive integer/i,
   )
 
   const userDataContainerCamera = makeCamera()
   userDataContainerCamera.userData = 'size'
   assert.throws(
-    () => new Renderer().render(scene, userDataContainerCamera, { format: 'rgba' }),
+    () => getRenderer().render(scene, userDataContainerCamera, { format: 'rgba' }),
     /camera\.userData must be an object/i,
   )
 
   const invalidAspectCamera = makeCamera()
   invalidAspectCamera.aspect = Number.NaN
   assert.throws(
-    () => new Renderer().render(scene, invalidAspectCamera, { width: 32, format: 'rgba' }),
+    () => getRenderer().render(scene, invalidAspectCamera, { width: 32, format: 'rgba' }),
     /camera\.aspect must be a finite number/i,
   )
 
   const zeroAspectCamera = makeCamera()
   zeroAspectCamera.aspect = 0
   assert.throws(
-    () => new Renderer().render(scene, zeroAspectCamera, { height: 32, format: 'rgba' }),
+    () => getRenderer().render(scene, zeroAspectCamera, { height: 32, format: 'rgba' }),
     /camera\.aspect must be positive/i,
   )
 })
@@ -1244,33 +1248,33 @@ test('invalid camera clipping distances fail clearly', () => {
   camera.near = Number.NaN
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.near must be a finite number/i,
   )
 
   camera.near = 0
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.near must be positive/i,
   )
 
   camera.near = 0.01
   camera.far = 'deep'
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.far must be a finite number/i,
   )
 
   camera.far = -1
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.far must be positive/i,
   )
 
   camera.near = 10
   camera.far = 1
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.far must be greater than camera\.near/i,
   )
 
@@ -1278,28 +1282,28 @@ test('invalid camera clipping distances fail clearly', () => {
   camera.far = 100
   camera.projectionMatrix.elements[0] = Number.NaN
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32 }),
     /camera\.projectionMatrix\.elements\[0\] must be a finite number/i,
   )
 
   const missingMatrixCamera = makeCamera()
   missingMatrixCamera.projectionMatrix = null
   assert.throws(
-    () => new Renderer().render(scene, missingMatrixCamera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, missingMatrixCamera, { width: 32, height: 32 }),
     /THREE\.Camera must have projectionMatrix and matrixWorldInverse/i,
   )
 
   const projectionContainerCamera = makeCamera()
   projectionContainerCamera.projectionMatrix = { elements: [1, 2, 3] }
   assert.throws(
-    () => new Renderer().render(scene, projectionContainerCamera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, projectionContainerCamera, { width: 32, height: 32 }),
     /camera\.projectionMatrix must be a THREE\.Matrix4/i,
   )
 
   const viewMatrixCamera = makeCamera()
   viewMatrixCamera.matrixWorldInverse.elements[4] = Number.NaN
   assert.throws(
-    () => new Renderer().render(scene, viewMatrixCamera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, viewMatrixCamera, { width: 32, height: 32 }),
     /camera\.matrixWorldInverse\.elements\[4\] must be a finite number/i,
   )
 
@@ -1307,7 +1311,7 @@ test('invalid camera clipping distances fail clearly', () => {
   worldMatrixCamera.updateMatrixWorld = () => {}
   worldMatrixCamera.matrixWorld.elements[12] = Number.NaN
   assert.throws(
-    () => new Renderer().render(scene, worldMatrixCamera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, worldMatrixCamera, { width: 32, height: 32 }),
     /camera\.matrixWorld\.elements\[12\] must be a finite number/i,
   )
 
@@ -1315,7 +1319,7 @@ test('invalid camera clipping distances fail clearly', () => {
   matrixContainerCamera.updateMatrixWorld = () => {}
   matrixContainerCamera.matrixWorld = 'world'
   assert.throws(
-    () => new Renderer().render(scene, matrixContainerCamera, { width: 32, height: 32 }),
+    () => getRenderer().render(scene, matrixContainerCamera, { width: 32, height: 32 }),
     /camera\.matrixWorld must be a THREE\.Matrix4/i,
   )
 })
@@ -1395,7 +1399,7 @@ test('ArrayCamera renders sub-camera viewports', () => {
 test('ArrayCamera supports PNG output', () => {
   const scene = makeLayeredSplitScene()
   const arrayCamera = makeLayeredArrayCamera()
-  assertValidPng(new Renderer().render(scene, arrayCamera, { width: 64, height: 64 }), { width: 64, height: 64 })
+  assertValidPng(getRenderer().render(scene, arrayCamera, { width: 64, height: 64 }), { width: 64, height: 64 })
 })
 
 test('malformed ArrayCamera sub-camera containers fail clearly', () => {
@@ -1438,7 +1442,7 @@ test('CubeCamera renders cube target faces', () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
-  assertValidPng(new Renderer().render(scene, cubeCamera, { width: 32, height: 32 }), { width: 32, height: 32 })
+  assertValidPng(getRenderer().render(scene, cubeCamera, { width: 32, height: 32 }), { width: 32, height: 32 })
 
   cubeTarget.depthTexture = {
     type: THREE.FloatType,
@@ -4880,9 +4884,14 @@ test('Renderer.setOpaqueSort overrides opaque draw ordering', () => {
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  const renderer = new Renderer()
+  const renderer = getRenderer()
   renderer.setOpaqueSort((a, b) => b.id - a.id)
-  const mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  let mean
+  try {
+    mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  } finally {
+    renderer.setOpaqueSort(null)
+  }
   assert.ok(mean.r > mean.b + 160, `custom opaque sort should draw red after blue (${mean.r} vs ${mean.b})`)
 })
 
@@ -4908,9 +4917,14 @@ test('Renderer.setTransparentSort overrides transparent depth sorting', () => {
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  const renderer = new Renderer()
+  const renderer = getRenderer()
   renderer.setTransparentSort((a, b) => a.id - b.id)
-  const mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  let mean
+  try {
+    mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  } finally {
+    renderer.setTransparentSort(null)
+  }
   assert.ok(mean.b > mean.r + 160, `custom transparent sort should draw blue after red (${mean.b} vs ${mean.r})`)
 })
 
@@ -5036,9 +5050,14 @@ test('sortObjects=false preserves traversal order within transparent bucket', ()
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  const renderer = new Renderer()
+  const renderer = getRenderer()
   renderer.sortObjects = false
-  const mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  let mean
+  try {
+    mean = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  } finally {
+    renderer.sortObjects = true
+  }
   assert.ok(mean.b > mean.r + 160, `sortObjects=false should leave blue after red traversal order (${mean.b} vs ${mean.r})`)
 })
 
@@ -5063,7 +5082,7 @@ test('invalid sort controls fail clearly', () => {
     /options\.transparentSort must be a function or null/i,
   )
 
-  const renderer = new Renderer()
+  const renderer = getRenderer()
   assert.throws(
     () => { renderer.sortObjects = 'yes' },
     /Renderer\.sortObjects must be a boolean/i,
@@ -10149,7 +10168,7 @@ test('unsupported outputColorSpace values fail clearly', () => {
   const camera = makeCamera()
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, outputColorSpace: 'display-p3' }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, outputColorSpace: 'display-p3' }),
     /options\.outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
   )
   assert.throws(
@@ -15780,8 +15799,7 @@ test('lines topology renders successfully', () => {
   scene.add(new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color: 0xffffff })))
 
   const camera = makeCamera()
-  const r = new Renderer()
-  const buf = r.render(scene, camera, { width: SIZE, height: SIZE })
+  const buf = getRenderer().render(scene, camera, { width: SIZE, height: SIZE })
   assertValidPng(buf, { width: SIZE, height: SIZE })
 })
 
@@ -16948,8 +16966,7 @@ test('points topology renders successfully', () => {
   scene.add(new THREE.Points(geom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 })))
 
   const camera = makeCamera()
-  const r = new Renderer()
-  const buf = r.render(scene, camera, { width: SIZE, height: SIZE })
+  const buf = getRenderer().render(scene, camera, { width: SIZE, height: SIZE })
   assertValidPng(buf, { width: SIZE, height: SIZE })
 })
 
@@ -17564,8 +17581,7 @@ test('empty scene renders the background color', () => {
   scene.background = new THREE.Color(1, 0, 0)
   const camera = makeCamera()
 
-  const r = new Renderer()
-  const rgba = r.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  const rgba = getRenderer().render(scene, camera, { width: 64, height: 64, format: 'rgba' })
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 200, `expected red background, got r=${mean.r}`)
   assert.ok(mean.g < 20, `expected red background, got g=${mean.g}`)
@@ -18278,15 +18294,15 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   const camera = makeCamera()
 
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, viewport: [0, 0, 0, 16] }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, viewport: [0, 0, 0, 16] }),
     /options\.viewport width and height must be greater than 0/i,
   )
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, viewport: { x: '0', y: 0, width: 16, height: 16 } }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, viewport: { x: '0', y: 0, width: 16, height: 16 } }),
     /options\.viewport must contain finite x, y, width, and height values/i,
   )
   assert.throws(
-    () => new Renderer().render(scene, camera, { width: 32, height: 32, scissor: { x: 0, y: 0, width: 64, height: 16 } }),
+    () => getRenderer().render(scene, camera, { width: 32, height: 32, scissor: { x: 0, y: 0, width: 64, height: 16 } }),
     /options\.scissor must fit inside the render target/i,
   )
   assert.throws(
