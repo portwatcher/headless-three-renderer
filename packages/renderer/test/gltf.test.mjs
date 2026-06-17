@@ -38,6 +38,7 @@ const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
+const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
   let configured = false
@@ -754,6 +755,44 @@ test('committed Khronos glTF Sample Assets MultipleScenes fixture preserves defa
   assert.ok(triangleRatio > 0.25, `alternate triangle scene should render visible pixels (${triangleRatio})`)
   assert.ok(squareRatio > 0.6, `default square scene should render visible pixels (${squareRatio})`)
   assert.ok(squareRatio > triangleRatio + 0.25, `default square scene should cover more pixels than alternate triangle scene (${squareRatio} vs ${triangleRatio})`)
+})
+
+test('committed Khronos glTF Sample Assets UnlitTest fixture loads KHR_materials_unlit', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_UNLIT_TEST)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['Orange_Object', 'Blue_Object'])
+
+  const [orange, blue] = meshes
+  assert.equal(orange.material.isMeshBasicMaterial, true)
+  assert.equal(blue.material.isMeshBasicMaterial, true)
+  assert.equal(orange.geometry.getAttribute('position')?.count, 96)
+  assert.equal(orange.geometry.getAttribute('normal')?.count, 96)
+  assert.equal(orange.geometry.index?.count, 132)
+  assert.deepEqual(orange.material.color.toArray(), [1, 0.217637640824031, 0])
+  assert.deepEqual(blue.material.color.toArray(), [0, 0.217637640824031, 1])
+
+  const camera = new THREE.PerspectiveCamera(45, 4 / 3, 0.01, 20)
+  camera.position.set(0, 0, 6)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'UnlitTest should render visible objects without scene lights')
+  const left = meanRegion(rgba, 128, 96, 24, 32, 54, 64)
+  const right = meanRegion(rgba, 128, 96, 74, 32, 104, 64)
+  assert.ok(left.r > left.g + 180 && left.r > left.b + 200, `unlit orange mesh should render orange without lights (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.b > right.g + 150 && right.b > right.r + 180, `unlit blue mesh should render blue without lights (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
