@@ -40,6 +40,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
+const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
 const SAMPLE_ASSET_NEGATIVE_SCALE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'NegativeScaleTest', 'glTF', 'NegativeScaleTest.gltf')
@@ -520,6 +521,65 @@ test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_mater
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'ClearCoatTest should render visible clearcoat panels')
+})
+
+test('committed Khronos glTF Sample Assets IridescenceLamp fixture loads physical iridescence inputs', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_IRIDESCENCE_LAMP)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 3)
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const base = materials.get('IridescenceLamp')
+  assert.equal(base?.isMeshStandardMaterial, true)
+  assert.equal(Buffer.isBuffer(base.map?.image), true, 'base color PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(base.roughnessMap?.image), true, 'ORM roughness PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(base.metalnessMap?.image), true, 'ORM metalness PNG should load as an encoded Buffer')
+  assert.equal(Buffer.isBuffer(base.aoMap?.image), true, 'ORM occlusion PNG should load as an encoded Buffer')
+  assert.equal(base.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(base.roughnessMap.colorSpace, THREE.NoColorSpace)
+
+  const transmitted = materials.get('IridescenceLampTransmissionIridescence')
+  assert.equal(transmitted?.isMeshPhysicalMaterial, true)
+  assert.equal(transmitted.transmission, 1)
+  assert.equal(transmitted.thickness, 0.005)
+  assert.equal(transmitted.ior, 1.6)
+  assert.equal(transmitted.iridescence, 1)
+  assert.equal(transmitted.iridescenceIOR, 2)
+  assert.deepEqual(transmitted.iridescenceThicknessRange, [385, 405])
+  assert.equal(Buffer.isBuffer(transmitted.iridescenceThicknessMap?.image), true, 'iridescence thickness PNG should load as an encoded Buffer')
+  assert.equal(transmitted.iridescenceThicknessMap.colorSpace, THREE.NoColorSpace)
+
+  const iridescent = materials.get('IridescenceLampIridescence')
+  assert.equal(iridescent?.isMeshPhysicalMaterial, true)
+  assert.equal(iridescent.transmission, 0)
+  assert.equal(iridescent.ior, 1.5)
+  assert.equal(iridescent.iridescence, 1)
+  assert.equal(iridescent.iridescenceIOR, 1.8)
+  assert.deepEqual(iridescent.iridescenceThicknessRange, [485, 515])
+  assert.equal(Buffer.isBuffer(iridescent.iridescenceThicknessMap?.image), true, 'second iridescence thickness PNG should load as an encoded Buffer')
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
+  camera.position.set(0, 0.7, 2.4)
+  camera.lookAt(0, 0.45, 0)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  const light = new THREE.DirectionalLight(0xffffff, 1.5)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.035, 'IridescenceLamp should render visible physical-material geometry')
 })
 
 test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin animation', async () => {
