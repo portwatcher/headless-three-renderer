@@ -39,6 +39,7 @@ const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
+const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TriangleWithoutIndices', 'glTF', 'TriangleWithoutIndices.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 
 test('committed glTF fixture loads through GLTFLoader and renders', async () => {
@@ -840,6 +841,36 @@ test('committed Khronos glTF Sample Assets UnlitTest fixture loads KHR_materials
   const right = meanRegion(rgba, 128, 96, 74, 32, 104, 64)
   assert.ok(left.r > left.g + 180 && left.r > left.b + 200, `unlit orange mesh should render orange without lights (${left.r}, ${left.g}, ${left.b})`)
   assert.ok(right.b > right.g + 150 && right.b > right.r + 180, `unlit blue mesh should render blue without lights (${right.r}, ${right.g}, ${right.b})`)
+})
+
+test('committed Khronos glTF Sample Assets TriangleWithoutIndices fixture loads non-indexed geometry', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos TriangleWithoutIndices sample should load a mesh')
+  assert.equal(mesh.geometry.index, null)
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 3)
+  assert.deepEqual(vectorFromAttribute(mesh.geometry.getAttribute('position'), 0), [0, 0, 0])
+  assert.deepEqual(vectorFromAttribute(mesh.geometry.getAttribute('position'), 1), [1, 0, 0])
+  assert.deepEqual(vectorFromAttribute(mesh.geometry.getAttribute('position'), 2), [0, 1, 0])
+
+  mesh.material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  mesh.position.set(-0.5, -0.5, 0)
+
+  const camera = new THREE.OrthographicCamera(-0.6, 0.6, 0.6, -0.6, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'TriangleWithoutIndices sample should render visible non-indexed geometry')
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
