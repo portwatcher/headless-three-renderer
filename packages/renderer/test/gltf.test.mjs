@@ -139,6 +139,7 @@ const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
 const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
+const SAMPLE_ASSET_VIRTUAL_CITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VirtualCity', 'glTF', 'VirtualCity.gltf')
 const SAMPLE_ASSET_WATER_BOTTLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'WaterBottle', 'glTF', 'WaterBottle.gltf')
 const SAMPLE_ASSET_XMP_METADATA_ROUNDED_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'XmpMetadataRoundedCube', 'glTF', 'XmpMetadataRoundedCube.gltf')
 
@@ -3028,6 +3029,110 @@ test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imp
   const orthographicCenter = meanRegion(orthographicRgba, 96, 96, 24, 24, 72, 72)
   assert.ok(perspectiveCenter.r > 80 && perspectiveCenter.g > 80 && perspectiveCenter.b > 80, `perspective camera should see the white mesh (${perspectiveCenter.r}, ${perspectiveCenter.g}, ${perspectiveCenter.b})`)
   assert.ok(orthographicCenter.r > 80 && orthographicCenter.g > 80 && orthographicCenter.b > 80, `orthographic camera should see the white mesh (${orthographicCenter.r}, ${orthographicCenter.g}, ${orthographicCenter.b})`)
+})
+
+test('committed Khronos glTF Sample Assets VirtualCity fixture loads textured multi-camera animated city scene', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_VIRTUAL_CITY, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 1967226, uri: 'VC0.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    '001.jpg',
+    'cockpit-map.jpg',
+    's_08.jpg',
+    's_06.jpg',
+    's_04.jpg',
+    's_02.jpg',
+    's_07.jpg',
+    's_03.jpg',
+    's_05.jpg',
+    's_01.jpg',
+    '002.jpg',
+    '11.jpg',
+    'machine.jpg',
+    'prop128.png',
+    'scrapsurf03-red.jpg',
+    'f22.jpg',
+    'heli.jpg',
+    'O21.jpg',
+    '5.jpg',
+    'surface01.jpg',
+  ])
+  assert.equal(source.textures.length, 28)
+  assert.equal(source.materials.length, 167)
+  assert.equal(source.meshes.length, 135)
+  assert.equal(source.nodes.length, 234)
+  assert.equal(source.cameras.length, 14)
+  assert.equal(source.animations.length, 1)
+  assert.equal(source.animations[0].channels.length, 73)
+  assert.equal(source.animations[0].samplers.length, 73)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_VIRTUAL_CITY)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 167)
+  assert.equal(gltf.cameras.length, 14)
+  assert.ok(gltf.cameras.every((camera) => camera.isPerspectiveCamera === true), 'VirtualCity should load perspective camera set')
+  assert.equal(meshes.reduce((sum, mesh) => sum + mesh.geometry.getAttribute('position').count, 0), 19483)
+  assert.equal(meshes.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? 0), 0), 25149)
+  assert.equal(meshes.filter((mesh) => mesh.material.map?.isTexture === true).length, 147)
+  assert.equal(meshes.filter((mesh) => mesh.material.aoMap?.isTexture === true).length, 147)
+
+  const tower = gltf.scene.getObjectByName('tower00')
+  assert.ok(tower?.isMesh, 'VirtualCity should load named tower mesh')
+  assert.equal(tower.geometry.getAttribute('position')?.count, 321)
+  assert.equal(tower.geometry.getAttribute('uv')?.count, 321)
+  assert.equal(tower.geometry.index?.count, 342)
+  assert.equal(tower.material.name, 'Scrape04')
+  assert.equal(tower.material.map.name, '001.jpg')
+  assert.equal(Buffer.isBuffer(tower.material.map.image), true, 'VirtualCity JPEG base-color texture should load as an encoded Buffer')
+  assert.equal(tower.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(tower.material.aoMap, tower.material.map, 'VirtualCity should preserve shared base-color/AO texture references')
+
+  const redTower = gltf.scene.getObjectByName('tower02')
+  assert.ok(redTower?.isMesh, 'VirtualCity should load alternate textured tower mesh')
+  assert.equal(redTower.material.name, '_22jyj')
+  assert.equal(redTower.material.map.name, 'scrapsurf03-red.jpg')
+  assert.equal(Buffer.isBuffer(redTower.material.map.image), true, 'VirtualCity secondary JPEG texture should load as an encoded Buffer')
+
+  const clip = gltf.animations[0]
+  assert.equal(clip.name, 'animation_0')
+  assert.equal(clip.duration, 30)
+  assert.equal(clip.tracks.length, 73)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.position')).length, 41)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.quaternion')).length, 16)
+  assert.equal(clip.tracks.filter((track) => track.name.endsWith('.scale')).length, 16)
+  assert.ok(clip.tracks.every((track) => track.times.length === 901), 'every VirtualCity track should contain 901 keyframes')
+
+  const ship = gltf.scene.getObjectByName('_ship-box01')
+  assert.ok(ship?.isMesh, 'VirtualCity should load animated ship node')
+  const mixer = new THREE.AnimationMixer(gltf.scene)
+  mixer.clipAction(clip).play()
+  mixer.setTime(0)
+  const startPosition = ship.position.clone()
+  mixer.setTime(clip.duration / 2)
+  assert.ok(startPosition.distanceTo(ship.position) > 1000, 'VirtualCity animation should move the ship node across the city')
+
+  const camera = gltf.cameras[1]
+  camera.aspect = 1.5
+  camera.updateProjectionMatrix()
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(100, 300, 200)
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 144,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.55, 'VirtualCity should render visible animated city geometry through an imported camera')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.g && mean.g > mean.b, `VirtualCity textures should render warm city colors (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets DirectionalLight fixture loads KHR_lights_punctual and renders with imported camera', async () => {
