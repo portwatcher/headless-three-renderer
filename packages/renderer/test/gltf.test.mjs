@@ -34,6 +34,7 @@ const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMorph', 'glTF', 'SimpleMorph.gltf')
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
+const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
 const SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureTransformTest', 'glTF', 'TextureTransformTest.gltf')
 
@@ -492,6 +493,64 @@ test('committed Khronos glTF Sample Assets SimpleInstancing fixture loads EXT_me
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'SimpleInstancing sample should render visible instanced geometry')
+})
+
+test('committed Khronos glTF Sample Assets SimpleTexture fixture loads sampler state and renders mirrored texture repeats', async () => {
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_TEXTURE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos SimpleTexture sample should load a mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 4)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 4)
+  assert.equal(mesh.geometry.index?.count, 6)
+
+  const texture = mesh.material.map
+  assert.ok(texture?.isTexture, 'SimpleTexture sample should load a base color texture')
+  assert.equal(Buffer.isBuffer(texture.image), true, 'SimpleTexture external PNG should load as an encoded Buffer')
+  assert.equal(texture.wrapS, THREE.MirroredRepeatWrapping)
+  assert.equal(texture.wrapT, THREE.MirroredRepeatWrapping)
+  assert.equal(texture.magFilter, THREE.LinearFilter)
+  assert.equal(texture.minFilter, THREE.LinearMipmapLinearFilter)
+  assert.equal(texture.flipY, false)
+
+  texture.repeat.set(2, 2)
+  mesh.material = new THREE.MeshBasicMaterial({ map: texture })
+  mesh.position.set(-0.5, -0.5, 0)
+
+  const camera = new THREE.OrthographicCamera(-0.6, 0.6, 0.6, -0.6, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'SimpleTexture sample should render a visible repeated texture')
+  const topLeft = meanRegion(rgba, 96, 96, 18, 18, 38, 38)
+  const topRight = meanRegion(rgba, 96, 96, 58, 18, 78, 38)
+  const bottomLeft = meanRegion(rgba, 96, 96, 18, 58, 38, 78)
+  const bottomRight = meanRegion(rgba, 96, 96, 58, 58, 78, 78)
+
+  for (const [label, sample] of [
+    ['top-right', topRight],
+    ['bottom-left', bottomLeft],
+    ['bottom-right', bottomRight],
+  ]) {
+    assert.ok(
+      Math.abs(sample.r - topLeft.r) < 8 &&
+        Math.abs(sample.g - topLeft.g) < 8 &&
+        Math.abs(sample.b - topLeft.b) < 8,
+      `mirrored-repeat ${label} sample should match top-left (${topLeft.r}, ${topLeft.g}, ${topLeft.b}) vs (${sample.r}, ${sample.g}, ${sample.b})`,
+    )
+  }
+
+  const center = meanRegion(rgba, 96, 96, 38, 38, 58, 58)
+  assert.ok(center.r > topLeft.r + 80 && center.g > topLeft.g + 80, `repeated texture center should sample brighter texels (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders external PNG UV quadrants', async () => {
