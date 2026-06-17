@@ -49,6 +49,20 @@ type GltfLoaderModule = {
   GLTFLoader: GltfLoaderCtor
 }
 export type VrmLoaderPluginConstructor = new (parser: unknown) => unknown
+type GltfRootLike = {
+  scene?: unknown
+  scenes?: unknown[]
+}
+type GltfNodeVisibilityParser = {
+  associations?: Map<unknown, Record<string, number>>
+  json?: {
+    nodes?: unknown[]
+  }
+}
+type TraversableObjectLike = {
+  traverse?: (callback: (object: unknown) => void) => void
+  visible?: boolean
+}
 type TextureLoadCallback = (texture: TextureLike) => void
 type TextureErrorCallback = (error: unknown) => void
 
@@ -168,6 +182,7 @@ export async function createNodeGltfLoader(
   const { GLTFLoader } = await importGltfLoader()
   const loader = new GLTFLoader(loadingManager)
   await configureLoader?.(loader)
+  installNodeVisibilityExtension(loader)
   installEmbeddedGlbImageNormalizer(loader)
   return { encodedImages, loader, manager: loadingManager, rootDir: root }
 }
@@ -397,6 +412,52 @@ function installEmbeddedGlbImageNormalizer(loader: ThreeGltfLoaderLike): void {
   loader.parse = (data, parsePath, onLoad, onError) => {
     originalParse(normalizeEmbeddedGlbImages(data), parsePath, onLoad, onError)
   }
+}
+
+function installNodeVisibilityExtension(loader: ThreeGltfLoaderLike): void {
+  registerLoaderPlugin(loader, (parser) => ({
+    name: 'KHR_node_visibility',
+    afterRoot(gltf: unknown) {
+      applyNodeVisibilityExtension(gltf, parser as GltfNodeVisibilityParser)
+    },
+  }), 'KHR_node_visibility')
+}
+
+function applyNodeVisibilityExtension(gltf: unknown, parser: GltfNodeVisibilityParser): void {
+  const associations = parser.associations
+  const nodes = parser.json?.nodes
+  if (!associations || !Array.isArray(nodes)) return
+
+  for (const root of gltfRootScenes(gltf)) {
+    root.traverse?.((object) => {
+      const association = associations.get(object)
+      const nodeIndex = association?.nodes
+      if (typeof nodeIndex !== 'number' || !Number.isInteger(nodeIndex)) return
+      const node = nodes[nodeIndex]
+      if (!node || typeof node !== 'object' || Array.isArray(node)) return
+      const visible = (node as any).extensions?.KHR_node_visibility?.visible
+      const objectLike = object as TraversableObjectLike
+      if (visible === false) {
+        objectLike.visible = false
+      } else if (visible === true) {
+        objectLike.visible = true
+      }
+    })
+  }
+}
+
+function gltfRootScenes(gltf: unknown): TraversableObjectLike[] {
+  const root = gltf as GltfRootLike
+  const scenes = Array.isArray(root?.scenes) ? root.scenes : []
+  const result = scenes.filter(isTraversableObject)
+  if (isTraversableObject(root?.scene) && !result.includes(root.scene)) {
+    result.push(root.scene)
+  }
+  return result
+}
+
+function isTraversableObject(value: unknown): value is TraversableObjectLike {
+  return !!value && typeof value === 'object' && typeof (value as TraversableObjectLike).traverse === 'function'
 }
 
 function normalizeEmbeddedGlbImages(data: ArrayBuffer | string): ArrayBuffer | string {

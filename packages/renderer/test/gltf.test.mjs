@@ -46,6 +46,7 @@ const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_INTERPOLATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'InterpolationTest', 'glTF', 'InterpolationTest.gltf')
 const SAMPLE_ASSET_IRIDESCENCE_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'IridescenceLamp', 'glTF', 'IridescenceLamp.gltf')
+const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
 const SAMPLE_ASSET_MULTIPLE_SCENES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultipleScenes', 'glTF', 'MultipleScenes.gltf')
@@ -527,6 +528,89 @@ test('committed Khronos glTF Sample Assets PointLightIntensityTest fixture loads
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'PointLightIntensityTest should render visible point-light panels')
+})
+
+test('committed Khronos glTF Sample Assets LightVisibility fixture applies KHR_node_visibility to imported lights', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_LIGHT_VISIBILITY, 'utf8'))
+  assert.deepEqual(source.extensionsRequired, ['KHR_lights_punctual', 'KHR_node_visibility'])
+  assert.deepEqual(source.extensionsUsed, ['KHR_animation_pointer', 'KHR_lights_punctual', 'KHR_node_visibility'])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_LIGHT_VISIBILITY)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_lights_punctual'))
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_node_visibility'))
+
+  const meshes = []
+  const lights = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+    if (object.isLight === true) lights.push(object)
+  })
+
+  assert.deepEqual(meshes.map((mesh) => mesh.name), ['QuadMeshNode'])
+  assert.equal(lights.length, 5)
+  assert.ok(lights.every((light) => light.isSpotLight === true), 'all imported punctual lights should become SpotLight objects')
+  assert.deepEqual(lights.map((light) => light.name), [
+    'InvisibleLight',
+    'ChildOfInvisibleShouldBeInvisible',
+    'DescendantOfInvisibleShouldBeInvisible',
+    'VisibleLight',
+    'AnimatedVisibility',
+  ])
+  assert.deepEqual(lights.map((light) => light.color.toArray()), [
+    [1, 0, 0],
+    [1, 0, 0],
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0.125, 1],
+  ])
+  assert.deepEqual(lights.map((light) => light.intensity), [5, 5, 5, 5, 6])
+  assert.ok(lights.every((light) => light.distance === 5 && light.decay === 2 && light.angle === 0.8 && light.penumbra === 0.1875))
+
+  gltf.scene.updateMatrixWorld(true)
+  assertVectorClose(lights[0].getWorldPosition(new THREE.Vector3()).toArray(), [-1.5, 0, 1], 'InvisibleLight world position')
+  assertVectorClose(lights[3].getWorldPosition(new THREE.Vector3()).toArray(), [0, 0, 1], 'VisibleLight world position')
+  assertVectorClose(lights[4].getWorldPosition(new THREE.Vector3()).toArray(), [1.5, 0, 1], 'AnimatedVisibility world position')
+
+  assert.equal(lights[0].visible, false, 'InvisibleLight should import KHR_node_visibility false')
+  assert.equal(lights[1].visible, true, 'child light should keep its own default visible flag')
+  assert.equal(lights[2].visible, true, 'descendant light should keep its own default visible flag')
+  assert.equal(lights[3].visible, true)
+  assert.equal(lights[4].visible, true)
+  assert.equal(isEffectivelyVisible(lights[0]), false, 'InvisibleLight should be effectively hidden')
+  assert.equal(isEffectivelyVisible(lights[1]), false, 'child light should be hidden by its invisible parent')
+  assert.equal(isEffectivelyVisible(lights[2]), false, 'descendant light should be hidden by its invisible ancestor')
+  assert.equal(isEffectivelyVisible(lights[3]), true)
+  assert.equal(isEffectivelyVisible(lights[4]), true)
+
+  const mesh = meshes[0]
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 4)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 4)
+  assert.equal(mesh.geometry.index?.count, 6)
+  assert.equal(mesh.material.isMeshStandardMaterial, true)
+  assert.equal(mesh.material.roughness, 1)
+  assert.equal(mesh.material.metalness, 1)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0, -2.4, 2.1)
+  camera.lookAt(0, 0, 0)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'LightVisibility should render visible green and blue spot-light contribution')
+  const left = meanRegion(rgba, 96, 96, 12, 42, 34, 74)
+  const center = meanRegion(rgba, 96, 96, 37, 42, 59, 74)
+  const right = meanRegion(rgba, 96, 96, 62, 42, 84, 74)
+  assert.ok(left.r < 10, `invisible red light branch should not tint the left panel red (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(center.g > 80 && center.g > center.r + 80, `visible green light should tint the center panel (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(right.b > 20 && right.b > right.r + 20, `visible animated blue light should tint the right panel (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed Khronos glTF Sample Assets InterpolationTest fixture applies animation interpolation modes', async () => {
@@ -2761,6 +2845,15 @@ function assertVectorClose(actual, expected, label, tolerance = 1e-6) {
   for (let i = 0; i < expected.length; i++) {
     assert.ok(Math.abs(actual[i] - expected[i]) <= tolerance, `${label}[${i}] should be close to ${expected[i]} (${actual[i]})`)
   }
+}
+
+function isEffectivelyVisible(object) {
+  let current = object
+  while (current) {
+    if (current.visible === false) return false
+    current = current.parent
+  }
+  return true
 }
 
 function worldDeterminant(object) {
