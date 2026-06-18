@@ -3336,9 +3336,11 @@ test('envMap on non-env-map material classes is ignored', () => {
     mapping: THREE.EquirectangularReflectionMapping,
   })
   const cases = [
+    ['MeshDistanceMaterial', () => new THREE.MeshDistanceMaterial()],
     ['MeshMatcapMaterial', () => new THREE.MeshMatcapMaterial({ color: 0xffffff })],
     ['MeshNormalMaterial', () => new THREE.MeshNormalMaterial()],
     ['MeshDepthMaterial', () => new THREE.MeshDepthMaterial()],
+    ['MeshToonMaterial', () => new THREE.MeshToonMaterial({ color: 0xffffff })],
   ]
 
   function renderMaterial(makeMaterial, envMapped) {
