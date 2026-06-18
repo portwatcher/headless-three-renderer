@@ -19491,8 +19491,10 @@ test('Line and LineLoop with InstancedBufferGeometry expand offsets and colors',
     const rgba = renderLine(makeObject)
     const redPixels = countRegionPixels(rgba, 96, 96, 14, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
     const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 82, 56, (r, g, b) => g > r + 30 && g > b + 30)
+    const bridgePixels = countRegionPixels(rgba, 96, 96, 43, 40, 53, 56, (r, g, b) => r > 30 || g > 30 || b > 30)
     assert.ok(redPixels > 6, `${label} should render red pixels from the first instanced color (${redPixels})`)
     assert.ok(greenPixels > 6, `${label} should render green pixels from the second instanced color (${greenPixels})`)
+    assert.ok(bridgePixels < 4, `${label} should not connect separate instances across the center gap (${bridgePixels})`)
   }
 })
 
@@ -19626,8 +19628,10 @@ test('Line and LineLoop with InstancedBufferGeometry expand instanced map UV att
     const rgba = renderLine(makeObject)
     const redPixels = countRegionPixels(rgba, 96, 96, 12, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
     const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
+    const bridgePixels = countRegionPixels(rgba, 96, 96, 43, 40, 53, 56, (r, g, b) => r > 30 || g > 30 || b > 30)
     assert.ok(redPixels > 4, `${label} instanced line uv should sample red (${redPixels})`)
     assert.ok(greenPixels > 4, `${label} instanced line uv should sample green (${greenPixels})`)
+    assert.ok(bridgePixels < 4, `${label} instanced line uv should not connect separate instances (${bridgePixels})`)
   }
 })
 
