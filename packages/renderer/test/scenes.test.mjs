@@ -18800,6 +18800,44 @@ test('LineBasicMaterial and LineDashedMaterial ignore linecap and linejoin like 
   }
 })
 
+test('LineBasicMaterial and LineDashedMaterial receiveShadow is accepted as an unlit WebGL-compatible no-op', () => {
+  function renderLine(kind, receiveShadow) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0, 0),
+      new THREE.Vector3(1.2, 0, 0),
+    ])
+    const material = kind === 'basic'
+      ? new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 8 })
+      : new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        linewidth: 8,
+        dashSize: 0.3,
+        gapSize: 0.15,
+        scale: 1,
+      })
+    const line = new THREE.Line(geom, material)
+    line.receiveShadow = receiveShadow
+    if (kind === 'dashed') line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const kind of ['basic', 'dashed']) {
+    assert.deepEqual(
+      renderLine(kind, true),
+      renderLine(kind, false),
+      `${kind} line receiveShadow should not change unlit line output`,
+    )
+  }
+})
+
 test('LineBasicMaterial and LineDashedMaterial alphaHash produce main-pass stochastic coverage', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
