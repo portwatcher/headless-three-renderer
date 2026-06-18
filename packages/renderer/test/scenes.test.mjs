@@ -3811,6 +3811,41 @@ test('MeshToonMaterial gradientMap honors nearest and linear filters', () => {
   assert.ok(linear.r > nearest.r + 30, `LinearFilter should blend in the bright toon ramp texel (${linear.r} vs ${nearest.r})`)
 })
 
+test('MeshToonMaterial gradientMap honors horizontal repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping(wrapS) {
+    const gradientMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    gradientMap.wrapS = wrapS
+    gradientMap.magFilter = THREE.NearestFilter
+    gradientMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }))
+  }
+
+  const clamped = renderWithWrapping(THREE.ClampToEdgeWrapping)
+  const repeated = renderWithWrapping(THREE.RepeatWrapping)
+  assert.ok(clamped.r > repeated.r + 80, `clamped toon gradientMap should sample the bright edge texel (${clamped.r} vs ${repeated.r})`)
+  assert.ok(repeated.r < 5, `repeated toon gradientMap should wrap the lit ramp coordinate to the dark texel (${repeated.r})`)
+})
+
 test('MeshToonMaterial gradientMap decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const gradientMap = solidTexture(128, 128, 128)
