@@ -448,6 +448,31 @@ test('malformed geometry bounding spheres fail clearly', () => {
   }
 })
 
+test('malformed object bounding spheres fail clearly', () => {
+  const camera = makeCamera()
+  const cases = [
+    ['container', 'sphere', /object\.boundingSphere must be a THREE\.Sphere-like object/i],
+    ['center', { center: { x: Number.NaN, y: 0, z: 0 }, radius: 1 }, /object\.boundingSphere\.center must be a finite Vector3-like value/i],
+    ['radius', { center: { x: 0, y: 0, z: 0 }, radius: -1 }, /object\.boundingSphere\.radius must be non-negative/i],
+  ]
+
+  for (const [name, boundingSphere, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    mesh.boundingSphere = boundingSphere
+    scene.add(mesh)
+
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('invalid geometry attribute layout values fail clearly', () => {
   const camera = makeCamera()
   const values = new Float32Array([
