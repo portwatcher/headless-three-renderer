@@ -4500,6 +4500,54 @@ test('SpriteMaterial and PointsMaterial alphaHash produce main-pass stochastic c
   }
 })
 
+test('SpriteMaterial and PointsMaterial alphaToCoverage produce 4x-MSAA main-pass coverage', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderBillboard(kind, alphaToCoverage, sampleCount = 4) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const materialProps = {
+      alphaToCoverage,
+      color: 0xffffff,
+      opacity: 0.5,
+      transparent: false,
+    }
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial(materialProps))
+      sprite.scale.set(1.2, 1.2, 1)
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+        ...materialProps,
+        size: 48,
+        sizeAttenuation: false,
+      })))
+    }
+
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      sampleCount,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const noCoverage = renderBillboard(kind, false)
+    const coverage = renderBillboard(kind, true)
+    const singleSample = renderBillboard(kind, true, 1)
+
+    assert.ok(noCoverage.r > 170, `${kind} non-A2C path should keep bright RGB despite opacity alpha (${noCoverage.r})`)
+    assert.ok(Math.abs(singleSample.r - noCoverage.r) < 5, `${kind} single-sample alphaToCoverage should not alter RGB coverage (${singleSample.r} vs ${noCoverage.r})`)
+    assert.ok(coverage.r > 30 && coverage.r < noCoverage.r - 80, `${kind} 4x alphaToCoverage should resolve partial RGB coverage (${coverage.r} vs ${noCoverage.r})`)
+  }
+})
+
 test('SpriteMaterial honors sprite scale and material rotation', () => {
   function renderRotatedSprite(rotation) {
     const scene = new THREE.Scene()
