@@ -19456,6 +19456,52 @@ test('LineSegments with InstancedBufferGeometry expand instanced map UV attribut
   assert.ok(greenPixels > 4, `right instanced line uv should sample green (${greenPixels})`)
 })
 
+test('LineDashedMaterial with InstancedBufferGeometry expands instanced map UV attributes', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 2
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.25, 0, 0,
+    0.25, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, 1]), 1))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 4,
+    gapSize: 0,
+    linewidth: 8,
+    map,
+    scale: 1,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 12, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(redPixels > 4, `left instanced dashed line uv should sample red (${redPixels})`)
+  assert.ok(greenPixels > 4, `right instanced dashed line uv should sample green (${greenPixels})`)
+})
+
 test('LineDashedMaterial with InstancedBufferGeometry expands offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 2
