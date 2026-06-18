@@ -11220,13 +11220,17 @@ test('base color maps honor horizontal and vertical repeat wrapping', () => {
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.r > clamped.g + 80, `clamped base map U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
   assert.ok(repeated.g > repeated.r + 80, `repeated base map U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+  assert.ok(mirrored.r > mirrored.g + 80, `mirrored base map U coordinates should reflect to the red texel (${mirrored.r} vs ${mirrored.g})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.r > clampedVertical.g + 80, `clamped base map V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
   assert.ok(repeatedVertical.g > repeatedVertical.r + 80, `repeated base map V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+  assert.ok(mirroredVertical.r > mirroredVertical.g + 80, `mirrored base map V coordinates should reflect to the red texel (${mirroredVertical.r} vs ${mirroredVertical.g})`)
 })
 
 test('base color maps honor nearest texture filters', () => {
