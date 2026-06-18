@@ -14869,7 +14869,7 @@ test('conflicting packed physical texture anisotropy settings fail clearly', () 
   )
 })
 
-test('specularColorMap samples the selected secondary UV channel', () => {
+test('specularColorMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const specularColorMap = rgbaTexture([
       0, 0, 0, 255,
@@ -14878,7 +14878,9 @@ test('specularColorMap samples the selected secondary UV channel', () => {
     specularColorMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', channel === 1 ? 0.75 : 0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv2', channel === 2 ? 0.75 : 0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv3', channel === 3 ? 0.75 : 0.25, 0.5)
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -14905,9 +14907,13 @@ test('specularColorMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  assert.ok(secondary.r > primary.r + 4, `specularColorMap channel=1 should sample uv1's red texel (${secondary.r} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.g + 4, `specularColorMap channel=1 should tint the specular response red (${secondary.r} vs ${secondary.g})`)
+  const uv1 = renderWithChannel(1)
+  const uv2 = renderWithChannel(2)
+  const uv3 = renderWithChannel(3)
+  for (const [label, sample] of [['uv1', uv1], ['uv2', uv2], ['uv3', uv3]]) {
+    assert.ok(sample.r > primary.r + 4, `specularColorMap ${label} should sample its red texel (${sample.r} vs ${primary.r})`)
+    assert.ok(sample.r > sample.g + 4, `specularColorMap ${label} should tint the specular response red (${sample.r} vs ${sample.g})`)
+  }
 })
 
 test('specularColorMap decodes sRGB colorSpace before shading', () => {
