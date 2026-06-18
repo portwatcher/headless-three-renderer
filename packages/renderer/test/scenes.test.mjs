@@ -19455,6 +19455,50 @@ test('LineSegments with InstancedBufferGeometry expand offsets and colors', () =
   assert.ok(greenPixels > 2, `right instanced line should render green pixels (${greenPixels})`)
 })
 
+test('LineSegments with InstancedBufferGeometry honor meshPerAttribute repeat values for colors', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 4
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.06, 0, 0,
+    0.06, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.6, 0, 0,
+    -0.2, 0, 0,
+    0.2, 0, 0,
+    0.6, 0, 0,
+  ]), 3))
+
+  const colors = new THREE.InstancedBufferAttribute(new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
+  ]), 3)
+  colors.meshPerAttribute = 2
+  geometry.setAttribute('color', colors)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    linewidth: 8,
+    vertexColors: true,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const firstRed = countRegionPixels(rgba, 96, 96, 18, 42, 32, 54, (r, g, b) => r > g + 30 && r > b + 30)
+  const secondRed = countRegionPixels(rgba, 96, 96, 34, 42, 47, 54, (r, g, b) => r > g + 30 && r > b + 30)
+  const firstGreen = countRegionPixels(rgba, 96, 96, 50, 42, 63, 54, (r, g, b) => g > r + 30 && g > b + 30)
+  const secondGreen = countRegionPixels(rgba, 96, 96, 65, 42, 79, 54, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(firstRed > 6, `first repeated line color should render red pixels (${firstRed})`)
+  assert.ok(secondRed > 6, `second repeated line color should render red pixels (${secondRed})`)
+  assert.ok(firstGreen > 6, `first repeated line color should render green pixels (${firstGreen})`)
+  assert.ok(secondGreen > 6, `second repeated line color should render green pixels (${secondGreen})`)
+})
+
 test('LineSegments with InstancedBufferGeometry expand instanced map UV attributes', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 2
@@ -20152,6 +20196,50 @@ test('Points with InstancedBufferGeometry expand offsets and colors', () => {
   const greenPixels = countRegionPixels(rgba, 96, 96, 52, 34, 76, 62, (r, g, b) => g > r + 40 && g > b + 40)
   assert.ok(redPixels > 20, `left instanced point should render red pixels (${redPixels})`)
   assert.ok(greenPixels > 20, `right instanced point should render green pixels (${greenPixels})`)
+})
+
+test('Points with InstancedBufferGeometry honor meshPerAttribute repeat values for colors', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 4
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.6, 0, 0,
+    -0.2, 0, 0,
+    0.2, 0, 0,
+    0.6, 0, 0,
+  ]), 3))
+
+  const colors = new THREE.InstancedBufferAttribute(new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
+  ]), 3)
+  colors.meshPerAttribute = 2
+  geometry.setAttribute('color', colors)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    size: 12,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const firstRed = countRegionPixels(rgba, 96, 96, 18, 42, 32, 54, (r, g, b) => r > g + 40 && r > b + 40)
+  const secondRed = countRegionPixels(rgba, 96, 96, 34, 42, 47, 54, (r, g, b) => r > g + 40 && r > b + 40)
+  const firstGreen = countRegionPixels(rgba, 96, 96, 50, 42, 63, 54, (r, g, b) => g > r + 40 && g > b + 40)
+  const secondGreen = countRegionPixels(rgba, 96, 96, 65, 42, 79, 54, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(firstRed > 20, `first repeated point color should render red pixels (${firstRed})`)
+  assert.ok(secondRed > 20, `second repeated point color should render red pixels (${secondRed})`)
+  assert.ok(firstGreen > 20, `first repeated point color should render green pixels (${firstGreen})`)
+  assert.ok(secondGreen > 20, `second repeated point color should render green pixels (${secondGreen})`)
 })
 
 test('Points with InstancedBufferGeometry expand instanced map UV attributes', () => {
