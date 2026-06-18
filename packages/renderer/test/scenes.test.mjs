@@ -18163,6 +18163,102 @@ test('LineBasicMaterial opacity blends over the background', () => {
   assert.ok(blendedPixels > 2, `semi-transparent line should blend red over blue (${blendedPixels})`)
 })
 
+test('LineBasicMaterial and LineDashedMaterial alphaHash produce main-pass stochastic coverage', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderLine(kind, alphaHash) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0, 0),
+      new THREE.Vector3(1.2, 0, 0),
+    ])
+    const materialProps = {
+      alphaHash,
+      color: 0xffffff,
+      linewidth: 16,
+      opacity: alphaHash ? 0.35 : 1,
+    }
+    const material = kind === 'basic'
+      ? new THREE.LineBasicMaterial(materialProps)
+      : new THREE.LineDashedMaterial({
+        ...materialProps,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+    const line = new THREE.Line(geom, material)
+    if (kind === 'dashed') line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const kind of ['basic', 'dashed']) {
+    const opaque = renderLine(kind, false)
+    const hashed = renderLine(kind, true)
+    const visiblePixel = (r, g, b) => r > 20 || g > 20 || b > 20
+    const opaquePixels = countRegionPixels(opaque, 96, 96, 16, 40, 80, 56, visiblePixel)
+    const hashedPixels = countRegionPixels(hashed, 96, 96, 16, 40, 80, 56, visiblePixel)
+
+    assert.ok(opaquePixels > 600, `${kind} opaque line should fill the sampled region (${opaquePixels})`)
+    assert.ok(hashedPixels > 80, `${kind} alphaHash line should retain some visible pixels (${hashedPixels})`)
+    assert.ok(hashedPixels < opaquePixels - 180, `${kind} alphaHash line should discard visible pixels (${hashedPixels} vs ${opaquePixels})`)
+  }
+})
+
+test('LineBasicMaterial and LineDashedMaterial alphaToCoverage produce 4x-MSAA main-pass coverage', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderLine(kind, alphaToCoverage, sampleCount = 4) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0, 0),
+      new THREE.Vector3(1.2, 0, 0),
+    ])
+    const materialProps = {
+      alphaToCoverage,
+      color: 0xffffff,
+      linewidth: 16,
+      opacity: 0.5,
+      transparent: false,
+    }
+    const material = kind === 'basic'
+      ? new THREE.LineBasicMaterial(materialProps)
+      : new THREE.LineDashedMaterial({
+        ...materialProps,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+    const line = new THREE.Line(geom, material)
+    if (kind === 'dashed') line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 96,
+      height: 96,
+      sampleCount,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 28, 44, 68, 52)
+  }
+
+  for (const kind of ['basic', 'dashed']) {
+    const noCoverage = renderLine(kind, false)
+    const coverage = renderLine(kind, true)
+    const singleSample = renderLine(kind, true, 1)
+
+    assert.ok(noCoverage.r > 170, `${kind} non-A2C line should keep bright RGB despite opacity alpha (${noCoverage.r})`)
+    assert.ok(Math.abs(singleSample.r - noCoverage.r) < 5, `${kind} single-sample line alphaToCoverage should not alter RGB coverage (${singleSample.r} vs ${noCoverage.r})`)
+    assert.ok(coverage.r > 30 && coverage.r < noCoverage.r - 80, `${kind} 4x line alphaToCoverage should resolve partial RGB coverage (${coverage.r} vs ${noCoverage.r})`)
+  }
+})
+
 test('LineBasicMaterial map alpha samples line UVs', () => {
   const map = rgbaTexture([
     255, 255, 255, 0,
