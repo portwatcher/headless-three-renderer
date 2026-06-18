@@ -7092,6 +7092,61 @@ test('clipIntersection requires all local clipping planes to reject a fragment',
   assert.ok(visibleBottomRight.r > visibleBottomRight.b + 80, `bottom-right should remain visible with intersection clipping (${visibleBottomRight.r} vs ${visibleBottomRight.b})`)
 })
 
+test('line clipIntersection requires all clipping planes to reject a fragment', () => {
+  function makeLine() {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0.7, 0),
+      new THREE.Vector3(-0.3, 0.7, 0),
+      new THREE.Vector3(-1.5, -0.7, 0),
+      new THREE.Vector3(-0.3, -0.7, 0),
+      new THREE.Vector3(0.3, -0.7, 0),
+      new THREE.Vector3(1.5, -0.7, 0),
+    ])
+    return new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 8 }),
+    )
+  }
+
+  function renderLine(source) {
+    const planes = [
+      new THREE.Plane(new THREE.Vector3(1, 0, 0), 0),
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    ]
+    const line = makeLine()
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    if (source === 'material') {
+      line.material.clippingPlanes = planes
+      line.material.clipIntersection = true
+      scene.add(line)
+    } else {
+      const group = new THREE.Group()
+      group.isClippingGroup = true
+      group.clipIntersection = true
+      group.clippingPlanes = planes
+      group.add(line)
+      scene.add(group)
+    }
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  for (const source of ['material', 'group']) {
+    const rgba = renderLine(source)
+    const visibleTopLeft = countRegionPixels(rgba, 64, 64, 8, 14, 30, 28, (r, g, b) => r > 120 && r > b + 40 && g < 60)
+    const clippedBottomLeft = meanRegion(rgba, 64, 64, 8, 36, 30, 50)
+    const visibleBottomRight = countRegionPixels(rgba, 64, 64, 34, 36, 56, 50, (r, g, b) => r > 120 && r > b + 40 && g < 60)
+
+    assert.ok(visibleTopLeft > 4, `${source} top-left line should remain visible with intersection clipping (${visibleTopLeft})`)
+    assert.ok(clippedBottomLeft.b > clippedBottomLeft.r + 80, `${source} bottom-left line should be clipped by both planes (${clippedBottomLeft.b} vs ${clippedBottomLeft.r})`)
+    assert.ok(visibleBottomRight > 4, `${source} bottom-right line should remain visible with intersection clipping (${visibleBottomRight})`)
+  }
+})
+
 test('scene ClippingGroup planes clip descendants', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
