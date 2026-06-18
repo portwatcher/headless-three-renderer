@@ -600,6 +600,23 @@ test('malformed BatchedMesh inputs fail clearly', () => {
     /THREE\.BatchedMesh instance table is not readable.*ordinary Mesh or InstancedMesh/i,
   )
 
+  const instanceCases = [
+    ['instance entry', [null], /THREE\.BatchedMesh\._instanceInfo\[0\] must be an object/i],
+    ['active flag', [{ geometryIndex: 0, active: 'yes' }], /THREE\.BatchedMesh\._instanceInfo\[0\]\.active must be a boolean/i],
+    ['visible flag', [{ geometryIndex: 0, visible: 'yes' }], /THREE\.BatchedMesh\._instanceInfo\[0\]\.visible must be a boolean/i],
+    ['geometry index', [{ geometryIndex: -1 }], /THREE\.BatchedMesh\._instanceInfo\[0\]\.geometryIndex must be a non-negative integer/i],
+  ]
+
+  for (const [name, instanceInfo, pattern] of instanceCases) {
+    const { scene, mesh } = makeBatchedScene()
+    mesh._instanceInfo = instanceInfo
+    assert.throws(
+      () => getRenderer().render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+
   const matrixCases = [
     ['matrix texture container', (mesh) => {
       mesh._instanceInfo = [{ geometryIndex: 0 }]
