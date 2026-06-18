@@ -8758,6 +8758,118 @@ test('Sprite and Points source alphaHash applies to custom shadow material caste
   }
 })
 
+test('Sprite and Points source alphaToCoverage opacity applies to custom shadow material casters', () => {
+  function sourceBillboardMaterial(kind, alphaToCoverage) {
+    const params = {
+      color: 0xffffff,
+      opacity: alphaToCoverage ? 0.35 : 1,
+      alphaToCoverage,
+    }
+    if (kind === 'sprite') return new THREE.SpriteMaterial(params)
+    return new THREE.PointsMaterial({
+      ...params,
+      size: 48,
+      sizeAttenuation: false,
+    })
+  }
+
+  function addBillboard(scene, kind, alphaToCoverage, shadowProperty, shadowMaterial, position) {
+    const material = sourceBillboardMaterial(kind, alphaToCoverage)
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(...position)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = true
+      sprite[shadowProperty] = shadowMaterial
+      scene.add(sprite)
+      return
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
+    const points = new THREE.Points(geometry, material)
+    points.castShadow = true
+    points[shadowProperty] = shadowMaterial
+    scene.add(points)
+  }
+
+  function renderDirectionalCustomDepthSourceAlphaCoverage(kind, alphaToCoverage) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    addBillboard(scene, kind, alphaToCoverage, 'customDepthMaterial', new THREE.MeshDepthMaterial(), [0, 4, 0])
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  function renderPointCustomDistanceSourceAlphaCoverage(kind, alphaToCoverage) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    addBillboard(scene, kind, alphaToCoverage, 'customDistanceMaterial', new THREE.MeshDistanceMaterial(), [0, 2.2, 1.8])
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const fullDepth = renderDirectionalCustomDepthSourceAlphaCoverage(kind, false)
+    const coveredDepth = renderDirectionalCustomDepthSourceAlphaCoverage(kind, true)
+    const fullDepthLum = fullDepth.r + fullDepth.g + fullDepth.b
+    const coveredDepthLum = coveredDepth.r + coveredDepth.g + coveredDepth.b
+    assert.ok(coveredDepthLum > fullDepthLum + 10, `${kind} source alphaToCoverage opacity should lighten the customDepthMaterial caster shadow (${coveredDepthLum} vs ${fullDepthLum})`)
+
+    const fullDistance = renderPointCustomDistanceSourceAlphaCoverage(kind, false)
+    const coveredDistance = renderPointCustomDistanceSourceAlphaCoverage(kind, true)
+    const fullDistanceLum = fullDistance.r + fullDistance.g + fullDistance.b
+    const coveredDistanceLum = coveredDistance.r + coveredDistance.g + coveredDistance.b
+    assert.ok(coveredDistanceLum > fullDistanceLum + 10, `${kind} source alphaToCoverage opacity should lighten the customDistanceMaterial caster shadow (${coveredDistanceLum} vs ${fullDistanceLum})`)
+  }
+})
+
 test('customDepthMaterial alphaMap controls directional shadow casters', () => {
   function renderCustomDepthShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
@@ -9193,6 +9305,100 @@ test('source material alphaHash applies to custom shadow material casters', () =
   const fullDistanceLum = fullDistance.r + fullDistance.g + fullDistance.b
   const hashedDistanceLum = hashedDistance.r + hashedDistance.g + hashedDistance.b
   assert.ok(hashedDistanceLum > fullDistanceLum + 10, `source alphaHash should lighten the customDistanceMaterial caster shadow (${hashedDistanceLum} vs ${fullDistanceLum})`)
+})
+
+test('source material alphaToCoverage opacity applies to custom shadow material casters', () => {
+  function sourceMaterial(alphaToCoverage) {
+    return new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      opacity: alphaToCoverage ? 0.35 : 1,
+      alphaToCoverage,
+      colorWrite: false,
+      depthWrite: false,
+    })
+  }
+
+  function renderDirectionalCustomDepthSourceAlphaCoverage(alphaToCoverage) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), sourceMaterial(alphaToCoverage))
+    caster.position.y = 1.5
+    caster.castShadow = true
+    caster.customDepthMaterial = new THREE.MeshDepthMaterial()
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  function renderPointCustomDistanceSourceAlphaCoverage(alphaToCoverage) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), sourceMaterial(alphaToCoverage))
+    caster.position.y = 1.25
+    caster.castShadow = true
+    caster.customDistanceMaterial = new THREE.MeshDistanceMaterial()
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const fullDepth = renderDirectionalCustomDepthSourceAlphaCoverage(false)
+  const coveredDepth = renderDirectionalCustomDepthSourceAlphaCoverage(true)
+  const fullDepthLum = fullDepth.r + fullDepth.g + fullDepth.b
+  const coveredDepthLum = coveredDepth.r + coveredDepth.g + coveredDepth.b
+  assert.ok(coveredDepthLum > fullDepthLum + 20, `source alphaToCoverage opacity should lighten the customDepthMaterial caster shadow (${coveredDepthLum} vs ${fullDepthLum})`)
+
+  const fullDistance = renderPointCustomDistanceSourceAlphaCoverage(false)
+  const coveredDistance = renderPointCustomDistanceSourceAlphaCoverage(true)
+  const fullDistanceLum = fullDistance.r + fullDistance.g + fullDistance.b
+  const coveredDistanceLum = coveredDistance.r + coveredDistance.g + coveredDistance.b
+  assert.ok(coveredDistanceLum > fullDistanceLum + 10, `source alphaToCoverage opacity should lighten the customDistanceMaterial caster shadow (${coveredDistanceLum} vs ${fullDistanceLum})`)
 })
 
 test('customDepthMaterial displacement shifts directional shadow casters', () => {

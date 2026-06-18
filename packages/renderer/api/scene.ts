@@ -992,8 +992,8 @@ function shadowMaterialWithSourceShadowState(
     shadowMaterial.alphaMap = sourceMaterial.alphaMap ?? null
     shadowMaterial.alphaTest = sourceMaterial.alphaToCoverage === true ? 0.5 : sourceMaterial.alphaTest
     shadowMaterial.alphaToCoverage = sourceMaterial.alphaToCoverage
-    if (sourceMaterial.alphaHash === true) {
-      shadowMaterial.alphaHash = true
+    if (sourceMaterial.alphaHash === true) shadowMaterial.alphaHash = true
+    if (sourceMaterial.alphaHash === true || sourceMaterial.alphaToCoverage === true) {
       if (sourceMaterial.opacity != null) {
         shadowMaterial.opacity = sourceMaterial.opacity
       }
@@ -1027,6 +1027,7 @@ function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefin
   const hasAlphaTexture = !!(material.map || material.alphaMap)
   const hasOpacityAlpha = typeof material.opacity === 'number' && Number.isFinite(material.opacity) && material.opacity < 1
   if (material.alphaHash === true && (hasAlphaTexture || hasOpacityAlpha)) return true
+  if (material.alphaToCoverage === true && (hasAlphaTexture || hasOpacityAlpha)) return true
   if (!hasAlphaTexture) return false
   if (material.alphaToCoverage === true) return true
   return typeof material.alphaTest === 'number' && Number.isFinite(material.alphaTest) && material.alphaTest > 0
