@@ -703,7 +703,7 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   assert.ok(bottomMean.r < 5 && bottomMean.g < 5 && bottomMean.b < 5, `deleted BatchedMesh instance should not render at bottom (${bottomMean.r}, ${bottomMean.g}, ${bottomMean.b})`)
 })
 
-test('BatchedMesh skips inactive geometry ranges', () => {
+test('BatchedMesh skips deleted geometry ranges', () => {
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
@@ -723,7 +723,7 @@ test('BatchedMesh skips inactive geometry ranges', () => {
   batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
   batched.setColorAt(left, new THREE.Color(1, 0, 0))
   batched.setColorAt(right, new THREE.Color(0, 1, 0))
-  batched._geometryInfo[inactiveGeometryId].active = false
+  batched.deleteGeometry(inactiveGeometryId)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -734,7 +734,7 @@ test('BatchedMesh skips inactive geometry ranges', () => {
   const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
 
   assert.ok(leftMean.r > leftMean.g + 80, `active BatchedMesh geometry should render red (${leftMean.r} vs ${leftMean.g})`)
-  assert.ok(rightMean.r < 5 && rightMean.g < 5 && rightMean.b < 5, `inactive BatchedMesh geometry should skip its visible instance (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+  assert.ok(rightMean.r < 5 && rightMean.g < 5 && rightMean.b < 5, `deleted BatchedMesh geometry should skip its visible instance (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
 test('BatchedMesh material arrays honor packed geometry groups', () => {
