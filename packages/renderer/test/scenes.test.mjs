@@ -16382,6 +16382,29 @@ test('post-processing exposure contrast and grayscale controls modify output', (
   assert.ok(Math.max(grayscale.r, grayscale.g, grayscale.b) - Math.min(grayscale.r, grayscale.g, grayscale.b) < 3, `boolean grayscale should equalize color channels (${grayscale.r}, ${grayscale.g}, ${grayscale.b})`)
 })
 
+test('post-processing enabled false bypasses configured effects', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.25, 0.5, 0.75)
+  const camera = makeCamera()
+  const options = { width: 32, height: 32, outputColorSpace: THREE.LinearSRGBColorSpace }
+
+  const base = renderRgba(scene, camera, options)
+  const disabled = renderRgba(scene, camera, {
+    ...options,
+    postProcessing: {
+      enabled: false,
+      exposure: 4,
+      contrast: 4,
+      grayscale: true,
+      invert: true,
+      saturation: 0,
+      vignette: 1,
+    },
+  })
+
+  assert.deepEqual(disabled, base, 'postProcessing.enabled=false should ignore configured effects')
+})
+
 test('invalid post-processing option values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
