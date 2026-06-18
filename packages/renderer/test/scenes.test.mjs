@@ -19392,6 +19392,30 @@ test('PointsMaterial size controls billboard pixel bounds', () => {
   assert.ok(large.height > small.height * 2, `larger point should produce taller bounds (${large.height} vs ${small.height})`)
 })
 
+test('PointsMaterial untextured billboards keep square point-sprite corners', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 48,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const center = meanRegion(rgba, 96, 96, 44, 44, 52, 52)
+  const corner = meanRegion(rgba, 96, 96, 28, 28, 36, 36)
+
+  assert.ok(center.r > 180 && center.g > 180 && center.b > 180, `point billboard center should be white (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(corner.r > 180 && corner.g > 180 && corner.b > 180, `untextured point billboard corners should remain square/visible (${corner.r}, ${corner.g}, ${corner.b})`)
+})
+
 test('PointsMaterial clamps oversized billboard bounds to a WebGL-style point size cap', () => {
   function renderPoint(size) {
     const geometry = new THREE.BufferGeometry()
