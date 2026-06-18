@@ -30,6 +30,7 @@ const REAL_VRM_EXPRESSION_SAMPLE = path.join(
   'VRMC_vrm_expressions_isBinary_Overridden.vrm',
 )
 const REAL_VRMA_ANIMATION_SAMPLE = path.join(FIXTURE_DIR, 'three-vrm-animation', 'test.vrma')
+const SAMPLE_ASSET_A_BEAUTIFUL_GAME = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ABeautifulGame', 'glTF', 'ABeautifulGame.gltf')
 const SAMPLE_ASSET_ANIMATED_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedCube', 'glTF', 'AnimatedCube.gltf')
 const SAMPLE_ASSET_ANIMATED_COLORS_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedColorsCube', 'glTF', 'AnimatedColorsCube.gltf')
 const SAMPLE_ASSET_ANIMATED_MORPH_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'AnimatedMorphCube', 'glTF', 'AnimatedMorphCube.gltf')
@@ -118,6 +119,7 @@ const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-ass
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheresNoTextures', 'glTF', 'MetalRoughSpheresNoTextures.gltf')
 const SAMPLE_ASSET_MESH_PRIMITIVE_MODES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshPrimitiveModes', 'glTF', 'MeshPrimitiveModes.gltf')
 const SAMPLE_ASSET_MESHOPT_CUBE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MeshoptCubeTest', 'glTF', 'MeshoptCubeTest.gltf')
+const SAMPLE_ASSET_MOSQUITO_IN_AMBER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MosquitoInAmber', 'glTF', 'MosquitoInAmber.gltf')
 const SAMPLE_ASSET_MORPH_PRIMITIVES_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphPrimitivesTest', 'glTF', 'MorphPrimitivesTest.gltf')
 const SAMPLE_ASSET_MORPH_STRESS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MorphStressTest', 'glTF', 'MorphStressTest.gltf')
 const SAMPLE_ASSET_MULTI_UV_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MultiUVTest', 'glTF', 'MultiUVTest.gltf')
@@ -150,6 +152,7 @@ const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets',
 const SAMPLE_ASSET_SPEC_GLOSS_VS_METAL_ROUGH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecGlossVsMetalRough', 'glTF', 'SpecGlossVsMetalRough.gltf')
 const SAMPLE_ASSET_SPECULAR_SILK_POUF = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularSilkPouf', 'glTF', 'SpecularSilkPouf.gltf')
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
+const SAMPLE_ASSET_SPONZA = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Sponza', 'glTF', 'Sponza.gltf')
 const SAMPLE_ASSET_STAINED_GLASS_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'StainedGlassLamp', 'glTF', 'StainedGlassLamp.gltf')
 const SAMPLE_ASSET_SUNGLASSES_KHRONOS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SunglassesKhronos', 'glTF', 'SunglassesKhronos.gltf')
 const SAMPLE_ASSET_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Suzanne', 'glTF', 'Suzanne.gltf')
@@ -11825,6 +11828,215 @@ test('committed Khronos glTF Sample Assets StainedGlassLamp fixture loads glass 
   assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.12, 'StainedGlassLamp should render visible lamp geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r < 245 && mean.g < 245 && mean.b < 245, `StainedGlassLamp should render non-white glass and metal pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets ABeautifulGame fixture loads chessboard transmission pieces', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_A_BEAUTIFUL_GAME, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 10829440, uri: 'ABeautifulGame.bin' }])
+  assert.equal(source.nodes.length, 49)
+  assert.equal(source.meshes.length, 15)
+  assert.equal(source.materials.length, 15)
+  assert.equal(source.images.length, 33)
+  assert.deepEqual(source.materials.find((material) => material.name === 'Pawn_Top_White').extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: {
+      attenuationColor: [0.800000011920929, 0.800000011920929, 0.800000011920929],
+      thicknessFactor: 0.2199999988079071,
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_A_BEAUTIFUL_GAME)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 49)
+  assert.equal(uniqueMaterials(gltf.scene).length, 15)
+
+  const king = gltf.scene.getObjectByName('King_B')
+  assert.ok(king?.isMesh, 'ABeautifulGame should load the black king mesh')
+  assert.equal(king.geometry.getAttribute('position')?.count, 28901)
+  assert.equal(king.geometry.index?.count, 121440)
+  assert.equal(king.material.name, 'King_Black')
+  assert.equal(king.material.map?.name, 'King_black_base_color')
+  assert.equal(Buffer.isBuffer(king.material.map.image), true, 'King base-color JPEG should load as an encoded Buffer')
+  assert.equal(king.material.normalMap?.name, 'King_black_normal')
+  assert.equal(king.material.roughnessMap?.name, 'King_black_ORM')
+  assert.equal(king.material.metalnessMap, king.material.roughnessMap)
+  assert.equal(king.material.aoMap, king.material.roughnessMap)
+
+  const chessboard = gltf.scene.getObjectByName('Chessboard')
+  assert.equal(chessboard?.geometry.getAttribute('position')?.count, 108441)
+  assert.equal(chessboard.geometry.index?.count, 277248)
+  assert.equal(chessboard.material.map?.name, 'Chessboard_base_color')
+  assert.equal(chessboard.material.normalMap?.name, 'Chessboard_normal')
+
+  const pawnTop = gltf.scene.getObjectByName('Pawn_Top_W1')
+  assert.ok(pawnTop?.isMesh, 'ABeautifulGame should load a translucent white pawn top')
+  assert.equal(pawnTop.geometry.getAttribute('position')?.count, 1131)
+  assert.equal(pawnTop.geometry.index?.count, 6624)
+  assert.equal(pawnTop.material.name, 'Pawn_Top_White')
+  assert.equal(pawnTop.material.isMeshPhysicalMaterial, true)
+  assert.equal(pawnTop.material.transmission, 1)
+  assert.equal(pawnTop.material.thickness, 0.2199999988079071)
+  assert.equal(pawnTop.material.ior, 1.5)
+  assertVectorClose(pawnTop.material.attenuationColor.toArray(), [
+    0.800000011920929,
+    0.800000011920929,
+    0.800000011920929,
+  ], 'ABeautifulGame pawn attenuation color')
+  assert.equal(pawnTop.material.normalMap?.name, 'Pawn_normal')
+  assert.equal(pawnTop.material.roughnessMap?.name, 'Pawn_ORM')
+  assert.equal(pawnTop.material.metalnessMap, pawnTop.material.roughnessMap)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.12, 'ABeautifulGame should render visible chessboard geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 245 && mean.g < 245 && mean.b < 245, `ABeautifulGame should render non-white chess pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MosquitoInAmber fixture loads amber transmission volume', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_MOSQUITO_IN_AMBER, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_ior',
+    'KHR_materials_volume',
+  ])
+  assert.deepEqual(source.buffers, [{ name: 'MosquitoInAmber', byteLength: 1068732, uri: 'MosquitoInAmber.bin' }])
+  assert.equal(source.meshes.length, 3)
+  assert.equal(source.materials.length, 3)
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'MosquitoInAmber0.jpg',
+    'MosquitoInAmber1.png',
+    'MosquitoInAmber2.png',
+    'MosquitoInAmber3.jpg',
+    'MosquitoInAmber4.jpg',
+  ])
+  assert.deepEqual(source.materials.find((material) => material.name === 'material').extensions, {
+    KHR_materials_transmission: { transmissionFactor: 0.75 },
+    KHR_materials_ior: { ior: 1.55 },
+    KHR_materials_volume: { thicknessFactor: 0.9 },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MOSQUITO_IN_AMBER)
+  const materials = uniqueMaterials(gltf.scene)
+  assert.equal(materials.length, 3)
+
+  const amber = gltf.scene.getObjectByName('5_amber_lr_PBR_0')
+  assert.ok(amber?.isMesh, 'MosquitoInAmber should load the amber shell mesh')
+  assert.equal(amber.geometry.getAttribute('position')?.count, 1085)
+  assert.equal(amber.geometry.index?.count, 5556)
+  assert.equal(amber.material.name, 'material')
+  assert.equal(amber.material.isMeshPhysicalMaterial, true)
+  assert.equal(amber.material.transmission, 0.75)
+  assert.equal(amber.material.thickness, 0.9)
+  assert.equal(amber.material.ior, 1.55)
+  assert.equal(amber.material.roughness, 0.5)
+  assert.equal(amber.material.map?.name, 'MosquitoInAmber0.jpg')
+  assert.equal(Buffer.isBuffer(amber.material.map.image), true, 'amber base-color JPEG should load as an encoded Buffer')
+  assert.equal(amber.material.roughnessMap?.name, 'MosquitoInAmber1.png')
+  assert.deepEqual(pngDimensions(amber.material.roughnessMap.image), [4096, 4096])
+  assert.equal(amber.material.metalnessMap, amber.material.roughnessMap)
+  assert.equal(amber.material.normalMap?.name, 'MosquitoInAmber2.png')
+  assert.deepEqual(pngDimensions(amber.material.normalMap.image), [2048, 2048])
+
+  const shards = gltf.scene.getObjectByName('6_eclats_eclats_0')
+  assert.equal(shards?.geometry.getAttribute('position')?.count, 3057)
+  assert.equal(shards.geometry.index?.count, 3189)
+  assert.equal(shards.material.metalness, 1)
+  assert.equal(shards.material.roughness, 0.3922348485)
+  const mosquito = gltf.scene.getObjectByName('2_mosquito_lr_originalo_material_0_0')
+  assert.equal(mosquito?.geometry.getAttribute('position')?.count, 14536)
+  assert.equal(mosquito.geometry.index?.count, 34302)
+  assert.equal(mosquito.material.map?.name, 'MosquitoInAmber3.jpg')
+  assert.equal(mosquito.material.normalMap?.name, 'MosquitoInAmber4.jpg')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.3, 'MosquitoInAmber should render visible amber and insect geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 250 && mean.g < 250 && mean.b < 250, `MosquitoInAmber should render non-white amber pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets Sponza fixture loads large textured architectural scene', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SPONZA, 'utf8'))
+  assert.deepEqual(source.buffers, [{ uri: 'Sponza.bin', byteLength: 9528220 }])
+  assert.equal(source.nodes.length, 1)
+  assert.equal(source.meshes.length, 1)
+  assert.equal(source.materials.length, 25)
+  assert.equal(source.textures.length, 69)
+  assert.equal(source.images.length, 69)
+  assert.deepEqual(source.materials[0].pbrMetallicRoughness.baseColorFactor, [
+    0.5879999995231628,
+    0.5879999995231628,
+    0.5879999995231628,
+    1,
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SPONZA)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 103)
+  assert.equal(uniqueMaterials(gltf.scene).length, 25)
+
+  const first = gltf.scene.getObjectByName('mesh_0')
+  assert.ok(first?.isMesh, 'Sponza should load split mesh_0 geometry')
+  assert.equal(first.geometry.getAttribute('position')?.count, 3175)
+  assert.equal(first.geometry.getAttribute('uv')?.count, 3175)
+  assert.equal(first.geometry.index?.count, 10920)
+  assert.equal(first.material.isMeshStandardMaterial, true)
+  assert.equal(first.material.map?.name, '5061699253647017043.png')
+  assert.deepEqual(pngDimensions(first.material.map.image), [1024, 1024])
+  assert.equal(first.material.normalMap?.name, '8773302468495022225.jpg')
+  assert.equal(first.material.roughnessMap?.name, '11872827283454512094.jpg')
+  assert.equal(first.material.metalnessMap, first.material.roughnessMap)
+
+  const second = gltf.scene.getObjectByName('mesh_0_1')
+  assert.equal(second?.geometry.getAttribute('position')?.count, 533)
+  assert.equal(second.geometry.index?.count, 1404)
+  assert.equal(second.material.map?.name, '8006627369776289000.png')
+  assert.deepEqual(pngDimensions(second.material.map.image), [1024, 1024])
+  assert.equal(second.material.normalMap?.name, '12501374198249454378.jpg')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene, { distance: 1.8, yOffset: 0.1 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.5, 'Sponza should render visible architectural geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 220 && mean.g < 220 && mean.b < 220, `Sponza should render textured architecture pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
