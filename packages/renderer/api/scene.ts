@@ -546,7 +546,7 @@ function appendShadowOnlyMeshGroup(
         topology: wireframe ? 'lines' : undefined,
         castShadow: true,
         receiveShadow: false,
-        clipShadows: clipShadowsForMaterial(material, clippingContext),
+        clipShadows: clipShadowsForMaterial(shadowMaterial, clippingContext),
         ...clipping,
         ...sortInfo.keys,
         ...pbrProps,
@@ -608,7 +608,7 @@ function appendShadowOnlyMeshGroup(
       topology: wireframe ? 'lines' : undefined,
       castShadow: true,
       receiveShadow: false,
-      clipShadows: clipShadowsForMaterial(material, clippingContext),
+      clipShadows: clipShadowsForMaterial(shadowMaterial, clippingContext),
       ...clipping,
       ...sortInfo.keys,
       ...pbrProps,
@@ -973,7 +973,7 @@ function appendShadowOnlyBillboardMesh(
     topology: 'triangles',
     castShadow: true,
     receiveShadow: false,
-    clipShadows: clipShadowsForMaterial(material, clippingContext),
+    clipShadows: clipShadowsForMaterial(shadowMaterial, clippingContext),
     ...clipping,
     ...sortInfo.keys,
     ...shadowProps,
@@ -998,11 +998,18 @@ function shadowMaterialWithSourceShadowState(
     shadowMaterial.displacementScale = sourceMaterial.displacementScale
     shadowMaterial.displacementBias = sourceMaterial.displacementBias
   }
+  if (sourceMaterialHasShadowClippingState(sourceMaterial)) {
+    shadowMaterial.clipShadows = sourceMaterial.clipShadows
+    shadowMaterial.clippingPlanes = sourceMaterial.clippingPlanes
+    shadowMaterial.clipIntersection = sourceMaterial.clipIntersection
+  }
   return shadowMaterial
 }
 
 function sourceMaterialHasShadowState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
-  return sourceMaterialHasShadowAlphaState(material) || sourceMaterialHasShadowDisplacementState(material)
+  return sourceMaterialHasShadowAlphaState(material) ||
+    sourceMaterialHasShadowDisplacementState(material) ||
+    sourceMaterialHasShadowClippingState(material)
 }
 
 function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
@@ -1013,6 +1020,14 @@ function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefin
 
 function sourceMaterialHasShadowDisplacementState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
   return !!material?.displacementMap
+}
+
+function sourceMaterialHasShadowClippingState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
+  return !!material && (
+    'clipShadows' in material ||
+    material.clippingPlanes != null ||
+    'clipIntersection' in material
+  )
 }
 
 function shadowPbrProperties(
