@@ -8,6 +8,10 @@ Status keys:
 - **Partial**: implemented for common cases, with known gaps listed here.
 - **Unsupported**: not implemented; scenes should be preprocessed or should expect clear documented gaps.
 
+The committed Khronos fixture corpus is tracked separately in
+[Khronos glTF Sample Asset Coverage](./gltf-sample-assets.md), with a docs
+consistency test keeping that list synchronized with `gltf.test.mjs`.
+
 ## Public API
 
 | Feature | Status | Notes |
