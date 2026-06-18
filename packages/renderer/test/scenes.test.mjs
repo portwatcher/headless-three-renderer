@@ -2755,6 +2755,46 @@ test('normalMap honors nearest texture filters', () => {
   assert.ok(nearest.b > linear.b + 10, `NearestFilter should preserve a stronger blue normal output (${nearest.b} vs ${linear.b})`)
 })
 
+test('normalMap honors horizontal and vertical repeat wrapping', () => {
+  function renderWithWrapping({ wrapS, wrapT, vertical = false }) {
+    const normalMap = vertical
+      ? rgbaTexture([
+        255, 128, 128, 255,
+        128, 128, 255, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        255, 128, 128, 255,
+        128, 128, 255, 255,
+      ], 2, 1)
+    if (wrapS != null) normalMap.wrapS = wrapS
+    if (wrapT != null) normalMap.wrapT = wrapT
+    normalMap.magFilter = THREE.NearestFilter
+    normalMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      new THREE.MeshNormalMaterial({ normalMap }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.b > clamped.r + 20, `clamped normalMap U coordinates should sample the flat blue texel (${clamped.b} vs ${clamped.r})`)
+  assert.ok(repeated.r > repeated.b + 20, `repeated normalMap U coordinates should wrap to the tangent-right red texel (${repeated.r} vs ${repeated.b})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.b > clampedVertical.r + 20, `clamped normalMap V coordinates should sample the flat blue texel (${clampedVertical.b} vs ${clampedVertical.r})`)
+  assert.ok(repeatedVertical.r > repeatedVertical.b + 20, `repeated normalMap V coordinates should wrap to the tangent-right red texel (${repeatedVertical.r} vs ${repeatedVertical.b})`)
+})
+
 test('MeshPhongMaterial renders Blinn-Phong specular and honors specularMap', () => {
   function renderPhong(specularMap) {
     const scene = new THREE.Scene()
