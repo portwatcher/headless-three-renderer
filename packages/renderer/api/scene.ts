@@ -481,15 +481,16 @@ function appendShadowOnlyMeshGroup(
   instancedPositionOffset: InstancedAttributeRef | null,
   instances: MeshInstance[],
 ): void {
+  const shadowMaterial = shadowMaterialWithSourceAlphaState(material, sourceMaterial)
   const baseColor = materialColor(material)
   const useVertexColors = vertexColors && material.vertexColors !== false
-  const pbrProps = shadowPbrProperties(material, sourceMaterial, materialContext)
-  const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, material)
+  const pbrProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
+  const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, shadowMaterial)
   if (uvStreams.alphaMapUsesUv2 !== undefined) {
     pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
   }
-  const textureInfo = extractTextureData(material)
-  const clipping = clippingState(clippingContext, material, localClippingEnabled)
+  const textureInfo = extractTextureData(shadowMaterial)
+  const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
   const wireframe = isDepthDistanceWireframeMaterial(material)
   const hiddenMainPass = shadowOnlyMainPassState()
 
@@ -944,11 +945,12 @@ function appendShadowOnlyBillboardMesh(
   indices: number[],
   uvs: number[],
 ): void {
-  const textureInfo = extractTextureData(material)
+  const shadowMaterial = shadowMaterialWithSourceAlphaState(material, sourceMaterial)
+  const textureInfo = extractTextureData(shadowMaterial)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
-  const clipping = clippingState(clippingContext, material, localClippingEnabled)
+  const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
   const hiddenMainPass = shadowOnlyMainPassState()
-  const shadowProps = shadowPbrProperties(material, sourceMaterial, materialContext)
+  const shadowProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
   shadowProps.alphaMapUsesUv2 = false
 
   pushMesh(meshes, {
@@ -977,6 +979,25 @@ function appendShadowOnlyBillboardMesh(
     ...shadowProps,
     ...hiddenMainPass,
   }, sortInfo.item)
+}
+
+function shadowMaterialWithSourceAlphaState(
+  material: ThreeMaterialLike,
+  sourceMaterial: ThreeMaterialLike | undefined,
+): ThreeMaterialLike {
+  if (!sourceMaterialHasShadowAlphaState(sourceMaterial)) return material
+  const shadowMaterial = Object.create(material) as ThreeMaterialLike
+  shadowMaterial.map = sourceMaterial.map ?? null
+  shadowMaterial.alphaMap = sourceMaterial.alphaMap ?? null
+  shadowMaterial.alphaTest = sourceMaterial.alphaToCoverage === true ? 0.5 : sourceMaterial.alphaTest
+  shadowMaterial.alphaToCoverage = sourceMaterial.alphaToCoverage
+  return shadowMaterial
+}
+
+function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
+  if (!material || (!material.map && !material.alphaMap)) return false
+  if (material.alphaToCoverage === true) return true
+  return typeof material.alphaTest === 'number' && Number.isFinite(material.alphaTest) && material.alphaTest > 0
 }
 
 function shadowPbrProperties(
