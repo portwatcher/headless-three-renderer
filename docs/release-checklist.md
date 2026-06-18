@@ -24,8 +24,9 @@ fixture, and golden-reference state for that version.
 - Commit platform-scoped references under
   `packages/renderer/test/browser-reference/references/<platform>-<arch>/`
   when that platform is expected to enforce golden parity.
-- Run `pnpm -C packages/renderer run test:golden` for the default no-reference
-  or auto-detected platform-reference path.
+- Run `pnpm -C packages/renderer run test:golden` for the auto-detected
+  platform-reference path, or for the documented no-reference skip path on
+  platforms without committed references.
 - Run
   `HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES=1 HEADLESS_THREE_BROWSER_REFERENCE_DIR=/path/to/browser-references pnpm -C packages/renderer run test:golden`
   before release when the platform should require committed or externally
