@@ -21140,6 +21140,62 @@ test('PointsMaterial map honors explicit texture matrices', () => {
   assert.ok(mean.g > mean.r + 40, `explicit point map matrix should shift left point-sprite UVs from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('PointsMaterial map honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const map = vertical
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+    map.wrapS = wrapS
+    map.wrapT = wrapT
+    map.offset.set(vertical ? 0 : 1, vertical ? 1 : 0)
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestFilter
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      map,
+      size: 48,
+      sizeAttenuation: false,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const rgba = renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+    return vertical
+      ? meanRegion(rgba, 96, 96, 44, 58, 52, 66)
+      : meanRegion(rgba, 96, 96, 30, 44, 38, 52)
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.r > clamped.g + 100, `clamped point map U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
+  assert.ok(repeated.g > repeated.r + 60, `repeated point map U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.r > clampedVertical.g + 100, `clamped point map V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
+  assert.ok(repeatedVertical.g > repeatedVertical.r + 60, `repeated point map V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+})
+
 test('PointsMaterial alphaMap applies texture UV transforms', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,
