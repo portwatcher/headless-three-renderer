@@ -13002,6 +13002,50 @@ test('lightMap honors nearest texture filters', () => {
   assert.ok(linear.g > nearest.g + 30, `LinearFilter should blend in the green light-map texel (${linear.g} vs ${nearest.g})`)
 })
 
+test('lightMap honors horizontal and vertical repeat wrapping', () => {
+  function renderWithWrapping({ wrapS, wrapT, vertical = false }) {
+    const lightMap = vertical
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 1)
+    if (wrapS != null) lightMap.wrapS = wrapS
+    if (wrapT != null) lightMap.wrapT = wrapT
+    lightMap.magFilter = THREE.NearestFilter
+    lightMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        lightMap,
+        lightMapIntensity: 3,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.r > clamped.g + 80, `clamped lightMap U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
+  assert.ok(repeated.g > repeated.r + 30, `repeated lightMap U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.r > clampedVertical.g + 80, `clamped lightMap V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
+  assert.ok(repeatedVertical.g > repeatedVertical.r + 30, `repeated lightMap V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+})
+
 test('AmbientLight honors camera layer filtering', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
