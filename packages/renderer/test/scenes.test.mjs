@@ -19726,6 +19726,65 @@ test('LineBasicMaterial map honors explicit texture matrices', () => {
   assert.ok(greenPixels > 2, `explicit line map matrix should shift line UVs from red to green (${greenPixels})`)
 })
 
+test('LineBasicMaterial map honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const map = vertical
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+    map.wrapS = wrapS
+    map.wrapT = wrapT
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestFilter
+
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25,
+      vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25,
+    ]), 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Line(
+      geom,
+      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 8, map }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const clampedRed = countRegionPixels(clamped, 96, 96, 0, 0, 96, 96, (r, g, b) => r > g + 40 && r > b + 40)
+  const repeatedGreen = countRegionPixels(repeated, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(clampedRed > 600, `clamped line map U coordinates should sample the red edge texel (${clampedRed})`)
+  assert.ok(repeatedGreen > 600, `repeated line map U coordinates should wrap to the green texel (${repeatedGreen})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const clampedVerticalRed = countRegionPixels(clampedVertical, 96, 96, 0, 0, 96, 96, (r, g, b) => r > g + 40 && r > b + 40)
+  const repeatedVerticalGreen = countRegionPixels(repeatedVertical, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(clampedVerticalRed > 600, `clamped line map V coordinates should sample the red edge texel (${clampedVerticalRed})`)
+  assert.ok(repeatedVerticalGreen > 600, `repeated line map V coordinates should wrap to the green texel (${repeatedVerticalGreen})`)
+})
+
 test('LineBasicMaterial map decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
