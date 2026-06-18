@@ -1,0 +1,655 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "@headless-three/renderer synthetic humanoid VRM fixture"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "SyntheticHumanoidAvatarScene",
+      "nodes": [
+        0,
+        19
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "SyntheticHumanoidRoot",
+      "children": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "SyntheticHumanoidSkinnedMesh",
+      "mesh": 0,
+      "skin": 0
+    },
+    {
+      "name": "hips",
+      "translation": [
+        0,
+        0.18,
+        0
+      ],
+      "children": [
+        3,
+        13,
+        16
+      ]
+    },
+    {
+      "name": "spine",
+      "translation": [
+        0,
+        0.32,
+        0
+      ],
+      "children": [
+        4
+      ]
+    },
+    {
+      "name": "chest",
+      "translation": [
+        0,
+        0.32,
+        0
+      ],
+      "children": [
+        5,
+        7,
+        10
+      ]
+    },
+    {
+      "name": "neck",
+      "translation": [
+        0,
+        0.24,
+        0
+      ],
+      "children": [
+        6
+      ]
+    },
+    {
+      "name": "head",
+      "translation": [
+        0,
+        0.22,
+        0
+      ]
+    },
+    {
+      "name": "leftUpperArm",
+      "translation": [
+        -0.34,
+        0.16,
+        0
+      ],
+      "children": [
+        8
+      ]
+    },
+    {
+      "name": "leftLowerArm",
+      "translation": [
+        -0.28,
+        -0.18,
+        0
+      ],
+      "children": [
+        9
+      ]
+    },
+    {
+      "name": "leftHand",
+      "translation": [
+        -0.24,
+        -0.18,
+        0
+      ]
+    },
+    {
+      "name": "rightUpperArm",
+      "translation": [
+        0.34,
+        0.16,
+        0
+      ],
+      "children": [
+        11
+      ]
+    },
+    {
+      "name": "rightLowerArm",
+      "translation": [
+        0.28,
+        -0.18,
+        0
+      ],
+      "children": [
+        12
+      ]
+    },
+    {
+      "name": "rightHand",
+      "translation": [
+        0.24,
+        -0.18,
+        0
+      ]
+    },
+    {
+      "name": "leftUpperLeg",
+      "translation": [
+        -0.12,
+        -0.44,
+        0
+      ],
+      "children": [
+        14
+      ]
+    },
+    {
+      "name": "leftLowerLeg",
+      "translation": [
+        0,
+        -0.42,
+        0
+      ],
+      "children": [
+        15
+      ]
+    },
+    {
+      "name": "leftFoot",
+      "translation": [
+        -0.03,
+        -0.16,
+        0.08
+      ]
+    },
+    {
+      "name": "rightUpperLeg",
+      "translation": [
+        0.12,
+        -0.44,
+        0
+      ],
+      "children": [
+        17
+      ]
+    },
+    {
+      "name": "rightLowerLeg",
+      "translation": [
+        0,
+        -0.42,
+        0
+      ],
+      "children": [
+        18
+      ]
+    },
+    {
+      "name": "rightFoot",
+      "translation": [
+        0.03,
+        -0.16,
+        0.08
+      ]
+    },
+    {
+      "name": "Camera",
+      "camera": 0,
+      "translation": [
+        0,
+        0.35,
+        3.6
+      ]
+    }
+  ],
+  "skins": [
+    {
+      "name": "SyntheticHumanoidSkin",
+      "skeleton": 2,
+      "joints": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "inverseBindMatrices": 6
+    }
+  ],
+  "cameras": [
+    {
+      "name": "SyntheticHumanoidCamera",
+      "type": "perspective",
+      "perspective": {
+        "aspectRatio": 1,
+        "yfov": 0.7853981633974483,
+        "znear": 0.01,
+        "zfar": 100
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "SyntheticHumanoidMesh",
+      "weights": [
+        0
+      ],
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 3,
+            "WEIGHTS_0": 4
+          },
+          "indices": 7,
+          "material": 0,
+          "targets": [
+            {
+              "POSITION": 5
+            }
+          ]
+        },
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 3,
+            "WEIGHTS_0": 4
+          },
+          "indices": 8,
+          "material": 1,
+          "targets": [
+            {
+              "POSITION": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "SyntheticHumanoidMToonSkin",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.42,
+          0.68,
+          1,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.82
+      },
+      "extensions": {
+        "KHR_materials_unlit": {},
+        "VRMC_materials_mtoon": {
+          "specVersion": "1.0",
+          "shadeColorFactor": [
+            0.2,
+            0.32,
+            0.52
+          ]
+        }
+      }
+    },
+    {
+      "name": "SyntheticHumanoidMToonAccent",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.07,
+          0.08,
+          0.12,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.9
+      },
+      "extensions": {
+        "KHR_materials_unlit": {},
+        "VRMC_materials_mtoon": {
+          "specVersion": "1.0",
+          "shadeColorFactor": [
+            0.02,
+            0.02,
+            0.04
+          ]
+        }
+      }
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 4212,
+      "uri": "data:application/octet-stream;base64,rkdhvgrXIz4AAAAArkdhPgrXIz4AAAAArkdhPo/CdT8AAAAArkdhvo/CdT8AAAAACtcjvnE9ij8AAAAACtcjPnE9ij8AAAAACtcjPo/CtT8AAAAACtcjvo/CtT8AAAAAKVwPv+F6FD8AAAAAj8J1vuF6FD8AAAAAj8J1voXrUT8AAAAAKVwPv4XrUT8AAAAAFK5Hv+xRuD4AAAAAuB4Fv+xRuD4AAAAAuB4Fv5qZGT8AAAAAFK5Hv5qZGT8AAAAAj8J1PuF6FD8AAAAAKVwPP+F6FD8AAAAAKVwPP4XrUT8AAAAAj8J1PoXrUT8AAAAAuB4FP+xRuD4AAAAAFK5HP+xRuD4AAAAAFK5HP5qZGT8AAAAAuB4FP5qZGT8AAAAAH4VrvnsUrr4AAAAACtcjvXsUrr4AAAAACtcjvexROD4AAAAAH4VrvuxROD4AAAAAAACAvvYoXL8AAAAAj8J1vfYoXL8AAAAAj8J1vXsUrr4AAAAAAACAvnsUrr4AAAAACtcjPXsUrr4AAAAAH4VrPnsUrr4AAAAAH4VrPuxROD4AAAAACtcjPexROD4AAAAAj8J1PfYoXL8AAAAAAACAPvYoXL8AAAAAAACAPnsUrr4AAAAAj8J1PXsUrr4AAAAA7FE4vgrXoz8AAAAA7FE4PgrXoz8AAAAA7FE4PgAAwD8AAAAA7FE4vgAAwD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AACAPwAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AACAPwAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AACAPwAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwEAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAEAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAFAAAAAAAAAAUAAAAAAAAABQAAAAAAAAAFAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAACAAAAAAAAAAIAAAAAAAAAAgAAAAAAAAACAAAAAAAAAAJAAAAAAAAAAkAAAAAAAAACQAAAAAAAAAJAAAAAAAAAAsAAAAAAAAACwAAAAAAAAALAAAAAAAAAAsAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAOAAAAAAAAAA4AAAAAAAAADgAAAAAAAAAOAAAAAAAAAA8AAAAAAAAADwAAAAAAAAAPAAAAAAAAAA8AAAAAAAAABAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApXA89AAAAAAAAAAApXA89AAAAAAAAAAApXA89AAAAAAAAAAApXA89AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADNzMw8AAAAAAAAAADNzMw8AAAAAAAAAADNzMw8AAAAAAAAAADNzMw8AAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAABAAIAAAACAAMABAAFAAYABAAGAAcACAAJAAoACAAKAAsADAANAA4ADAAOAA8AEAARABIAEAASABMAFAAVABYAFAAWABcAGAAZABoAGAAaABsAHAAdAB4AHAAeAB8AIAAhACIAIAAiACMAJAAlACYAJAAmACcAKAApACoAKAAqACsA"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 528,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 528,
+      "byteLength": 528,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 1056,
+      "byteLength": 352,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 1408,
+      "byteLength": 352,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 1760,
+      "byteLength": 704,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 2464,
+      "byteLength": 528,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 2992,
+      "byteLength": 1088
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 4080,
+      "byteLength": 120,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 4200,
+      "byteLength": 12,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 44,
+      "type": "VEC3",
+      "min": [
+        -0.78,
+        -0.86,
+        0
+      ],
+      "max": [
+        0.78,
+        1.5,
+        0
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 44,
+      "type": "VEC3",
+      "min": [
+        0,
+        0,
+        1
+      ],
+      "max": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 44,
+      "type": "VEC2",
+      "min": [
+        0,
+        0
+      ],
+      "max": [
+        1,
+        1
+      ]
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 44,
+      "type": "VEC4",
+      "min": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "max": [
+        15,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 44,
+      "type": "VEC4",
+      "min": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "max": [
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 44,
+      "type": "VEC3",
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        0,
+        0.035,
+        0
+      ]
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 17,
+      "type": "MAT4"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5123,
+      "count": 60,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        39
+      ]
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR",
+      "min": [
+        40
+      ],
+      "max": [
+        43
+      ]
+    }
+  ],
+  "extensionsUsed": [
+    "KHR_materials_unlit",
+    "VRMC_materials_mtoon",
+    "VRMC_vrm"
+  ],
+  "extensions": {
+    "VRMC_vrm": {
+      "specVersion": "1.0",
+      "meta": {
+        "name": "Synthetic Humanoid Avatar",
+        "version": "v1.0.0",
+        "authors": [
+          "@headless-three/renderer"
+        ],
+        "copyrightInformation": "Synthetic test fixture generated for @headless-three/renderer.",
+        "contactInformation": "https://github.com/portwatcher/headless-three-renderer",
+        "references": [],
+        "licenseUrl": "https://vrm.dev/licenses/1.0/",
+        "avatarPermission": "everyone",
+        "allowExcessivelyViolentUsage": false,
+        "allowExcessivelySexualUsage": false,
+        "commercialUsage": "corporation",
+        "allowPoliticalOrReligiousUsage": false,
+        "allowAntisocialOrHateUsage": false,
+        "creditNotation": "unnecessary",
+        "allowRedistribution": true,
+        "modification": "allowModificationRedistribution"
+      },
+      "humanoid": {
+        "humanBones": {
+          "hips": {
+            "node": 2
+          },
+          "spine": {
+            "node": 3
+          },
+          "chest": {
+            "node": 4
+          },
+          "neck": {
+            "node": 5
+          },
+          "head": {
+            "node": 6
+          },
+          "leftUpperArm": {
+            "node": 7
+          },
+          "leftLowerArm": {
+            "node": 8
+          },
+          "leftHand": {
+            "node": 9
+          },
+          "rightUpperArm": {
+            "node": 10
+          },
+          "rightLowerArm": {
+            "node": 11
+          },
+          "rightHand": {
+            "node": 12
+          },
+          "leftUpperLeg": {
+            "node": 13
+          },
+          "leftLowerLeg": {
+            "node": 14
+          },
+          "leftFoot": {
+            "node": 15
+          },
+          "rightUpperLeg": {
+            "node": 16
+          },
+          "rightLowerLeg": {
+            "node": 17
+          },
+          "rightFoot": {
+            "node": 18
+          }
+        }
+      },
+      "lookAt": {
+        "offsetFromHeadBone": [
+          0,
+          0.06,
+          0.08
+        ],
+        "type": "expression"
+      },
+      "expressions": {
+        "preset": {
+          "happy": {
+            "morphTargetBinds": [
+              {
+                "node": 1,
+                "index": 0,
+                "weight": 0.7
+              }
+            ],
+            "overrideBlink": "blend"
+          },
+          "blink": {
+            "morphTargetBinds": [
+              {
+                "node": 1,
+                "index": 0,
+                "weight": 1
+              }
+            ],
+            "isBinary": true
+          }
+        }
+      }
+    }
+  }
+}

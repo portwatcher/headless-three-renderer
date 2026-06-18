@@ -1,0 +1,413 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "@headless-three/renderer synthetic humanoid VRMA fixture"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "SyntheticHumanoidAnimationScene",
+      "nodes": [
+        0,
+        17,
+        18
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "hips",
+      "children": [
+        1,
+        11,
+        14
+      ]
+    },
+    {
+      "name": "spine",
+      "translation": [
+        0,
+        0.32,
+        0
+      ],
+      "children": [
+        2
+      ]
+    },
+    {
+      "name": "chest",
+      "translation": [
+        0,
+        0.32,
+        0
+      ],
+      "children": [
+        3,
+        5,
+        8
+      ]
+    },
+    {
+      "name": "neck",
+      "translation": [
+        0,
+        0.24,
+        0
+      ],
+      "children": [
+        4
+      ]
+    },
+    {
+      "name": "head",
+      "translation": [
+        0,
+        0.22,
+        0
+      ]
+    },
+    {
+      "name": "leftUpperArm",
+      "translation": [
+        -0.34,
+        0.16,
+        0
+      ],
+      "children": [
+        6
+      ]
+    },
+    {
+      "name": "leftLowerArm",
+      "translation": [
+        -0.28,
+        -0.18,
+        0
+      ],
+      "children": [
+        7
+      ]
+    },
+    {
+      "name": "leftHand",
+      "translation": [
+        -0.24,
+        -0.18,
+        0
+      ]
+    },
+    {
+      "name": "rightUpperArm",
+      "translation": [
+        0.34,
+        0.16,
+        0
+      ],
+      "children": [
+        9
+      ]
+    },
+    {
+      "name": "rightLowerArm",
+      "translation": [
+        0.28,
+        -0.18,
+        0
+      ],
+      "children": [
+        10
+      ]
+    },
+    {
+      "name": "rightHand",
+      "translation": [
+        0.24,
+        -0.18,
+        0
+      ]
+    },
+    {
+      "name": "leftUpperLeg",
+      "translation": [
+        -0.12,
+        -0.44,
+        0
+      ],
+      "children": [
+        12
+      ]
+    },
+    {
+      "name": "leftLowerLeg",
+      "translation": [
+        0,
+        -0.42,
+        0
+      ],
+      "children": [
+        13
+      ]
+    },
+    {
+      "name": "leftFoot",
+      "translation": [
+        -0.03,
+        -0.16,
+        0.08
+      ]
+    },
+    {
+      "name": "rightUpperLeg",
+      "translation": [
+        0.12,
+        -0.44,
+        0
+      ],
+      "children": [
+        15
+      ]
+    },
+    {
+      "name": "rightLowerLeg",
+      "translation": [
+        0,
+        -0.42,
+        0
+      ],
+      "children": [
+        16
+      ]
+    },
+    {
+      "name": "rightFoot",
+      "translation": [
+        0.03,
+        -0.16,
+        0.08
+      ]
+    },
+    {
+      "name": "lookAtTarget",
+      "translation": [
+        0,
+        1.38,
+        0.5
+      ]
+    },
+    {
+      "name": "happyExpression"
+    }
+  ],
+  "animations": [
+    {
+      "name": "SyntheticHumanoidIdle",
+      "samplers": [
+        {
+          "input": 0,
+          "output": 1,
+          "interpolation": "LINEAR"
+        },
+        {
+          "input": 0,
+          "output": 2,
+          "interpolation": "LINEAR"
+        },
+        {
+          "input": 0,
+          "output": 3,
+          "interpolation": "LINEAR"
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 0,
+            "path": "translation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 4,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 5,
+            "path": "rotation"
+          }
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 144,
+      "uri": "data:application/octet-stream;base64,AAAAAAAAAD8AAIA/AAAAAAAAAAAAAAAAAAAAAM3MTD0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAh1M3Pi7dez8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAP3dXfb4AAAAAAAAAAKUKeD8AAAAAAAAAAAAAAAAAAIA/"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 12
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 12,
+      "byteLength": 36
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 48,
+      "byteLength": 48
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 96,
+      "byteLength": 48
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 3,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        1
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC3",
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        0,
+        0.05,
+        0
+      ]
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC4",
+      "min": [
+        0,
+        0,
+        0,
+        0.9838436927881214
+      ],
+      "max": [
+        0,
+        0,
+        0.17902957342582418,
+        1
+      ]
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC4",
+      "min": [
+        -0.24740395925452294,
+        0,
+        0,
+        0.9689124217106447
+      ],
+      "max": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "extensionsUsed": [
+    "VRMC_vrm_animation"
+  ],
+  "extensions": {
+    "VRMC_vrm_animation": {
+      "specVersion": "1.0",
+      "humanoid": {
+        "humanBones": {
+          "hips": {
+            "node": 0
+          },
+          "spine": {
+            "node": 1
+          },
+          "chest": {
+            "node": 2
+          },
+          "neck": {
+            "node": 3
+          },
+          "head": {
+            "node": 4
+          },
+          "leftUpperArm": {
+            "node": 5
+          },
+          "leftLowerArm": {
+            "node": 6
+          },
+          "leftHand": {
+            "node": 7
+          },
+          "rightUpperArm": {
+            "node": 8
+          },
+          "rightLowerArm": {
+            "node": 9
+          },
+          "rightHand": {
+            "node": 10
+          },
+          "leftUpperLeg": {
+            "node": 11
+          },
+          "leftLowerLeg": {
+            "node": 12
+          },
+          "leftFoot": {
+            "node": 13
+          },
+          "rightUpperLeg": {
+            "node": 14
+          },
+          "rightLowerLeg": {
+            "node": 15
+          },
+          "rightFoot": {
+            "node": 16
+          }
+        }
+      },
+      "lookAt": {
+        "node": 17
+      },
+      "expressions": {
+        "preset": {
+          "happy": {
+            "node": 18
+          }
+        }
+      }
+    }
+  }
+}
