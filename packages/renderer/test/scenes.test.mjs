@@ -13032,6 +13032,35 @@ test('color-space decoding composes with explicit texture matrices', () => {
     }), 96, 96, 0, 46, 96, 50).r
   }, 10)
 
+  assertLinearBrighter('dashed-line map', (colorSpace) => {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.25, 0.5,
+      0.25, 0.5,
+    ]), 2))
+
+    const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      dashSize: 10,
+      gapSize: 0,
+      map: transformedGrayTexture(colorSpace),
+      scale: 1,
+    }))
+    line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+    return meanRegion(renderRgba(scene, frontCamera(), {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 96, 96, 0, 46, 96, 50).r
+  }, 10)
+
   assertLinearBrighter('matcap color map', (colorSpace) => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
