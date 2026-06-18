@@ -6073,6 +6073,34 @@ test('transparent sort depth uses geometry bounding sphere center', () => {
   assert.ok(mean.r > mean.b + 20, `near red geometry center should sort over far blue despite matching object origins (${mean.r} vs ${mean.b})`)
 })
 
+test('transparent sort depth prefers object bounding sphere center when present', () => {
+  function objectBoundedPlane(zCenter, color) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+      }),
+    )
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, zCenter), 1.5)
+    return mesh
+  }
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(objectBoundedPlane(0.45, 0xff0000))
+  scene.add(objectBoundedPlane(-0.45, 0x0000ff))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 20, `near red object bounding sphere center should sort over far blue despite matching geometry centers (${mean.r} vs ${mean.b})`)
+})
+
 test('material depthTest=false renders over earlier depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

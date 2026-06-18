@@ -1767,6 +1767,22 @@ function projectedWorldPointZ(worldPoint: [number, number, number], camera: Thre
 }
 
 function objectSortCenter(object: ThreeObject3DLike): [number, number, number] {
+  if (object.boundingSphere !== undefined) {
+    if (object.boundingSphere == null && typeof object.computeBoundingSphere === 'function') {
+      try {
+        object.computeBoundingSphere()
+      } catch {
+        return [0, 0, 0]
+      }
+    }
+
+    if (object.boundingSphere == null) return [0, 0, 0]
+    if (!object.boundingSphere || typeof object.boundingSphere !== 'object') {
+      throw new TypeError('object.boundingSphere must be a THREE.Sphere-like object.')
+    }
+    return requiredVec3Like(object.boundingSphere.center, 'object.boundingSphere.center')
+  }
+
   const geometry = object.geometry
   if (!geometry) return [0, 0, 0]
 
