@@ -2688,10 +2688,10 @@ function compareBatchedDrawsTransparent(a: BatchedMeshDraw, b: BatchedMeshDraw):
 }
 
 function batchedMeshUsesTransparentSort(object: ThreeObject3DLike): boolean {
-  const material = Array.isArray(object.material)
-    ? object.material.find(Boolean)
-    : object.material
-  return material?.transparent === true
+  const materials = Array.isArray(object.material)
+    ? object.material
+    : [object.material]
+  return materials.some((material) => material?.transparent === true || finitePositive(material?.transmission))
 }
 
 function batchedDrawDistanceZ(
