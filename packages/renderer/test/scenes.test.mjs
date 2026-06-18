@@ -7382,13 +7382,19 @@ test('aoMap honors horizontal and vertical repeat wrapping', () => {
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.r < 20, `clamped aoMap U coordinates should sample the dark edge texel (${clamped.r})`)
   assert.ok(repeated.r > clamped.r + 80, `repeated aoMap U coordinates should wrap to the bright texel (${repeated.r} vs ${clamped.r})`)
+  assert.ok(mirrored.r < 20, `mirrored aoMap U coordinates should reflect to the dark texel (${mirrored.r})`)
+  assert.ok(repeated.r > mirrored.r + 80, `mirrored aoMap U coordinates should differ from RepeatWrapping (${mirrored.r} vs ${repeated.r})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.r < 20, `clamped aoMap V coordinates should sample the dark edge texel (${clampedVertical.r})`)
   assert.ok(repeatedVertical.r > clampedVertical.r + 80, `repeated aoMap V coordinates should wrap to the bright texel (${repeatedVertical.r} vs ${clampedVertical.r})`)
+  assert.ok(mirroredVertical.r < 20, `mirrored aoMap V coordinates should reflect to the dark texel (${mirroredVertical.r})`)
+  assert.ok(repeatedVertical.r > mirroredVertical.r + 80, `mirrored aoMap V coordinates should differ from RepeatWrapping (${mirroredVertical.r} vs ${repeatedVertical.r})`)
 })
 
 test('alphaMap green channel contributes to alpha testing', () => {
@@ -10939,13 +10945,17 @@ test('emissiveMap honors horizontal and vertical repeat wrapping', () => {
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.r > clamped.g + 80, `clamped emissiveMap U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
   assert.ok(repeated.g > repeated.r + 30, `repeated emissiveMap U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+  assert.ok(mirrored.r > mirrored.g + 80, `mirrored emissiveMap U coordinates should reflect to the red texel (${mirrored.r} vs ${mirrored.g})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.r > clampedVertical.g + 80, `clamped emissiveMap V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
   assert.ok(repeatedVertical.g > repeatedVertical.r + 30, `repeated emissiveMap V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+  assert.ok(mirroredVertical.r > mirroredVertical.g + 80, `mirrored emissiveMap V coordinates should reflect to the red texel (${mirroredVertical.r} vs ${mirroredVertical.g})`)
 })
 
 test('metallicRoughness maps apply texture UV transforms', () => {
@@ -13423,13 +13433,17 @@ test('lightMap honors horizontal and vertical repeat wrapping', () => {
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.r > clamped.g + 80, `clamped lightMap U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
   assert.ok(repeated.g > repeated.r + 30, `repeated lightMap U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+  assert.ok(mirrored.r > mirrored.g + 80, `mirrored lightMap U coordinates should reflect to the red texel (${mirrored.r} vs ${mirrored.g})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.r > clampedVertical.g + 80, `clamped lightMap V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
   assert.ok(repeatedVertical.g > repeatedVertical.r + 30, `repeated lightMap V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+  assert.ok(mirroredVertical.r > mirroredVertical.g + 80, `mirrored lightMap V coordinates should reflect to the red texel (${mirroredVertical.r} vs ${mirroredVertical.g})`)
 })
 
 test('AmbientLight honors camera layer filtering', () => {
