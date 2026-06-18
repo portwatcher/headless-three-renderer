@@ -3922,8 +3922,10 @@ test('MeshToonMaterial gradientMap honors horizontal repeat wrapping', () => {
 
   const clamped = renderWithWrapping(THREE.ClampToEdgeWrapping)
   const repeated = renderWithWrapping(THREE.RepeatWrapping)
+  const mirrored = renderWithWrapping(THREE.MirroredRepeatWrapping)
   assert.ok(clamped.r > repeated.r + 80, `clamped toon gradientMap should sample the bright edge texel (${clamped.r} vs ${repeated.r})`)
   assert.ok(repeated.r < 5, `repeated toon gradientMap should wrap the lit ramp coordinate to the dark texel (${repeated.r})`)
+  assert.ok(mirrored.r > repeated.r + 80, `mirrored toon gradientMap should reflect the lit ramp coordinate to the bright texel (${mirrored.r} vs ${repeated.r})`)
 })
 
 test('MeshToonMaterial gradientMap decodes sRGB colorSpace before shading', () => {
