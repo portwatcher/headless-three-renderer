@@ -7727,8 +7727,8 @@ test('LineBasicMaterial alphaToCoverage approximates shadow caster cutouts', () 
   assert.ok(cutoutLum > fullLum + 2, `line alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
 })
 
-test('LineBasicMaterial alphaHash approximates shadow caster opacity cutouts', () => {
-  function renderLineAlphaHashShadow(alphaHash) {
+test('LineBasicMaterial and LineDashedMaterial alphaHash approximate shadow caster opacity cutouts', () => {
+  function renderLineAlphaHashShadow(materialKind, alphaHash) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -7740,11 +7740,20 @@ test('LineBasicMaterial alphaHash approximates shadow caster opacity cutouts', (
     receiver.receiveShadow = true
     scene.add(receiver)
 
-    const material = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      opacity: alphaHash ? 0.35 : 1,
-      alphaHash,
-    })
+    const material = materialKind === 'dashed'
+      ? new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+        alphaHash,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+      : new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+        alphaHash,
+      })
     material.colorWrite = false
     material.depthWrite = false
 
@@ -7756,6 +7765,7 @@ test('LineBasicMaterial alphaHash approximates shadow caster opacity cutouts', (
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const line = new THREE.LineSegments(geometry, material)
+    if (materialKind === 'dashed') line.computeLineDistances()
     line.castShadow = true
     scene.add(line)
 
@@ -7779,11 +7789,13 @@ test('LineBasicMaterial alphaHash approximates shadow caster opacity cutouts', (
     return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
   }
 
-  const fullShadow = renderLineAlphaHashShadow(false)
-  const hashedShadow = renderLineAlphaHashShadow(true)
-  const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
-  const hashedLum = hashedShadow.r + hashedShadow.g + hashedShadow.b
-  assert.ok(hashedLum > fullLum + 2, `line alphaHash shadow cutoff should let more receiver light through (${hashedLum} vs ${fullLum})`)
+  for (const materialKind of ['basic', 'dashed']) {
+    const fullShadow = renderLineAlphaHashShadow(materialKind, false)
+    const hashedShadow = renderLineAlphaHashShadow(materialKind, true)
+    const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+    const hashedLum = hashedShadow.r + hashedShadow.g + hashedShadow.b
+    assert.ok(hashedLum > fullLum + 2, `${materialKind} line alphaHash shadow cutoff should let more receiver light through (${hashedLum} vs ${fullLum})`)
+  }
 })
 
 test('Line shadow casters honor material and group clipShadows', () => {
