@@ -321,6 +321,9 @@ export interface ThreeObject3DLike {
   isHemisphereLight?: boolean
   isAmbientLight?: boolean
   isLightProbe?: boolean
+  frustumCulled?: boolean
+  boundingSphere?: ThreeSphereLike | null
+  computeBoundingSphere?(): void
   geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike | ThreeMaterialLike[]
   clippingPlanes?: ThreePlaneLike[] | null

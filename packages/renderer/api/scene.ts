@@ -176,13 +176,21 @@ function visitObject(
     updateLodObject(object, camera)
 
     if (object.isBatchedMesh === true && object.geometry) {
-      appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      if (!renderableObjectOutsideFrustum(object, camera)) {
+        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      }
     } else if (object.isMesh === true && object.geometry) {
-      appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      if (!renderableObjectOutsideFrustum(object, camera)) {
+        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      }
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
-      appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext)
+      if (!renderableObjectOutsideFrustum(object, camera)) {
+        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext)
+      }
     } else if (object.isPoints === true && object.geometry) {
-      appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      if (!renderableObjectOutsideFrustum(object, camera)) {
+        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      }
     } else if (object.isSprite === true) {
       appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
     }
@@ -664,10 +672,12 @@ function appendSprite(
 
   validateSpriteScale(object)
   const matrix = matrixElements(object.matrixWorld!, 'sprite.matrixWorld')
-  const center = [
+  const center: [number, number] = [
     finiteMaterialOrObjectNumber(object.center?.x, 'Sprite.center.x', 0.5),
     finiteMaterialOrObjectNumber(object.center?.y, 'Sprite.center.y', 0.5),
   ]
+  if (spriteOutsideFrustum(object, camera, matrix, center)) return
+
   const worldPosition = [matrix[12], matrix[13], matrix[14]]
   let scaleX = columnLength3(matrix, 0)
   let scaleY = columnLength3(matrix, 4)
@@ -1776,6 +1786,76 @@ function objectSortCenter(object: ThreeObject3DLike): [number, number, number] {
   return requiredVec3Like((sphere as { center?: { x?: number; y?: number; z?: number } | ArrayLike<number> }).center, 'geometry.boundingSphere.center')
 }
 
+function renderableObjectOutsideFrustum(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+): boolean {
+  if (!camera) return false
+  const frustumCulled = optionalObjectBoolean(object.frustumCulled, 'object.frustumCulled')
+  if (frustumCulled === false) return false
+
+  const sphere = objectBoundingSphere(object)
+  if (!sphere) return false
+  const transform = matrixElements(object.matrixWorld!, renderableMatrixWorldLabel(object))
+  return transformedSphereOutsideFrustum(camera, transform, sphere)
+}
+
+function renderableMatrixWorldLabel(object: ThreeObject3DLike): string {
+  if (object.isBatchedMesh === true) return 'batchedMesh.matrixWorld'
+  if (object.isMesh === true) return 'mesh.matrixWorld'
+  if (object.isPoints === true) return 'points.matrixWorld'
+  return 'object.matrixWorld'
+}
+
+function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, number, number]; radius: number } | null {
+  if (object.boundingSphere !== undefined) {
+    if (object.boundingSphere == null && typeof object.computeBoundingSphere === 'function') {
+      object.computeBoundingSphere()
+    }
+    return object.boundingSphere == null
+      ? null
+      : sphereLike(object.boundingSphere, 'object.boundingSphere')
+  }
+
+  const geometry = object.geometry
+  if (!geometry) return null
+  if (geometry.boundingSphere == null && typeof geometry.computeBoundingSphere === 'function') {
+    geometry.computeBoundingSphere()
+  }
+  return geometry.boundingSphere == null
+    ? null
+    : sphereLike(geometry.boundingSphere, 'geometry.boundingSphere')
+}
+
+function spriteOutsideFrustum(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  transform: ArrayLike<number>,
+  center: [number, number],
+): boolean {
+  if (!camera) return false
+  const frustumCulled = optionalObjectBoolean(object.frustumCulled, 'object.frustumCulled')
+  if (frustumCulled === false) return false
+
+  const offset = Math.hypot(center[0] - 0.5, center[1] - 0.5)
+  return transformedSphereOutsideFrustum(camera, transform, {
+    center: [0, 0, 0],
+    radius: 0.7071067811865476 + offset,
+  })
+}
+
+function transformedSphereOutsideFrustum(
+  camera: ThreeCameraLike,
+  transform: ArrayLike<number>,
+  sphere: { center: [number, number, number]; radius: number },
+): boolean {
+  const center = transformPoint(transform, sphere.center)
+  const scale = Math.max(columnLength3(transform, 0), columnLength3(transform, 4), columnLength3(transform, 8))
+  const radius = sphere.radius * scale
+  if (!Number.isFinite(radius) || radius < 0) return false
+  return !cameraFrustumIntersectsSphere(camera, center, radius)
+}
+
 function vec3Like(value: { x?: number; y?: number; z?: number } | ArrayLike<number> | undefined): [number, number, number] | null {
   if (!value) return null
   const objectValue = value as { x?: unknown; y?: unknown; z?: unknown }
@@ -2724,12 +2804,7 @@ function batchedDrawOutsideFrustum(
 ): boolean {
   const sphere = batchedGeometryBoundingSphere(object, geometry, geometryId, range)
   if (!sphere) return false
-
-  const center = transformPoint(transform, sphere.center)
-  const scale = Math.max(columnLength3(transform, 0), columnLength3(transform, 4), columnLength3(transform, 8))
-  const radius = sphere.radius * scale
-  if (!Number.isFinite(radius) || radius < 0) return false
-  return !cameraFrustumIntersectsSphere(camera, center, radius)
+  return transformedSphereOutsideFrustum(camera, transform, sphere)
 }
 
 function batchedGeometryRange(
@@ -2796,6 +2871,13 @@ function batchedGeometryBoundingSphere(
 }
 
 function batchedSphereLike(
+  sphere: ThreeSphereLike,
+  label: string,
+): { center: [number, number, number]; radius: number } {
+  return sphereLike(sphere, label)
+}
+
+function sphereLike(
   sphere: ThreeSphereLike,
   label: string,
 ): { center: [number, number, number]; radius: number } {

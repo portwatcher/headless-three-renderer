@@ -854,6 +854,7 @@ test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
     const geometryId = batched.addGeometry(source)
     const instanceId = batched.addInstance(geometryId)
     batched.setMatrixAt(instanceId, new THREE.Matrix4())
+    batched.frustumCulled = false
     batched.perObjectFrustumCulled = perObjectFrustumCulled
 
     const scene = new THREE.Scene()
@@ -866,6 +867,77 @@ test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   const uncullable = renderCulling(false)
   assert.ok(culled.r < 5 && culled.g < 5 && culled.b < 5, `cached out-of-frustum BatchedMesh bounds should cull the draw (${culled.r}, ${culled.g}, ${culled.b})`)
   assert.ok(uncullable.r > 200, `perObjectFrustumCulled=false should render the oversized batch draw (${uncullable.r})`)
+})
+
+test('renderable object frustum culling honors geometry bounds and frustumCulled opt-out', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderObject(object, frustumCulled = true) {
+    object.frustumCulled = frustumCulled
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(object)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function visiblePixels(rgba) {
+    return countRegionPixels(rgba, 64, 64, 12, 12, 52, 52, (r, g, b) => r > 180 || g > 180 || b > 180)
+  }
+
+  const cases = [
+    ['Mesh', () => {
+      const geometry = new THREE.PlaneGeometry(1.2, 1.2)
+      geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+      return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+    }],
+    ['Mesh object boundingSphere', () => {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.2, 1.2),
+        new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      )
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+      return mesh
+    }],
+    ['Line', () => {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.6, 0, 0),
+        new THREE.Vector3(0.6, 0, 0),
+      ])
+      geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+      return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffffff }))
+    }],
+    ['Points', () => {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+      ])
+      geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+      return new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xffffff, size: 20, sizeAttenuation: false }))
+    }],
+  ]
+
+  for (const [label, createObject] of cases) {
+    const culledPixels = visiblePixels(renderObject(createObject(), true))
+    const uncullablePixels = visiblePixels(renderObject(createObject(), false))
+    assert.equal(culledPixels, 0, `${label} bounding sphere outside the frustum should cull the centered geometry (${culledPixels})`)
+    assert.ok(uncullablePixels > 2, `${label} frustumCulled=false should render centered geometry (${uncullablePixels})`)
+  }
+})
+
+test('invalid renderable object frustumCulled values fail clearly', () => {
+  const scene = new THREE.Scene()
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  mesh.frustumCulled = 'yes'
+  scene.add(mesh)
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /object\.frustumCulled must be a boolean/i,
+  )
 })
 
 test('invalid BatchedMesh perObjectFrustumCulled values fail clearly', () => {
