@@ -21152,14 +21152,32 @@ test('cube background textures require six face images', () => {
 })
 
 test('CubeUV background texture mappings fail clearly', () => {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  const optionBackground = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping })
+  const cases = [
+    ['scene.background', () => {
+      const scene = new THREE.Scene()
+      scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping })
+      return { scene, options: {} }
+    }],
+    ['options.background', () => {
+      const scene = new THREE.Scene()
+      scene.background = new THREE.Color(0, 0, 0)
+      return {
+        scene,
+        options: {
+          background: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping }),
+        },
+      }
+    }],
+  ]
 
-  assert.throws(
-    () => renderRgba(scene, makeCamera(), { width: 64, height: 64, background: optionBackground }),
-    /PMREM\/CubeUV texture mapping.*not supported/i,
-  )
+  for (const [name, makeCase] of cases) {
+    const { scene, options } = makeCase()
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64, ...options }),
+      /PMREM\/CubeUV texture mapping.*not supported/i,
+      name,
+    )
+  }
 })
 
 test('render options accept texture backgrounds', () => {
