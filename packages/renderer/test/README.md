@@ -49,6 +49,7 @@ If references are committed under `packages/renderer/test/browser-reference/refe
 variable.
 
 Use `HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF` to tune the mean RGBA tolerance for the chosen browser/GPU reference platform. The default is `18`.
+Set `HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES=1` in CI when golden references are expected to be present; without it, `test:golden` keeps the no-reference skip mode for platforms where references have not been committed yet.
 
 ## Adding visual-regression snapshots (optional)
 

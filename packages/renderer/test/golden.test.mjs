@@ -18,6 +18,7 @@ import {
 const { Renderer } = pkg
 
 const referenceDir = resolveBrowserReferenceDir()
+const referencesRequired = areBrowserReferencesRequired()
 const maxMeanDiff = Number(process.env.HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF ?? 18)
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
@@ -61,12 +62,27 @@ test('browser reference directory resolution prefers explicit env over platform 
   assert.equal(resolveBrowserReferenceDir({}, () => false), undefined)
 })
 
+test('browser reference required mode parses explicit opt-in values', () => {
+  assert.equal(areBrowserReferencesRequired({ HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES: '1' }), true)
+  assert.equal(areBrowserReferencesRequired({ HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES: 'true' }), true)
+  assert.equal(areBrowserReferencesRequired({ HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES: 'yes' }), true)
+  assert.equal(areBrowserReferencesRequired({ HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES: '0' }), false)
+  assert.equal(areBrowserReferencesRequired({ HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES: 'false' }), false)
+  assert.equal(areBrowserReferencesRequired({}), false)
+})
+
 test('generated corpus matches browser WebGLRenderer golden references', {
   skip: referenceDir
     ? false
-    : `set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}`,
+    : referencesRequired
+      ? false
+      : `set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}`,
 }, async (t) => {
   assert.ok(Number.isFinite(maxMeanDiff) && maxMeanDiff >= 0, 'HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number')
+  assert.ok(
+    referenceDir,
+    `Browser reference directory is required. Set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}.`,
+  )
 
   const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
   const manifest = await readReferenceManifest(referenceDir)
@@ -170,4 +186,9 @@ function defaultBrowserReferenceDir() {
     'references',
     `${process.platform}-${process.arch}`,
   )
+}
+
+function areBrowserReferencesRequired(env = process.env) {
+  const value = env.HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES
+  return value === '1' || value === 'true' || value === 'yes'
 }
