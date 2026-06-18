@@ -19542,9 +19542,8 @@ test('LineSegments with InstancedBufferGeometry honor meshPerAttribute repeat va
   assert.ok(secondGreen > 6, `second repeated line color should render green pixels (${secondGreen})`)
 })
 
-test('LineSegments with InstancedBufferGeometry expand instanced map UV attributes', () => {
+test('LineSegments with InstancedBufferGeometry default instanceCount expands instanced map UV attributes', () => {
   const geometry = new THREE.InstancedBufferGeometry()
-  geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     -0.25, 0, 0,
     0.25, 0, 0,
@@ -19635,9 +19634,8 @@ test('Line and LineLoop with InstancedBufferGeometry expand instanced map UV att
   }
 })
 
-test('LineDashedMaterial with InstancedBufferGeometry expands instanced map UV attributes', () => {
+test('LineDashedMaterial with InstancedBufferGeometry default instanceCount expands instanced map UV attributes', () => {
   const geometry = new THREE.InstancedBufferGeometry()
-  geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     -0.25, 0, 0,
     0.25, 0, 0,
@@ -20382,9 +20380,8 @@ test('Points with InstancedBufferGeometry honor meshPerAttribute repeat values f
   assert.ok(secondGreen > 20, `second repeated point color should render green pixels (${secondGreen})`)
 })
 
-test('Points with InstancedBufferGeometry expand instanced map UV attributes', () => {
+test('Points with InstancedBufferGeometry default instanceCount expands instanced map UV attributes', () => {
   const geometry = new THREE.InstancedBufferGeometry()
-  geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     0, 0, 0,
   ]), 3))
