@@ -17353,7 +17353,7 @@ test('unsupported material shadowSide values fail clearly', () => {
   )
 })
 
-test('source material shadowSide applies to customDepthMaterial shadow casters', () => {
+test('source material shadowSide applies to custom shadow material casters', () => {
   function renderCustomDepthShadowSide(shadowSide) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
@@ -17399,11 +17399,60 @@ test('source material shadowSide applies to customDepthMaterial shadow casters',
     return meanRgba(renderRgbaIsolated(scene, camera, { width: 96, height: 96 }))
   }
 
+  function renderCustomDistanceShadowSide(shadowSide) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const sourceMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      colorWrite: false,
+      depthWrite: false,
+    })
+    sourceMaterial.shadowSide = shadowSide
+    const caster = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), sourceMaterial)
+    caster.rotation.x = -Math.PI / 2
+    caster.position.y = 2
+    caster.castShadow = true
+    caster.customDistanceMaterial = new THREE.MeshDistanceMaterial()
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 6, 2)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgbaIsolated(scene, camera, { width: 96, height: 96 }))
+  }
+
   const front = renderCustomDepthShadowSide(THREE.FrontSide)
   const back = renderCustomDepthShadowSide(THREE.BackSide)
   const frontLum = front.r + front.g + front.b
   const backLum = back.r + back.g + back.b
   assert.ok(frontLum < backLum - 30, `source material shadowSide should affect customDepthMaterial shadows (${frontLum} vs ${backLum})`)
+
+  const frontDistance = renderCustomDistanceShadowSide(THREE.FrontSide)
+  const backDistance = renderCustomDistanceShadowSide(THREE.BackSide)
+  const frontDistanceLum = frontDistance.r + frontDistance.g + frontDistance.b
+  const backDistanceLum = backDistance.r + backDistance.g + backDistance.b
+  assert.ok(
+    frontDistanceLum < backDistanceLum - 10,
+    `source material shadowSide should affect customDistanceMaterial shadows (${frontDistanceLum} vs ${backDistanceLum})`,
+  )
 })
 
 test('material alphaToCoverage approximates shadow caster alpha cutouts', () => {
