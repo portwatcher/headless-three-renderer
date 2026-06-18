@@ -16231,6 +16231,12 @@ test('MSAA sampleCount 4 resolves antialiased color output and render targets', 
     sampleCount: 4,
     outputColorSpace: THREE.LinearSRGBColorSpace,
   })
+  const msaaSamplesAlias = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    samples: 4,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
 
   function intermediateCoverage(rgba) {
     return countRegionPixels(rgba, 64, 64, 0, 0, 64, 64, (r, g, b) => {
@@ -16240,7 +16246,9 @@ test('MSAA sampleCount 4 resolves antialiased color output and render targets', 
 
   const singleCoverage = intermediateCoverage(single)
   const msaaCoverage = intermediateCoverage(msaa)
+  const msaaAliasCoverage = intermediateCoverage(msaaSamplesAlias)
   assert.ok(msaaCoverage > singleCoverage + 20, `4x MSAA should add resolved edge coverage (${msaaCoverage} vs ${singleCoverage})`)
+  assert.ok(msaaAliasCoverage > singleCoverage + 20, `4x MSAA samples alias should add resolved edge coverage (${msaaAliasCoverage} vs ${singleCoverage})`)
 
   for (const [label, target] of [
     ['target.samples', { texture: {}, samples: 4 }],
