@@ -20475,6 +20475,56 @@ test('LineDashedMaterial uses custom lineDistance attributes', () => {
   assert.ok(rightPixels > 2, `custom lineDistance should reset and keep the right dashed segment visible (${rightPixels})`)
 })
 
+test('LineDashedMaterial handles descending custom lineDistance spans', () => {
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, 0, 0,
+    0.9, 0, 0,
+  ]), 3))
+  geom.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    2,
+    0,
+  ]), 1))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Line(geom, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 0.6,
+    gapSize: 10,
+    scale: 1,
+  })))
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const leftGapPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    14,
+    44,
+    30,
+    52,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+  const rightDashPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    66,
+    44,
+    84,
+    52,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+
+  assert.equal(leftGapPixels, 0, `descending lineDistance should keep high-distance span in the gap (${leftGapPixels})`)
+  assert.ok(rightDashPixels > 2, `descending lineDistance should render the low-distance dash span (${rightDashPixels})`)
+})
+
 test('LineDashedMaterial renders LineLoop closing dashes', () => {
   const geom = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-1, -0.8, 0),
