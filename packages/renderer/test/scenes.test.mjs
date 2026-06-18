@@ -2886,13 +2886,17 @@ test('normalMap honors horizontal and vertical repeat wrapping', () => {
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.b > clamped.r + 20, `clamped normalMap U coordinates should sample the flat blue texel (${clamped.b} vs ${clamped.r})`)
   assert.ok(repeated.r > repeated.b + 20, `repeated normalMap U coordinates should wrap to the tangent-right red texel (${repeated.r} vs ${repeated.b})`)
+  assert.ok(mirrored.b > mirrored.r + 20, `mirrored normalMap U coordinates should reflect to the flat blue texel (${mirrored.b} vs ${mirrored.r})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.b > clampedVertical.r + 20, `clamped normalMap V coordinates should sample the flat blue texel (${clampedVertical.b} vs ${clampedVertical.r})`)
   assert.ok(repeatedVertical.r > repeatedVertical.b + 20, `repeated normalMap V coordinates should wrap to the tangent-right red texel (${repeatedVertical.r} vs ${repeatedVertical.b})`)
+  assert.ok(mirroredVertical.b > mirroredVertical.r + 20, `mirrored normalMap V coordinates should reflect to the flat blue texel (${mirroredVertical.b} vs ${mirroredVertical.r})`)
 })
 
 test('MeshPhongMaterial renders Blinn-Phong specular and honors specularMap', () => {
