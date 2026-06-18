@@ -11091,13 +11091,19 @@ test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () 
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clamped < 10, `clamped roughnessMap U coordinates should sample the smooth edge texel (${clamped})`)
   assert.ok(repeated > clamped + 20, `repeated roughnessMap U coordinates should wrap to the rough texel (${repeated} vs ${clamped})`)
+  assert.ok(mirrored < 10, `mirrored roughnessMap U coordinates should reflect to the smooth texel (${mirrored})`)
+  assert.ok(repeated > mirrored + 20, `mirrored roughnessMap U coordinates should differ from RepeatWrapping (${mirrored} vs ${repeated})`)
   assert.ok(clampedVertical < 10, `clamped roughnessMap V coordinates should sample the smooth edge texel (${clampedVertical})`)
   assert.ok(repeatedVertical > clampedVertical + 20, `repeated roughnessMap V coordinates should wrap to the rough texel (${repeatedVertical} vs ${clampedVertical})`)
+  assert.ok(mirroredVertical < 10, `mirrored roughnessMap V coordinates should reflect to the smooth texel (${mirroredVertical})`)
+  assert.ok(repeatedVertical > mirroredVertical + 20, `mirrored roughnessMap V coordinates should differ from RepeatWrapping (${mirroredVertical} vs ${repeatedVertical})`)
 })
 
 test('metallicRoughness metalnessMap honors horizontal and vertical repeat wrapping', () => {
@@ -11140,13 +11146,19 @@ test('metallicRoughness metalnessMap honors horizontal and vertical repeat wrapp
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped > 180, `clamped metalnessMap U coordinates should sample the non-metal edge texel (${clamped})`)
   assert.ok(repeated < clamped - 80, `repeated metalnessMap U coordinates should wrap to the metallic texel (${repeated} vs ${clamped})`)
+  assert.ok(mirrored > 180, `mirrored metalnessMap U coordinates should reflect to the non-metal texel (${mirrored})`)
+  assert.ok(repeated < mirrored - 80, `mirrored metalnessMap U coordinates should differ from RepeatWrapping (${mirrored} vs ${repeated})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical > 180, `clamped metalnessMap V coordinates should sample the non-metal edge texel (${clampedVertical})`)
   assert.ok(repeatedVertical < clampedVertical - 80, `repeated metalnessMap V coordinates should wrap to the metallic texel (${repeatedVertical} vs ${clampedVertical})`)
+  assert.ok(mirroredVertical > 180, `mirrored metalnessMap V coordinates should reflect to the non-metal texel (${mirroredVertical})`)
+  assert.ok(repeatedVertical < mirroredVertical - 80, `mirrored metalnessMap V coordinates should differ from RepeatWrapping (${mirroredVertical} vs ${repeatedVertical})`)
 })
 
 test('base color maps honor texture flipY', () => {
