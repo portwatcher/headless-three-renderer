@@ -4397,11 +4397,15 @@ test('displacementMap honors horizontal and vertical repeat wrapping before dept
 
   const clamped = renderDisplaced({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderDisplaced({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderDisplaced({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(repeated.r > clamped.r + 15, `repeat wrapping should wrap displacement U coordinates to the high texel (${repeated.r} vs ${clamped.r})`)
+  assert.ok(repeated.r > mirrored.r + 15, `mirrored displacement U coordinates should reflect away from the high texel (${mirrored.r} vs ${repeated.r})`)
 
   const clampedVertical = renderDisplaced({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderDisplaced({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderDisplaced({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(repeatedVertical.r > clampedVertical.r + 15, `repeat wrapping should wrap displacement V coordinates to the high texel (${repeatedVertical.r} vs ${clampedVertical.r})`)
+  assert.ok(repeatedVertical.r > mirroredVertical.r + 15, `mirrored displacement V coordinates should reflect away from the high texel (${mirroredVertical.r} vs ${repeatedVertical.r})`)
 })
 
 test('displacementMap applies displacementBias independently of sampled height', () => {
