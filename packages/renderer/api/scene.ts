@@ -433,7 +433,6 @@ function appendMesh(
     }
 
     if (usesCustomShadowMaterial && customShadowMaterial?.visible !== false) {
-      assertSupportedCustomShadowMaterial(customShadowMaterial, shadowMaterialMode)
       appendShadowOnlyMeshGroup(
         object,
         camera,
@@ -630,17 +629,6 @@ function customShadowMaterialForMode(
     return object.customDistanceMaterial
   }
   return undefined
-}
-
-function assertSupportedCustomShadowMaterial(
-  material: ThreeMaterialLike,
-  mode: ShadowMaterialMode | undefined,
-): void {
-  if (!isDepthDistanceWireframeMaterial(material)) return
-  const property = mode === 'distance' ? 'customDistanceMaterial' : 'customDepthMaterial'
-  throw new Error(
-    `Object3D.${property} wireframe shadow casters are not supported by @headless-three/renderer yet. Disable wireframe on the custom shadow material or expand the intended shadow shape to mesh geometry before rendering.`,
-  )
 }
 
 function shadowOnlyMainPassState(): Pick<

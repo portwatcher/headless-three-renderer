@@ -153,6 +153,7 @@ pub struct GpuRenderer {
     shadow_layout: wgpu::BindGroupLayout,
     /// Depth-only pipeline used to render the shadow map.
     shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
+    line_shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
     sampler: wgpu::Sampler,
     shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
@@ -1080,63 +1081,179 @@ impl GpuRenderer {
                 ],
                 immediate_size: 0,
             });
-        let make_shadow_pipeline = |entry_point: &'static str, label: &'static str| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(label),
-                layout: Some(&shadow_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: Some(entry_point),
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    buffers: &[Vertex::layout()],
-                },
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    strip_index_format: None,
-                    front_face: wgpu::FrontFace::Ccw,
-                    // No culling: captures shadows from any side, including DoubleSide materials.
-                    cull_mode: None,
-                    unclipped_depth: false,
-                    polygon_mode: wgpu::PolygonMode::Fill,
-                    conservative: false,
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: Some(true),
-                    depth_compare: Some(wgpu::CompareFunction::Less),
-                    stencil: wgpu::StencilState::default(),
+        let make_shadow_pipeline =
+            |entry_point: &'static str, topology: wgpu::PrimitiveTopology, label: &'static str| {
+                let depth_bias = if topology == wgpu::PrimitiveTopology::TriangleList {
                     // Slight slope-scaled bias to reduce acne (in addition to the
                     // per-fragment bias we apply during shadow sampling).
-                    bias: wgpu::DepthBiasState {
+                    wgpu::DepthBiasState {
                         constant: 2,
                         slope_scale: 2.0,
                         clamp: 0.0,
+                    }
+                } else {
+                    wgpu::DepthBiasState::default()
+                };
+                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some(label),
+                    layout: Some(&shadow_pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: Some(entry_point),
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                        buffers: &[Vertex::layout()],
                     },
-                }),
-                multisample: wgpu::MultisampleState::default(),
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: Some("fs_shadow"),
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    targets: &[],
-                }),
-                multiview_mask: None,
-                cache: None,
-            })
-        };
+                    primitive: wgpu::PrimitiveState {
+                        topology,
+                        strip_index_format: None,
+                        front_face: wgpu::FrontFace::Ccw,
+                        // No culling: captures shadows from any side, including DoubleSide materials.
+                        cull_mode: None,
+                        unclipped_depth: false,
+                        polygon_mode: wgpu::PolygonMode::Fill,
+                        conservative: false,
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth32Float,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::Less),
+                        stencil: wgpu::StencilState::default(),
+                        bias: depth_bias,
+                    }),
+                    multisample: wgpu::MultisampleState::default(),
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: Some("fs_shadow"),
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                        targets: &[],
+                    }),
+                    multiview_mask: None,
+                    cache: None,
+                })
+            };
         let shadow_pipelines = [
-            make_shadow_pipeline("vs_shadow0", "headless-three-renderer shadow pipeline 0"),
-            make_shadow_pipeline("vs_shadow1", "headless-three-renderer shadow pipeline 1"),
-            make_shadow_pipeline("vs_shadow2", "headless-three-renderer shadow pipeline 2"),
-            make_shadow_pipeline("vs_shadow3", "headless-three-renderer shadow pipeline 3"),
-            make_shadow_pipeline("vs_shadow4", "headless-three-renderer shadow pipeline 4"),
-            make_shadow_pipeline("vs_shadow5", "headless-three-renderer shadow pipeline 5"),
-            make_shadow_pipeline("vs_shadow6", "headless-three-renderer shadow pipeline 6"),
-            make_shadow_pipeline("vs_shadow7", "headless-three-renderer shadow pipeline 7"),
-            make_shadow_pipeline("vs_shadow8", "headless-three-renderer shadow pipeline 8"),
-            make_shadow_pipeline("vs_shadow9", "headless-three-renderer shadow pipeline 9"),
-            make_shadow_pipeline("vs_shadow10", "headless-three-renderer shadow pipeline 10"),
-            make_shadow_pipeline("vs_shadow11", "headless-three-renderer shadow pipeline 11"),
+            make_shadow_pipeline(
+                "vs_shadow0",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 0",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow1",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 1",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow2",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 2",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow3",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 3",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow4",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 4",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow5",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 5",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow6",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 6",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow7",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 7",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow8",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 8",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow9",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 9",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow10",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 10",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow11",
+                wgpu::PrimitiveTopology::TriangleList,
+                "headless-three-renderer shadow pipeline 11",
+            ),
+        ];
+        let line_shadow_pipelines = [
+            make_shadow_pipeline(
+                "vs_shadow0",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 0",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow1",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 1",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow2",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 2",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow3",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 3",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow4",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 4",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow5",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 5",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow6",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 6",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow7",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 7",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow8",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 8",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow9",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 9",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow10",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 10",
+            ),
+            make_shadow_pipeline(
+                "vs_shadow11",
+                wgpu::PrimitiveTopology::LineList,
+                "headless-three-renderer line shadow pipeline 11",
+            ),
         ];
 
         let vertex_buffers = [Vertex::layout()];
@@ -1346,6 +1463,7 @@ impl GpuRenderer {
             ao_map_layout,
             shadow_layout,
             shadow_pipelines,
+            line_shadow_pipelines,
             sampler,
             shadow_sampler,
             _default_texture: default_texture,
@@ -1858,11 +1976,18 @@ impl GpuRenderer {
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
-                pass.set_pipeline(&self.shadow_pipelines[layer as usize]);
                 for mesh in gpu_meshes.iter() {
-                    // Only triangle meshes flagged as shadow casters contribute.
-                    if !mesh.cast_shadow || mesh.topology != Topology::Triangles {
+                    if !mesh.cast_shadow {
                         continue;
+                    }
+                    match mesh.topology {
+                        Topology::Triangles => {
+                            pass.set_pipeline(&self.shadow_pipelines[layer as usize]);
+                        }
+                        Topology::Lines => {
+                            pass.set_pipeline(&self.line_shadow_pipelines[layer as usize]);
+                        }
+                        Topology::Points => continue,
                     }
                     pass.set_bind_group(0, &mesh.bind_group, &[]);
                     pass.set_bind_group(1, &mesh.texture_bind_group, &[]);

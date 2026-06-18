@@ -7997,51 +7997,109 @@ test('malformed custom shadow material containers fail clearly', () => {
   )
 })
 
-test('custom shadow material wireframe inputs fail clearly', () => {
-  function makeScene(customShadowMaterial, light) {
+test('custom shadow material wireframes cast thinner shadows than filled custom casters', () => {
+  function renderDirectionalCustomDepthShadow(wireframe, castShadow = true) {
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0, 0, 0)
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
     const caster = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.BoxGeometry(3, 3, 3, 4, 4, 4),
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
     )
-    caster.castShadow = true
-    if (customShadowMaterial.isMeshDistanceMaterial) {
-      caster.customDistanceMaterial = customShadowMaterial
-    } else {
-      caster.customDepthMaterial = customShadowMaterial
-    }
+    caster.position.y = 1.5
+    caster.castShadow = castShadow
+    caster.customDepthMaterial = new THREE.MeshDepthMaterial({ wireframe })
     scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
     scene.add(light)
-    if (light.target) scene.add(light.target)
-    return scene
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return mean.r + mean.g + mean.b
   }
 
-  const directional = new THREE.DirectionalLight(0xffffff, 1)
-  directional.castShadow = true
-  directional.position.set(2, 4, 3)
-  directional.target.position.set(0, 0, 0)
-  assert.throws(
-    () => renderRgba(
-      makeScene(new THREE.MeshDepthMaterial({ wireframe: true }), directional),
-      makeCamera(),
-      { width: 64, height: 64 },
-    ),
-    /customDepthMaterial wireframe shadow casters.*not supported/i,
+  function renderPointCustomDistanceShadow(wireframe, castShadow = true) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 2.5, 2.5, 4, 4, 4),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.25
+    caster.castShadow = castShadow
+    const customDistanceMaterial = new THREE.MeshDistanceMaterial()
+    customDistanceMaterial.wireframe = wireframe
+    caster.customDistanceMaterial = customDistanceMaterial
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return mean.r + mean.g + mean.b
+  }
+
+  const filledDepthLum = renderDirectionalCustomDepthShadow(false)
+  const wireframeDepthLum = renderDirectionalCustomDepthShadow(true)
+  const unshadowedDepthLum = renderDirectionalCustomDepthShadow(true, false)
+  assert.ok(
+    wireframeDepthLum > filledDepthLum + 20,
+    `customDepthMaterial wireframe shadow should be lighter than filled caster shadow (${wireframeDepthLum} vs ${filledDepthLum})`,
+  )
+  assert.ok(
+    wireframeDepthLum < unshadowedDepthLum - 2,
+    `customDepthMaterial wireframe shadow should still cast visible shadow (${wireframeDepthLum} vs ${unshadowedDepthLum})`,
   )
 
-  const point = new THREE.PointLight(0xffffff, 1)
-  point.castShadow = true
-  point.position.set(2, 4, 3)
-  const distanceWireframe = new THREE.MeshDistanceMaterial()
-  distanceWireframe.wireframe = true
-  assert.throws(
-    () => renderRgba(
-      makeScene(distanceWireframe, point),
-      makeCamera(),
-      { width: 64, height: 64 },
-    ),
-    /customDistanceMaterial wireframe shadow casters.*not supported/i,
+  const filledDistanceLum = renderPointCustomDistanceShadow(false)
+  const wireframeDistanceLum = renderPointCustomDistanceShadow(true)
+  const unshadowedDistanceLum = renderPointCustomDistanceShadow(true, false)
+  assert.ok(
+    wireframeDistanceLum > filledDistanceLum + 10,
+    `customDistanceMaterial wireframe shadow should be lighter than filled caster shadow (${wireframeDistanceLum} vs ${filledDistanceLum})`,
+  )
+  assert.ok(
+    wireframeDistanceLum < unshadowedDistanceLum - 5,
+    `customDistanceMaterial wireframe shadow should still cast visible shadow (${wireframeDistanceLum} vs ${unshadowedDistanceLum})`,
   )
 })
 
