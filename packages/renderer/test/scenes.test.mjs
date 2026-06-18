@@ -11404,13 +11404,27 @@ test('unsupported texture inputs fail clearly for background and environment slo
   const mipmappedTexture = solidTexture(255, 255, 255)
   mipmappedTexture.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
 
+  function addMaterialEnvMap(scene, envMap) {
+    envMap.mapping = THREE.EquirectangularReflectionMapping
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ envMap }),
+    ))
+  }
+
   const cases = [
     ['compressed background', (scene) => { scene.background = compressedTexture }, /compressed texture.*pre-decode/i],
     ['compressed environment', (scene) => { scene.environment = compressedTexture }, /compressed texture.*pre-decode/i],
+    ['compressed material envMap', (scene) => {
+      addMaterialEnvMap(scene, compressedTexture)
+    }, /compressed texture.*pre-decode/i],
     ['compressed reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: compressedTexture } }
     }, /compressed texture.*pre-decode/i],
     ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
+    ['mipmapped material envMap', (scene) => {
+      addMaterialEnvMap(scene, mipmappedTexture)
+    }, /explicit texture mipmaps.*not uploaded/i],
     ['mipmapped reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: mipmappedTexture } }
     }, /explicit texture mipmaps.*not uploaded/i],
@@ -11453,6 +11467,14 @@ test('unsupported array and 3D texture inputs fail clearly', () => {
     ['environment Data3DTexture', (scene) => {
       scene.environment = data3dTexture()
     }, /scene\.environment uses an array or 3D texture/i],
+    ['material envMap Data3DTexture', (scene) => {
+      const envMap = data3dTexture()
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap uses an array or 3D texture/i],
     ['reflection probe Data3DTexture', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: data3dTexture() } }
     }, /reflectionProbe\.texture uses an array or 3D texture/i],
@@ -11665,6 +11687,14 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
     ['environment', (scene) => {
       scene.environment = browserLikeTexture()
     }, /scene\.environment.*texture image object.*not readable.*environment map rendering/i],
+    ['material envMap', (scene) => {
+      const envMap = browserLikeTexture()
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap.*texture image object.*not readable.*environment map rendering/i],
     ['reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: browserLikeTexture() },
@@ -11682,6 +11712,14 @@ test('browser-like texture image objects fail clearly in Node slots', () => {
     ['environment source container', (scene) => {
       scene.environment = sourcedTexture('source')
     }, /scene\.environment\.source must be a source-like object/i],
+    ['material envMap source data container', (scene) => {
+      const envMap = sourcedTexture({ data: 'source' })
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap\.source\.data must be an image-like object/i],
     ['reflection probe source data container', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: sourcedTexture({ data: 'source' }) },
