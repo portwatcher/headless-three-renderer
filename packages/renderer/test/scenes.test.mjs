@@ -3606,6 +3606,34 @@ test('MeshToonMaterial gradientMap decodes sRGB colorSpace before shading', () =
   assert.ok(linear.r > srgb.r + 20, `linear toon gradient ramp should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('MeshToonMaterial normalMap perturbs toon lighting', () => {
+  function renderNormalScale(normalScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        normalMap: solidTexture(255, 128, 128),
+        normalScale: new THREE.Vector2(normalScale, normalScale),
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 3)
+    light.position.set(3, 0, 0.25)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const flat = renderNormalScale(0)
+  const tilted = renderNormalScale(1)
+  assert.ok(tilted.r > flat.r + 5, `normalMap should tilt toon lighting toward the oblique light (${tilted.r} vs ${flat.r})`)
+})
+
 test('MeshToonMaterial map samples the selected secondary UV channel', () => {
   function renderWithChannel(channel) {
     const map = rgbaTexture([
