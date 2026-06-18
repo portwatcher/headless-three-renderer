@@ -1819,6 +1819,36 @@ test('renderMode object-id target includes reverse lookup metadata', () => {
   assert.equal(target.objectIdMap, undefined)
 })
 
+test('renderMode auxiliary passes bypass post-processing', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ color: 0x0088ff }))
+  mesh.rotation.y = Math.PI * 0.2
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  for (const renderMode of ['mask', 'object-id', 'normal']) {
+    const base = renderRgba(scene, camera, { width: 64, height: 64, renderMode })
+    const processed = renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      renderMode,
+      postProcessing: {
+        exposure: 4,
+        contrast: 4,
+        grayscale: true,
+        invert: true,
+        saturation: 0,
+        vignette: 1,
+      },
+    })
+    assert.deepEqual(processed, base, `${renderMode} should ignore post-processing effects`)
+  }
+})
+
 test('renderMode auxiliary passes preserve texture alpha cutouts', () => {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)
