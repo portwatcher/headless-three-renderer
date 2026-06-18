@@ -3034,7 +3034,9 @@ function lineSegmentsWithDistances(
       a: previous,
       b: first,
       d0: previousDistance,
-      d1: previousDistance + vertexDistance(positions, previous, first),
+      d1: lineDistance
+        ? attributeComponent(lineDistance, first, 0, 'geometry.attributes.lineDistance')
+        : previousDistance + vertexDistance(positions, previous, first),
     })
   }
   return segments
@@ -3054,19 +3056,25 @@ function appendDashedSegment(
   const s0 = segment.d0 * scale
   const s1 = segment.d1 * scale
   const span = s1 - s0
-  if (span <= 1e-6) return
+  const direction = Math.sign(span)
+  if (Math.abs(span) <= 1e-6 || direction === 0) return
 
   let cursor = s0
   let guard = 0
-  while (cursor < s1 - 1e-6 && guard < 10000) {
+  while ((direction > 0 ? cursor < s1 - 1e-6 : cursor > s1 + 1e-6) && guard < 10000) {
     guard += 1
     const cycle = Math.floor(cursor / totalSize)
     const cycleStart = cycle * totalSize
     const inCycle = cursor - cycleStart
     const visible = inCycle <= dashSize
-    const boundary = cycleStart + (visible ? dashSize : totalSize)
-    const next = Math.min(s1, boundary <= cursor + 1e-6 ? cursor + 1e-6 : boundary)
-    if (visible && next > cursor + 1e-6) {
+    const boundary = direction > 0
+      ? cycleStart + (visible ? dashSize : totalSize)
+      : cycleStart + (visible ? 0 : dashSize)
+    const next = direction > 0
+      ? Math.min(s1, boundary <= cursor + 1e-6 ? cursor + 1e-6 : boundary)
+      : Math.max(s1, boundary >= cursor - 1e-6 ? cursor - 1e-6 : boundary)
+    const hasVisibleSpan = direction > 0 ? next > cursor + 1e-6 : next < cursor - 1e-6
+    if (visible && hasVisibleSpan) {
       const t0 = (cursor - s0) / span
       const t1 = (next - s0) / span
       appendInterpolatedLine(out, positions, uvs, uvs2, colors, segment.a, segment.b, t0, t1)

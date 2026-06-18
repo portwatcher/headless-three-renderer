@@ -20510,6 +20510,55 @@ test('LineDashedMaterial renders LineLoop closing dashes', () => {
   assert.ok(closingPixels > 2, `dashed LineLoop should render dashes on the closing segment (${closingPixels})`)
 })
 
+test('LineDashedMaterial LineLoop closing segment interpolates existing lineDistance values', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const geom = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-0.8, -0.8, 0),
+    new THREE.Vector3(0.8, -0.8, 0),
+    new THREE.Vector3(0.8, 0.8, 0),
+    new THREE.Vector3(-0.8, 0.8, 0),
+  ])
+  const line = new THREE.LineLoop(geom, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 2,
+    gapSize: 10,
+    scale: 1,
+  }))
+  line.computeLineDistances()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(line)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const closingPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    12,
+    48,
+    20,
+    76,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+  const upperClosingPixels = countRegionPixels(
+    rgba,
+    96,
+    96,
+    12,
+    18,
+    20,
+    34,
+    (r, g, b) => r > 180 && g > 180 && b > 180,
+  )
+
+  assert.ok(closingPixels > 1, `closing LineLoop segment should use the first vertex lineDistance near the lower-left corner (${closingPixels})`)
+  assert.equal(upperClosingPixels, 0, `closing LineLoop segment should keep the high-distance upper-left side in the dash gap (${upperClosingPixels})`)
+})
+
 test('LineBasicMaterial linewidth expands to thick camera-facing quads', () => {
   function renderLine(linewidth) {
     const geom = new THREE.BufferGeometry().setFromPoints([
