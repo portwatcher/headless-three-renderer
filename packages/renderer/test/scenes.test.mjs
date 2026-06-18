@@ -8677,6 +8677,111 @@ test('custom shadow material wireframes cast thinner shadows than filled custom 
   )
 })
 
+test('source material wireframe applies to custom shadow material casters', () => {
+  function sourceMaterial(wireframe) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe })
+    material.colorWrite = false
+    material.depthWrite = false
+    return material
+  }
+
+  function renderDirectionalCustomDepthShadow(wireframe, castShadow = true) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), sourceMaterial(wireframe))
+    caster.position.y = 1.5
+    caster.castShadow = castShadow
+    caster.customDepthMaterial = new THREE.MeshDepthMaterial()
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return mean.r + mean.g + mean.b
+  }
+
+  function renderPointCustomDistanceShadow(wireframe, castShadow = true) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), sourceMaterial(wireframe))
+    caster.position.y = 1.25
+    caster.castShadow = castShadow
+    caster.customDistanceMaterial = new THREE.MeshDistanceMaterial()
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return mean.r + mean.g + mean.b
+  }
+
+  const filledDepthLum = renderDirectionalCustomDepthShadow(false)
+  const wireframeDepthLum = renderDirectionalCustomDepthShadow(true)
+  const unshadowedDepthLum = renderDirectionalCustomDepthShadow(false, false)
+  assert.ok(
+    wireframeDepthLum > filledDepthLum + 20,
+    `source material wireframe should lighten the customDepthMaterial caster shadow (${wireframeDepthLum} vs ${filledDepthLum})`,
+  )
+  assert.ok(
+    wireframeDepthLum < unshadowedDepthLum - 2,
+    `source material wireframe customDepthMaterial shadow should still be visible (${wireframeDepthLum} vs ${unshadowedDepthLum})`,
+  )
+
+  const filledDistanceLum = renderPointCustomDistanceShadow(false)
+  const wireframeDistanceLum = renderPointCustomDistanceShadow(true)
+  const unshadowedDistanceLum = renderPointCustomDistanceShadow(false, false)
+  assert.ok(
+    wireframeDistanceLum > filledDistanceLum + 10,
+    `source material wireframe should lighten the customDistanceMaterial caster shadow (${wireframeDistanceLum} vs ${filledDistanceLum})`,
+  )
+  assert.ok(
+    wireframeDistanceLum < unshadowedDistanceLum - 5,
+    `source material wireframe customDistanceMaterial shadow should still be visible (${wireframeDistanceLum} vs ${unshadowedDistanceLum})`,
+  )
+})
+
 test('base color map applies texture UV transforms', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,

@@ -491,7 +491,7 @@ function appendShadowOnlyMeshGroup(
   }
   const textureInfo = extractTextureData(shadowMaterial)
   const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
-  const wireframe = isDepthDistanceWireframeMaterial(material)
+  const wireframe = isDepthDistanceWireframeMaterial(shadowMaterial)
   const hiddenMainPass = shadowOnlyMainPassState()
 
   if (index) {
@@ -1003,13 +1003,17 @@ function shadowMaterialWithSourceShadowState(
     shadowMaterial.clippingPlanes = sourceMaterial.clippingPlanes
     shadowMaterial.clipIntersection = sourceMaterial.clipIntersection
   }
+  if (sourceMaterialHasShadowWireframeState(sourceMaterial)) {
+    shadowMaterial.wireframe = sourceMaterial.wireframe
+  }
   return shadowMaterial
 }
 
 function sourceMaterialHasShadowState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
   return sourceMaterialHasShadowAlphaState(material) ||
     sourceMaterialHasShadowDisplacementState(material) ||
-    sourceMaterialHasShadowClippingState(material)
+    sourceMaterialHasShadowClippingState(material) ||
+    sourceMaterialHasShadowWireframeState(material)
 }
 
 function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
@@ -1028,6 +1032,10 @@ function sourceMaterialHasShadowClippingState(material: ThreeMaterialLike | unde
     material.clippingPlanes != null ||
     'clipIntersection' in material
   )
+}
+
+function sourceMaterialHasShadowWireframeState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
+  return material?.wireframe === true
 }
 
 function shadowPbrProperties(
