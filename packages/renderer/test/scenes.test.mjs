@@ -7273,6 +7273,50 @@ test('alphaMap honors nearest texture filters before alpha testing', () => {
   assert.ok(linear.r > linear.b + 40, `LinearFilter should blend enough green-channel alpha to pass the test (${linear.r} vs ${linear.b})`)
 })
 
+test('alphaMap honors horizontal and vertical repeat wrapping before alpha testing', () => {
+  function renderWithWrapping({ wrapS, wrapT, vertical = false }) {
+    const alphaMap = vertical
+      ? rgbaTexture([
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+      ], 2, 1)
+    if (wrapS != null) alphaMap.wrapS = wrapS
+    if (wrapT != null) alphaMap.wrapT = wrapT
+    alphaMap.magFilter = THREE.NearestFilter
+    alphaMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        alphaMap,
+        alphaTest: 0.5,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.b > clamped.r + 80, `clamped alphaMap U coordinates should sample the transparent edge texel (${clamped.b} vs ${clamped.r})`)
+  assert.ok(repeated.r > repeated.b + 40, `repeated alphaMap U coordinates should wrap to the opaque texel (${repeated.r} vs ${repeated.b})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.b > clampedVertical.r + 80, `clamped alphaMap V coordinates should sample the transparent edge texel (${clampedVertical.b} vs ${clampedVertical.r})`)
+  assert.ok(repeatedVertical.r > repeatedVertical.b + 40, `repeated alphaMap V coordinates should wrap to the opaque texel (${repeatedVertical.r} vs ${repeatedVertical.b})`)
+})
+
 test('material alphaHash produces stochastic coverage without transparent blending', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 1, 0)
