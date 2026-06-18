@@ -6183,7 +6183,7 @@ test('InstancedMesh expands instance matrices and colors', () => {
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `white material should be modulated by instanceColor (${mean.b})`)
 })
 
-test('InstancedBufferGeometry expands per-instance offsets and colors', () => {
+test('InstancedBufferGeometry default instanceCount expands per-instance offsets and colors', () => {
   const base = new THREE.PlaneGeometry(0.85, 0.85)
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.index = base.index
@@ -19421,9 +19421,8 @@ test('LineDashedMaterial interpolates vertex colors across dash segments', () =>
   assert.ok(greenPixels > 2, `right dash segments should retain green vertex colors (${greenPixels})`)
 })
 
-test('LineSegments with InstancedBufferGeometry expand offsets and colors', () => {
+test('LineSegments with InstancedBufferGeometry default instanceCount expands offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
-  geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     -0.25, 0, 0,
     0.25, 0, 0,
@@ -19587,9 +19586,8 @@ test('LineDashedMaterial with InstancedBufferGeometry expands instanced map UV a
   assert.ok(greenPixels > 4, `right instanced dashed line uv should sample green (${greenPixels})`)
 })
 
-test('LineDashedMaterial with InstancedBufferGeometry expands offsets and colors', () => {
+test('LineDashedMaterial with InstancedBufferGeometry default instanceCount expands offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
-  geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     -0.25, 0, 0,
     0.25, 0, 0,
@@ -20211,9 +20209,8 @@ test('PointsMaterial maps use point-sprite UVs when geometry UVs are absent', ()
   assert.ok(right.g > right.r + 60, `right point-sprite half should sample green (${right.g} vs ${right.r})`)
 })
 
-test('Points with InstancedBufferGeometry expand offsets and colors', () => {
+test('Points with InstancedBufferGeometry default instanceCount expands offsets and colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
-  geometry.instanceCount = 2
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     0, 0, 0,
   ]), 3))
