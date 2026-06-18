@@ -15654,6 +15654,39 @@ test('renderToTarget depthTexture preserves base texture alpha cutouts', () => {
   assert.ok(visible.r > 80, `opaque base texture region should write visible mesh depth (${visible.r})`)
 })
 
+test('renderToTarget depthTexture preserves alphaHash cutouts', () => {
+  function renderAlphaHashDepth(alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        alphaHash,
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+      }),
+    ))
+
+    const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+    camera.position.set(0, 0, 5)
+    camera.lookAt(0, 0, 0)
+
+    const depthTexture = {}
+    renderToTarget(scene, camera, { texture: {}, depthTexture }, { width: 64, height: 64 })
+    return depthTexture.image.data
+  }
+
+  const opaque = renderAlphaHashDepth(false)
+  const hashed = renderAlphaHashDepth(true)
+  const depthPixel = (r) => r > 2
+  const opaquePixels = countRegionPixels(opaque, 64, 64, 20, 20, 44, 44, depthPixel)
+  const hashedPixels = countRegionPixels(hashed, 64, 64, 20, 20, 44, 44, depthPixel)
+
+  assert.ok(opaquePixels > 520, `opaque target depth should fill the sampled region (${opaquePixels})`)
+  assert.ok(hashedPixels > 40, `alphaHash target depth should retain some depth pixels (${hashedPixels})`)
+  assert.ok(hashedPixels < opaquePixels - 120, `alphaHash target depth should discard depth pixels (${hashedPixels} vs ${opaquePixels})`)
+})
+
 test('renderToTarget depthTexture honors transparent default depthWrite', () => {
   function renderTransparentDepth(depthWrite) {
     const scene = new THREE.Scene()
