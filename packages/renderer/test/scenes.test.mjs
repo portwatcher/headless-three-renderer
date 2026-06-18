@@ -21613,13 +21613,17 @@ test('PointsMaterial map honors horizontal and vertical repeat wrapping', () => 
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.r > clamped.g + 100, `clamped point map U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
   assert.ok(repeated.g > repeated.r + 60, `repeated point map U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+  assert.ok(mirrored.r > mirrored.g + 100, `mirrored point map U coordinates should reflect to the red texel (${mirrored.r} vs ${mirrored.g})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.r > clampedVertical.g + 100, `clamped point map V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
   assert.ok(repeatedVertical.g > repeatedVertical.r + 60, `repeated point map V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+  assert.ok(mirroredVertical.r > mirroredVertical.g + 100, `mirrored point map V coordinates should reflect to the red texel (${mirroredVertical.r} vs ${mirroredVertical.g})`)
 })
 
 test('PointsMaterial alphaMap applies texture UV transforms', () => {
@@ -21730,13 +21734,17 @@ test('PointsMaterial alphaMap honors horizontal and vertical repeat wrapping', (
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.b > clamped.g + 40, `clamped point alphaMap U coordinates should discard against the blue background (${clamped.b} vs ${clamped.g})`)
   assert.ok(repeated.g > repeated.b + 40, `repeated point alphaMap U coordinates should wrap to the opaque texel (${repeated.g} vs ${repeated.b})`)
+  assert.ok(mirrored.b > mirrored.g + 40, `mirrored point alphaMap U coordinates should reflect to the transparent texel (${mirrored.b} vs ${mirrored.g})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.b > clampedVertical.g + 40, `clamped point alphaMap V coordinates should discard against the blue background (${clampedVertical.b} vs ${clampedVertical.g})`)
   assert.ok(repeatedVertical.g > repeatedVertical.b + 40, `repeated point alphaMap V coordinates should wrap to the opaque texel (${repeatedVertical.g} vs ${repeatedVertical.b})`)
+  assert.ok(mirroredVertical.b > mirroredVertical.g + 40, `mirrored point alphaMap V coordinates should reflect to the transparent texel (${mirroredVertical.b} vs ${mirroredVertical.g})`)
 })
 
 test('PointsMaterial map decodes sRGB colorSpace before shading', () => {
