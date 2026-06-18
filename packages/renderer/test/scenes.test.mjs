@@ -2142,6 +2142,31 @@ test('unsupported normalMapType values fail clearly', () => {
   )
 })
 
+test('MeshNormalMaterial normalMap honors normalScale strength', () => {
+  function renderNormalScale(scale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({
+        normalMap: solidTexture(255, 128, 128),
+        normalScale: new THREE.Vector2(scale, scale),
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const disabled = renderNormalScale(0)
+  const strong = renderNormalScale(2)
+  assert.ok(strong.r > disabled.r + 40, `larger normalScale should strengthen tangent-red output (${strong.r} vs ${disabled.r})`)
+  assert.ok(disabled.b > strong.b + 40, `normalScale 0 should preserve more front-facing blue output (${disabled.b} vs ${strong.b})`)
+})
+
 test('MeshNormalMaterial bumpMap perturbs output normals', () => {
   function renderBumpMaterial(bumpScale) {
     const bumpMap = rgbaTexture([
