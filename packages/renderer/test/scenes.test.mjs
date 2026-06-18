@@ -12787,6 +12787,26 @@ test('invalid light numeric values fail clearly', () => {
       light.intensity = 'bright'
       return light
     }, /light\.intensity must be a finite number/i],
+    ['point intensity', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      light.intensity = Number.NaN
+      return light
+    }, /light\.intensity must be a finite number/i],
+    ['spot intensity', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.intensity = Number.POSITIVE_INFINITY
+      return light
+    }, /light\.intensity must be a finite number/i],
+    ['hemisphere intensity', () => {
+      const light = new THREE.HemisphereLight(0xffffff, 0x222222, 1)
+      light.intensity = 'bright'
+      return light
+    }, /light\.intensity must be a finite number/i],
+    ['rect intensity', () => {
+      const light = new THREE.RectAreaLight(0xffffff, 1, 1, 1)
+      light.intensity = Number.NEGATIVE_INFINITY
+      return light
+    }, /light\.intensity must be a finite number/i],
     ['directional target matrix', () => {
       const light = new THREE.DirectionalLight(0xffffff, 1)
       light.target.matrixWorld.elements[14] = Number.NaN
