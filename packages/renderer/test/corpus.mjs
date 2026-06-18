@@ -37,6 +37,7 @@ export function createSceneCorpus() {
     linearFogCorpus(),
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
+    customWgslPremultipliedCorpus(),
     maskRenderModeCorpus(),
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
@@ -619,6 +620,36 @@ function linearOutputColorSpaceCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(center.r > 60 && center.r < 90 && center.g < 20 && center.b < 10 && corner.r > 40 && corner.r < 55 && corner.g > 40 && corner.g < 55 && corner.b > 40 && corner.b < 55)) {
         throw new Error(`linear output corpus should preserve linear RGB values, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function customWgslPremultipliedCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.ShaderMaterial({
+    blending: THREE.NoBlending,
+    premultipliedAlpha: true,
+    transparent: true,
+  })
+  material.userData.headlessThreeRenderer = {
+    fragmentWgsl: 'return vec4<f32>(0.0, 1.0, 0.0, alpha * 0.5);',
+  }
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  return {
+    name: 'custom-wgsl-premultiplied-alpha',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minMeanAlpha: 120,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      if (!(center.g > 60 && center.g < 150 && center.a > 120 && center.a < 140)) {
+        throw new Error(`custom WGSL premultiplied corpus should output half-alpha premultiplied green, got ${JSON.stringify(center)}`)
       }
     },
   }
