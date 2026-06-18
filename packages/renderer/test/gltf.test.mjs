@@ -25,6 +25,13 @@ const SYNTHETIC_VRM = path.join(FIXTURE_DIR, 'synthetic-avatar.vrm')
 const SYNTHETIC_VRMA = path.join(FIXTURE_DIR, 'synthetic-animation.vrma')
 const SYNTHETIC_HUMANOID_VRM = path.join(FIXTURE_DIR, 'synthetic-humanoid-avatar.vrm')
 const SYNTHETIC_HUMANOID_VRMA = path.join(FIXTURE_DIR, 'synthetic-humanoid-animation.vrma')
+const REAL_VRM_SEED_SAN_SAMPLE = path.join(
+  FIXTURE_DIR,
+  'vrm-specification',
+  'Seed-san',
+  'vrm',
+  'Seed-san.vrm',
+)
 const REAL_VRM_EXPRESSION_SAMPLE = path.join(
   FIXTURE_DIR,
   'vrm-specification',
@@ -12399,6 +12406,84 @@ test('synthetic humanoid VRM and VRMA fixtures expose avatar-scale skeleton meta
   assert.equal(animationHumanBones.rightFoot?.node, 16)
   assert.equal(vrmaExtension?.lookAt?.node, 17)
   assert.equal(vrmaExtension?.expressions?.preset?.happy?.node, 18)
+})
+
+test('real full-avatar VRM fixture loads practical avatar extension coverage', async () => {
+  let vrmPluginParser = null
+
+  class CaptureVRMLoaderPlugin {
+    constructor(parser) {
+      this.name = 'CaptureVRMLoaderPlugin'
+      vrmPluginParser = parser
+    }
+  }
+
+  const vrmGltf = await loadVrmFromFile(REAL_VRM_SEED_SAN_SAMPLE, {
+    VRMLoaderPlugin: CaptureVRMLoaderPlugin,
+  })
+  assert.ok(vrmPluginParser, 'Seed-san VRM should initialize the supplied VRM loader plugin')
+  assert.ok(vrmPluginParser.json?.extensionsUsed?.includes('VRMC_vrm'), 'Seed-san VRM should expose VRMC_vrm metadata')
+  assert.ok(vrmPluginParser.json?.extensionsUsed?.includes('VRMC_springBone'), 'Seed-san VRM should expose VRMC_springBone metadata')
+  assert.ok(
+    vrmPluginParser.json?.extensionsUsed?.includes('VRMC_materials_mtoon'),
+    'Seed-san VRM should expose VRMC_materials_mtoon metadata',
+  )
+  assert.ok(
+    vrmPluginParser.json?.extensionsUsed?.includes('VRMC_node_constraint'),
+    'Seed-san VRM should expose VRMC_node_constraint metadata',
+  )
+  assert.deepEqual(
+    {
+      nodes: vrmPluginParser.json?.nodes?.length,
+      meshes: vrmPluginParser.json?.meshes?.length,
+      skins: vrmPluginParser.json?.skins?.length,
+      materials: vrmPluginParser.json?.materials?.length,
+      images: vrmPluginParser.json?.images?.length,
+    },
+    { nodes: 147, meshes: 5, skins: 5, materials: 17, images: 15 },
+  )
+
+  const skinnedMeshes = []
+  vrmGltf.scene.traverse((object) => {
+    if (object.isSkinnedMesh === true) skinnedMeshes.push(object)
+  })
+  assert.equal(skinnedMeshes.length, 21)
+
+  const vrmExtension = vrmPluginParser.json?.extensions?.VRMC_vrm
+  const humanBones = vrmExtension?.humanoid?.humanBones ?? {}
+  assert.equal(vrmExtension?.specVersion, '1.0')
+  assert.equal(vrmExtension?.meta?.name, 'Seed-san')
+  assert.equal(vrmExtension?.meta?.licenseUrl, 'https://vrm.dev/licenses/1.0/')
+  assert.equal(vrmExtension?.meta?.allowRedistribution, true)
+  assert.equal(vrmExtension?.meta?.creditNotation, 'required')
+  assert.ok('hips' in humanBones, 'Seed-san VRM should map humanoid hips')
+  assert.ok('head' in humanBones, 'Seed-san VRM should map humanoid head')
+  assert.ok('leftHand' in humanBones, 'Seed-san VRM should map humanoid left hand')
+  assert.ok('rightToes' in humanBones, 'Seed-san VRM should map humanoid right toes')
+  assert.equal(Object.keys(humanBones).length, 51)
+  assert.equal(Object.keys(vrmExtension?.expressions?.preset ?? {}).length, 18)
+  assert.ok(vrmExtension?.lookAt, 'Seed-san VRM should include look-at metadata')
+  assert.ok(vrmExtension?.firstPerson, 'Seed-san VRM should include first-person metadata')
+
+  const springBoneExtension = vrmPluginParser.json?.extensions?.VRMC_springBone
+  assert.equal(springBoneExtension?.springs?.length, 9)
+  assert.equal(springBoneExtension?.colliders?.length, 8)
+  assert.equal(springBoneExtension?.colliderGroups?.length, 2)
+  assert.equal(
+    vrmPluginParser.json?.nodes?.filter((node) => node.extensions?.VRMC_node_constraint).length,
+    23,
+  )
+  assert.equal(vrmPluginParser.json?.materials?.filter((material) => material.extensions?.VRMC_materials_mtoon).length, 10)
+
+  const camera = frameSceneCamera(vrmGltf.scene)
+  const rgba = new Renderer().render(vrmGltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.05, 'Seed-san VRM should render visible full-avatar geometry')
 })
 
 test('real external VRM and VRMA fixtures expose extension metadata through loader helpers', async () => {
