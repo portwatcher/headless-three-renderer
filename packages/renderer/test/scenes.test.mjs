@@ -1467,6 +1467,25 @@ test('ArrayCamera supports PNG output', () => {
   assertValidPng(getRenderer().render(scene, arrayCamera, { width: 64, height: 64 }), { width: 64, height: 64 })
 })
 
+test('ArrayCamera object-id target merges sub-camera metadata', () => {
+  const scene = makeLayeredSplitScene()
+  const arrayCamera = makeLayeredArrayCamera()
+  const [red, green] = scene.children
+  const target = { texture: {} }
+
+  renderToTarget(scene, arrayCamera, target, { width: 64, height: 64, renderMode: 'object-id' })
+
+  const redEncoded = red.id + 1
+  const greenEncoded = green.id + 1
+  const left = meanRegion(target.data, 64, 64, 8, 20, 24, 44)
+  const right = meanRegion(target.data, 64, 64, 40, 20, 56, 44)
+  assertRgbClose(left, objectIdBytes(redEncoded), 'left ArrayCamera object id')
+  assertRgbClose(right, objectIdBytes(greenEncoded), 'right ArrayCamera object id')
+  assert.equal(target.objectIdEntries.length, 2)
+  assert.equal(target.objectIdMap[String(redEncoded)].id, red.id)
+  assert.equal(target.objectIdMap[String(greenEncoded)].id, green.id)
+})
+
 test('malformed ArrayCamera sub-camera containers fail clearly', () => {
   const scene = makeLayeredSplitScene()
   const arrayCamera = makeLayeredArrayCamera()
