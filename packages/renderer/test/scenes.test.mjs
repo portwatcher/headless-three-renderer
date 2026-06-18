@@ -19454,6 +19454,48 @@ test('LineSegments with InstancedBufferGeometry default instanceCount expands of
   assert.ok(greenPixels > 2, `right instanced line should render green pixels (${greenPixels})`)
 })
 
+test('Line and LineLoop with InstancedBufferGeometry expand offsets and colors', () => {
+  function renderLine(makeObject) {
+    const geometry = new THREE.InstancedBufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -0.25, 0, 0,
+      0.25, 0, 0,
+    ]), 3))
+    geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+      -0.45, 0, 0,
+      0.45, 0, 0,
+    ]), 3))
+    geometry.setAttribute('color', new THREE.InstancedBufferAttribute(new Float32Array([
+      1, 0, 0,
+      0, 1, 0,
+    ]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(makeObject(geometry, new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      linewidth: 8,
+      vertexColors: true,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const [label, makeObject] of [
+    ['Line', (geometry, material) => new THREE.Line(geometry, material)],
+    ['LineLoop', (geometry, material) => new THREE.LineLoop(geometry, material)],
+  ]) {
+    const rgba = renderLine(makeObject)
+    const redPixels = countRegionPixels(rgba, 96, 96, 14, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
+    const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 82, 56, (r, g, b) => g > r + 30 && g > b + 30)
+    assert.ok(redPixels > 6, `${label} should render red pixels from the first instanced color (${redPixels})`)
+    assert.ok(greenPixels > 6, `${label} should render green pixels from the second instanced color (${greenPixels})`)
+  }
+})
+
 test('LineSegments with InstancedBufferGeometry honor meshPerAttribute repeat values for colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 4
