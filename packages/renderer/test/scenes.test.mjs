@@ -7727,6 +7727,65 @@ test('LineBasicMaterial alphaToCoverage approximates shadow caster cutouts', () 
   assert.ok(cutoutLum > fullLum + 2, `line alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
 })
 
+test('LineBasicMaterial alphaHash approximates shadow caster opacity cutouts', () => {
+  function renderLineAlphaHashShadow(alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      opacity: alphaHash ? 0.35 : 1,
+      alphaHash,
+    })
+    material.colorWrite = false
+    material.depthWrite = false
+
+    const positions = []
+    for (let offset = -3; offset <= 3; offset += 0.25) {
+      positions.push(-3, 2, offset, 3, 2, offset)
+      positions.push(offset, 2, -3, offset, 2, 3)
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const line = new THREE.LineSegments(geometry, material)
+    line.castShadow = true
+    scene.add(line)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(3, 6, 4)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(1024, 1024)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const fullShadow = renderLineAlphaHashShadow(false)
+  const hashedShadow = renderLineAlphaHashShadow(true)
+  const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+  const hashedLum = hashedShadow.r + hashedShadow.g + hashedShadow.b
+  assert.ok(hashedLum > fullLum + 2, `line alphaHash shadow cutoff should let more receiver light through (${hashedLum} vs ${fullLum})`)
+})
+
 test('Line shadow casters honor material and group clipShadows', () => {
   function makeLineSegments() {
     const material = new THREE.LineBasicMaterial({ color: 0xffffff })
@@ -8189,6 +8248,73 @@ test('SpriteMaterial and PointsMaterial alphaToCoverage approximate shadow caste
     const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
     const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
     assert.ok(cutoutLum > fullLum + 10, `${kind} alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
+  }
+})
+
+test('SpriteMaterial and PointsMaterial alphaHash approximate shadow caster opacity cutouts', () => {
+  function renderBillboardAlphaHashShadow(kind, alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    if (kind === 'sprite') {
+      const material = new THREE.SpriteMaterial({
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+        alphaHash,
+      })
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(0, 4, 0)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = true
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 4, 0]), 3))
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+        alphaHash,
+        size: 48,
+        sizeAttenuation: false,
+      })
+      const points = new THREE.Points(geometry, material)
+      points.castShadow = true
+      scene.add(points)
+    }
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const fullShadow = renderBillboardAlphaHashShadow(kind, false)
+    const hashedShadow = renderBillboardAlphaHashShadow(kind, true)
+    const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+    const hashedLum = hashedShadow.r + hashedShadow.g + hashedShadow.b
+    assert.ok(hashedLum > fullLum + 10, `${kind} alphaHash shadow cutoff should let more receiver light through (${hashedLum} vs ${fullLum})`)
   }
 })
 
