@@ -59,6 +59,7 @@ const SAMPLE_ASSET_CARBON_FIBRE = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
 const SAMPLE_ASSET_CESIUM_MILK_TRUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMilkTruck', 'glTF', 'CesiumMilkTruck.gltf')
 const SAMPLE_ASSET_CHAIR_DAMASK_PURPLEGOLD = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ChairDamaskPurplegold', 'glTF', 'ChairDamaskPurplegold.gltf')
+const SAMPLE_ASSET_CHRONOGRAPH_WATCH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ChronographWatch', 'glTF', 'ChronographWatch.gltf')
 const SAMPLE_ASSET_CLEARCOAT_CAR_PAINT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatCarPaint', 'glTF', 'ClearCoatCarPaint.gltf')
 const SAMPLE_ASSET_CLEARCOAT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearCoatTest', 'glTF', 'ClearCoatTest.gltf')
 const SAMPLE_ASSET_CLEARCOAT_WICKER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ClearcoatWicker', 'glTF', 'ClearcoatWicker.gltf')
@@ -80,9 +81,11 @@ const SAMPLE_ASSET_COMPARE_SPECULAR = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_COMPARE_TRANSMISSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareTransmission', 'glTF', 'CompareTransmission.gltf')
 const SAMPLE_ASSET_COMPARE_VOLUME = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CompareVolume', 'glTF', 'CompareVolume.gltf')
 const SAMPLE_ASSET_CORSET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Corset', 'glTF', 'Corset.gltf')
+const SAMPLE_ASSET_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cube', 'glTF', 'Cube.gltf')
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DAMAGED_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DamagedHelmet', 'glTF', 'DamagedHelmet.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
+const SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DiffuseTransmissionTest', 'glTF', 'DiffuseTransmissionTest.gltf')
 const SAMPLE_ASSET_DISPERSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DispersionTest', 'glTF', 'DispersionTest.gltf')
 const SAMPLE_ASSET_DRAGON_ATTENUATION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DragonAttenuation', 'glTF', 'DragonAttenuation.gltf')
 const SAMPLE_ASSET_DRAGON_DISPERSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DragonDispersion', 'glTF', 'DragonDispersion.gltf')
@@ -106,6 +109,7 @@ const SAMPLE_ASSET_IRIDESCENT_DISH_WITH_OLIVES = path.join(FIXTURE_DIR, 'gltf-sa
 const SAMPLE_ASSET_LANTERN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Lantern', 'glTF', 'Lantern.gltf')
 const SAMPLE_ASSET_LIGHT_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightVisibility', 'glTF', 'LightVisibility.gltf')
 const SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'LightsPunctualLamp', 'glTF', 'LightsPunctualLamp.gltf')
+const SAMPLE_ASSET_MANDARIN_ORANGE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MandarinOrange', 'glTF', 'MandarinOrange.gltf')
 const SAMPLE_ASSET_MATERIALS_VARIANTS_SHOE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MaterialsVariantsShoe', 'glTF', 'MaterialsVariantsShoe.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheres', 'glTF', 'MetalRoughSpheres.gltf')
 const SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'MetalRoughSpheresNoTextures', 'glTF', 'MetalRoughSpheresNoTextures.gltf')
@@ -130,6 +134,7 @@ const SAMPLE_ASSET_SCIFI_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SHEEN_CLOTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenCloth', 'glTF', 'SheenCloth.gltf')
 const SAMPLE_ASSET_SHEEN_TEST_GRID = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenTestGrid', 'glTF', 'SheenTestGrid.gltf')
+const SAMPLE_ASSET_SHEEN_WOOD_LEATHER_SOFA = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenWoodLeatherSofa', 'glTF', 'SheenWoodLeatherSofa.gltf')
 const SAMPLE_ASSET_SIMPLE_INSTANCING = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleInstancing', 'glTF', 'SimpleInstancing.gltf')
 const SAMPLE_ASSET_SIMPLE_MATERIAL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMaterial', 'glTF', 'SimpleMaterial.gltf')
 const SAMPLE_ASSET_SIMPLE_MESHES = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleMeshes', 'glTF', 'SimpleMeshes.gltf')
@@ -157,6 +162,7 @@ const SAMPLE_ASSET_TRIANGLE_WITHOUT_INDICES = path.join(FIXTURE_DIR, 'gltf-sampl
 const SAMPLE_ASSET_TWO_SIDED_PLANE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TwoSidedPlane', 'glTF', 'TwoSidedPlane.gltf')
 const SAMPLE_ASSET_UNICODE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Unicode❤♻Test', 'glTF', 'Unicode❤♻Test.gltf')
 const SAMPLE_ASSET_UNLIT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'UnlitTest', 'glTF', 'UnlitTest.gltf')
+const SAMPLE_ASSET_USD_SHADER_BALL_FOR_GLTF = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'USDShaderBallForGltf', 'glTF', 'USDShaderBallForGltf.gltf')
 const SAMPLE_ASSET_VERTEX_COLOR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VertexColorTest', 'glTF', 'VertexColorTest.gltf')
 const SAMPLE_ASSET_VIRTUAL_CITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'VirtualCity', 'glTF', 'VirtualCity.gltf')
 const SAMPLE_ASSET_WATER_BOTTLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'WaterBottle', 'glTF', 'WaterBottle.gltf')
@@ -201,6 +207,48 @@ test('committed glTF fixture loads through GLTFLoader and renders', async () => 
   const mean = meanRgba(rgba)
   assert.ok(mean.b > mean.r, `loaded blue PBR material should contribute blue output (${mean.b} vs ${mean.r})`)
   assert.ok(mean.a > 240, `loaded glTF output should be opaque (${mean.a})`)
+})
+
+test('committed Khronos glTF Sample Assets Cube fixture loads canonical textured cube', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CUBE, 'utf8'))
+  assert.deepEqual(source.buffers, [{ byteLength: 1800, uri: 'Cube.bin' }])
+  assert.deepEqual(source.images, [{ uri: 'Cube_BaseColor.png' }])
+  assert.equal(source.materials[0].name, 'Cube')
+  assert.equal(source.materials[0].pbrMetallicRoughness.roughnessFactor, 0.079)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CUBE)
+  const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
+  assert.ok(mesh, 'Khronos Cube sample should load a mesh')
+  assert.equal(mesh.name, 'Cube')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 36)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 36)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 36)
+  assert.equal(mesh.geometry.index?.count, 36)
+  assert.equal(mesh.material.isMeshStandardMaterial, true)
+  assert.equal(mesh.material.name, 'Cube')
+  assert.equal(mesh.material.roughness, 0.079)
+  assert.equal(mesh.material.metalness, 0)
+  assert.equal(mesh.material.map?.name, 'Cube_BaseColor.png')
+  assert.deepEqual(pngDimensions(mesh.material.map.image), [512, 512])
+  assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(mesh.material.map.flipY, false)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  const light = new THREE.DirectionalLight(0xffffff, 1.4)
+  light.position.set(2, 3, 4)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 96,
+    height: 96,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.5, 'Cube sample should render visible textured cube pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 230 && mean.g < 230 && mean.b < 230, `Cube texture should darken the white background (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets Box fixture loads external buffer and renders', async () => {
@@ -11024,6 +11072,306 @@ test('committed Khronos glTF Sample Assets TriangleWithoutIndices fixture loads 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'TriangleWithoutIndices sample should render visible non-indexed geometry')
 })
 
+test('committed Khronos glTF Sample Assets DiffuseTransmissionTest fixture preserves diffuse-transmission metadata', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEST, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_diffuse_transmission',
+    'KHR_materials_unlit',
+    'KHR_lights_punctual',
+  ])
+  assert.deepEqual(source.extensionsRequired, ['KHR_materials_unlit', 'KHR_lights_punctual'])
+  assert.deepEqual(source.buffers, [{ byteLength: 192896, uri: 'DiffuseTransmissionTest.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'DiffuseTransmissionTexture.png',
+    'glTF-Green.png',
+    'Khronos-Red.png',
+  ])
+  assert.equal(source.materials.filter((material) => material.extensions?.KHR_materials_diffuse_transmission).length, 20)
+  assert.equal(source.materials.filter((material) => material.extensions?.KHR_materials_unlit).length, 8)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEST)
+  assert.deepEqual(gltf.parser.json.extensionsUsed, source.extensionsUsed)
+  const meshes = []
+  const materials = uniqueMaterials(gltf.scene)
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 33)
+  assert.equal(materials.length, 29)
+
+  const factor = gltf.scene.getObjectByName('Plane005')?.material
+  assert.equal(factor?.name, 'Factor 1.0')
+  assert.deepEqual(factor.userData.gltfExtensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionColorFactor: [1, 1, 1],
+    diffuseTransmissionFactor: 1,
+  })
+  const colorTexture = materials.find((material) => material.name === 'ColorTexture 1.0')
+  assert.equal(colorTexture?.map?.name, 'glTF-Green.png')
+  assert.deepEqual(pngDimensions(colorTexture.map.image), [512, 512])
+  const unlitTexture = materials.find((material) => material.name === 'TextureUnlit')
+  assert.equal(unlitTexture?.isMeshBasicMaterial, true)
+  assert.equal(unlitTexture.map?.name, 'DiffuseTransmissionTexture.png')
+  assert.deepEqual(pngDimensions(unlitTexture.map.image), [64, 64])
+
+  const importedLight = findFirst(gltf.scene, (object) => object.isDirectionalLight === true)
+  assert.equal(importedLight?.name, 'DirectLight')
+  assert.equal(importedLight.intensity, 1)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  const camera = frameSceneCamera(gltf.scene, { distance: 2.1, yOffset: 0.3 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.15, 'DiffuseTransmissionTest should render visible test-grid pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.g > mean.r - 20, `diffuse-transmission grid should include green/teal material output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets MandarinOrange fixture loads real diffuse-transmission texture set', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_MANDARIN_ORANGE, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_diffuse_transmission'])
+  assert.deepEqual(source.buffers, [{ byteLength: 1262448, uri: 'MandarinOrange.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'MandarinOrange_Basecolor.jpg',
+    'MandarinOrange_DiffuseTransmission.png',
+    'MandarinOrange_Normal.png',
+    'MandarinOrange_OcclusionRough.jpg',
+  ])
+  assert.deepEqual(source.materials[0].extensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionFactor: 1,
+    diffuseTransmissionColorTexture: { index: 1 },
+    diffuseTransmissionTexture: { index: 1 },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_MANDARIN_ORANGE)
+  const mesh = gltf.scene.getObjectByName('MandarinOrange')
+  assert.ok(mesh?.isMesh, 'MandarinOrange should load its fruit mesh')
+  assert.equal(mesh.geometry.getAttribute('position')?.count, 24138)
+  assert.equal(mesh.geometry.getAttribute('normal')?.count, 24138)
+  assert.equal(mesh.geometry.getAttribute('uv')?.count, 24138)
+  assert.equal(mesh.geometry.index?.count, 122508)
+  const material = mesh.material
+  assert.equal(material.name, 'MandarinOrange')
+  assert.equal(material.isMeshStandardMaterial, true)
+  assert.equal(material.map?.name, 'MandarinOrange_Basecolor')
+  assert.equal(Buffer.isBuffer(material.map.image), true, 'MandarinOrange JPEG base color should load as an encoded Buffer')
+  assert.equal(material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.normalMap?.name, 'MandarinOrange_Normal')
+  assert.deepEqual(pngDimensions(material.normalMap.image), [1024, 1024])
+  assert.equal(material.aoMap?.name, 'MandarinOrange_OcclusionRough')
+  assert.equal(material.roughnessMap, material.aoMap)
+  assert.equal(material.metalnessMap, material.aoMap)
+  assert.deepEqual(material.userData.gltfExtensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionFactor: 1,
+    diffuseTransmissionColorTexture: { index: 1 },
+    diffuseTransmissionTexture: { index: 1 },
+  })
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.15, 'MandarinOrange should render visible textured fruit pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 15 && mean.g > mean.b + 8, `MandarinOrange should render warm orange pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets USDShaderBallForGltf fixture loads transmission volume thickness maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_USD_SHADER_BALL_FOR_GLTF, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_materials_volume'])
+  assert.deepEqual(source.buffers, [{ uri: 'USDShaderBallForGltf.bin', byteLength: 1035192 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'core_ao.png',
+    'material_ao.png',
+    'material_thick.png',
+    'sss_bars.png',
+  ])
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: {
+      attenuationColor: [0.9734452903978066, 0.9911020971136257, 0.982250550332711],
+      attenuationDistance: 0.01,
+      thicknessFactor: 8.9,
+      thicknessTexture: { index: 2, texCoord: 0 },
+    },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_USD_SHADER_BALL_FOR_GLTF)
+  const surface = gltf.scene.getObjectByName('material_surface')
+  assert.ok(surface?.isMesh, 'USDShaderBallForGltf should load the material surface mesh')
+  assert.equal(surface.geometry.getAttribute('position')?.count, 12069)
+  assert.equal(surface.geometry.index?.count, 69276)
+  const material = surface.material
+  assert.equal(material.name, 'material_surface')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.transmission, 1)
+  assert.equal(material.thickness, 8.9)
+  assert.equal(material.ior, 1.5)
+  assert.equal(material.aoMap?.name, 'material_ao.png')
+  assert.deepEqual(pngDimensions(material.aoMap.image), [512, 512])
+  assert.equal(material.thicknessMap?.name, 'material_thick.png')
+  assert.deepEqual(pngDimensions(material.thicknessMap.image), [512, 512])
+  const bars = gltf.scene.getObjectByName('sss_bars')
+  assert.equal(bars?.material?.map?.name, 'sss_bars.png')
+  assert.deepEqual(pngDimensions(bars.material.map.image), [64, 512])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.25, 'USDShaderBallForGltf should render visible shader-ball geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 230 && mean.g < 235 && mean.b < 230, `USD shader ball should render non-white geometry (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets ChronographWatch fixture loads variants, watch animation, and glass transmission', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CHRONOGRAPH_WATCH, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_variants',
+    'KHR_texture_transform',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 4114564, uri: 'ChronographWatch.data.bin' }])
+  assert.deepEqual(source.extensions.KHR_materials_variants.variants.map((variant) => variant.name), [
+    'Surgical White',
+    'Midnight Gold',
+    'Commerce Green',
+    'Khronos Red',
+  ])
+  assert.equal(source.animations[0].name, 'Anim_0')
+  assert.equal(source.animations[0].channels[0].target.path, 'rotation')
+  assert.equal(source.meshes.filter((mesh) => mesh.primitives.some((primitive) => primitive.extensions?.KHR_materials_variants)).length, 7)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CHRONOGRAPH_WATCH)
+  assert.equal(gltf.parser.json.materials.length, 29)
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].duration, 60)
+  assert.deepEqual(gltf.animations[0].tracks.map((track) => track.name), ['Hand_Seconds.quaternion'])
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 19)
+
+  const band = gltf.scene.getObjectByName('Band_Carbon_Fiber')
+  assert.ok(band?.isMesh, 'ChronographWatch should load the carbon-fiber band')
+  assert.equal(band.geometry.getAttribute('position')?.count, 6113)
+  assert.equal(band.userData.gltfExtensions.KHR_materials_variants.mappings.length, 4)
+  assert.equal(band.material.name, 'Band Carbon Fiber Gold')
+  assert.equal(band.material.normalMap?.name, 'carbonfiber_normal.png')
+  assert.deepEqual(pngDimensions(band.material.normalMap.image), [256, 256])
+
+  const glass = gltf.scene.getObjectByName('Glass_Face')
+  assert.ok(glass?.isMesh, 'ChronographWatch should load a transmissive glass face')
+  assert.equal(glass.material.name, 'Glass Face')
+  assert.equal(glass.material.isMeshPhysicalMaterial, true)
+  assert.equal(glass.material.transmission, 1)
+  assert.equal(glass.geometry.index?.count, 186)
+  const watchFace = gltf.scene.getObjectByName('Watch_Face')
+  assert.equal(watchFace?.material?.map?.name, 'watchface_basecolor.png')
+  assert.deepEqual(pngDimensions(watchFace.material.map.image), [2048, 2048])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.7)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene, { distance: 2.0, yOffset: 0.25 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.3, 'ChronographWatch should render visible watch geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 230 && mean.g < 230 && mean.b < 225, `ChronographWatch should render textured metal and face pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets SheenWoodLeatherSofa fixture loads required WebP sheen/specular materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SHEEN_WOOD_LEATHER_SOFA, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_specular',
+    'KHR_materials_sheen',
+    'KHR_texture_transform',
+    'EXT_texture_webp',
+  ])
+  assert.deepEqual(source.extensionsRequired, ['KHR_texture_transform', 'EXT_texture_webp'])
+  assert.deepEqual(source.buffers, [{ byteLength: 6533376, uri: 'SheenWoodLeatherSofa.bin' }])
+  assert.equal(source.images.length, 13)
+  assert.equal(source.images.every((image) => image.mimeType === 'image/webp'), true)
+  assert.equal(source.textures.every((texture) => texture.extensions?.EXT_texture_webp), true)
+  assert.equal(source.materials.filter((material) => material.extensions?.KHR_materials_sheen).length, 5)
+  assert.equal(source.materials.filter((material) => material.extensions?.KHR_materials_specular).length, 5)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SHEEN_WOOD_LEATHER_SOFA)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Fringe',
+    'Frame',
+    'Frame_Fabric',
+    'Paisley',
+    'Stripes',
+    'Brown',
+  ])
+
+  const fringe = gltf.scene.getObjectByName('Fringe')
+  assert.equal(fringe.geometry.getAttribute('position')?.count, 53760)
+  assert.equal(fringe.geometry.getAttribute('color')?.count, 53760)
+  assert.equal(fringe.material.name, 'Fringe')
+  assert.equal(fringe.material.isMeshPhysicalMaterial, true)
+  assert.equal(fringe.material.transparent, true)
+  assert.equal(fringe.material.sheen, 1)
+  assert.equal(fringe.material.sheenRoughness, 0.4)
+  assert.equal(fringe.material.specularIntensity, 0.3)
+  assert.equal(fringe.material.map?.name, 'Fringe_BaseColor.webp')
+  assertWebpBuffer(fringe.material.map.image, 'Fringe base color')
+  assert.equal(fringe.material.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(fringe.material.normalMap?.name, 'Fringe_Normal.webp')
+  assertWebpBuffer(fringe.material.normalMap.image, 'Fringe normal')
+
+  const paisley = gltf.scene.getObjectByName('Paisley')
+  assert.equal(paisley.material.map?.name, 'Paisley_BaseColor.webp')
+  assert.equal(paisley.material.normalMap?.name, 'Paisley_Normal.webp')
+  assert.equal(paisley.material.aoMap?.name, 'Cushions_Occlusion.webp')
+  assert.equal(paisley.material.roughnessMap, paisley.material.aoMap)
+  assertWebpBuffer(paisley.material.map.image, 'Paisley base color')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.7)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene, { distance: 2.1 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.18, 'SheenWoodLeatherSofa should render visible WebP-textured sofa pixels')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 235 && mean.g < 235 && mean.b < 235, `SheenWoodLeatherSofa should render non-white textured material output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
   const gltf = await loadGltfFixture(TEXTURED_QUAD)
 
@@ -11472,6 +11820,12 @@ function pngDimensions(buffer) {
   return [buffer.readUInt32BE(16), buffer.readUInt32BE(20)]
 }
 
+function assertWebpBuffer(buffer, label) {
+  assert.equal(Buffer.isBuffer(buffer), true, `${label} should be an encoded Buffer`)
+  assert.equal(buffer.subarray(0, 4).toString('ascii'), 'RIFF', `${label} should start with a RIFF header`)
+  assert.equal(buffer.subarray(8, 12).toString('ascii'), 'WEBP', `${label} should be a WebP payload`)
+}
+
 function assertVectorClose(actual, expected, label, tolerance = 1e-6) {
   assert.equal(actual.length, expected.length, `${label} should have ${expected.length} components`)
   for (let i = 0; i < expected.length; i++) {
@@ -11619,6 +11973,34 @@ function findFirst(root, predicate) {
     if (!match && predicate(object)) match = object
   })
   return match
+}
+
+function uniqueMaterials(root) {
+  const materials = []
+  const seen = new Set()
+  root.traverse((object) => {
+    const objectMaterials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : []
+    for (const material of objectMaterials) {
+      if (seen.has(material.uuid)) continue
+      seen.add(material.uuid)
+      materials.push(material)
+    }
+  })
+  return materials
+}
+
+function frameSceneCamera(scene, { fov = 35, xOffset = 0.8, yOffset = 0.35, distance = 2.4 } = {}) {
+  scene.updateMatrixWorld(true)
+  const bounds = new THREE.Box3().setFromObject(scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const radius = Math.max(size.length() * 0.55, 0.001)
+  const camera = new THREE.PerspectiveCamera(fov, 1, radius / 100, radius * 25)
+  camera.position.set(center.x + radius * xOffset, center.y + radius * yOffset, center.z + radius * distance)
+  camera.lookAt(center)
+  camera.updateMatrixWorld(true)
+  camera.updateProjectionMatrix()
+  return camera
 }
 
 function meanRegion(rgba, width, _height, x0, y0, x1, y1) {
