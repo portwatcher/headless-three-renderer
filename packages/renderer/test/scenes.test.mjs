@@ -8508,6 +8508,118 @@ test('Points customDistanceMaterial alphaMap controls point-light shadow casters
   assert.ok(cutoutLum > opaqueLum + 10, `points customDistanceMaterial alphaMap should remove the caster shadow (${cutoutLum} vs ${opaqueLum})`)
 })
 
+test('Sprite and Points source alphaHash applies to custom shadow material casters', () => {
+  function sourceBillboardMaterial(kind, alphaHash) {
+    const params = {
+      color: 0xffffff,
+      opacity: alphaHash ? 0.35 : 1,
+      alphaHash,
+    }
+    if (kind === 'sprite') return new THREE.SpriteMaterial(params)
+    return new THREE.PointsMaterial({
+      ...params,
+      size: 48,
+      sizeAttenuation: false,
+    })
+  }
+
+  function addBillboard(scene, kind, alphaHash, shadowProperty, shadowMaterial, position) {
+    const material = sourceBillboardMaterial(kind, alphaHash)
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(...position)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = true
+      sprite[shadowProperty] = shadowMaterial
+      scene.add(sprite)
+      return
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
+    const points = new THREE.Points(geometry, material)
+    points.castShadow = true
+    points[shadowProperty] = shadowMaterial
+    scene.add(points)
+  }
+
+  function renderDirectionalCustomDepthSourceAlphaHash(kind, alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    addBillboard(scene, kind, alphaHash, 'customDepthMaterial', new THREE.MeshDepthMaterial(), [0, 4, 0])
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  function renderPointCustomDistanceSourceAlphaHash(kind, alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    addBillboard(scene, kind, alphaHash, 'customDistanceMaterial', new THREE.MeshDistanceMaterial(), [0, 2.2, 1.8])
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const fullDepth = renderDirectionalCustomDepthSourceAlphaHash(kind, false)
+    const hashedDepth = renderDirectionalCustomDepthSourceAlphaHash(kind, true)
+    const fullDepthLum = fullDepth.r + fullDepth.g + fullDepth.b
+    const hashedDepthLum = hashedDepth.r + hashedDepth.g + hashedDepth.b
+    assert.ok(hashedDepthLum > fullDepthLum + 10, `${kind} source alphaHash should lighten the customDepthMaterial caster shadow (${hashedDepthLum} vs ${fullDepthLum})`)
+
+    const fullDistance = renderPointCustomDistanceSourceAlphaHash(kind, false)
+    const hashedDistance = renderPointCustomDistanceSourceAlphaHash(kind, true)
+    const fullDistanceLum = fullDistance.r + fullDistance.g + fullDistance.b
+    const hashedDistanceLum = hashedDistance.r + hashedDistance.g + hashedDistance.b
+    assert.ok(hashedDistanceLum > fullDistanceLum + 10, `${kind} source alphaHash should lighten the customDistanceMaterial caster shadow (${hashedDistanceLum} vs ${fullDistanceLum})`)
+  }
+})
+
 test('customDepthMaterial alphaMap controls directional shadow casters', () => {
   function renderCustomDepthShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
