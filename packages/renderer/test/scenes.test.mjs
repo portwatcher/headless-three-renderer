@@ -3634,6 +3634,49 @@ test('MeshToonMaterial normalMap perturbs toon lighting', () => {
   assert.ok(tilted.r > flat.r + 5, `normalMap should tilt toon lighting toward the oblique light (${tilted.r} vs ${flat.r})`)
 })
 
+test('MeshToonMaterial bumpMap perturbs toon lighting', () => {
+  function renderBumpScale(bumpScale) {
+    const bumpMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    bumpMap.magFilter = THREE.LinearFilter
+    bumpMap.minFilter = THREE.LinearFilter
+
+    const gradientMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    gradientMap.magFilter = THREE.LinearFilter
+    gradientMap.minFilter = THREE.LinearFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        bumpMap,
+        bumpScale,
+        gradientMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 3)
+    light.position.set(3, 0, 0.25)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const flat = renderBumpScale(0)
+  const bumped = renderBumpScale(8)
+  assert.ok(flat.r > bumped.r + 8, `bumpMap should perturb the toon ramp lookup (${flat.r} vs ${bumped.r})`)
+})
+
 test('MeshToonMaterial map samples the selected secondary UV channel', () => {
   function renderWithChannel(channel) {
     const map = rgbaTexture([
