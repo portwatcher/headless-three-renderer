@@ -4456,6 +4456,50 @@ test('SpriteMaterial alphaMap honors explicit texture matrices', () => {
   assert.ok(mean.g > mean.b + 40, `explicit sprite alphaMap matrix should shift left sprite UVs into the opaque texel (${mean.g} vs ${mean.b})`)
 })
 
+test('SpriteMaterial and PointsMaterial alphaHash produce main-pass stochastic coverage', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderBillboard(kind, alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const materialProps = {
+      alphaHash,
+      color: 0xffffff,
+      opacity: alphaHash ? 0.35 : 1,
+    }
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial(materialProps))
+      sprite.scale.set(1.2, 1.2, 1)
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+        ...materialProps,
+        size: 48,
+        sizeAttenuation: false,
+      })))
+    }
+
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const opaque = renderBillboard(kind, false)
+    const hashed = renderBillboard(kind, true)
+    const visiblePixel = (r, g, b) => r > 20 || g > 20 || b > 20
+    const opaquePixels = countRegionPixels(opaque, 64, 64, 16, 16, 48, 48, visiblePixel)
+    const hashedPixels = countRegionPixels(hashed, 64, 64, 16, 16, 48, 48, visiblePixel)
+
+    assert.ok(opaquePixels > 700, `${kind} opaque billboard should fill the sampled region (${opaquePixels})`)
+    assert.ok(hashedPixels > 80, `${kind} alphaHash billboard should retain some visible pixels (${hashedPixels})`)
+    assert.ok(hashedPixels < opaquePixels - 180, `${kind} alphaHash billboard should discard visible pixels (${hashedPixels} vs ${opaquePixels})`)
+  }
+})
+
 test('SpriteMaterial honors sprite scale and material rotation', () => {
   function renderRotatedSprite(rotation) {
     const scene = new THREE.Scene()
