@@ -4114,20 +4114,26 @@ test('displacementMap honors texture filters before depth output', () => {
   assert.ok(nearest.r > linear.r + 8, `nearest displacement should sample the high texel more strongly than linear filtering (${nearest.r} vs ${linear.r})`)
 })
 
-test('displacementMap honors repeat wrapping before depth output', () => {
-  function renderDisplaced(wrapS) {
-    const displacementMap = rgbaTexture([
-      255, 255, 255, 255,
-      0, 0, 0, 255,
-    ], 2, 1)
-    displacementMap.wrapS = wrapS
+test('displacementMap honors horizontal and vertical repeat wrapping before depth output', () => {
+  function renderDisplaced({ wrapS, wrapT, vertical = false }) {
+    const displacementMap = vertical
+      ? rgbaTexture([
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        255, 255, 255, 255,
+        0, 0, 0, 255,
+      ], 2, 1)
+    if (wrapS != null) displacementMap.wrapS = wrapS
+    if (wrapT != null) displacementMap.wrapT = wrapT
     displacementMap.magFilter = THREE.NearestFilter
     displacementMap.minFilter = THREE.NearestFilter
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.add(new THREE.Mesh(
-      constantUvPlane(1.25, 0.5),
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
       new THREE.MeshDepthMaterial({
         displacementMap,
         displacementScale: 2.5,
@@ -4141,9 +4147,13 @@ test('displacementMap honors repeat wrapping before depth output', () => {
     return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
   }
 
-  const clamped = renderDisplaced(THREE.ClampToEdgeWrapping)
-  const repeated = renderDisplaced(THREE.RepeatWrapping)
-  assert.ok(repeated.r > clamped.r + 15, `repeat wrapping should wrap displacement UVs to the high texel (${repeated.r} vs ${clamped.r})`)
+  const clamped = renderDisplaced({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderDisplaced({ wrapS: THREE.RepeatWrapping })
+  assert.ok(repeated.r > clamped.r + 15, `repeat wrapping should wrap displacement U coordinates to the high texel (${repeated.r} vs ${clamped.r})`)
+
+  const clampedVertical = renderDisplaced({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderDisplaced({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(repeatedVertical.r > clampedVertical.r + 15, `repeat wrapping should wrap displacement V coordinates to the high texel (${repeatedVertical.r} vs ${clampedVertical.r})`)
 })
 
 test('displacementMap applies displacementBias independently of sampled height', () => {
