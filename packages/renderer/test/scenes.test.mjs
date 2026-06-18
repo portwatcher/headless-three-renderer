@@ -10842,7 +10842,7 @@ test('invalid texture transform values fail clearly', () => {
   }
 })
 
-test('one- and two-channel raw DataTexture maps expand for texture rendering', () => {
+test('one- and two-channel raw DataTexture maps and backgrounds expand for texture rendering', () => {
   function renderMap(map) {
     map.needsUpdate = true
     const scene = new THREE.Scene()
@@ -10856,15 +10856,35 @@ test('one- and two-channel raw DataTexture maps expand for texture rendering', (
     return meanRegion(rgba, 64, 64, 24, 24, 40, 40)
   }
 
+  function renderBackground(background) {
+    background.needsUpdate = true
+    const scene = new THREE.Scene()
+    scene.background = background
+
+    const rgba = renderRgba(scene, makeCamera(), { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace })
+    return meanRgba(rgba)
+  }
+
   const redMap = new THREE.DataTexture(new Uint8Array([220]), 1, 1, THREE.RedFormat)
   const red = renderMap(redMap)
   assert.ok(red.r > 180 && red.g > 180 && red.b > 180, `one-channel raw texture should expand to grayscale (${red.r}, ${red.g}, ${red.b})`)
+
+  const redBackground = renderBackground(new THREE.DataTexture(new Uint8Array([220]), 1, 1, THREE.RedFormat))
+  assert.ok(
+    redBackground.r > 180 && redBackground.g > 180 && redBackground.b > 180,
+    `one-channel raw background should expand to grayscale (${redBackground.r}, ${redBackground.g}, ${redBackground.b})`,
+  )
 
   const rgMap = new THREE.DataTexture(new Uint8Array([230, 24]), 1, 1, THREE.RGFormat)
   const rg = renderMap(rgMap)
   assert.ok(rg.r > 190, `two-channel raw texture should preserve red (${rg.r})`)
   assert.ok(rg.g < 80, `two-channel raw texture should preserve green (${rg.g})`)
   assert.ok(rg.b < 40, `two-channel raw texture should leave blue empty (${rg.b})`)
+
+  const rgBackground = renderBackground(new THREE.DataTexture(new Uint8Array([230, 24]), 1, 1, THREE.RGFormat))
+  assert.ok(rgBackground.r > 190, `two-channel raw background should preserve red (${rgBackground.r})`)
+  assert.ok(rgBackground.g < 80, `two-channel raw background should preserve green (${rgBackground.g})`)
+  assert.ok(rgBackground.b < 40, `two-channel raw background should leave blue empty (${rgBackground.b})`)
 })
 
 test('HalfFloatType raw DataTexture maps decode for material and background textures', () => {
