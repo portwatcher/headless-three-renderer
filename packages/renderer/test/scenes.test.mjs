@@ -6466,6 +6466,9 @@ test('invalid material render-state boolean values fail clearly', () => {
     ['transparent', (material) => {
       material.transparent = 'yes'
     }, /material\.transparent must be a boolean/i],
+    ['forceSinglePass', (material) => {
+      material.forceSinglePass = 'yes'
+    }, /material\.forceSinglePass must be a boolean/i],
     ['vertexColors', (material) => {
       material.vertexColors = 'yes'
     }, /material\.vertexColors must be a boolean/i],
@@ -6547,6 +6550,28 @@ test('unsupported material side values fail clearly', () => {
     material,
     /material\.side 999.*not supported/i,
   )
+})
+
+test('material forceSinglePass is accepted as a native single-pass no-op', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    opacity: 0.5,
+    side: THREE.DoubleSide,
+    transparent: true,
+  })
+  material.forceSinglePass = true
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > 40, `forceSinglePass material should still render visible red output (${mean.r})`)
+  assert.ok(mean.r > mean.g + 40, `forceSinglePass material should still render red output (${mean.r} vs ${mean.g})`)
+  assert.ok(mean.r > mean.b + 40, `forceSinglePass material should still render red output (${mean.r} vs ${mean.b})`)
 })
 
 test('NoBlending disables blending even for transparent materials', () => {

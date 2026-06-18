@@ -242,6 +242,7 @@ export interface ThreeMaterialLike {
   stencilZFail?: number
   stencilZPass?: number
   transparent?: boolean
+  forceSinglePass?: boolean
   side?: number
   shadowSide?: number | null
   flatShading?: boolean

@@ -1012,6 +1012,7 @@ export function extractPbrProperties(
   if (transparent !== undefined) {
     props.transparent = transparent
   }
+  optionalBoolean(material.forceSinglePass, 'material.forceSinglePass')
   const blending = materialBlending(material)
   if (blending) {
     props.blending = blending
