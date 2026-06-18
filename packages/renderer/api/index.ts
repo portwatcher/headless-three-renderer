@@ -648,6 +648,7 @@ function renderCubeCamera(
   const { width, height } = cubeMipmapSize(targetWidth, targetHeight, activeMipmapLevel)
   const outputFormat = options.format ?? (options.target ? 'rgba' : 'png')
   const subCameras = cubeSubCameras(camera)
+  const objectIdEntryMap = new Map<number, RenderObjectIdEntry>()
   const faceOptions: InternalRenderOptions = {
     ...options,
     target,
@@ -662,8 +663,13 @@ function renderCubeCamera(
   const faces: Buffer[] = []
   const depthFaces: NonNullable<RenderTargetImageLike['data']>[] = []
   for (const subCamera of subCameras) {
-    const { nativeScene, nativeCamera } = toNativeInput(scene, subCamera, faceOptions)
+    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, subCamera, faceOptions)
     faces.push(Buffer.from(renderNativeScene(nativeScene, nativeCamera)))
+    if (objectIdEntries) {
+      for (const entry of objectIdEntries) {
+        objectIdEntryMap.set(entry.encodedId, entry)
+      }
+    }
     const depthFace = renderTargetDepthBuffer(target, nativeScene, nativeCamera, renderNativeScene)
     if (depthFace) {
       depthFaces.push(cloneTargetData(depthTextureData(target.depthTexture!, depthFace)))
@@ -679,6 +685,9 @@ function renderCubeCamera(
     height,
     activeMipmapLevel,
     depthFaces.length > 0 ? depthFaces : undefined,
+    objectIdEntryMap.size > 0
+      ? [...objectIdEntryMap.values()].sort((a, b) => a.encodedId - b.encodedId)
+      : undefined,
   )
 
   const buffer = outputFormat === 'png' ? native.encodePng(faces[0], width, height) : faces[0]
@@ -810,6 +819,7 @@ function writeCubeRenderTarget(
   faceHeight: number,
   activeMipmapLevel: number,
   depthFaces?: NonNullable<RenderTargetImageLike['data']>[],
+  objectIdEntries?: RenderObjectIdEntry[],
 ): RenderTargetLike {
   if (faces.length !== CUBE_FACE_COUNT) {
     throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered faces, received ${faces.length}.`)
@@ -828,6 +838,7 @@ function writeCubeRenderTarget(
     }
     writeCubeTextureFaces(target.depthTexture, depthFaces, faceWidth, faceHeight, activeMipmapLevel, 'target.depthTexture')
   }
+  writeObjectIdMetadata(target, objectIdEntries)
   return target
 }
 
@@ -1813,6 +1824,12 @@ function writeRenderTarget(
     writeRenderTargetTexture(target.depthTexture, depthTextureData(target.depthTexture, depthData), width, height)
   }
 
+  writeObjectIdMetadata(target, objectIdEntries)
+
+  return target
+}
+
+function writeObjectIdMetadata(target: RenderTargetLike, objectIdEntries?: RenderObjectIdEntry[]): void {
   if (objectIdEntries) {
     target.objectIdEntries = objectIdEntries
     target.objectIdMap = Object.fromEntries(objectIdEntries.map((entry) => [String(entry.encodedId), entry]))
@@ -1820,8 +1837,6 @@ function writeRenderTarget(
     delete target.objectIdEntries
     delete target.objectIdMap
   }
-
-  return target
 }
 
 function renderTargetColorTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {

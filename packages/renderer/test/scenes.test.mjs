@@ -1555,6 +1555,29 @@ test('CubeCamera renders cube target faces', () => {
   assert.ok(depthPx > 0 && depthPx <= 1, `cube depth face should contain normalized depth (${depthPx})`)
 })
 
+test('CubeCamera object-id target includes reverse lookup metadata', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  const [positiveX, negativeX] = scene.children
+
+  renderToTarget(scene, cubeCamera, cubeTarget, { renderMode: 'object-id' })
+
+  const positiveXEncoded = positiveX.id + 1
+  const negativeXEncoded = negativeX.id + 1
+  const px = meanRegion(cubeTarget.texture.image[0].data, 32, 32, 12, 12, 20, 20)
+  const nx = meanRegion(cubeTarget.texture.image[1].data, 32, 32, 12, 12, 20, 20)
+  assertRgbClose(px, objectIdBytes(positiveXEncoded), '+X CubeCamera object id')
+  assertRgbClose(nx, objectIdBytes(negativeXEncoded), '-X CubeCamera object id')
+  assert.ok(cubeTarget.objectIdEntries.length >= 2, 'cube object-id target should expose rendered object metadata')
+  assert.equal(cubeTarget.objectIdMap[String(positiveXEncoded)].id, positiveX.id)
+  assert.equal(cubeTarget.objectIdMap[String(negativeXEncoded)].id, negativeX.id)
+
+  renderToTarget(scene, cubeCamera, cubeTarget)
+  assert.equal(cubeTarget.objectIdEntries, undefined)
+  assert.equal(cubeTarget.objectIdMap, undefined)
+})
+
 test('CubeCamera renders active mip target faces', () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
