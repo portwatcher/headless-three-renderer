@@ -16514,6 +16514,22 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     )
   }
 
+  const optionsTargetCases = [
+    [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'options.target texture array'],
+    [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
+    [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'options.target sampleCount'],
+    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'options.target color texture format'],
+    [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'options.target depth texture type'],
+  ]
+
+  for (const [target, pattern, label] of optionsTargetCases) {
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32, target }),
+      pattern,
+      label,
+    )
+  }
+
   for (const options of [{ samples: 2 }, { sampleCount: 8 }]) {
     assert.throws(
       () => renderRgba(scene, camera, { width: 32, height: 32, ...options }),
