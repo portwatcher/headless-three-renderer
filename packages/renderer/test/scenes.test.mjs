@@ -7546,13 +7546,17 @@ test('alphaMap honors horizontal and vertical repeat wrapping before alpha testi
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.b > clamped.r + 80, `clamped alphaMap U coordinates should sample the transparent edge texel (${clamped.b} vs ${clamped.r})`)
   assert.ok(repeated.r > repeated.b + 40, `repeated alphaMap U coordinates should wrap to the opaque texel (${repeated.r} vs ${repeated.b})`)
+  assert.ok(mirrored.b > mirrored.r + 80, `mirrored alphaMap U coordinates should reflect to the transparent texel (${mirrored.b} vs ${mirrored.r})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.b > clampedVertical.r + 80, `clamped alphaMap V coordinates should sample the transparent edge texel (${clampedVertical.b} vs ${clampedVertical.r})`)
   assert.ok(repeatedVertical.r > repeatedVertical.b + 40, `repeated alphaMap V coordinates should wrap to the opaque texel (${repeatedVertical.r} vs ${repeatedVertical.b})`)
+  assert.ok(mirroredVertical.b > mirroredVertical.r + 80, `mirrored alphaMap V coordinates should reflect to the transparent texel (${mirroredVertical.b} vs ${mirroredVertical.r})`)
 })
 
 test('material alphaHash produces stochastic coverage without transparent blending', () => {
