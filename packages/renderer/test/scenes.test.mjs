@@ -19498,6 +19498,41 @@ test('Line and LineLoop with InstancedBufferGeometry expand offsets and colors',
   }
 })
 
+test('LineLoop with InstancedBufferGeometry preserves per-instance closing segments', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.25, -0.35, 0,
+    0.25, -0.35, 0,
+    0.25, 0.35, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.setAttribute('color', new THREE.InstancedBufferAttribute(new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
+  ]), 3))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    linewidth: 6,
+    vertexColors: true,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redClosingPixels = countRegionPixels(rgba, 96, 96, 22, 42, 36, 58, (r, g, b) => r > g + 30 && r > b + 30)
+  const greenClosingPixels = countRegionPixels(rgba, 96, 96, 60, 42, 74, 58, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(redClosingPixels > 6, `left instanced LineLoop should render its red closing segment (${redClosingPixels})`)
+  assert.ok(greenClosingPixels > 6, `right instanced LineLoop should render its green closing segment (${greenClosingPixels})`)
+})
+
 test('LineSegments with InstancedBufferGeometry honor meshPerAttribute repeat values for colors', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.instanceCount = 4
