@@ -19624,6 +19624,54 @@ test('LineDashedMaterial with InstancedBufferGeometry expands offsets and colors
   assert.ok(greenPixels > 2, `right instanced dashed line should render green pixels (${greenPixels})`)
 })
 
+test('LineDashedMaterial with InstancedBufferGeometry honors meshPerAttribute repeat values for colors', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.instanceCount = 4
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.06, 0, 0,
+    0.06, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.6, 0, 0,
+    -0.2, 0, 0,
+    0.2, 0, 0,
+    0.6, 0, 0,
+  ]), 3))
+
+  const colors = new THREE.InstancedBufferAttribute(new Float32Array([
+    1, 0, 0,
+    0, 1, 0,
+  ]), 3)
+  colors.meshPerAttribute = 2
+  geometry.setAttribute('color', colors)
+  geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, 1]), 1))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 4,
+    gapSize: 0,
+    linewidth: 8,
+    scale: 1,
+    vertexColors: true,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const firstRed = countRegionPixels(rgba, 96, 96, 18, 42, 32, 54, (r, g, b) => r > g + 30 && r > b + 30)
+  const secondRed = countRegionPixels(rgba, 96, 96, 34, 42, 47, 54, (r, g, b) => r > g + 30 && r > b + 30)
+  const firstGreen = countRegionPixels(rgba, 96, 96, 50, 42, 63, 54, (r, g, b) => g > r + 30 && g > b + 30)
+  const secondGreen = countRegionPixels(rgba, 96, 96, 65, 42, 79, 54, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(firstRed > 6, `first repeated dashed-line color should render red pixels (${firstRed})`)
+  assert.ok(secondRed > 6, `second repeated dashed-line color should render red pixels (${secondRed})`)
+  assert.ok(firstGreen > 6, `first repeated dashed-line color should render green pixels (${firstGreen})`)
+  assert.ok(secondGreen > 6, `second repeated dashed-line color should render green pixels (${secondGreen})`)
+})
+
 test('points topology renders successfully', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.1, 0.1, 0.1)
