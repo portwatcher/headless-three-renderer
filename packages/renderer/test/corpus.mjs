@@ -54,6 +54,7 @@ export function createSceneCorpus() {
     pointsMaterialTextureCorpus(),
     instancedLinesPointsCorpus(),
     instancedTextureUvCorpus(),
+    renderableFrustumCullingCorpus(),
     batchedMeshCorpus(),
     batchedMeshInactiveGeometryCorpus(),
     batchedMeshCullingCorpus(),
@@ -2421,6 +2422,51 @@ function instancedTextureUvCorpus() {
         if (expected === 'green' && color.g <= color.r + 45) {
           throw new Error(`${label} should sample the green instanced UV texel, got rgb(${color.r}, ${color.g}, ${color.b})`)
         }
+      }
+    },
+  }
+}
+
+function renderableFrustumCullingCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const culledGeometry = new THREE.PlaneGeometry(0.62, 0.62)
+  culledGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(5, 0, 0), 0.05)
+  const culled = new THREE.Mesh(
+    culledGeometry,
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  culled.position.set(-0.42, 0, 0)
+  scene.add(culled)
+
+  const uncullableGeometry = new THREE.PlaneGeometry(0.62, 0.62)
+  uncullableGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(5, 0, 0), 0.05)
+  const uncullable = new THREE.Mesh(
+    uncullableGeometry,
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  )
+  uncullable.frustumCulled = false
+  uncullable.position.set(0.42, 0, 0)
+  scene.add(uncullable)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'renderable-frustum-culling',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    validate(rgba, { width, height }) {
+      const redPixels = countRegionPixels(rgba, width, 0, 0, Math.floor(width / 2), height, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
+      const greenPixels = countRegionPixels(rgba, width, Math.floor(width / 2), 0, width, height, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
+      if (redPixels > 5 || greenPixels < 200) {
+        throw new Error(`renderable frustum culling should skip the red object and keep frustumCulled=false green visible, got red=${redPixels} green=${greenPixels}`)
       }
     },
   }
