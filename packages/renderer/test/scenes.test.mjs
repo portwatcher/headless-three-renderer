@@ -10296,27 +10296,34 @@ test('base color map samples the selected secondary UV channel', () => {
   assert.ok(secondary.r > secondary.g + 40, `map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
 })
 
-test('base color map samples texture channel 2 from uv2 attributes', () => {
-  const map = rgbaTexture([
-    0, 255, 0, 255,
-    255, 0, 0, 255,
-  ], 2, 1)
-  map.channel = 2
+test('base color map samples texture channels 2 and 3 from matching UV attributes', () => {
+  function renderWithChannel(channel) {
+    const map = rgbaTexture([
+      0, 255, 0, 255,
+      255, 0, 0, 255,
+    ], 2, 1)
+    map.channel = channel
 
-  const geometry = constantUvPlane(0.25, 0.5)
-  setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
-  setConstantUvAttribute(geometry, 'uv2', 0.75, 0.5)
+    const geometry = constantUvPlane(0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv2', channel === 2 ? 0.75 : 0.25, 0.5)
+    setConstantUvAttribute(geometry, 'uv3', channel === 3 ? 0.75 : 0.25, 0.5)
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map })))
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map })))
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
 
-  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
-  assert.ok(mean.r > mean.g + 40, `map channel=2 should sample the uv2 red texel (${mean.r} vs ${mean.g})`)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const uv2 = renderWithChannel(2)
+  const uv3 = renderWithChannel(3)
+  assert.ok(uv2.r > uv2.g + 40, `map channel=2 should sample the uv2 red texel (${uv2.r} vs ${uv2.g})`)
+  assert.ok(uv3.r > uv3.g + 40, `map channel=3 should sample the uv3 red texel (${uv3.r} vs ${uv3.g})`)
 })
 
 test('emissiveMap applies texture UV transforms', () => {
