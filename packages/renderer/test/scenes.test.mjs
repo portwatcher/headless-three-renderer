@@ -10835,6 +10835,53 @@ test('metallicRoughness maps sample the selected secondary UV channel', () => {
   assert.ok(Math.abs(secondary - primary) > 20, `roughnessMap channel=1 should sample uv1's different texel (${secondary} vs ${primary})`)
 })
 
+test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () => {
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const roughnessMap = rgbaTexture([
+      0, 255, 0, 255,
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+    ], 2, 2)
+    roughnessMap.wrapS = wrapS
+    roughnessMap.wrapT = wrapT
+    roughnessMap.magFilter = THREE.NearestFilter
+    roughnessMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25),
+      new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        roughnessMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 12)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return maxLuminance(renderRgbaIsolated(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clamped < 10, `clamped roughnessMap U coordinates should sample the smooth edge texel (${clamped})`)
+  assert.ok(repeated > clamped + 20, `repeated roughnessMap U coordinates should wrap to the rough texel (${repeated} vs ${clamped})`)
+  assert.ok(clampedVertical < 10, `clamped roughnessMap V coordinates should sample the smooth edge texel (${clampedVertical})`)
+  assert.ok(repeatedVertical > clampedVertical + 20, `repeated roughnessMap V coordinates should wrap to the rough texel (${repeatedVertical} vs ${clampedVertical})`)
+})
+
 test('base color maps honor texture flipY', () => {
   const data = [
     255, 0, 0, 255,
