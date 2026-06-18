@@ -10836,6 +10836,8 @@ test('metallicRoughness maps sample the selected secondary UV channel', () => {
 })
 
 test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
   function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
     const roughnessMap = rgbaTexture([
       0, 255, 0, 255,
@@ -10868,7 +10870,7 @@ test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () 
     camera.position.set(0, 0, 3)
     camera.lookAt(0, 0, 0)
 
-    return maxLuminance(renderRgbaIsolated(scene, camera, { width: 64, height: 64 }))
+    return maxLuminance(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }))
   }
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
@@ -10880,6 +10882,55 @@ test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () 
   assert.ok(repeated > clamped + 20, `repeated roughnessMap U coordinates should wrap to the rough texel (${repeated} vs ${clamped})`)
   assert.ok(clampedVertical < 10, `clamped roughnessMap V coordinates should sample the smooth edge texel (${clampedVertical})`)
   assert.ok(repeatedVertical > clampedVertical + 20, `repeated roughnessMap V coordinates should wrap to the rough texel (${repeatedVertical} vs ${clampedVertical})`)
+})
+
+test('metallicRoughness metalnessMap honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const metalnessMap = rgbaTexture([
+      0, 0, 255, 255,
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+    ], 2, 2)
+    metalnessMap.wrapS = wrapS
+    metalnessMap.wrapT = wrapT
+    metalnessMap.magFilter = THREE.NearestFilter
+    metalnessMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 1,
+        metalnessMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 12)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return maxLuminance(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped > 180, `clamped metalnessMap U coordinates should sample the non-metal edge texel (${clamped})`)
+  assert.ok(repeated < clamped - 80, `repeated metalnessMap U coordinates should wrap to the metallic texel (${repeated} vs ${clamped})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical > 180, `clamped metalnessMap V coordinates should sample the non-metal edge texel (${clampedVertical})`)
+  assert.ok(repeatedVertical < clampedVertical - 80, `repeated metalnessMap V coordinates should wrap to the metallic texel (${repeatedVertical} vs ${clampedVertical})`)
 })
 
 test('base color maps honor texture flipY', () => {
