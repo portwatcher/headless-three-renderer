@@ -2485,14 +2485,14 @@ function batchedMeshInactiveGeometryCorpus() {
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
   )
   const activeGeometryId = batch.addGeometry(source)
-  const inactiveGeometryId = batch.addGeometry(source.clone())
+  const deletedGeometryId = batch.addGeometry(source.clone())
   const left = batch.addInstance(activeGeometryId)
-  const right = batch.addInstance(inactiveGeometryId)
+  const right = batch.addInstance(deletedGeometryId)
   batch.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.52, 0, 0))
   batch.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.52, 0, 0))
   batch.setColorAt(left, new THREE.Color(1, 0.05, 0.05))
   batch.setColorAt(right, new THREE.Color(0.05, 1, 0.05))
-  batch._geometryInfo[inactiveGeometryId].active = false
+  batch.deleteGeometry(deletedGeometryId)
   scene.add(batch)
 
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
@@ -2519,7 +2519,7 @@ function batchedMeshInactiveGeometryCorpus() {
         throw new Error(`active BatchedMesh geometry should render red, got red=${leftR} green=${leftG}`)
       }
       if (rightR > 8 || rightG > 8 || rightB > 8) {
-        throw new Error(`inactive BatchedMesh geometry should remain black, got rgb(${rightR}, ${rightG}, ${rightB})`)
+        throw new Error(`deleted BatchedMesh geometry should remain black, got rgb(${rightR}, ${rightG}, ${rightB})`)
       }
     },
   }
