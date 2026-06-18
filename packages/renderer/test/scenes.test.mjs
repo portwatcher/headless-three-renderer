@@ -3173,13 +3173,19 @@ test('MeshPhongMaterial specularMap honors horizontal and vertical repeat wrappi
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.r < 5, `clamped specularMap U coordinates should sample the disabled edge texel (${clamped.r})`)
   assert.ok(repeated.r > clamped.r + 80, `repeated specularMap U coordinates should wrap to the enabled texel (${repeated.r} vs ${clamped.r})`)
+  assert.ok(mirrored.r < 5, `mirrored specularMap U coordinates should reflect to the disabled texel (${mirrored.r})`)
+  assert.ok(repeated.r > mirrored.r + 80, `mirrored specularMap U coordinates should differ from RepeatWrapping (${mirrored.r} vs ${repeated.r})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.r < 5, `clamped specularMap V coordinates should sample the disabled edge texel (${clampedVertical.r})`)
   assert.ok(repeatedVertical.r > clampedVertical.r + 80, `repeated specularMap V coordinates should wrap to the enabled texel (${repeatedVertical.r} vs ${clampedVertical.r})`)
+  assert.ok(mirroredVertical.r < 5, `mirrored specularMap V coordinates should reflect to the disabled texel (${mirroredVertical.r})`)
+  assert.ok(repeatedVertical.r > mirroredVertical.r + 80, `mirrored specularMap V coordinates should differ from RepeatWrapping (${mirroredVertical.r} vs ${repeatedVertical.r})`)
 })
 
 test('MeshPhongMaterial scene environment feeds specular reflection', () => {
