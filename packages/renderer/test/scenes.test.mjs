@@ -2391,6 +2391,62 @@ test('MeshNormalMaterial bumpMap samples the selected secondary UV channel', () 
   assert.ok(diff > 2, `bumpMap channel=1 should use uv1 and change the bump perturbation (diff=${diff.toFixed(2)})`)
 })
 
+test('MeshNormalMaterial bumpMap honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function offsetUvPlane(offsetU, offsetV) {
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    const uv = geometry.getAttribute('uv')
+    for (let i = 0; i < uv.count; i++) {
+      uv.setXY(i, uv.getX(i) + offsetU, uv.getY(i) + offsetV)
+    }
+    uv.needsUpdate = true
+    return geometry
+  }
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const bumpMap = vertical
+      ? rgbaTexture([
+        0, 0, 0, 255,
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+        0, 0, 0, 255,
+        255, 255, 255, 255,
+      ], 2, 2)
+    bumpMap.wrapS = wrapS
+    bumpMap.wrapT = wrapT
+    bumpMap.magFilter = THREE.LinearFilter
+    bumpMap.minFilter = THREE.LinearFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      offsetUvPlane(vertical ? 0 : 1, vertical ? 1 : 0),
+      new THREE.MeshNormalMaterial({ bumpMap, bumpScale: 8 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const diff = meanAbsDiff(clamped, repeated)
+  assert.ok(diff > 5, `RepeatWrapping should wrap bumpMap U coordinates before perturbing normals (diff=${diff.toFixed(2)})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const verticalDiff = meanAbsDiff(clampedVertical, repeatedVertical)
+  assert.ok(verticalDiff > 5, `RepeatWrapping should wrap bumpMap V coordinates before perturbing normals (diff=${verticalDiff.toFixed(2)})`)
+})
+
 test('MeshNormalMaterial flatShading uses per-face normals on indexed geometry', () => {
   function renderFlatShading(flatShading) {
     const scene = new THREE.Scene()
