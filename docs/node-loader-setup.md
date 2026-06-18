@@ -58,8 +58,10 @@ const vrm = gltf.userData.vrm
 
 For VRMA clips, use `loadVrmAnimationFromFile()` with
 `@pixiv/three-vrm-animation` installed. Use `applyVrmAnimation()` to create a
-VRMA clip, seek an animation mixer to a still-frame time, and update the avatar
-before rendering.
+VRMA clip, seek an animation mixer to a still-frame time with `setTime()` or the
+`update()` fallback, and update the avatar before rendering. Pass
+`updateDelta` to control the VRM update step, or `updateVrm: false` when the
+caller will update the avatar manually.
 
 For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
 configured `{ loader, manager, encodedImages }` bundle so callers can add more
