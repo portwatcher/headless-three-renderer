@@ -12,44 +12,58 @@ const fixturesEl = document.getElementById('fixtures')
 const statusEl = document.getElementById('status')
 const downloadAllButton = document.getElementById('download-all')
 const downloadManifestLink = document.getElementById('download-manifest')
+const browserReferenceReadyGlobal = '__HEADLESS_THREE_BROWSER_REFERENCE_READY__'
 
-const renderer = new THREE.WebGLRenderer({
-  alpha: true,
-  antialias: true,
-  preserveDrawingBuffer: true,
-  stencil: true,
-})
-renderer.setPixelRatio(1)
-renderer.shadowMap.enabled = true
-renderer.shadowMap.type = THREE.PCFShadowMap
-RectAreaLightUniformsLib.init()
-
+let renderer
 const downloadLinks = []
 
-try {
-  const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
-  const manifest = createBrowserReferenceManifest(fixtures)
-  setupManifestDownload(manifest)
-
-  for (const fixture of fixtures) {
-    const reference = renderFixture(fixture)
-    fixturesEl.appendChild(reference.element)
-    downloadLinks.push(reference.link)
-    await nextFrame()
-  }
-
-  statusEl.textContent = `Rendered ${fixtures.length} browser reference PNGs. Save them and ${BROWSER_REFERENCE_MANIFEST_FILE} in one reference directory.`
-  downloadAllButton.disabled = false
-} catch (error) {
-  statusEl.textContent = error instanceof Error ? error.message : String(error)
-  console.error(error)
-}
+globalThis[browserReferenceReadyGlobal] = renderBrowserReferenceCorpus()
 
 downloadAllButton.addEventListener('click', () => {
   downloadLinks.forEach((link, index) => {
     setTimeout(() => link.click(), index * 150)
   })
 })
+
+async function renderBrowserReferenceCorpus() {
+  try {
+    renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+      stencil: true,
+    })
+    renderer.setPixelRatio(1)
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFShadowMap
+    RectAreaLightUniformsLib.init()
+
+    const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
+    const manifest = createBrowserReferenceManifest(fixtures)
+    setupManifestDownload(manifest)
+
+    const renderedFixtures = []
+    for (const fixture of fixtures) {
+      const reference = renderFixture(fixture)
+      fixturesEl.appendChild(reference.element)
+      downloadLinks.push(reference.link)
+      renderedFixtures.push({
+        name: fixture.name,
+        dataUrl: reference.dataUrl,
+      })
+      await nextFrame()
+    }
+
+    statusEl.textContent = `Rendered ${fixtures.length} browser reference PNGs. Save them and ${BROWSER_REFERENCE_MANIFEST_FILE} in one reference directory.`
+    downloadAllButton.disabled = false
+
+    return { manifest, fixtures: renderedFixtures }
+  } catch (error) {
+    statusEl.textContent = error instanceof Error ? error.message : String(error)
+    console.error(error)
+    throw error
+  }
+}
 
 function setupManifestDownload(manifest) {
   const json = `${JSON.stringify(manifest, null, 2)}\n`
@@ -107,7 +121,7 @@ function renderFixture(fixture) {
   title.textContent = fixture.name
   element.append(image, title, link)
 
-  return { element, link }
+  return { element, link, dataUrl }
 }
 
 function clearFullCanvas(scene, width, height) {

@@ -69,6 +69,7 @@
     "test:gltf": "node --test --test-reporter=spec test/gltf.test.mjs",
     "test:corpus": "node --test --test-reporter=spec test/corpus.test.mjs",
     "test:golden": "node --test --test-reporter=spec test/golden.test.mjs",
+    "generate:browser-reference": "node test/browser-reference/generate-headless.mjs",
     "test:scale": "node --test --test-reporter=spec test/scale.test.mjs",
     "test:conformance": "node --test --test-reporter=spec test/scenes.test.mjs",
     "test:update": "UPDATE_SNAPSHOTS=1 node --test \"test/**/*.test.mjs\"",

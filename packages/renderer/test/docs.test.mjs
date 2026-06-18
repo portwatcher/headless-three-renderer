@@ -98,6 +98,11 @@ test('release checklist gates compatibility and golden-reference updates', async
   )
   assert.match(
     checklist,
+    /generate:browser-reference/,
+    'release checklist should document the headless browser-reference generator',
+  )
+  assert.match(
+    checklist,
     /pnpm -C packages\/renderer run test:golden/,
     'release checklist should require the golden-reference harness',
   )

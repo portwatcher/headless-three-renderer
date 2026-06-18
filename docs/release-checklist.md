@@ -21,6 +21,9 @@ fixture, and golden-reference state for that version.
 - Regenerate browser references from
   `packages/renderer/test/browser-reference/` whenever the generated corpus,
   Three.js version, renderer output semantics, or reference tolerance changes.
+- Prefer
+  `pnpm -C packages/renderer run generate:browser-reference -- --output test/browser-reference/references/<platform>-<arch>`
+  when Playwright is installed locally; otherwise use the browser page manually.
 - Review fixture-scoped golden tolerance changes with the compatibility matrix;
   large tolerances should stay tied to named partial-parity gaps.
 - Commit platform-scoped references under

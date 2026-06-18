@@ -38,6 +38,15 @@ python3 -m http.server 4173
 # open http://localhost:4173/packages/renderer/test/browser-reference/
 ```
 
+For reproducible local generation, install Playwright only in the workspace
+where you are regenerating references, then run the optional headless wrapper:
+
+```bash
+pnpm add -D playwright
+pnpm exec playwright install chromium
+pnpm -C packages/renderer run generate:browser-reference -- --output test/browser-reference/references/<platform>-<arch>
+```
+
 Compare those browser PNGs against the headless renderer with:
 
 ```bash
