@@ -21415,6 +21415,63 @@ test('PointsMaterial alphaMap honors explicit texture matrices', () => {
   assert.ok(mean.g > mean.b + 40, `explicit point alphaMap matrix should shift left point-sprite UVs into the opaque texel (${mean.g} vs ${mean.b})`)
 })
 
+test('PointsMaterial alphaMap honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const alphaMap = vertical
+      ? rgbaTexture([
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+      ], 2, 2)
+    alphaMap.wrapS = wrapS
+    alphaMap.wrapT = wrapT
+    alphaMap.offset.set(vertical ? 0 : 1, vertical ? 1 : 0)
+    alphaMap.magFilter = THREE.NearestFilter
+    alphaMap.minFilter = THREE.NearestFilter
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0x00ff00,
+      alphaMap,
+      alphaTest: 0.5,
+      size: 48,
+      sizeAttenuation: false,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const rgba = renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+    return vertical
+      ? meanRegion(rgba, 96, 96, 44, 58, 52, 66)
+      : meanRegion(rgba, 96, 96, 30, 44, 38, 52)
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.b > clamped.g + 40, `clamped point alphaMap U coordinates should discard against the blue background (${clamped.b} vs ${clamped.g})`)
+  assert.ok(repeated.g > repeated.b + 40, `repeated point alphaMap U coordinates should wrap to the opaque texel (${repeated.g} vs ${repeated.b})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.b > clampedVertical.g + 40, `clamped point alphaMap V coordinates should discard against the blue background (${clampedVertical.b} vs ${clampedVertical.g})`)
+  assert.ok(repeatedVertical.g > repeatedVertical.b + 40, `repeated point alphaMap V coordinates should wrap to the opaque texel (${repeatedVertical.g} vs ${repeatedVertical.b})`)
+})
+
 test('PointsMaterial map decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
