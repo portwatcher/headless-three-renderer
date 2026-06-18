@@ -1845,6 +1845,37 @@ test('renderMode auxiliary passes preserve texture alpha cutouts', () => {
   }
 })
 
+test('renderMode auxiliary passes preserve alphaHash cutouts', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderAuxiliary(renderMode, alphaHash) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(1.2, 1.2),
+      new THREE.MeshBasicMaterial({
+        alphaHash,
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+      }),
+    ))
+    return renderRgba(scene, camera, { width: 64, height: 64, renderMode })
+  }
+
+  for (const renderMode of ['mask', 'object-id', 'normal']) {
+    const opaque = renderAuxiliary(renderMode, false)
+    const hashed = renderAuxiliary(renderMode, true)
+    const visiblePixel = (r, g, b) => r > 0 || g > 0 || b > 0
+    const opaquePixels = countRegionPixels(opaque, 64, 64, 20, 20, 44, 44, visiblePixel)
+    const hashedPixels = countRegionPixels(hashed, 64, 64, 20, 20, 44, 44, visiblePixel)
+
+    assert.ok(opaquePixels > 520, `${renderMode} opaque pass should fill the sampled region (${opaquePixels})`)
+    assert.ok(hashedPixels > 40, `${renderMode} alphaHash pass should retain some visible pixels (${hashedPixels})`)
+    assert.ok(hashedPixels < opaquePixels - 120, `${renderMode} alphaHash pass should discard visible pixels (${hashedPixels} vs ${opaquePixels})`)
+  }
+})
+
 test('invalid renderMode values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial()))
