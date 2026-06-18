@@ -482,7 +482,7 @@ function appendShadowOnlyMeshGroup(
   instances: MeshInstance[],
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
-  const baseColor = materialColor(material)
+  const baseColor = materialColor(shadowMaterial)
   const useVertexColors = vertexColors && material.vertexColors !== false
   const pbrProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
   const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, shadowMaterial)
@@ -957,7 +957,7 @@ function appendShadowOnlyBillboardMesh(
     positions,
     indices,
     uvs,
-    color: materialColor(material),
+    color: materialColor(shadowMaterial),
     texture: textureInfo?.data,
     textureWidth: textureInfo?.width ?? undefined,
     textureHeight: textureInfo?.height ?? undefined,
@@ -992,6 +992,12 @@ function shadowMaterialWithSourceShadowState(
     shadowMaterial.alphaMap = sourceMaterial.alphaMap ?? null
     shadowMaterial.alphaTest = sourceMaterial.alphaToCoverage === true ? 0.5 : sourceMaterial.alphaTest
     shadowMaterial.alphaToCoverage = sourceMaterial.alphaToCoverage
+    if (sourceMaterial.alphaHash === true) {
+      shadowMaterial.alphaHash = true
+      if (sourceMaterial.opacity != null) {
+        shadowMaterial.opacity = sourceMaterial.opacity
+      }
+    }
   }
   if (sourceMaterialHasShadowDisplacementState(sourceMaterial)) {
     shadowMaterial.displacementMap = sourceMaterial.displacementMap ?? null
@@ -1017,7 +1023,11 @@ function sourceMaterialHasShadowState(material: ThreeMaterialLike | undefined): 
 }
 
 function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
-  if (!material || (!material.map && !material.alphaMap)) return false
+  if (!material) return false
+  const hasAlphaTexture = !!(material.map || material.alphaMap)
+  const hasOpacityAlpha = typeof material.opacity === 'number' && Number.isFinite(material.opacity) && material.opacity < 1
+  if (material.alphaHash === true && (hasAlphaTexture || hasOpacityAlpha)) return true
+  if (!hasAlphaTexture) return false
   if (material.alphaToCoverage === true) return true
   return typeof material.alphaTest === 'number' && Number.isFinite(material.alphaTest) && material.alphaTest > 0
 }
