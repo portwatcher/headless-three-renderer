@@ -1572,6 +1572,23 @@ test('CubeCamera renders active mip target faces', () => {
   assert.ok(depthPx > 0, `cube depth mip face should contain scalar depth (${depthPx})`)
 })
 
+test('CubeCamera active mip target faces honor scissor clipping', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  cubeTarget.scissorTest = true
+  cubeTarget.scissor = { x: 4, y: 4, width: 16, height: 16 }
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  cubeCamera.activeMipmapLevel = 1
+
+  renderToTarget(scene, cubeCamera, cubeTarget)
+
+  const face = cubeTarget.texture.mipmaps[1].image[0].data
+  const inside = meanRegion(face, 16, 16, 6, 6, 10, 10)
+  const outside = meanRegion(face, 16, 16, 0, 6, 3, 10)
+  assert.ok(inside.r > 180 && inside.g < 40 && inside.b < 40, `cube scissor should keep red inside the active mip rectangle (${inside.r}, ${inside.g}, ${inside.b})`)
+  assert.ok(outside.r < 20 && outside.g < 20 && outside.b < 20, `cube scissor should leave pixels outside the active mip rectangle clear (${outside.r}, ${outside.g}, ${outside.b})`)
+})
+
 test('CubeCamera captured target textures can be reused as cube inputs', () => {
   const captureTarget = {}
   const cubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(32))
