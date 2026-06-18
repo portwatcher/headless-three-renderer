@@ -8,6 +8,8 @@ const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const COMPATIBILITY_DOC = path.join(REPO_ROOT, 'docs', 'compatibility.md')
 const GLTF_SAMPLE_ASSETS_DOC = path.join(REPO_ROOT, 'docs', 'gltf-sample-assets.md')
 const RELEASE_CHECKLIST_DOC = path.join(REPO_ROOT, 'docs', 'release-checklist.md')
+const CI_WORKFLOW = path.join(REPO_ROOT, '.github', 'workflows', 'CI.yml')
+const PACKAGE_JSON = path.join(REPO_ROOT, 'packages', 'renderer', 'package.json')
 const GLTF_TEST = path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'gltf.test.mjs')
 
 test('public documentation links point at committed files', async () => {
@@ -107,3 +109,43 @@ test('release checklist gates compatibility and golden-reference updates', async
     'release checklist should require the golden-reference harness',
   )
 })
+
+test('compatibility matrix and CI stay synchronized with packaged platform targets', async () => {
+  const [compatibility, ciWorkflow, packageJson] = await Promise.all([
+    readFile(COMPATIBILITY_DOC, 'utf8'),
+    readFile(CI_WORKFLOW, 'utf8'),
+    readFile(PACKAGE_JSON, 'utf8'),
+  ])
+  const { napi } = JSON.parse(packageJson)
+  const packageNamesByTarget = new Map([
+    ['x86_64-apple-darwin', '@headless-three/renderer-darwin-x64'],
+    ['aarch64-apple-darwin', '@headless-three/renderer-darwin-arm64'],
+    ['x86_64-pc-windows-msvc', '@headless-three/renderer-win32-x64-msvc'],
+    ['x86_64-unknown-linux-gnu', '@headless-three/renderer-linux-x64-gnu'],
+    ['aarch64-unknown-linux-gnu', '@headless-three/renderer-linux-arm64-gnu'],
+  ])
+
+  assert.deepEqual(
+    [...napi.targets].sort(),
+    [...packageNamesByTarget.keys()].sort(),
+    'docs test package target map must match packages/renderer/package.json napi.targets',
+  )
+
+  for (const target of napi.targets) {
+    const packageName = packageNamesByTarget.get(target)
+    assert.match(
+      compatibility,
+      new RegExp(escapeRegExp(packageName)),
+      `compatibility matrix should list ${packageName}`,
+    )
+    assert.match(
+      ciWorkflow,
+      new RegExp(escapeRegExp(target)),
+      `CI matrix should include ${target}`,
+    )
+  }
+})
+
+function escapeRegExp(value) {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')
+}
