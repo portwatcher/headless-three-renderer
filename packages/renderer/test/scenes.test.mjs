@@ -7432,6 +7432,73 @@ test('Line, LineSegments, and LineLoop objects cast directional shadows', () => 
   }
 })
 
+test('LineSegments objects cast spot and point shadows', () => {
+  function makeLineSegments(castShadow) {
+    const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
+    material.colorWrite = false
+    material.depthWrite = false
+
+    const positions = []
+    for (let offset = -3; offset <= 3; offset += 0.35) {
+      positions.push(-3, 2, offset, 3, 2, offset)
+      positions.push(offset, 2, -3, offset, 2, 3)
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const line = new THREE.LineSegments(geometry, material)
+    line.castShadow = castShadow
+    return line
+  }
+
+  function renderLineSegmentsShadow(lightKind, castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+    scene.add(makeLineSegments(castShadow))
+
+    if (lightKind === 'spot') {
+      const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
+      light.position.set(0, 7, 8)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(512, 512)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 20
+      scene.add(light)
+      scene.add(light.target)
+    } else {
+      const light = new THREE.PointLight(0xffffff, 2)
+      light.position.set(0, 5, 4)
+      light.distance = 12
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 12
+      scene.add(light)
+    }
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const lightKind of ['spot', 'point']) {
+    const unshadowed = renderLineSegmentsShadow(lightKind, false)
+    const shadowed = renderLineSegmentsShadow(lightKind, true)
+    const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+    const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+    assert.ok(shadowedLum < unshadowedLum - 4, `${lightKind} line shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
+  }
+})
+
 test('alpha-tested shadow casters honor alphaMap cutouts', () => {
   function renderAlphaShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
