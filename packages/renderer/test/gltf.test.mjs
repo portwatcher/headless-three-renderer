@@ -56,6 +56,7 @@ const SAMPLE_ASSET_BOX_VERTEX_COLORS = path.join(FIXTURE_DIR, 'gltf-sample-asset
 const SAMPLE_ASSET_BRAIN_STEM = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'BrainStem', 'glTF', 'BrainStem.gltf')
 const SAMPLE_ASSET_CAMERAS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cameras', 'glTF', 'Cameras.gltf')
 const SAMPLE_ASSET_CARBON_FIBRE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CarbonFibre', 'glTF', 'CarbonFibre.gltf')
+const SAMPLE_ASSET_CAR_CONCEPT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CarConcept', 'glTF', 'CarConcept.gltf')
 const SAMPLE_ASSET_CESIUM_MAN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMan', 'glTF', 'CesiumMan.gltf')
 const SAMPLE_ASSET_CESIUM_MILK_TRUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CesiumMilkTruck', 'glTF', 'CesiumMilkTruck.gltf')
 const SAMPLE_ASSET_CHAIR_DAMASK_PURPLEGOLD = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ChairDamaskPurplegold', 'glTF', 'ChairDamaskPurplegold.gltf')
@@ -128,6 +129,7 @@ const SAMPLE_ASSET_ORIENTATION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets
 const SAMPLE_ASSET_PLAYSET_LIGHT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PlaysetLightTest', 'glTF', 'PlaysetLightTest.gltf')
 const SAMPLE_ASSET_POINT_LIGHT_INTENSITY_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PointLightIntensityTest', 'glTF', 'PointLightIntensityTest.gltf')
 const SAMPLE_ASSET_POT_OF_COALS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PotOfCoals', 'glTF', 'PotOfCoals.gltf')
+const SAMPLE_ASSET_POT_OF_COALS_ANIMATION_POINTER = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PotOfCoalsAnimationPointer', 'glTF', 'PotOfCoalsAnimationPointer.gltf')
 const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'PrimitiveModeNormalsTest', 'glTF', 'PrimitiveModeNormalsTest.gltf')
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
 const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedFigure', 'glTF', 'RiggedFigure.gltf')
@@ -148,6 +150,7 @@ const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets',
 const SAMPLE_ASSET_SPEC_GLOSS_VS_METAL_ROUGH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecGlossVsMetalRough', 'glTF', 'SpecGlossVsMetalRough.gltf')
 const SAMPLE_ASSET_SPECULAR_SILK_POUF = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularSilkPouf', 'glTF', 'SpecularSilkPouf.gltf')
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
+const SAMPLE_ASSET_STAINED_GLASS_LAMP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'StainedGlassLamp', 'glTF', 'StainedGlassLamp.gltf')
 const SAMPLE_ASSET_SUNGLASSES_KHRONOS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SunglassesKhronos', 'glTF', 'SunglassesKhronos.gltf')
 const SAMPLE_ASSET_SUZANNE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Suzanne', 'glTF', 'Suzanne.gltf')
 const SAMPLE_ASSET_TEXTURE_COORDINATE_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'TextureCoordinateTest', 'glTF', 'TextureCoordinateTest.gltf')
@@ -11622,6 +11625,206 @@ test('committed Khronos glTF Sample Assets SpecGlossVsMetalRough fixture preserv
   assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.25, 'SpecGlossVsMetalRough should render visible bottle comparison geometry')
   const mean = meanRgba(rgba)
   assert.ok(mean.r < 240 && mean.g < 240 && mean.b < 235, `SpecGlossVsMetalRough should render non-white bottle pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets CarConcept fixture loads variants, clearcoat paint, emissive dash, and glass', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_CAR_CONCEPT, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_clearcoat',
+    'KHR_materials_emissive_strength',
+    'KHR_materials_iridescence',
+    'KHR_materials_transmission',
+    'KHR_materials_variants',
+    'KHR_texture_transform',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 8670516, uri: 'CarConcept.data.bin' }])
+  assert.equal(source.images.length, 14)
+  assert.deepEqual(source.extensions.KHR_materials_variants.variants.map((variant) => variant.name), [
+    'Carmine Candy',
+    'Pearly Swirly',
+    'Torched Graphite',
+  ])
+  const variantPrimitiveCount = source.meshes.reduce(
+    (count, mesh) => count + mesh.primitives.filter((primitive) => primitive.extensions?.KHR_materials_variants).length,
+    0,
+  )
+  assert.equal(variantPrimitiveCount, 25)
+  assert.deepEqual(source.materials.find((material) => material.name === 'Glass').extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_CAR_CONCEPT)
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.equal(meshes.length, 109)
+
+  const windshield = gltf.scene.getObjectByName('BodyWindshield')
+  assert.ok(windshield?.isMesh, 'CarConcept should load windshield glass')
+  assert.equal(windshield.geometry.getAttribute('position')?.count, 1535)
+  assert.equal(windshield.geometry.index?.count, 8640)
+  assert.equal(windshield.material.name, 'Glass')
+  assert.equal(windshield.material.isMeshPhysicalMaterial, true)
+  assert.equal(windshield.material.transmission, 1)
+  assert.equal(windshield.material.ior, 1.5)
+
+  const variantPanel = gltf.scene.getObjectByName('BodyRoofPanel')
+  assert.equal(variantPanel?.userData.gltfExtensions.KHR_materials_variants.mappings.length, 3)
+  const paint = uniqueMaterials(gltf.scene).find((material) => material.name === 'Paint 2 Carmine')
+  assert.equal(paint?.isMeshPhysicalMaterial, true)
+  assert.equal(paint.clearcoat, 0.25)
+  assert.equal(paint.metalness, 1)
+  assert.equal(paint.normalMap?.name, 'Powdercoat_N.png')
+  assert.deepEqual(pngDimensions(paint.normalMap.image), [128, 128])
+  const dashboard = uniqueMaterials(gltf.scene).find((material) => material.name === 'Dashboard')
+  assert.equal(dashboard?.emissiveIntensity, 3)
+  assert.equal(dashboard.emissiveMap?.name, 'Dash_E.png')
+  assert.deepEqual(pngDimensions(dashboard.emissiveMap.image), [1024, 256])
+  const mechanical = uniqueMaterials(gltf.scene).find((material) => material.name === 'Mechanical')
+  assert.equal(mechanical?.normalMap?.name, 'Mechanical_N.png')
+  assert.deepEqual(pngDimensions(mechanical.normalMap.image), [512, 512])
+  assert.equal(mechanical.roughnessMap?.name, 'Mechanical_ORM.png')
+  assert.equal(mechanical.metalnessMap, mechanical.roughnessMap)
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene, { distance: 2.8, yOffset: 0.3 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.1, 'CarConcept should render visible vehicle geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 245 && mean.g < 238 && mean.b < 238, `CarConcept should render non-white car pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets PotOfCoalsAnimationPointer fixture preserves animation pointer source metadata', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_POT_OF_COALS_ANIMATION_POINTER, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_animation_pointer',
+    'KHR_materials_clearcoat',
+    'KHR_materials_specular',
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_texture_transform',
+  ])
+  assert.deepEqual(source.extensionsRequired, [
+    'KHR_materials_specular',
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_texture_transform',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 1977628, uri: 'PotOfCoalsAnimationPointer.bin' }])
+  assert.equal(source.animations[0].channels.length, 2)
+  assert.deepEqual(source.animations[0].channels.map((channel) => channel.target.extensions.KHR_animation_pointer.pointer), [
+    '/materials/2/normalTexture/extensions/KHR_texture_transform/rotation',
+    '/materials/2/extensions/KHR_materials_volume/thicknessTexture/extensions/KHR_texture_transform/rotation',
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_POT_OF_COALS_ANIMATION_POINTER)
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].duration, 0)
+  assert.equal(gltf.animations[0].tracks.length, 0, 'current Three.js loader exposes unsupported material animation pointers as an empty clip')
+  const hotCoals = gltf.scene.getObjectByName('HotCoals')
+  const copperPot = gltf.scene.getObjectByName('CopperPot')
+  const heatDome = gltf.scene.getObjectByName('HeatDome')
+  assert.equal(hotCoals?.geometry.getAttribute('position')?.count, 38733)
+  assert.equal(copperPot?.geometry.getAttribute('position')?.count, 15936)
+  assert.equal(heatDome?.geometry.getAttribute('position')?.count, 264)
+  assert.equal(hotCoals.material.map?.name, 'HotCoals_basecolor.jpg')
+  assert.equal(Buffer.isBuffer(hotCoals.material.emissiveMap?.image), true, 'HotCoals emissive JPEG should load as an encoded Buffer')
+  assert.equal(copperPot.material.clearcoat, 1)
+  assert.equal(copperPot.material.clearcoatMap?.name, 'CopperPot_clearcoat.jpg')
+  assert.equal(copperPot.material.normalMap?.name, 'CopperPot_normal.png')
+  assert.deepEqual(pngDimensions(copperPot.material.normalMap.image), [2048, 2048])
+  assert.equal(heatDome.material.transmission, 1)
+  assert.equal(heatDome.material.thickness, 0.01999)
+  assert.equal(heatDome.material.thicknessMap?.name, 'Heatdome_thickness.jpg')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.25, 'PotOfCoalsAnimationPointer should render visible coals and pot geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 230 && mean.g < 220 && mean.b < 215, `PotOfCoalsAnimationPointer should render warm coal/pot pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets StainedGlassLamp fixture loads glass variants and transmission materials', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_STAINED_GLASS_LAMP, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_clearcoat',
+    'KHR_materials_variants',
+    'KHR_materials_ior',
+    'KHR_materials_volume',
+  ])
+  assert.deepEqual(source.buffers, [{ byteLength: 1847592, uri: 'StainedGlassLamp.bin' }])
+  assert.deepEqual(source.extensions.KHR_materials_variants.variants.map((variant) => variant.name), ['Lamp on', 'Lamp off'])
+  const variantPrimitiveCount = source.meshes.reduce(
+    (count, mesh) => count + mesh.primitives.filter((primitive) => primitive.extensions?.KHR_materials_variants).length,
+    0,
+  )
+  assert.equal(variantPrimitiveCount, 5)
+  assert.equal(source.images.length, 19)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_STAINED_GLASS_LAMP)
+  const stainedGlass = gltf.scene.getObjectByName('stainedglass')
+  assert.ok(stainedGlass?.isMesh, 'StainedGlassLamp should load stained glass mesh')
+  assert.equal(stainedGlass.geometry.getAttribute('position')?.count, 2616)
+  assert.equal(stainedGlass.geometry.index?.count, 12096)
+  assert.equal(stainedGlass.userData.gltfExtensions.KHR_materials_variants.mappings.length, 2)
+  const material = stainedGlass.material
+  assert.equal(material.name, 'stainedglass')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.transmission, 1)
+  assert.equal(material.clearcoat, 1)
+  assert.equal(material.ior, 1.5)
+  assert.equal(material.map?.name, 'StainedGlassLamp_glass_basecolor-alpha.png')
+  assert.deepEqual(pngDimensions(material.map.image), [2048, 1024])
+  assert.equal(material.normalMap?.name, 'StainedGlassLamp_glass_normal.png')
+  assert.deepEqual(pngDimensions(material.normalMap.image), [2048, 1024])
+  assert.equal(material.clearcoatMap?.name, 'StainedGlassLamp_glass_transmission-clearcoat.png')
+  assert.deepEqual(pngDimensions(material.clearcoatMap.image), [2048, 1024])
+
+  const amber = gltf.scene.getObjectByName('amberbeads')
+  assert.equal(amber?.material?.transmission, 1)
+  assert.equal(amber.material.thickness, 0.02)
+  assert.equal(amber.material.ior, 1.4)
+  const red = gltf.scene.getObjectByName('redgems')
+  assert.equal(red?.material?.transmission, 1)
+  assert.equal(red.material.thickness, 0.03)
+  assert.equal(red.material.ior, 1.52)
+  const grill = gltf.scene.getObjectByName('grill')
+  assert.equal(grill?.material?.map?.name, 'StainedGlassLamp_grill_basecolor-alpha.png')
+  assert.deepEqual(pngDimensions(grill.material.map.image), [2048, 2048])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  const light = new THREE.DirectionalLight(0xffffff, 1.8)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.12, 'StainedGlassLamp should render visible lamp geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 245 && mean.g < 245 && mean.b < 245, `StainedGlassLamp should render non-white glass and metal pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
