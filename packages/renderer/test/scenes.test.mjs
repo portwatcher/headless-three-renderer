@@ -16640,6 +16640,34 @@ test('ShaderMaterial custom WGSL preserves output alpha', () => {
   assert.ok(mean.a > 120 && mean.a < 140, `ShaderMaterial WGSL override should preserve returned alpha (${mean.a})`)
 })
 
+test('ShaderMaterial custom WGSL honors premultipliedAlpha output', () => {
+  function renderCustom(premultipliedAlpha) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.ShaderMaterial({
+      blending: THREE.NoBlending,
+      premultipliedAlpha,
+      transparent: true,
+    })
+    material.userData.headlessThreeRenderer = {
+      fragmentWgsl: 'return vec4<f32>(0.0, 1.0, 0.0, alpha * 0.5);',
+    }
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const straight = renderCustom(false)
+  const premultiplied = renderCustom(true)
+  assert.ok(straight.g > premultiplied.g + 60, `premultiplied custom WGSL should reduce raw green output (${straight.g} vs ${premultiplied.g})`)
+  assert.ok(premultiplied.g > 60, `premultiplied custom WGSL output should retain source contribution (${premultiplied.g})`)
+  assert.ok(premultiplied.a > 120 && premultiplied.a < 140, `premultiplied custom WGSL should preserve returned alpha (${premultiplied.a})`)
+})
+
 test('material onBeforeCompile customizations fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

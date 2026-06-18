@@ -1669,6 +1669,23 @@ fn transform_alpha_map_uv(uv: vec2<f32>) -> vec2<f32> {
   return vec2<f32>(dot(uniforms.alpha_map_transform1.xyz, uv1), dot(uniforms.alpha_map_transform2.xyz, uv1));
 }
 
+fn output_color(rgb: vec3<f32>, alpha: f32) -> vec4<f32> {
+  if uniforms.clipping_params.w > 0.5 {
+    return vec4<f32>(rgb * alpha, alpha);
+  }
+  return vec4<f32>(rgb, alpha);
+}
+
+fn custom_fragment_body(
+  input: VertexOutput,
+  front_facing: bool,
+  alpha: f32,
+  normal: vec3<f32>,
+  base_color: vec4<f32>,
+) -> vec4<f32> {
+  __CUSTOM_FRAGMENT_BODY__
+}
+
 @fragment
 fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
   if is_clipped_by_planes(input.world_pos) {
@@ -1698,7 +1715,8 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   if !front_facing {
     normal = -normal;
   }
-  __CUSTOM_FRAGMENT_BODY__
+  let custom_color = custom_fragment_body(input, front_facing, alpha, normal, base_color);
+  return output_color(custom_color.rgb, custom_color.a);
 }
 "#;
 
