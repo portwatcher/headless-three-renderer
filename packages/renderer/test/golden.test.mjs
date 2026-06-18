@@ -19,7 +19,30 @@ const { Renderer } = pkg
 
 const referenceDir = resolveBrowserReferenceDir()
 const referencesRequired = areBrowserReferencesRequired()
-const maxMeanDiff = Number(process.env.HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF ?? 64)
+
+const DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF = 18
+const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map([
+  ['array-camera-viewport-split', 64],
+  ['material-env-map-pbr', 64],
+  ['avatar-like-skinned-toon', 45],
+  ['alpha-to-coverage-msaa-plane', 44],
+  ['transparent-layer-stack', 44],
+  ['lod-groups-material-array', 44],
+  ['physical-ibl-shadow', 41],
+  ['light-probe-diffuse', 40],
+  ['skinned-morphed-plane', 40],
+  ['pathological-degenerate-geometry', 32],
+  ['material-env-map-phong', 31],
+  ['material-local-clipping-plane', 30],
+  ['mesh-toon-gradient-map', 27],
+  ['point-spot-light-materials', 27],
+  ['sprite-material-map-billboard', 27],
+  ['material-env-map-basic-lambert', 27],
+  ['linear-fog-material-opt-out', 25],
+  ['mesh-matcap-material-map', 24],
+  ['light-probe-lit-material-models', 24],
+  ['mesh-normal-material-flat', 20],
+])
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
   const fixtures = [
@@ -71,6 +94,32 @@ test('browser reference required mode parses explicit opt-in values', () => {
   assert.equal(areBrowserReferencesRequired({}), false)
 })
 
+test('browser reference tolerance policy scopes known parity gaps to fixture names', () => {
+  const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
+  const fixtureNames = new Set(fixtures.map((fixture) => fixture.name))
+
+  for (const name of BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE.keys()) {
+    assert.ok(fixtureNames.has(name), `browser reference tolerance entry ${name} must match a generated fixture`)
+  }
+
+  assert.equal(getBrowserReferenceMaxMeanDiff('mesh-depth-material-basic', {}), DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF)
+  assert.equal(getBrowserReferenceMaxMeanDiff('array-camera-viewport-split', {}), 64)
+  assert.equal(
+    getBrowserReferenceMaxMeanDiff(
+      'array-camera-viewport-split',
+      { HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF: '5' },
+    ),
+    5,
+  )
+  assert.throws(
+    () => getBrowserReferenceMaxMeanDiff(
+      'mesh-depth-material-basic',
+      { HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF: 'nan' },
+    ),
+    /HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number/,
+  )
+})
+
 test('generated corpus matches browser WebGLRenderer golden references', {
   skip: referenceDir
     ? false
@@ -78,7 +127,6 @@ test('generated corpus matches browser WebGLRenderer golden references', {
       ? false
       : `set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}`,
 }, async (t) => {
-  assert.ok(Number.isFinite(maxMeanDiff) && maxMeanDiff >= 0, 'HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number')
   assert.ok(
     referenceDir,
     `Browser reference directory is required. Set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}.`,
@@ -105,6 +153,7 @@ test('generated corpus matches browser WebGLRenderer golden references', {
         format: 'rgba',
       })
       const metrics = diffRgba(actual, reference.data)
+      const maxMeanDiff = getBrowserReferenceMaxMeanDiff(fixture.name)
 
       assert.ok(
         metrics.mean <= maxMeanDiff,
@@ -191,4 +240,19 @@ function defaultBrowserReferenceDir() {
 function areBrowserReferencesRequired(env = process.env) {
   const value = env.HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES
   return value === '1' || value === 'true' || value === 'yes'
+}
+
+function getBrowserReferenceMaxMeanDiff(fixtureName, env = process.env) {
+  const override = env.HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF
+  if (override !== undefined) {
+    const maxMeanDiff = Number(override)
+    assert.ok(
+      Number.isFinite(maxMeanDiff) && maxMeanDiff >= 0,
+      'HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF must be a non-negative number',
+    )
+    return maxMeanDiff
+  }
+
+  return BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE.get(fixtureName)
+    ?? DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF
 }

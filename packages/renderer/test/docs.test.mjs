@@ -93,6 +93,11 @@ test('release checklist gates compatibility and golden-reference updates', async
   )
   assert.match(
     checklist,
+    /fixture-scoped golden tolerance/i,
+    'release checklist should require tolerance changes to be reviewed',
+  )
+  assert.match(
+    checklist,
     /pnpm -C packages\/renderer run test:golden/,
     'release checklist should require the golden-reference harness',
   )

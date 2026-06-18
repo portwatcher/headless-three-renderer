@@ -21,6 +21,8 @@ fixture, and golden-reference state for that version.
 - Regenerate browser references from
   `packages/renderer/test/browser-reference/` whenever the generated corpus,
   Three.js version, renderer output semantics, or reference tolerance changes.
+- Review fixture-scoped golden tolerance changes with the compatibility matrix;
+  large tolerances should stay tied to named partial-parity gaps.
 - Commit platform-scoped references under
   `packages/renderer/test/browser-reference/references/<platform>-<arch>/`
   when that platform is expected to enforce golden parity.
