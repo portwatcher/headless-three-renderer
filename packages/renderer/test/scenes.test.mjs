@@ -8127,6 +8127,71 @@ test('SpriteMaterial and PointsMaterial base-map alpha cutouts affect directiona
   }
 })
 
+test('SpriteMaterial and PointsMaterial alphaToCoverage approximate shadow caster cutouts', () => {
+  function renderBillboardAlphaCoverageShadow(kind, alphaToCoverage) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    if (kind === 'sprite') {
+      const material = new THREE.SpriteMaterial({ color: 0xffffff })
+      material.alphaMap = solidTexture(255, 0, 255)
+      material.alphaToCoverage = alphaToCoverage
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(0, 4, 0)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = true
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 4, 0]), 3))
+      const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 48,
+        sizeAttenuation: false,
+      })
+      material.alphaMap = solidTexture(255, 0, 255)
+      material.alphaToCoverage = alphaToCoverage
+      const points = new THREE.Points(geometry, material)
+      points.castShadow = true
+      scene.add(points)
+    }
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const fullShadow = renderBillboardAlphaCoverageShadow(kind, false)
+    const cutoutShadow = renderBillboardAlphaCoverageShadow(kind, true)
+    const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+    const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
+    assert.ok(cutoutLum > fullLum + 10, `${kind} alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
+  }
+})
+
 test('SpriteMaterial and PointsMaterial cast spot-light shadows from expanded billboards', () => {
   function renderSpotBillboardShadow(kind, castShadow) {
     const scene = new THREE.Scene()
