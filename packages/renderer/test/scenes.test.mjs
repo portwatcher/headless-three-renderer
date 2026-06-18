@@ -2721,13 +2721,17 @@ test('MeshMatcapMaterial map honors horizontal and vertical repeat wrapping', ()
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped.g > clamped.r + 30, `clamped matcap map U coordinates should sample the green edge texel (${clamped.g} vs ${clamped.r})`)
   assert.ok(repeated.r > repeated.g + 80, `repeated matcap map U coordinates should wrap to the red texel (${repeated.r} vs ${repeated.g})`)
+  assert.ok(mirrored.g > mirrored.r + 30, `mirrored matcap map U coordinates should reflect to the green texel (${mirrored.g} vs ${mirrored.r})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical.g > clampedVertical.r + 30, `clamped matcap map V coordinates should sample the green edge texel (${clampedVertical.g} vs ${clampedVertical.r})`)
   assert.ok(repeatedVertical.r > repeatedVertical.g + 80, `repeated matcap map V coordinates should wrap to the red texel (${repeatedVertical.r} vs ${repeatedVertical.g})`)
+  assert.ok(mirroredVertical.g > mirroredVertical.r + 30, `mirrored matcap map V coordinates should reflect to the green texel (${mirroredVertical.g} vs ${mirroredVertical.r})`)
 })
 
 test('MeshMatcapMaterial map decodes sRGB colorSpace before shading', () => {
