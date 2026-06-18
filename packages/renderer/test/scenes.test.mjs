@@ -2620,6 +2620,50 @@ test('MeshMatcapMaterial map honors nearest and linear filters', () => {
   assert.ok(linear.r > nearest.r + 30, `LinearFilter should blend in the bright matcap map texel (${linear.r} vs ${nearest.r})`)
 })
 
+test('MeshMatcapMaterial map honors horizontal and vertical repeat wrapping', () => {
+  function renderWithWrapping({ wrapS, wrapT, vertical = false }) {
+    const map = vertical
+      ? rgbaTexture([
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+      ], 2, 1)
+    if (wrapS != null) map.wrapS = wrapS
+    if (wrapT != null) map.wrapT = wrapT
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: solidTexture(255, 255, 255),
+        map,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.g > clamped.r + 30, `clamped matcap map U coordinates should sample the green edge texel (${clamped.g} vs ${clamped.r})`)
+  assert.ok(repeated.r > repeated.g + 80, `repeated matcap map U coordinates should wrap to the red texel (${repeated.r} vs ${repeated.g})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.g > clampedVertical.r + 30, `clamped matcap map V coordinates should sample the green edge texel (${clampedVertical.g} vs ${clampedVertical.r})`)
+  assert.ok(repeatedVertical.r > repeatedVertical.g + 80, `repeated matcap map V coordinates should wrap to the red texel (${repeatedVertical.r} vs ${repeatedVertical.g})`)
+})
+
 test('MeshMatcapMaterial map decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const map = solidTexture(128, 128, 128)
