@@ -11543,6 +11543,13 @@ test('unsupported texture inputs fail clearly for background and environment slo
   }
 
   const cases = [
+    ['compressed material map', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: compressedTexture }),
+      ))
+    }, /compressed texture.*pre-decode/i],
     ['compressed background', (scene) => { scene.background = compressedTexture }, /compressed texture.*pre-decode/i],
     ['compressed environment', (scene) => { scene.environment = compressedTexture }, /compressed texture.*pre-decode/i],
     ['compressed material envMap', (scene) => {
