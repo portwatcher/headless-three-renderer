@@ -137,6 +137,8 @@ jobs:
 
       - name: Golden reference harness
         working-directory: packages/renderer
+        env:
+          HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES: ${{ matrix.settings.target == 'x86_64-unknown-linux-gnu' && '1' || '0' }}
         run: pnpm run test:golden
 
       - name: Scale budget tests
