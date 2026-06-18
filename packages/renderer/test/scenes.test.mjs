@@ -666,7 +666,7 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   const source = new THREE.PlaneGeometry(0.45, 0.45)
   const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
   const batched = new THREE.BatchedMesh(
-    3,
+    4,
     source.getAttribute('position').count,
     source.index.count,
     material,
@@ -675,13 +675,17 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   const left = batched.addInstance(geometryId)
   const right = batched.addInstance(geometryId)
   const hidden = batched.addInstance(geometryId)
+  const deleted = batched.addInstance(geometryId)
   batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
   batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
   batched.setMatrixAt(hidden, new THREE.Matrix4().makeTranslation(0, 0, 0))
+  batched.setMatrixAt(deleted, new THREE.Matrix4().makeTranslation(0, -0.55, 0))
   batched.setColorAt(left, new THREE.Color(1, 0, 0))
   batched.setColorAt(right, new THREE.Color(0, 1, 0))
   batched.setColorAt(hidden, new THREE.Color(0, 0, 1))
+  batched.setColorAt(deleted, new THREE.Color(1, 1, 0))
   batched.setVisibleAt(hidden, false)
+  batched.deleteInstance(deleted)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -691,10 +695,12 @@ test('BatchedMesh renders visible instance transforms and colors', () => {
   const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
   const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
   const centerMean = meanRegion(rgba, 96, 64, 44, 28, 52, 36)
+  const bottomMean = meanRegion(rgba, 96, 64, 44, 42, 52, 50)
 
   assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `left BatchedMesh instance should render red (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
   assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right BatchedMesh instance should render green (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
   assert.ok(centerMean.b < 5 && centerMean.r < 5 && centerMean.g < 5, `hidden BatchedMesh instance should not render at center (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
+  assert.ok(bottomMean.r < 5 && bottomMean.g < 5 && bottomMean.b < 5, `deleted BatchedMesh instance should not render at bottom (${bottomMean.r}, ${bottomMean.g}, ${bottomMean.b})`)
 })
 
 test('BatchedMesh skips inactive geometry ranges', () => {
