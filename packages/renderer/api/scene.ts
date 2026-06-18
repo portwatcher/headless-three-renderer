@@ -481,7 +481,7 @@ function appendShadowOnlyMeshGroup(
   instancedPositionOffset: InstancedAttributeRef | null,
   instances: MeshInstance[],
 ): void {
-  const shadowMaterial = shadowMaterialWithSourceAlphaState(material, sourceMaterial)
+  const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
   const baseColor = materialColor(material)
   const useVertexColors = vertexColors && material.vertexColors !== false
   const pbrProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
@@ -945,7 +945,7 @@ function appendShadowOnlyBillboardMesh(
   indices: number[],
   uvs: number[],
 ): void {
-  const shadowMaterial = shadowMaterialWithSourceAlphaState(material, sourceMaterial)
+  const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
   const textureInfo = extractTextureData(shadowMaterial)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
@@ -981,23 +981,38 @@ function appendShadowOnlyBillboardMesh(
   }, sortInfo.item)
 }
 
-function shadowMaterialWithSourceAlphaState(
+function shadowMaterialWithSourceShadowState(
   material: ThreeMaterialLike,
   sourceMaterial: ThreeMaterialLike | undefined,
 ): ThreeMaterialLike {
-  if (!sourceMaterialHasShadowAlphaState(sourceMaterial)) return material
+  if (!sourceMaterialHasShadowState(sourceMaterial)) return material
   const shadowMaterial = Object.create(material) as ThreeMaterialLike
-  shadowMaterial.map = sourceMaterial.map ?? null
-  shadowMaterial.alphaMap = sourceMaterial.alphaMap ?? null
-  shadowMaterial.alphaTest = sourceMaterial.alphaToCoverage === true ? 0.5 : sourceMaterial.alphaTest
-  shadowMaterial.alphaToCoverage = sourceMaterial.alphaToCoverage
+  if (sourceMaterialHasShadowAlphaState(sourceMaterial)) {
+    shadowMaterial.map = sourceMaterial.map ?? null
+    shadowMaterial.alphaMap = sourceMaterial.alphaMap ?? null
+    shadowMaterial.alphaTest = sourceMaterial.alphaToCoverage === true ? 0.5 : sourceMaterial.alphaTest
+    shadowMaterial.alphaToCoverage = sourceMaterial.alphaToCoverage
+  }
+  if (sourceMaterialHasShadowDisplacementState(sourceMaterial)) {
+    shadowMaterial.displacementMap = sourceMaterial.displacementMap ?? null
+    shadowMaterial.displacementScale = sourceMaterial.displacementScale
+    shadowMaterial.displacementBias = sourceMaterial.displacementBias
+  }
   return shadowMaterial
+}
+
+function sourceMaterialHasShadowState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
+  return sourceMaterialHasShadowAlphaState(material) || sourceMaterialHasShadowDisplacementState(material)
 }
 
 function sourceMaterialHasShadowAlphaState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
   if (!material || (!material.map && !material.alphaMap)) return false
   if (material.alphaToCoverage === true) return true
   return typeof material.alphaTest === 'number' && Number.isFinite(material.alphaTest) && material.alphaTest > 0
+}
+
+function sourceMaterialHasShadowDisplacementState(material: ThreeMaterialLike | undefined): material is ThreeMaterialLike {
+  return !!material?.displacementMap
 }
 
 function shadowPbrProperties(
