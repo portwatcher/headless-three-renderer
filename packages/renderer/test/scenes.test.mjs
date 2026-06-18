@@ -16355,6 +16355,33 @@ test('post-processing options modify the final image', () => {
   assert.ok(mean.g > mean.r, `inverted red background should have stronger green than red (${mean.g} vs ${mean.r})`)
 })
 
+test('post-processing exposure contrast and grayscale controls modify output', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.25, 0.5, 0.75)
+  const camera = makeCamera()
+  const options = { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }
+
+  const base = meanRgba(renderRgba(scene, camera, options))
+  const exposed = meanRgba(renderRgba(scene, camera, {
+    ...options,
+    postProcessing: { exposure: 1 },
+  }))
+  const contrasted = meanRgba(renderRgba(scene, camera, {
+    ...options,
+    postProcessing: { contrast: 2 },
+  }))
+  const grayscale = meanRgba(renderRgba(scene, camera, {
+    ...options,
+    postProcessing: { grayscale: true },
+  }))
+
+  assert.ok(exposed.r > base.r + 20, `exposure should brighten red (${exposed.r} vs ${base.r})`)
+  assert.ok(exposed.g > base.g + 20, `exposure should brighten green (${exposed.g} vs ${base.g})`)
+  assert.ok(contrasted.r < base.r - 20, `contrast should darken below-mid red (${contrasted.r} vs ${base.r})`)
+  assert.ok(contrasted.b > base.b + 20, `contrast should brighten above-mid blue (${contrasted.b} vs ${base.b})`)
+  assert.ok(Math.max(grayscale.r, grayscale.g, grayscale.b) - Math.min(grayscale.r, grayscale.g, grayscale.b) < 3, `boolean grayscale should equalize color channels (${grayscale.r}, ${grayscale.g}, ${grayscale.b})`)
+})
+
 test('invalid post-processing option values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
