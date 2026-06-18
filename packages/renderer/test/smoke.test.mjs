@@ -284,6 +284,29 @@ test('Node loader helper path and option containers fail clearly', async () => {
     () => loadVrmAnimationFromFile('avatar.vrma', { VRMAnimationLoaderPlugin: 'yes' }),
     /options\.VRMAnimationLoaderPlugin must be a function/i,
   )
+
+  class ValidAnimationMixer {
+    clipAction() {
+      return { play() {} }
+    }
+
+    setTime() {}
+  }
+
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: 'yes',
+      createVRMAnimationClip() {},
+    }),
+    /options\.AnimationMixer must be a function/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: ValidAnimationMixer,
+      createVRMAnimationClip: 'yes',
+    }),
+    /options\.createVRMAnimationClip must be a function/i,
+  )
   await assert.rejects(
     () => applyVrmAnimation(null, {}, {
       AnimationMixer: class FakeAnimationMixer {},
@@ -307,6 +330,22 @@ test('Node loader helper path and option containers fail clearly', async () => {
     /options\.time must be a finite non-negative number/i,
   )
   await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: ValidAnimationMixer,
+      createVRMAnimationClip() {},
+      updateDelta: -1,
+    }),
+    /options\.updateDelta must be a finite non-negative number/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: ValidAnimationMixer,
+      createVRMAnimationClip() {},
+      updateVrm: 'yes',
+    }),
+    /options\.updateVrm must be a boolean/i,
+  )
+  await assert.rejects(
     () => applyVrmAnimation({ scene: {}, update: 'yes' }, {}, {
       AnimationMixer: class FakeAnimationMixer {
         clipAction() {
@@ -318,6 +357,35 @@ test('Node loader helper path and option containers fail clearly', async () => {
       createVRMAnimationClip() {},
     }),
     /vrm\.update must be a function/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: class FakeAnimationMixer {},
+      createVRMAnimationClip() {},
+    }),
+    /AnimationMixer must provide a clipAction\(\) function/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: class FakeAnimationMixer {
+        clipAction() {
+          return {}
+        }
+      },
+      createVRMAnimationClip() {},
+    }),
+    /AnimationMixer\.clipAction\(\) must return an action with play\(\)/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: class FakeAnimationMixer {
+        clipAction() {
+          return { play() {} }
+        }
+      },
+      createVRMAnimationClip() {},
+    }),
+    /AnimationMixer must provide setTime\(\) or update\(\)/i,
   )
 })
 
