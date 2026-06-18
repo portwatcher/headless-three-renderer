@@ -22343,8 +22343,10 @@ test('background textures honor horizontal wrap modes', () => {
 
   const clamped = renderWrap(undefined)
   const repeated = renderWrap(THREE.RepeatWrapping)
+  const mirrored = renderWrap(THREE.MirroredRepeatWrapping)
   assert.ok(clamped.g > clamped.r + 80, `clamped offset should hold the green edge texel (${clamped.g} vs ${clamped.r})`)
   assert.ok(repeated.r > repeated.g + 80, `repeated offset should wrap back to the red texel (${repeated.r} vs ${repeated.g})`)
+  assert.ok(mirrored.g > mirrored.r + 80, `mirrored repeat should reflect the offset into the green texel (${mirrored.g} vs ${mirrored.r})`)
 })
 
 test('background textures honor vertical wrap modes', () => {
@@ -22367,9 +22369,11 @@ test('background textures honor vertical wrap modes', () => {
 
   const clamped = renderWrap(undefined)
   const repeated = renderWrap(THREE.RepeatWrapping)
+  const mirrored = renderWrap(THREE.MirroredRepeatWrapping)
   assert.ok(clamped.g > clamped.r + 80, `clamped vertical offset should hold the green edge texel (${clamped.g} vs ${clamped.r})`)
   assert.ok(repeated.r > clamped.r + 80, `repeated vertical offset should wrap red texels back into view (${repeated.r} vs ${clamped.r})`)
   assert.ok(repeated.g < clamped.g - 80, `repeated vertical offset should no longer be fully clamped green (${repeated.g} vs ${clamped.g})`)
+  assert.ok(mirrored.g > mirrored.r + 80, `mirrored repeat should reflect the vertical offset into green texels (${mirrored.g} vs ${mirrored.r})`)
 })
 
 test('background texture anisotropy renders with native sampler settings', () => {
