@@ -2448,7 +2448,7 @@ function dashedLineAttributes(
 
   const segments = lineSegmentsWithDistances(positions, source, start, end, object, lineDistance)
   const out = createDashedLineExpansion(uvs, uvs2, colors)
-  if (gapSize <= 0) {
+  if (!lineDistance || gapSize <= 0) {
     for (const segment of segments) {
       appendInterpolatedLine(out, positions, uvs, uvs2, colors, segment.a, segment.b, 0, 1)
     }

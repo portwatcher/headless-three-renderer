@@ -20371,6 +20371,34 @@ test('LineDashedMaterial renders fewer visible line pixels than a solid line', (
   assert.ok(dashedRatio < solidRatio * 0.85, `dashed line should cover less than solid (${dashedRatio} vs ${solidRatio})`)
 })
 
+test('LineDashedMaterial without lineDistance renders solid like WebGL', () => {
+  function renderLine(computeDistances) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      dashSize: 0.15,
+      gapSize: 0.15,
+      scale: 1,
+    }))
+    if (computeDistances) line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0.1, 0.1, 0.1)
+    scene.add(line)
+    return nonBackgroundRatio(renderRgba(scene, makeCamera(), { width: 96, height: 96 }), BG)
+  }
+
+  const missingDistances = renderLine(false)
+  const dashed = renderLine(true)
+
+  assert.ok(missingDistances > 0.001, `missing lineDistance should still render visible line pixels (${missingDistances})`)
+  assert.ok(dashed > 0.001, `computed lineDistance should render visible dash pixels (${dashed})`)
+  assert.ok(dashed < missingDistances * 0.85, `computed lineDistance should dash; missing lineDistance should stay solid (${dashed} vs ${missingDistances})`)
+})
+
 test('LineDashedMaterial scale changes dash coverage', () => {
   function renderScale(scale) {
     const geom = new THREE.BufferGeometry().setFromPoints([
