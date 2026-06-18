@@ -3059,6 +3059,55 @@ test('MeshPhongMaterial specularMap honors nearest texture filters', () => {
   assert.ok(linear.r > nearest.r + 25, `LinearFilter should blend in the enabled specular texel (${linear.r} vs ${nearest.r})`)
 })
 
+test('MeshPhongMaterial specularMap honors horizontal and vertical repeat wrapping', () => {
+  function renderWithWrapping({ wrapS, wrapT, vertical = false }) {
+    const specularMap = vertical
+      ? rgbaTexture([
+        255, 0, 0, 255,
+        0, 0, 0, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        255, 0, 0, 255,
+        0, 0, 0, 255,
+      ], 2, 1)
+    if (wrapS != null) specularMap.wrapS = wrapS
+    if (wrapT != null) specularMap.wrapT = wrapT
+    specularMap.magFilter = THREE.NearestFilter
+    specularMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      new THREE.MeshPhongMaterial({
+        color: 0x000000,
+        specular: 0xffffff,
+        shininess: 4,
+        specularMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 8)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.r < 5, `clamped specularMap U coordinates should sample the disabled edge texel (${clamped.r})`)
+  assert.ok(repeated.r > clamped.r + 80, `repeated specularMap U coordinates should wrap to the enabled texel (${repeated.r} vs ${clamped.r})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.r < 5, `clamped specularMap V coordinates should sample the disabled edge texel (${clampedVertical.r})`)
+  assert.ok(repeatedVertical.r > clampedVertical.r + 80, `repeated specularMap V coordinates should wrap to the enabled texel (${repeatedVertical.r} vs ${clampedVertical.r})`)
+})
+
 test('MeshPhongMaterial scene environment feeds specular reflection', () => {
   function renderPhongEnvironment(specularMap, useEnvironment) {
     const scene = new THREE.Scene()
