@@ -10678,6 +10678,50 @@ test('emissiveMap honors nearest texture filters', () => {
   assert.ok(nearest.r > linear.r + 20, `NearestFilter should preserve a stronger red emissive texel (${nearest.r} vs ${linear.r})`)
 })
 
+test('emissiveMap honors horizontal and vertical repeat wrapping', () => {
+  function renderWithWrapping({ wrapS, wrapT, vertical = false }) {
+    const emissiveMap = vertical
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 1, 2)
+      : rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 1)
+    if (wrapS != null) emissiveMap.wrapS = wrapS
+    if (wrapT != null) emissiveMap.wrapT = wrapT
+    emissiveMap.magFilter = THREE.NearestFilter
+    emissiveMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        emissive: 0xffffff,
+        emissiveMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.r > clamped.g + 80, `clamped emissiveMap U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
+  assert.ok(repeated.g > repeated.r + 30, `repeated emissiveMap U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.r > clampedVertical.g + 80, `clamped emissiveMap V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
+  assert.ok(repeatedVertical.g > repeatedVertical.r + 30, `repeated emissiveMap V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+})
+
 test('metallicRoughness maps apply texture UV transforms', () => {
   function renderWithOffset(offsetX) {
     const roughnessMap = rgbaTexture([
