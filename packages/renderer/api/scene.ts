@@ -1167,6 +1167,7 @@ function appendLineOrPoints(
   materialContext: MaterialExtractionContext,
 ): void {
   validateObjectShadowFlags(object)
+  const objectCastsShadow = topology === 'lines' && optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   const geometry = object.geometry!
   const position = getAttribute(geometry, 'position')
   if (!position) return
@@ -1338,6 +1339,7 @@ function appendLineOrPoints(
       ...(thickLine ? { side: 'double' } : {}),
       shadingModel: 'basic',
       topology: thickLine ? 'triangles' : topology,
+      castShadow: objectCastsShadow ? true : undefined,
       ...clipping,
       ...sortInfo.keys,
     }, sortInfo.item)

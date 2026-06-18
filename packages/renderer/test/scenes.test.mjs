@@ -7338,6 +7338,100 @@ test('source material clipShadows applies to custom shadow material casters', ()
   assert.ok(clippedDistanceLum > unclippedDistanceLum + 20, `source clipShadows should remove the customDistanceMaterial caster shadow (${clippedDistanceLum} vs ${unclippedDistanceLum})`)
 })
 
+test('Line, LineSegments, and LineLoop objects cast directional shadows', () => {
+  function makeLineObject(kind, castShadow) {
+    const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+    material.colorWrite = false
+    material.depthWrite = false
+
+    if (kind === 'segments') {
+      const positions = []
+      for (let offset = -3; offset <= 3; offset += 0.5) {
+        positions.push(-3, 2, offset, 3, 2, offset)
+        positions.push(offset, 2, -3, offset, 2, 3)
+      }
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      const line = new THREE.LineSegments(geometry, material)
+      line.castShadow = castShadow
+      return line
+    }
+
+    if (kind === 'loop') {
+      const positions = []
+      for (let row = 0; row < 18; row += 1) {
+        const z = -3 + row * (6 / 17)
+        if (row % 2 === 0) {
+          positions.push(-3, 2, z, 3, 2, z)
+        } else {
+          positions.push(3, 2, z, -3, 2, z)
+        }
+      }
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      const line = new THREE.LineLoop(geometry, material)
+      line.castShadow = castShadow
+      return line
+    }
+
+    const positions = []
+    for (let row = 0; row < 12; row += 1) {
+      const z = -3 + row * (6 / 11)
+      if (row % 2 === 0) {
+        positions.push(-3, 2, z, 3, 2, z)
+      } else {
+        positions.push(3, 2, z, -3, 2, z)
+      }
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const line = new THREE.Line(geometry, material)
+    line.castShadow = castShadow
+    return line
+  }
+
+  function renderLineShadow(kind, castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+    scene.add(makeLineObject(kind, castShadow))
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(3, 6, 4)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(1024, 1024)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const kind of ['line', 'segments', 'loop']) {
+    const unshadowed = renderLineShadow(kind, false)
+    const shadowed = renderLineShadow(kind, true)
+    const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+    const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+    assert.ok(shadowedLum < unshadowedLum - 2, `${kind} should cast visible line shadows (${shadowedLum} vs ${unshadowedLum})`)
+  }
+})
+
 test('alpha-tested shadow casters honor alphaMap cutouts', () => {
   function renderAlphaShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
