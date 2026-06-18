@@ -190,6 +190,58 @@ test('VRM animation helper creates a clip, seeks the mixer, and updates the avat
   ])
 })
 
+test('VRM animation helper supports mixer update fallback and VRM update opt-out', async () => {
+  const calls = []
+  const scene = { name: 'avatar-scene' }
+  const vrm = {
+    scene,
+    update(delta) {
+      calls.push(['vrm.update', delta])
+    },
+  }
+  const vrmAnimation = { name: 'idle' }
+
+  class UpdateOnlyAnimationMixer {
+    constructor(root) {
+      calls.push(['mixer.constructor', root])
+    }
+
+    clipAction(clip) {
+      calls.push(['mixer.clipAction', clip])
+      return {
+        play() {
+          calls.push(['action.play'])
+        },
+      }
+    }
+
+    update(delta) {
+      calls.push(['mixer.update', delta])
+    }
+  }
+
+  const result = await applyVrmAnimation(vrm, vrmAnimation, {
+    AnimationMixer: UpdateOnlyAnimationMixer,
+    createVRMAnimationClip(animation, model) {
+      calls.push(['createVRMAnimationClip', animation, model])
+      return { animation, model }
+    },
+    time: 0.75,
+    updateDelta: 0.2,
+    updateVrm: false,
+  })
+
+  assert.equal(result.clip.animation, vrmAnimation)
+  assert.equal(result.clip.model, vrm)
+  assert.deepEqual(calls, [
+    ['createVRMAnimationClip', vrmAnimation, vrm],
+    ['mixer.constructor', scene],
+    ['mixer.clipAction', result.clip],
+    ['action.play'],
+    ['mixer.update', 0.75],
+  ])
+})
+
 test('Node loader helper path and option containers fail clearly', async () => {
   assert.throws(
     () => createEncodedImageTextureLoader(123),
