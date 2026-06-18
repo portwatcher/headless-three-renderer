@@ -17912,6 +17912,15 @@ test('invalid shadow numeric values fail clearly', () => {
     ['mapSize.x zero', (light) => {
       light.shadow.mapSize.x = 0
     }, /light\.shadow\.mapSize\.x must be positive/i],
+    ['mapSize.width', (light) => {
+      light.shadow.mapSize = { width: 'wide', height: 512 }
+    }, /light\.shadow\.mapSize\.width must be a finite number/i],
+    ['mapSize.height', (light) => {
+      light.shadow.mapSize = { width: 512, height: Number.NaN }
+    }, /light\.shadow\.mapSize\.height must be a finite number/i],
+    ['mapSize.height zero', (light) => {
+      light.shadow.mapSize = { width: 512, height: 0 }
+    }, /light\.shadow\.mapSize\.height must be positive/i],
     ['bias', (light) => {
       light.shadow.bias = 'biased'
     }, /light\.shadow\.bias must be a finite number/i],
