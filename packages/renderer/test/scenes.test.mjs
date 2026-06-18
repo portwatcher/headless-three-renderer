@@ -753,6 +753,67 @@ test('BatchedMesh material arrays honor packed geometry groups', () => {
   assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right BatchedMesh geometry group should use the green material (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
+test('BatchedMesh packed geometry groups clip to partial draw ranges', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+  batched.perObjectFrustumCulled = false
+
+  const range = batched.getGeometryRangeAt(geometryId, {})
+  batched.geometry.clearGroups()
+  batched.geometry.addGroup(range.start, 6, 0)
+  batched.geometry.addGroup(range.start + 6, 6, 1)
+
+  // Force the active BatchedMesh draw range to start and end inside source groups.
+  batched._geometryInfo[geometryId].start = range.start + 3
+  batched._geometryInfo[geometryId].count = 6
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const redPixels = countRegionPixels(rgba, 96, 64, 12, 14, 42, 34, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(rgba, 96, 64, 62, 30, 90, 52, (r, g, b) => g > r + 40 && g > b + 40)
+  const clippedLeft = meanRegion(rgba, 96, 64, 30, 36, 40, 46)
+  const clippedRight = meanRegion(rgba, 96, 64, 56, 18, 66, 28)
+
+  assert.ok(redPixels > 40, `clipped left group should keep visible red pixels (${redPixels})`)
+  assert.ok(greenPixels > 40, `clipped right group should keep visible green pixels (${greenPixels})`)
+  assert.ok(clippedLeft.r < 5 && clippedLeft.g < 5 && clippedLeft.b < 5, `first skipped triangle should stay clipped out (${clippedLeft.r}, ${clippedLeft.g}, ${clippedLeft.b})`)
+  assert.ok(clippedRight.r < 5 && clippedRight.g < 5 && clippedRight.b < 5, `last skipped triangle should stay clipped out (${clippedRight.r}, ${clippedRight.g}, ${clippedRight.b})`)
+})
+
 test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)
