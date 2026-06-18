@@ -11781,6 +11781,19 @@ test('unsupported packed-depth raw DataTexture type constants fail clearly', () 
   }
 
   const cases = [
+    ['material map packed depth type', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type) }),
+      ))
+    }, /material\.map raw texture type UnsignedInt248Type.*not supported/i],
+    ['background packed depth type', (scene) => {
+      scene.background = rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type)
+    }, /background raw texture type UnsignedInt248Type.*not supported/i],
+    ['environment packed depth type', (scene) => {
+      scene.environment = rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type)
+    }, /scene\.environment raw texture type UnsignedInt248Type.*not supported/i],
     ['material envMap packed depth type', (scene) => {
       const envMap = rawTexture(new Uint32Array([0xffffffff]), THREE.UnsignedInt248Type)
       envMap.mapping = THREE.EquirectangularReflectionMapping
