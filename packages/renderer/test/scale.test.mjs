@@ -1,14 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import * as THREE from 'three'
 import native from '../native.js'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
-const { Renderer } = pkg
+const { Renderer, loadGltfFromFile } = pkg
 
 const SIZE = 96
 const BACKGROUND = [5, 5, 5]
+const NODE_PERFORMANCE_NODE_COUNT = 10000
+const NODE_PERFORMANCE_IMAGE_COUNT = 100
 
 let sharedRenderer
 
@@ -53,6 +58,136 @@ function makeEncodedTexture(index) {
   texture.colorSpace = THREE.SRGBColorSpace
   texture.needsUpdate = true
   return texture
+}
+
+function makePngDataUri(index) {
+  const raw = makeTexture(index)
+  const image = raw.image
+  const data = Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength)
+  return `data:image/png;base64,${native.encodePng(data, image.width, image.height).toString('base64')}`
+}
+
+function alignedLength(length) {
+  return (length + 3) & ~3
+}
+
+function makeSharedTriangleBuffer() {
+  const arrays = [
+    new Float32Array([-0.04, -0.04, 0, 0.04, -0.04, 0, 0, 0.04, 0]),
+    new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    new Float32Array([0, 0, 1, 0, 0.5, 1]),
+    new Uint16Array([0, 1, 2]),
+  ]
+  const parts = arrays.map((array) => Buffer.from(array.buffer))
+  const offsets = []
+  let totalLength = 0
+  for (const part of parts) {
+    totalLength = alignedLength(totalLength)
+    offsets.push(totalLength)
+    totalLength += part.length
+  }
+
+  const buffer = Buffer.alloc(alignedLength(totalLength))
+  for (let i = 0; i < parts.length; i += 1) {
+    parts[i].copy(buffer, offsets[i])
+  }
+  return { buffer, offsets, lengths: parts.map((part) => part.length) }
+}
+
+function makeNodePerformanceGltfSource() {
+  const { buffer, offsets, lengths } = makeSharedTriangleBuffer()
+  const bufferViews = []
+  const accessors = []
+  const meshes = []
+  const materials = []
+  const textures = []
+  const nodes = []
+  const images = Array.from({ length: NODE_PERFORMANCE_IMAGE_COUNT }, (_, index) => ({
+    name: `NodePerformanceTest_img${String(index).padStart(2, '0')}`,
+    uri: makePngDataUri(index),
+  }))
+
+  for (let index = 0; index < NODE_PERFORMANCE_NODE_COUNT; index += 1) {
+    const baseBufferView = bufferViews.length
+    bufferViews.push(
+      { buffer: 0, byteOffset: offsets[0], byteLength: lengths[0], target: 34962 },
+      { buffer: 0, byteOffset: offsets[1], byteLength: lengths[1], target: 34962 },
+      { buffer: 0, byteOffset: offsets[2], byteLength: lengths[2], target: 34962 },
+      { buffer: 0, byteOffset: offsets[3], byteLength: lengths[3], target: 34963 },
+    )
+
+    const baseAccessor = accessors.length
+    accessors.push(
+      { bufferView: baseBufferView, componentType: 5126, count: 3, type: 'VEC3', min: [-0.04, -0.04, 0], max: [0.04, 0.04, 0] },
+      { bufferView: baseBufferView + 1, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: baseBufferView + 2, componentType: 5126, count: 3, type: 'VEC2' },
+      { bufferView: baseBufferView + 3, componentType: 5123, count: 3, type: 'SCALAR' },
+    )
+
+    textures.push({ sampler: 0, source: index % NODE_PERFORMANCE_IMAGE_COUNT })
+    materials.push({
+      doubleSided: true,
+      name: `material_${index}`,
+      pbrMetallicRoughness: {
+        baseColorTexture: { index },
+        metallicFactor: 0,
+        roughnessFactor: 0.65,
+      },
+    })
+    meshes.push({
+      name: `Cube.${String(index).padStart(4, '0')}`,
+      primitives: [{
+        attributes: {
+          POSITION: baseAccessor,
+          NORMAL: baseAccessor + 1,
+          TEXCOORD_0: baseAccessor + 2,
+        },
+        indices: baseAccessor + 3,
+        material: index,
+      }],
+    })
+    nodes.push({
+      mesh: index,
+      name: `rock.${String(index).padStart(4, '0')}`,
+      translation: [index % 100, Math.floor(index / 100), 0],
+    })
+  }
+
+  nodes.push({ camera: 0, name: 'Camera', translation: [50, 50, 120] })
+  nodes.push({
+    extensions: { KHR_lights_punctual: { light: 0 } },
+    name: 'Light',
+    translation: [50, 50, 20],
+  })
+
+  return {
+    accessors,
+    asset: { generator: 'headless-three-renderer scale test', version: '2.0' },
+    buffers: [{
+      byteLength: buffer.length,
+      uri: `data:application/octet-stream;base64,${buffer.toString('base64')}`,
+    }],
+    bufferViews,
+    cameras: [{
+      type: 'perspective',
+      perspective: { aspectRatio: 1, yfov: 0.4, zfar: 1000, znear: 0.1 },
+    }],
+    extensions: {
+      KHR_lights_punctual: {
+        lights: [{ type: 'point', intensity: 1 }],
+      },
+    },
+    extensionsRequired: ['KHR_lights_punctual'],
+    extensionsUsed: ['KHR_lights_punctual'],
+    images,
+    materials,
+    meshes,
+    nodes,
+    samplers: [{ magFilter: 9729, minFilter: 9729, wrapS: 10497, wrapT: 10497 }],
+    scene: 0,
+    scenes: [{ nodes: nodes.map((_, index) => index) }],
+    textures,
+  }
 }
 
 function addSupportedLightBudget(scene, count = 8) {
@@ -147,6 +282,51 @@ test('encoded texture budget renders many unique PNG buffer maps', () => {
   assert.ok(ratio > 0.25, `encoded texture scene should render many mapped pixels (${ratio})`)
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `encoded texture scene should retain decoded color (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('NodePerformanceTest-shaped glTF graph loads many nodes, meshes, materials, and texture definitions', async () => {
+  const source = makeNodePerformanceGltfSource()
+  assert.equal(source.nodes.length, NODE_PERFORMANCE_NODE_COUNT + 2)
+  assert.equal(source.meshes.length, NODE_PERFORMANCE_NODE_COUNT)
+  assert.equal(source.materials.length, NODE_PERFORMANCE_NODE_COUNT)
+  assert.equal(source.textures.length, NODE_PERFORMANCE_NODE_COUNT)
+  assert.equal(source.images.length, NODE_PERFORMANCE_IMAGE_COUNT)
+  assert.equal(source.bufferViews.length, NODE_PERFORMANCE_NODE_COUNT * 4)
+  assert.equal(source.accessors.length, NODE_PERFORMANCE_NODE_COUNT * 4)
+
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'headless-three-node-performance-gltf-'))
+  try {
+    const modelPath = path.join(tmp, 'NodePerformanceShape.gltf')
+    await writeFile(modelPath, JSON.stringify(source))
+
+    const gltf = await loadGltfFromFile(modelPath)
+    let meshCount = 0
+    let firstMesh = null
+    let lastMesh = null
+    const materials = new Set()
+    const textures = new Set()
+    const imageBuffers = new Set()
+    gltf.scene.traverse((object) => {
+      if (object.isMesh !== true) return
+      meshCount += 1
+      firstMesh ??= object
+      lastMesh = object
+      materials.add(object.material)
+      textures.add(object.material.map)
+      imageBuffers.add(object.material.map.image)
+    })
+
+    assert.equal(meshCount, NODE_PERFORMANCE_NODE_COUNT)
+    assert.equal(materials.size, NODE_PERFORMANCE_NODE_COUNT)
+    assert.equal(textures.has(undefined), false)
+    assert.equal(textures.size, NODE_PERFORMANCE_IMAGE_COUNT)
+    assert.equal(imageBuffers.size, NODE_PERFORMANCE_IMAGE_COUNT)
+    assert.equal(gltf.cameras.length, 1)
+    assert.equal(firstMesh?.geometry.getAttribute('position')?.count, 3)
+    assert.equal(lastMesh?.material?.name, 'material_9999')
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
 })
 
 test('more than 64 visible non-ambient lights fail clearly', () => {
