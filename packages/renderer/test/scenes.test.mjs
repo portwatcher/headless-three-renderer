@@ -4799,6 +4799,59 @@ test('SpriteMaterial map honors explicit texture matrices', () => {
   assert.ok(mean.g > mean.r + 40, `explicit sprite map matrix should shift left sprite UVs from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('SpriteMaterial map honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const map = vertical
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+    map.wrapS = wrapS
+    map.wrapT = wrapT
+    map.offset.set(vertical ? 0 : 1, vertical ? 1 : 0)
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map,
+      color: 0xffffff,
+    }))
+    sprite.scale.set(2, 2, 1)
+    scene.add(sprite)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const rgba = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+    return vertical
+      ? meanRegion(rgba, 64, 64, 28, 38, 36, 46)
+      : meanRegion(rgba, 64, 64, 18, 28, 26, 36)
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.r > clamped.g + 100, `clamped sprite map U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
+  assert.ok(repeated.g > repeated.r + 60, `repeated sprite map U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.r > clampedVertical.g + 100, `clamped sprite map V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
+  assert.ok(repeatedVertical.g > repeatedVertical.r + 60, `repeated sprite map V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+})
+
 test('SpriteMaterial maps use generated sprite UVs for non-primary texture channels', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
