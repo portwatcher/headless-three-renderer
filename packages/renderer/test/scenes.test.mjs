@@ -16877,6 +16877,57 @@ test('material alphaToCoverage approximates shadow caster alpha cutouts', () => 
   assert.ok(cutoutLum > fullLum + 15, `alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
 })
 
+test('material alphaHash approximates shadow caster opacity cutouts', () => {
+  function renderAlphaHashShadow(alphaHash) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const casterMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      opacity: alphaHash ? 0.35 : 1,
+      alphaHash,
+      colorWrite: false,
+      depthWrite: false,
+    })
+    const caster = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 3), casterMaterial)
+    caster.position.y = 1.5
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const fullShadow = renderAlphaHashShadow(false)
+  const hashedShadow = renderAlphaHashShadow(true)
+  const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+  const hashedLum = hashedShadow.r + hashedShadow.g + hashedShadow.b
+  assert.ok(hashedLum > fullLum + 20, `alphaHash shadow cutoff should let more receiver light through (${hashedLum} vs ${fullLum})`)
+})
+
 test('invalid visibility flag values fail clearly', () => {
   const camera = makeCamera()
 
