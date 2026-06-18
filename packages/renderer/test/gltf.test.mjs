@@ -84,6 +84,8 @@ const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets'
 const SAMPLE_ASSET_DAMAGED_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DamagedHelmet', 'glTF', 'DamagedHelmet.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
 const SAMPLE_ASSET_DISPERSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DispersionTest', 'glTF', 'DispersionTest.gltf')
+const SAMPLE_ASSET_DRAGON_ATTENUATION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DragonAttenuation', 'glTF', 'DragonAttenuation.gltf')
+const SAMPLE_ASSET_DRAGON_DISPERSION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DragonDispersion', 'glTF', 'DragonDispersion.gltf')
 const SAMPLE_ASSET_DUCK = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Duck', 'glTF', 'Duck.gltf')
 const SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EmissiveStrengthTest', 'glTF', 'EmissiveStrengthTest.gltf')
 const SAMPLE_ASSET_ENVIRONMENT_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'EnvironmentTest', 'glTF', 'EnvironmentTest.gltf')
@@ -1522,6 +1524,102 @@ test('committed Khronos glTF Sample Assets DispersionTest fixture loads IOR and 
   })
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.55, 'DispersionTest should render visible IOR and dispersion grid geometry')
+})
+
+test('committed Khronos glTF Sample Assets DragonDispersion fixture loads real dispersion dragon scene', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DRAGON_DISPERSION, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_dispersion',
+    'KHR_materials_ior',
+  ])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 5819636, uri: 'DragonDispersion.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'Dragon_ThicknessMap.jpg',
+    'CheckerWithLines.png',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'Dragon with Attenuation',
+    'Cloth Backdrop',
+  ])
+  assert.deepEqual(source.materials[0].extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: {
+      attenuationColor: [0.75, 0.8, 0.82],
+      attenuationDistance: 0.1549999988913536,
+      thicknessFactor: 2.2699999809265137,
+      thicknessTexture: { index: 0 },
+    },
+    KHR_materials_dispersion: { dispersion: 2.04 },
+    KHR_materials_ior: { ior: 1.75 },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DRAGON_DISPERSION)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_dispersion'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Dragon',
+    'Cloth_Backdrop',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [76809, 62640])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [76809, 62640])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [76809, 62640])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [273648, 131337])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const dragon = materials.get('Dragon with Attenuation')
+  assert.equal(dragon?.isMeshPhysicalMaterial, true)
+  assert.equal(dragon.metalness, 0)
+  assert.equal(dragon.roughness, 0)
+  assert.equal(dragon.transmission, 1)
+  assert.equal(dragon.thickness, 2.2699999809265137)
+  assert.equal(dragon.attenuationDistance, 0.1549999988913536)
+  assert.deepEqual(dragon.attenuationColor.toArray(), [0.75, 0.8, 0.82])
+  assert.equal(dragon.dispersion, 2.04)
+  assert.equal(dragon.ior, 1.75)
+  assert.equal(dragon.thicknessMap.name, 'Dragon_ThicknessMap')
+  assert.equal(Buffer.isBuffer(dragon.thicknessMap.image), true, 'dragon dispersion thickness JPEG should load as an encoded Buffer')
+  assert.equal(dragon.thicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(dragon.thicknessMap.flipY, false)
+
+  const backdrop = materials.get('Cloth Backdrop')
+  assert.equal(backdrop?.isMeshStandardMaterial, true)
+  assert.equal(backdrop.map.name, 'CheckerWithLines')
+  assert.equal(Buffer.isBuffer(backdrop.map.image), true, 'dragon dispersion checker PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(backdrop.map.image), [256, 256])
+  assert.equal(backdrop.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(backdrop.map.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.12, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.15, 'DragonDispersion should render visible dispersion dragon and backdrop')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 10 && mean.g > 10 && mean.b > 10, `DragonDispersion should render lit dragon pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets CompareEmissiveStrength fixture loads emissive strength variants', async () => {
@@ -3350,6 +3448,119 @@ test('committed Khronos glTF Sample Assets AttenuationTest fixture loads volume 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.75, 'AttenuationTest should render visible attenuation and thickness panels')
   const center = meanRegion(rgba, 96, 96, 40, 40, 56, 56)
   assert.ok(center.r > 100 && center.g > 100 && center.b > 100, `AttenuationTest center panels should render visible transmission output (${center.r}, ${center.g}, ${center.b})`)
+})
+
+test('committed Khronos glTF Sample Assets DragonAttenuation fixture loads attenuation variants and thickness maps', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DRAGON_ATTENUATION, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_materials_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_variants',
+  ])
+  assert.deepEqual(source.extensions?.KHR_materials_variants?.variants?.map((variant) => variant.name), [
+    'Attenuation',
+    'Surface Color',
+  ])
+  assert.deepEqual(source.buffers, [
+    { byteLength: 5817396, uri: 'DragonAttenuation.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'checkerboard.png',
+    'Dragon_ThicknessMap.jpg',
+  ])
+  assert.deepEqual(source.materials.map((material) => material.name), [
+    'Cloth Backdrop',
+    'Dragon with Attenuation',
+    'Dragon with Surface Coloring Only',
+  ])
+  assert.deepEqual(source.materials[1].extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: {
+      attenuationColor: [0.921, 0.64, 0.064],
+      attenuationDistance: 0.155,
+      thicknessFactor: 2.27,
+      thicknessTexture: { index: 1, texCoord: 0 },
+    },
+  })
+  assert.deepEqual(source.materials[2].extensions, {
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: {
+      thicknessFactor: 2.27,
+      thicknessTexture: { index: 1, texCoord: 0 },
+    },
+  })
+  assert.deepEqual(source.meshes[1].primitives[0].extensions?.KHR_materials_variants?.mappings, [
+    { material: 1, variants: [0] },
+    { material: 2, variants: [1] },
+  ])
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DRAGON_ATTENUATION)
+  assert.ok(gltf.parser?.json?.extensionsUsed?.includes('KHR_materials_volume'))
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(meshes.map((mesh) => mesh.name), [
+    'Cloth_Backdrop',
+    'Dragon',
+  ])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('position')?.count), [62570, 76809])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('normal')?.count), [62570, 76809])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.getAttribute('uv')?.count), [62570, 76809])
+  assert.deepEqual(meshes.map((mesh) => mesh.geometry.index?.count), [131337, 273648])
+
+  const dragonMesh = meshes.find((mesh) => mesh.name === 'Dragon')
+  assert.deepEqual(dragonMesh.userData.gltfExtensions?.KHR_materials_variants?.mappings, [
+    { material: 1, variants: [0] },
+    { material: 2, variants: [1] },
+  ])
+
+  const materials = new Map(meshes.map((mesh) => [mesh.material.name, mesh.material]))
+  const backdrop = materials.get('Cloth Backdrop')
+  assert.equal(backdrop?.isMeshStandardMaterial, true)
+  assert.equal(backdrop.map.name, 'checkerboard.png')
+  assert.equal(Buffer.isBuffer(backdrop.map.image), true, 'DragonAttenuation checker PNG should load as an encoded Buffer')
+  assert.deepEqual(pngDimensions(backdrop.map.image), [2048, 2048])
+  assert.equal(backdrop.map.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(backdrop.map.flipY, false)
+
+  const dragon = materials.get('Dragon with Attenuation')
+  assert.equal(dragon?.isMeshPhysicalMaterial, true)
+  assert.equal(dragon.metalness, 0)
+  assert.equal(dragon.roughness, 0)
+  assert.equal(dragon.transmission, 1)
+  assert.equal(dragon.thickness, 2.27)
+  assert.equal(dragon.attenuationDistance, 0.155)
+  assert.deepEqual(dragon.attenuationColor.toArray(), [0.921, 0.64, 0.064])
+  assert.equal(dragon.thicknessMap.name, 'Dragon_ThicknessMap.jpg')
+  assert.equal(Buffer.isBuffer(dragon.thicknessMap.image), true, 'DragonAttenuation thickness JPEG should load as an encoded Buffer')
+  assert.equal(dragon.thicknessMap.colorSpace, THREE.NoColorSpace)
+  assert.equal(dragon.thicknessMap.flipY, false)
+
+  const bounds = new THREE.Box3().setFromObject(gltf.scene)
+  const center = bounds.getCenter(new THREE.Vector3())
+  const size = bounds.getSize(new THREE.Vector3())
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.12, Math.max(size.x, size.y, size.z) * 2.2))
+  camera.lookAt(center)
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 2.6)
+  light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
+  gltf.scene.add(light)
+  gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [0, 0, 0],
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2, 'DragonAttenuation should render visible attenuation dragon and checker backdrop')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `DragonAttenuation should render lit dragon pixels (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-map comparison variants', async () => {
