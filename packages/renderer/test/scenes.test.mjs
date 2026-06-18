@@ -20616,6 +20616,74 @@ test('LineDashedMaterial map honors horizontal and vertical repeat wrapping', ()
   assert.ok(repeatedVerticalGreen > 600, `repeated dashed-line map V coordinates should wrap to the green texel (${repeatedVerticalGreen})`)
 })
 
+test('LineDashedMaterial alphaMap honors horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const alphaMap = vertical
+      ? rgbaTexture([
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+        255, 0, 255, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+        255, 255, 255, 255,
+        255, 0, 255, 255,
+      ], 2, 2)
+    alphaMap.wrapS = wrapS
+    alphaMap.wrapT = wrapT
+    alphaMap.magFilter = THREE.NearestFilter
+    alphaMap.minFilter = THREE.NearestFilter
+
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25,
+      vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25,
+    ]), 2))
+
+    const material = new THREE.LineDashedMaterial({
+      alphaTest: 0.5,
+      color: 0x00ff00,
+      dashSize: 10,
+      gapSize: 0,
+      linewidth: 8,
+      scale: 1,
+    })
+    material.alphaMap = alphaMap
+    const line = new THREE.Line(geom, material)
+    line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(line)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const clampedGreen = countRegionPixels(clamped, 96, 96, 0, 0, 96, 96, (r, g, b) => g > b + 40 && g > r + 40)
+  const repeatedGreen = countRegionPixels(repeated, 96, 96, 0, 0, 96, 96, (r, g, b) => g > b + 40 && g > r + 40)
+  assert.ok(clampedGreen < 20, `clamped dashed-line alphaMap U coordinates should discard the line (${clampedGreen})`)
+  assert.ok(repeatedGreen > 600, `repeated dashed-line alphaMap U coordinates should wrap to the opaque texel (${repeatedGreen})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const clampedVerticalGreen = countRegionPixels(clampedVertical, 96, 96, 0, 0, 96, 96, (r, g, b) => g > b + 40 && g > r + 40)
+  const repeatedVerticalGreen = countRegionPixels(repeatedVertical, 96, 96, 0, 0, 96, 96, (r, g, b) => g > b + 40 && g > r + 40)
+  assert.ok(clampedVerticalGreen < 20, `clamped dashed-line alphaMap V coordinates should discard the line (${clampedVerticalGreen})`)
+  assert.ok(repeatedVerticalGreen > 600, `repeated dashed-line alphaMap V coordinates should wrap to the opaque texel (${repeatedVerticalGreen})`)
+})
+
 test('LineDashedMaterial map samples the selected secondary UV channel', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
