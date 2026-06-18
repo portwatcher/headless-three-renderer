@@ -16052,6 +16052,47 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(halfAlpha > 0.99, `HalfFloatType alpha channel should stay opaque (${halfAlpha})`)
 })
 
+test('single-attachment target array paths honor typed color readback requests', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const options = { width: 32, height: 32, outputColorSpace: THREE.LinearSRGBColorSpace }
+  const center = ((16 * 32) + 16) * 2
+  const cases = [
+    ['target.texture array', { texture: [{ format: THREE.RGFormat, type: THREE.FloatType }] }, (target) => target.texture[0]],
+    ['target.textures array', { textures: [{ format: THREE.RGFormat, type: THREE.FloatType }] }, (target) => target.textures[0]],
+    ['single-attachment MRT target', { isWebGLMultipleRenderTargets: true, textures: [{ format: THREE.RGFormat, type: THREE.FloatType }] }, (target) => target.textures[0]],
+  ]
+
+  for (const [label, target, colorTexture] of cases) {
+    renderToTarget(scene, camera, target, options)
+    const data = colorTexture(target).image.data
+    assert.ok(Buffer.isBuffer(target.data), `${label} top-level target.data should remain RGBA8`)
+    assert.ok(data instanceof Float32Array, `${label} should receive Float32Array data`)
+    assert.equal(data.length, 32 * 32 * 2, `${label} should receive two channels per pixel`)
+    assert.equal(colorTexture(target).source.data.data, data, `${label} source should reference typed data`)
+    assert.ok(data[center] > 0.5, `${label} red channel should be normalized (${data[center]})`)
+    assert.ok(data[center + 1] < 0.05, `${label} green channel should stay near zero (${data[center + 1]})`)
+  }
+
+  const optionsTarget = { textures: [{ format: THREE.RGFormat, type: THREE.FloatType }] }
+  const returned = renderRgba(scene, camera, { ...options, target: optionsTarget })
+  const data = optionsTarget.textures[0].image.data
+  assert.equal(optionsTarget.data, returned)
+  assert.ok(data instanceof Float32Array, 'options.target target.textures[0] should receive Float32Array data')
+  assert.equal(data.length, 32 * 32 * 2)
+  assert.ok(data[center] > 0.5, `options.target red channel should be normalized (${data[center]})`)
+  assert.ok(data[center + 1] < 0.05, `options.target green channel should stay near zero (${data[center + 1]})`)
+})
+
 test('MSAA sampleCount 4 resolves antialiased color output and render targets', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
