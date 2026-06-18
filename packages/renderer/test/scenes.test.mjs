@@ -2438,13 +2438,23 @@ test('MeshNormalMaterial bumpMap honors horizontal and vertical repeat wrapping'
 
   const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   const diff = meanAbsDiff(clamped, repeated)
+  const mirroredDiff = meanAbsDiff(clamped, mirrored)
+  const repeatedMirroredDiff = meanAbsDiff(repeated, mirrored)
   assert.ok(diff > 5, `RepeatWrapping should wrap bumpMap U coordinates before perturbing normals (diff=${diff.toFixed(2)})`)
+  assert.ok(mirroredDiff > 2, `MirroredRepeatWrapping should differ from clamped bumpMap U coordinates before perturbing normals (diff=${mirroredDiff.toFixed(2)})`)
+  assert.ok(repeatedMirroredDiff > 5, `MirroredRepeatWrapping should reflect bumpMap U coordinates differently than RepeatWrapping (diff=${repeatedMirroredDiff.toFixed(2)})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   const verticalDiff = meanAbsDiff(clampedVertical, repeatedVertical)
+  const mirroredVerticalDiff = meanAbsDiff(clampedVertical, mirroredVertical)
+  const repeatedMirroredVerticalDiff = meanAbsDiff(repeatedVertical, mirroredVertical)
   assert.ok(verticalDiff > 5, `RepeatWrapping should wrap bumpMap V coordinates before perturbing normals (diff=${verticalDiff.toFixed(2)})`)
+  assert.ok(mirroredVerticalDiff > 2, `MirroredRepeatWrapping should differ from clamped bumpMap V coordinates before perturbing normals (diff=${mirroredVerticalDiff.toFixed(2)})`)
+  assert.ok(repeatedMirroredVerticalDiff > 5, `MirroredRepeatWrapping should reflect bumpMap V coordinates differently than RepeatWrapping (diff=${repeatedMirroredVerticalDiff.toFixed(2)})`)
 })
 
 test('MeshNormalMaterial flatShading uses per-face normals on indexed geometry', () => {
