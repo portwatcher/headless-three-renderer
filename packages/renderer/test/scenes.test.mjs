@@ -11129,6 +11129,52 @@ test('base color maps honor explicit texture matrices', () => {
   assert.ok(mean.g > mean.r + 80, `explicit texture matrix should shift the base map to green (${mean.g} vs ${mean.r})`)
 })
 
+test('base color maps honor horizontal and vertical repeat wrapping', () => {
+  const renderer = new Renderer()
+
+  function renderWithWrapping({ wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, vertical = false }) {
+    const map = vertical
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+      : rgbaTexture([
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+        255, 0, 0, 255,
+      ], 2, 2)
+    map.wrapS = wrapS
+    map.wrapT = wrapT
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(vertical ? 0.25 : 1.25, vertical ? 1.25 : 0.25),
+      new THREE.MeshBasicMaterial({ map }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 22, 22, 42, 42)
+  }
+
+  const clamped = renderWithWrapping({ wrapS: THREE.ClampToEdgeWrapping })
+  const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
+  assert.ok(clamped.r > clamped.g + 80, `clamped base map U coordinates should sample the red edge texel (${clamped.r} vs ${clamped.g})`)
+  assert.ok(repeated.g > repeated.r + 80, `repeated base map U coordinates should wrap to the green texel (${repeated.g} vs ${repeated.r})`)
+
+  const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
+  const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
+  assert.ok(clampedVertical.r > clampedVertical.g + 80, `clamped base map V coordinates should sample the red edge texel (${clampedVertical.r} vs ${clampedVertical.g})`)
+  assert.ok(repeatedVertical.g > repeatedVertical.r + 80, `repeated base map V coordinates should wrap to the green texel (${repeatedVertical.g} vs ${repeatedVertical.r})`)
+})
+
 test('base color maps honor nearest texture filters', () => {
   function renderWithFilter(filter) {
     const map = rgbaTexture([
