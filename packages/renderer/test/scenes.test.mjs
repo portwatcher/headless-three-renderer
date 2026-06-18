@@ -15669,7 +15669,7 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleAttachmentMrtTarget.textures[0].source.data, singleAttachmentMrtTarget.textures[0].image)
 })
 
-test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
+test('renderToTarget and options.target populate depthTexture with normalized RGBA depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
 
@@ -15710,6 +15710,24 @@ test('renderToTarget populates depthTexture with normalized RGBA depth', () => {
   )
   assert.ok(Math.abs(leftDepth.r - leftDepth.g) <= 1, 'depth red and green channels should match')
   assert.ok(Math.abs(leftDepth.r - leftDepth.b) <= 1, 'depth red and blue channels should match')
+
+  const optionsDepthTexture = { source: { data: {} } }
+  const optionsTarget = { texture: {}, depthTexture: optionsDepthTexture }
+  const returned = renderRgba(scene, camera, { width: 64, height: 64, target: optionsTarget })
+  assert.equal(returned, optionsTarget.data, 'options.target should return target.data')
+  assert.equal(optionsTarget.texture.image.data, optionsTarget.data)
+  assert.equal(optionsDepthTexture.image.data.length, 64 * 64 * 4)
+  assert.notStrictEqual(optionsDepthTexture.image.data, optionsTarget.data)
+  assert.equal(optionsDepthTexture.source.data.data, optionsDepthTexture.image.data)
+  assert.equal(optionsDepthTexture.source.data.width, 64)
+  assert.equal(optionsDepthTexture.source.data.height, 64)
+
+  const optionsLeftDepth = meanRegion(optionsDepthTexture.image.data, 64, 64, 18, 26, 26, 38)
+  const optionsRightDepth = meanRegion(optionsDepthTexture.image.data, 64, 64, 38, 26, 46, 38)
+  assert.ok(
+    optionsLeftDepth.r > optionsRightDepth.r + 80,
+    `options.target near depth should be brighter than far depth (${optionsLeftDepth.r} vs ${optionsRightDepth.r})`,
+  )
 })
 
 test('renderToTarget populates FloatType depthTexture with normalized scalar depth', () => {
