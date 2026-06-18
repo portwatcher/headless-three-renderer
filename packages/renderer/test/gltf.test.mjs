@@ -85,6 +85,8 @@ const SAMPLE_ASSET_CUBE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'Cube', '
 const SAMPLE_ASSET_CUBE_VISIBILITY = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'CubeVisibility', 'glTF', 'CubeVisibility.gltf')
 const SAMPLE_ASSET_DAMAGED_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DamagedHelmet', 'glTF', 'DamagedHelmet.gltf')
 const SAMPLE_ASSET_DIRECTIONAL_LIGHT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DirectionalLight', 'glTF', 'DirectionalLight.gltf')
+const SAMPLE_ASSET_DIFFUSE_TRANSMISSION_PLANT = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DiffuseTransmissionPlant', 'glTF', 'DiffuseTransmissionPlant.gltf')
+const SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEACUP = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DiffuseTransmissionTeacup', 'glTF', 'DiffuseTransmissionTeacup.gltf')
 const SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DiffuseTransmissionTest', 'glTF', 'DiffuseTransmissionTest.gltf')
 const SAMPLE_ASSET_DISPERSION_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DispersionTest', 'glTF', 'DispersionTest.gltf')
 const SAMPLE_ASSET_DRAGON_ATTENUATION = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'DragonAttenuation', 'glTF', 'DragonAttenuation.gltf')
@@ -130,6 +132,7 @@ const SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST = path.join(FIXTURE_DIR, 'gltf-sa
 const SAMPLE_ASSET_RECURSIVE_SKELETONS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RecursiveSkeletons', 'glTF', 'RecursiveSkeletons.gltf')
 const SAMPLE_ASSET_RIGGED_FIGURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedFigure', 'glTF', 'RiggedFigure.gltf')
 const SAMPLE_ASSET_RIGGED_SIMPLE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'RiggedSimple', 'glTF', 'RiggedSimple.gltf')
+const SAMPLE_ASSET_SCATTERING_SKULL = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'ScatteringSkull', 'glTF', 'ScatteringSkull.gltf')
 const SAMPLE_ASSET_SCIFI_HELMET = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SciFiHelmet', 'glTF', 'SciFiHelmet.gltf')
 const SAMPLE_ASSET_SHEEN_CHAIR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenChair', 'glTF', 'SheenChair.gltf')
 const SAMPLE_ASSET_SHEEN_CLOTH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SheenCloth', 'glTF', 'SheenCloth.gltf')
@@ -142,6 +145,7 @@ const SAMPLE_ASSET_SIMPLE_MORPH = path.join(FIXTURE_DIR, 'gltf-sample-assets', '
 const SAMPLE_ASSET_SIMPLE_SKIN = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSkin', 'glTF', 'SimpleSkin.gltf')
 const SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleSparseAccessor', 'glTF', 'SimpleSparseAccessor.gltf')
 const SAMPLE_ASSET_SIMPLE_TEXTURE = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SimpleTexture', 'glTF', 'SimpleTexture.gltf')
+const SAMPLE_ASSET_SPEC_GLOSS_VS_METAL_ROUGH = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecGlossVsMetalRough', 'glTF', 'SpecGlossVsMetalRough.gltf')
 const SAMPLE_ASSET_SPECULAR_SILK_POUF = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularSilkPouf', 'glTF', 'SpecularSilkPouf.gltf')
 const SAMPLE_ASSET_SPECULAR_TEST = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SpecularTest', 'glTF', 'SpecularTest.gltf')
 const SAMPLE_ASSET_SUNGLASSES_KHRONOS = path.join(FIXTURE_DIR, 'gltf-sample-assets', 'SunglassesKhronos', 'glTF', 'SunglassesKhronos.gltf')
@@ -11372,6 +11376,254 @@ test('committed Khronos glTF Sample Assets SheenWoodLeatherSofa fixture loads re
   assert.ok(mean.r < 235 && mean.g < 235 && mean.b < 235, `SheenWoodLeatherSofa should render non-white textured material output (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('committed Khronos glTF Sample Assets DiffuseTransmissionPlant fixture loads animated fireflies and diffuse-transmission leaves', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DIFFUSE_TRANSMISSION_PLANT, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_lights_punctual', 'KHR_materials_diffuse_transmission'])
+  assert.deepEqual(source.buffers, [{ uri: 'DiffuseTransmissionPlant.bin', byteLength: 2156988 }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'img0.png',
+    'img1.jpg',
+    'img2.jpg',
+    'img3.jpg',
+    'img4.jpg',
+    'img5.jpg',
+    'img6.jpg',
+  ])
+  assert.equal(source.extensions.KHR_lights_punctual.lights.length, 2)
+  assert.equal(source.extensions.KHR_lights_punctual.lights.every((light) => light.type === 'point'), true)
+  assert.deepEqual(source.materials[1].extensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionColorFactor: [1, 1, 1],
+    diffuseTransmissionFactor: 0.1,
+    diffuseTransmissionColorTexture: { index: 5 },
+  })
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DIFFUSE_TRANSMISSION_PLANT)
+  assert.equal(gltf.animations.length, 1)
+  assert.equal(gltf.animations[0].tracks.length, 30)
+  assert.ok(gltf.animations[0].tracks.some((track) => track.name === 'pointlight_firefly1.position'))
+  const lights = []
+  const meshes = []
+  gltf.scene.traverse((object) => {
+    if (object.isPointLight === true) lights.push(object)
+    if (object.isMesh === true) meshes.push(object)
+  })
+  assert.deepEqual(lights.map((light) => light.name), ['pointlight_firefly1', 'pointlight_firefly2'])
+  assert.equal(meshes.length, 9)
+
+  const leaves = gltf.scene.getObjectByName('leaves')
+  assert.ok(leaves?.isMesh, 'DiffuseTransmissionPlant should load its leaves mesh')
+  assert.equal(leaves.geometry.getAttribute('position')?.count, 7077)
+  assert.equal(leaves.geometry.index?.count, 31941)
+  assert.equal(leaves.material.name, 'leaves')
+  assert.equal(leaves.material.alphaTest, 0.5)
+  assert.deepEqual(leaves.material.userData.gltfExtensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionColorFactor: [1, 1, 1],
+    diffuseTransmissionFactor: 0.1,
+    diffuseTransmissionColorTexture: { index: 5 },
+  })
+  assert.equal(leaves.material.map?.name, 'img0.png')
+  assert.deepEqual(pngDimensions(leaves.material.map.image), [1024, 1024])
+  assert.equal(leaves.material.normalMap?.name, 'img1.jpg')
+  assert.equal(Buffer.isBuffer(leaves.material.normalMap.image), true, 'leaf normal JPEG should load as an encoded Buffer')
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.45))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene, { distance: 2.2, yOffset: 0.4 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.2, 'DiffuseTransmissionPlant should render visible plant and firefly geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 240 && mean.g < 240 && mean.b < 235, `DiffuseTransmissionPlant should render non-white textured output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets DiffuseTransmissionTeacup fixture loads diffuse-transmission ORM texture reuse', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEACUP, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_diffuse_transmission'])
+  assert.deepEqual(source.buffers, [{ byteLength: 3043872, uri: 'DiffuseTransmissionTeacup.bin' }])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'teasaucer_basecolor.jpg',
+    'teasaucer_normal.png',
+    'teasaucer_ormt.png',
+    'teacup_basecolor.jpg',
+    'teacup_normal.png',
+    'teacup_ormt.png',
+  ])
+  assert.equal(source.materials.every((material) => material.extensions?.KHR_materials_diffuse_transmission?.diffuseTransmissionFactor === 1), true)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_DIFFUSE_TRANSMISSION_TEACUP)
+  const cup = gltf.scene.getObjectByName('tea_cup')
+  const saucer = gltf.scene.getObjectByName('tea_saucer')
+  assert.ok(cup?.isMesh, 'DiffuseTransmissionTeacup should load its cup mesh')
+  assert.ok(saucer?.isMesh, 'DiffuseTransmissionTeacup should load its saucer mesh')
+  assert.equal(cup.geometry.getAttribute('position')?.count, 49944)
+  assert.equal(cup.geometry.index?.count, 49944)
+  assert.equal(saucer.geometry.getAttribute('position')?.count, 34608)
+  assert.equal(saucer.geometry.index?.count, 34608)
+
+  assert.deepEqual(cup.material.userData.gltfExtensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionFactor: 1,
+    diffuseTransmissionTexture: { index: 5 },
+    diffuseTransmissionColorFactor: [0.84, 0.8, 0.74],
+  })
+  assert.equal(cup.material.map?.name, 'teacup_basecolor.jpg')
+  assert.equal(Buffer.isBuffer(cup.material.map.image), true, 'teacup base color JPEG should load as an encoded Buffer')
+  assert.equal(cup.material.normalMap?.name, 'teacup_normal.png')
+  assert.deepEqual(pngDimensions(cup.material.normalMap.image), [1024, 1024])
+  assert.equal(cup.material.aoMap?.name, 'teacup_ormt.png')
+  assert.equal(cup.material.roughnessMap, cup.material.aoMap)
+  assert.equal(cup.material.metalnessMap, cup.material.aoMap)
+  assert.deepEqual(pngDimensions(cup.material.aoMap.image), [1024, 1024])
+
+  assert.deepEqual(saucer.material.userData.gltfExtensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionFactor: 1,
+    diffuseTransmissionTexture: { index: 2 },
+    diffuseTransmissionColorFactor: [0.84, 0.8, 0.74],
+  })
+  assert.equal(saucer.material.normalMap?.name, 'teasaucer_normal.png')
+  assert.deepEqual(pngDimensions(saucer.material.normalMap.image), [1024, 512])
+  assert.equal(saucer.material.aoMap?.name, 'teasaucer_ormt.png')
+  assert.deepEqual(pngDimensions(saucer.material.aoMap.image), [1024, 512])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  const light = new THREE.DirectionalLight(0xffffff, 1.7)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.18, 'DiffuseTransmissionTeacup should render visible ceramic geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 245 && mean.g < 245 && mean.b < 242, `DiffuseTransmissionTeacup should render textured non-white output (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('committed Khronos glTF Sample Assets ScatteringSkull fixture loads volume-scatter metadata and thickness map', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SCATTERING_SKULL, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, [
+    'KHR_xmp_json_ld',
+    'KHR_materials_diffuse_transmission',
+    'KHR_materials_volume',
+    'KHR_materials_dispersion',
+    'KHR_materials_volume_scatter',
+    'KHR_materials_ior',
+  ])
+  assert.equal(source.extensions.KHR_xmp_json_ld.packets[0]['dc:title'], 'Skattering Skull')
+  assert.deepEqual(source.buffers, [{ uri: 'ScatteringSkull_binary.bin', byteLength: 6964692 }])
+  assert.deepEqual(source.images.map((image) => image.uri), ['ScatteringSkull_images/aoThickness.png'])
+  assert.equal(source.materials[0].extensions.KHR_materials_volume.thicknessFactor, 1)
+  assert.equal(source.materials[0].extensions.KHR_materials_dispersion.dispersion, 0.5699999928474426)
+  assert.equal(source.materials[0].extensions.KHR_materials_ior.ior, 1.3799999952316284)
+
+  const gltf = await loadGltfFixture(SAMPLE_ASSET_SCATTERING_SKULL)
+  const skull = gltf.scene.getObjectByName('Skull')
+  assert.ok(skull?.isMesh, 'ScatteringSkull should load its skull mesh')
+  assert.equal(skull.geometry.getAttribute('position')?.count, 97880)
+  assert.equal(skull.geometry.index?.count, 566613)
+  const material = skull.material
+  assert.equal(material.name, 'subsurface_material')
+  assert.equal(material.isMeshPhysicalMaterial, true)
+  assert.equal(material.thickness, 1)
+  assert.equal(material.dispersion, 0.5699999928474426)
+  assert.equal(material.ior, 1.3799999952316284)
+  assertVectorClose(material.attenuationColor.toArray(), [0.3678794503211975, 0.4857314527034759, 0.3964099884033203], 'ScatteringSkull attenuationColor')
+  assert.equal(material.attenuationDistance, 0.016891848295927048)
+  assert.deepEqual(material.userData.gltfExtensions.KHR_materials_diffuse_transmission, {
+    diffuseTransmissionFactor: 1,
+  })
+  assert.deepEqual(material.userData.gltfExtensions.KHR_materials_volume_scatter, {
+    multiscatterColorFactor: [0.16827136278152466, 0.5271198749542236, 0.5906253457069397],
+  })
+  assert.equal(material.aoMap?.name, 'aoThicknessTexture')
+  assert.equal(material.thicknessMap, material.aoMap)
+  assert.deepEqual(pngDimensions(material.thicknessMap.image), [2048, 2048])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  const light = new THREE.DirectionalLight(0xffffff, 1.6)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene)
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.2, 'ScatteringSkull should render visible skull geometry')
+})
+
+test('committed Khronos glTF Sample Assets SpecGlossVsMetalRough fixture preserves required spec-gloss extension metadata', async () => {
+  const source = JSON.parse(await readFile(SAMPLE_ASSET_SPEC_GLOSS_VS_METAL_ROUGH, 'utf8'))
+  assert.deepEqual(source.extensionsUsed, ['KHR_materials_pbrSpecularGlossiness'])
+  assert.deepEqual(source.extensionsRequired, ['KHR_materials_pbrSpecularGlossiness'])
+  assert.deepEqual(source.buffers, [
+    { uri: 'WaterBottle.bin', byteLength: 149412 },
+    { byteLength: 536, uri: 'SpecGlossVsMetalRoughLabel.bin' },
+  ])
+  assert.deepEqual(source.images.map((image) => image.uri), [
+    'WaterBottle_baseColor.png',
+    'WaterBottle_roughnessMetallic.png',
+    'WaterBottle_normal.png',
+    'WaterBottle_emissive.png',
+    'WaterBottle_occlusion.png',
+    'WaterBottle_diffuse.png',
+    'WaterBottle_specularGlossiness.png',
+    'SpecGlossVsMetalRough.png',
+  ])
+
+  const { result: gltf, warnings } = await captureConsoleWarn(() => loadGltfFixture(SAMPLE_ASSET_SPEC_GLOSS_VS_METAL_ROUGH))
+  assert.ok(
+    warnings.some((warning) => warning.includes('KHR_materials_pbrSpecularGlossiness')),
+    'GLTFLoader should warn that the required legacy spec-gloss extension is unknown',
+  )
+  const specGloss = gltf.scene.getObjectByName('WaterBottle_SpecGloss')
+  const metalRough = gltf.scene.getObjectByName('WaterBottle_MR')
+  assert.ok(specGloss?.isMesh, 'SpecGlossVsMetalRough should load the spec-gloss bottle mesh')
+  assert.ok(metalRough?.isMesh, 'SpecGlossVsMetalRough should load the metal-rough bottle mesh')
+  assert.equal(specGloss.geometry.getAttribute('position')?.count, 2549)
+  assert.equal(specGloss.geometry.index?.count, 13530)
+  assert.equal(metalRough.geometry.index?.count, 13530)
+  assert.deepEqual(specGloss.material.userData.gltfExtensions.KHR_materials_pbrSpecularGlossiness, {
+    diffuseTexture: { index: 5 },
+    specularGlossinessTexture: { index: 6 },
+  })
+  assert.equal(specGloss.material.normalMap?.name, 'WaterBottle_normal.png')
+  assert.deepEqual(pngDimensions(specGloss.material.normalMap.image), [2048, 2048])
+  assert.equal(specGloss.material.aoMap?.name, 'WaterBottle_occlusion.png')
+  assert.equal(specGloss.material.emissiveMap?.name, 'WaterBottle_emissive.png')
+  assert.equal(metalRough.material.map?.name, 'WaterBottle_baseColor.png')
+  assert.deepEqual(pngDimensions(metalRough.material.map.image), [2048, 2048])
+  assert.equal(metalRough.material.roughnessMap?.name, 'WaterBottle_roughnessMetallic.png')
+  assert.equal(metalRough.material.metalnessMap, metalRough.material.roughnessMap)
+
+  const label = gltf.scene.getObjectByName('MetalRoughLabel')
+  assert.equal(label?.material?.map?.name, 'SpecGlossVsMetalRough.png')
+  assert.deepEqual(pngDimensions(label.material.map.image), [512, 128])
+
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  const light = new THREE.DirectionalLight(0xffffff, 1.7)
+  light.position.set(2, 4, 5)
+  gltf.scene.add(light)
+  const camera = frameSceneCamera(gltf.scene, { distance: 2.1 })
+  const rgba = new Renderer().render(gltf.scene, camera, {
+    width: 128,
+    height: 128,
+    format: 'rgba',
+    background: [1, 1, 1],
+  })
+  assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.25, 'SpecGlossVsMetalRough should render visible bottle comparison geometry')
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r < 240 && mean.g < 240 && mean.b < 235, `SpecGlossVsMetalRough should render non-white bottle pixels (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('committed textured glTF fixture loads data URI image and renders texture', async () => {
   const gltf = await loadGltfFixture(TEXTURED_QUAD)
 
@@ -11808,6 +12060,20 @@ function assertTextureSampler(mesh, wrapS, wrapT) {
 
 async function loadGltfFixture(filePath, options) {
   return await loadGltfFromFile(filePath, options)
+}
+
+async function captureConsoleWarn(callback) {
+  const originalWarn = console.warn
+  const warnings = []
+  console.warn = (...args) => {
+    warnings.push(args.map((arg) => String(arg)).join(' '))
+  }
+  try {
+    const result = await callback()
+    return { result, warnings }
+  } finally {
+    console.warn = originalWarn
+  }
 }
 
 function vectorFromAttribute(attribute, index) {
