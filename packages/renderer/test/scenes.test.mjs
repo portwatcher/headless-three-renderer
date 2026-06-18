@@ -1856,6 +1856,18 @@ test('renderMode object-id target includes reverse lookup metadata', () => {
   assert.equal(target.objectIdMap[String(leftEncoded)].id, left.id)
   assert.equal(target.objectIdMap[String(rightEncoded)].hex, `#${rightEncoded.toString(16).padStart(6, '0')}`)
 
+  const optionsTarget = { texture: {} }
+  const returned = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    renderMode: 'object-id',
+    target: optionsTarget,
+  })
+  assert.equal(optionsTarget.data, returned)
+  assert.equal(optionsTarget.objectIdEntries.length, 2)
+  assert.equal(optionsTarget.objectIdMap[String(leftEncoded)].id, left.id)
+  assert.equal(optionsTarget.objectIdMap[String(rightEncoded)].id, right.id)
+
   renderToTarget(scene, camera, target, { width: 64, height: 64 })
   assert.equal(target.objectIdEntries, undefined)
   assert.equal(target.objectIdMap, undefined)
