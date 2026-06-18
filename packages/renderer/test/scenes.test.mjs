@@ -14923,20 +14923,40 @@ test('MeshPhysicalMaterial iridescence maps honor horizontal and vertical wrap m
   const iridescenceDiff = meanAbsDiff(clampedIridescence, repeatedIridescence)
   assert.ok(iridescenceDiff > 0.5, `RepeatWrapping should wrap iridescenceMap UVs before sampling, diff=${iridescenceDiff.toFixed(2)}`)
 
+  const repeatedHighIridescence = renderIridescenceMap({ wrapS: THREE.RepeatWrapping, offsetX: 1.5 })
+  const mirroredIridescence = renderIridescenceMap({ wrapS: THREE.MirroredRepeatWrapping, offsetX: 1.5 })
+  const mirroredIridescenceDiff = meanAbsDiff(repeatedHighIridescence, mirroredIridescence)
+  assert.ok(mirroredIridescenceDiff > 0.5, `MirroredRepeatWrapping should reflect iridescenceMap U coordinates differently than RepeatWrapping, diff=${mirroredIridescenceDiff.toFixed(2)}`)
+
   const clampedThickness = renderThicknessMap({ offsetX: 1 })
   const repeatedThickness = renderThicknessMap({ wrapS: THREE.RepeatWrapping, offsetX: 1 })
   const thicknessDiff = meanAbsDiff(clampedThickness, repeatedThickness)
   assert.ok(thicknessDiff > 0.5, `RepeatWrapping should wrap iridescenceThicknessMap UVs before sampling, diff=${thicknessDiff.toFixed(2)}`)
+
+  const repeatedHighThickness = renderThicknessMap({ wrapS: THREE.RepeatWrapping, offsetX: 1.5 })
+  const mirroredThickness = renderThicknessMap({ wrapS: THREE.MirroredRepeatWrapping, offsetX: 1.5 })
+  const mirroredThicknessDiff = meanAbsDiff(repeatedHighThickness, mirroredThickness)
+  assert.ok(mirroredThicknessDiff > 0.5, `MirroredRepeatWrapping should reflect iridescenceThicknessMap U coordinates differently than RepeatWrapping, diff=${mirroredThicknessDiff.toFixed(2)}`)
 
   const clampedVerticalIridescence = renderIridescenceMap({ offsetY: 1, vertical: true })
   const repeatedVerticalIridescence = renderIridescenceMap({ wrapT: THREE.RepeatWrapping, offsetY: 1, vertical: true })
   const verticalIridescenceDiff = meanAbsDiff(clampedVerticalIridescence, repeatedVerticalIridescence)
   assert.ok(verticalIridescenceDiff > 0.5, `RepeatWrapping should wrap iridescenceMap V coordinates before sampling, diff=${verticalIridescenceDiff.toFixed(2)}`)
 
+  const repeatedHighVerticalIridescence = renderIridescenceMap({ wrapT: THREE.RepeatWrapping, offsetY: 1.5, vertical: true })
+  const mirroredVerticalIridescence = renderIridescenceMap({ wrapT: THREE.MirroredRepeatWrapping, offsetY: 1.5, vertical: true })
+  const mirroredVerticalIridescenceDiff = meanAbsDiff(repeatedHighVerticalIridescence, mirroredVerticalIridescence)
+  assert.ok(mirroredVerticalIridescenceDiff > 0.5, `MirroredRepeatWrapping should reflect iridescenceMap V coordinates differently than RepeatWrapping, diff=${mirroredVerticalIridescenceDiff.toFixed(2)}`)
+
   const clampedVerticalThickness = renderThicknessMap({ offsetY: 1, vertical: true })
   const repeatedVerticalThickness = renderThicknessMap({ wrapT: THREE.RepeatWrapping, offsetY: 1, vertical: true })
   const verticalThicknessDiff = meanAbsDiff(clampedVerticalThickness, repeatedVerticalThickness)
   assert.ok(verticalThicknessDiff > 0.5, `RepeatWrapping should wrap iridescenceThicknessMap V coordinates before sampling, diff=${verticalThicknessDiff.toFixed(2)}`)
+
+  const repeatedHighVerticalThickness = renderThicknessMap({ wrapT: THREE.RepeatWrapping, offsetY: 1.5, vertical: true })
+  const mirroredVerticalThickness = renderThicknessMap({ wrapT: THREE.MirroredRepeatWrapping, offsetY: 1.5, vertical: true })
+  const mirroredVerticalThicknessDiff = meanAbsDiff(repeatedHighVerticalThickness, mirroredVerticalThickness)
+  assert.ok(mirroredVerticalThicknessDiff > 0.5, `MirroredRepeatWrapping should reflect iridescenceThicknessMap V coordinates differently than RepeatWrapping, diff=${mirroredVerticalThicknessDiff.toFixed(2)}`)
 })
 
 test('physical extension maps apply texture UV transforms', () => {
