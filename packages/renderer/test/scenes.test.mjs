@@ -18759,6 +18759,47 @@ test('LineBasicMaterial opacity blends over the background', () => {
   assert.ok(blendedPixels > 2, `semi-transparent line should blend red over blue (${blendedPixels})`)
 })
 
+test('LineBasicMaterial and LineDashedMaterial ignore linecap and linejoin like WebGLRenderer', () => {
+  function renderLine(kind, configure = () => {}) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0, 0),
+      new THREE.Vector3(0, 0.5, 0),
+      new THREE.Vector3(1.2, 0, 0),
+    ])
+    const material = kind === 'basic'
+      ? new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 8 })
+      : new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        linewidth: 8,
+        dashSize: 0.3,
+        gapSize: 0.15,
+        scale: 1,
+      })
+    configure(material)
+
+    const line = new THREE.Line(geom, material)
+    if (kind === 'dashed') line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const kind of ['basic', 'dashed']) {
+    const baseline = renderLine(kind)
+    const noOp = renderLine(kind, (material) => {
+      material.linecap = 'butt'
+      material.linejoin = 'bevel'
+    })
+    assert.deepEqual(noOp, baseline, `${kind} linecap/linejoin should be accepted as WebGL-compatible no-ops`)
+  }
+})
+
 test('LineBasicMaterial and LineDashedMaterial alphaHash produce main-pass stochastic coverage', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
