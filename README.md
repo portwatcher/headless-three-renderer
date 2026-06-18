@@ -14,6 +14,7 @@ Headless Three.js ecosystem for rendering Three.js scenes outside the browser.
 - [Three.js compatibility matrix](./docs/compatibility.md)
 - [Khronos glTF Sample Asset Coverage](./docs/gltf-sample-assets.md)
 - [Node loader setup](./docs/node-loader-setup.md)
+- [Release checklist](./docs/release-checklist.md)
 - [Renderer roadmap](./TODO.md)
 
 ## Examples

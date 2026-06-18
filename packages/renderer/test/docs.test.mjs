@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const COMPATIBILITY_DOC = path.join(REPO_ROOT, 'docs', 'compatibility.md')
 const GLTF_SAMPLE_ASSETS_DOC = path.join(REPO_ROOT, 'docs', 'gltf-sample-assets.md')
+const RELEASE_CHECKLIST_DOC = path.join(REPO_ROOT, 'docs', 'release-checklist.md')
 const GLTF_TEST = path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'gltf.test.mjs')
 
 test('public documentation links point at committed files', async () => {
@@ -14,6 +15,7 @@ test('public documentation links point at committed files', async () => {
     path.join(REPO_ROOT, 'README.md'),
     path.join(REPO_ROOT, 'docs', 'compatibility.md'),
     path.join(REPO_ROOT, 'docs', 'gltf-sample-assets.md'),
+    path.join(REPO_ROOT, 'docs', 'release-checklist.md'),
     path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'README.md'),
   ]
 
@@ -58,5 +60,40 @@ test('compatibility matrix links to synchronized Khronos glTF Sample Assets cove
     documentedNames,
     uniqueFixtureNames,
     'docs/gltf-sample-assets.md must match the committed Khronos glTF Sample Assets fixture list',
+  )
+})
+
+test('release checklist gates compatibility and golden-reference updates', async () => {
+  const checklist = await readFile(RELEASE_CHECKLIST_DOC, 'utf8')
+
+  assert.match(
+    checklist,
+    /\[Three\.js compatibility matrix\]\(\.\/compatibility\.md\)/,
+    'release checklist should require compatibility matrix updates',
+  )
+  assert.match(
+    checklist,
+    /release notes/i,
+    'release checklist should tie compatibility changes to release notes',
+  )
+  assert.match(
+    checklist,
+    /packages\/renderer\/test\/browser-reference\/references\/<platform>-<arch>\//,
+    'release checklist should name the committed platform reference directory',
+  )
+  assert.match(
+    checklist,
+    /HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES=1/,
+    'release checklist should document required golden-reference mode',
+  )
+  assert.match(
+    checklist,
+    /HEADLESS_THREE_BROWSER_REFERENCE_DIR=/,
+    'release checklist should document explicit browser-reference inputs',
+  )
+  assert.match(
+    checklist,
+    /pnpm -C packages\/renderer run test:golden/,
+    'release checklist should require the golden-reference harness',
   )
 })
