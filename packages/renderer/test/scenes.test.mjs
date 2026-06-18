@@ -11713,6 +11713,9 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
     ['environment', (scene) => {
       scene.environment = invalidRawTexture(new Uint8Array([255, 0]))
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['mismatched environment', (scene) => {
+      scene.environment = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
+    }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering.*mismatched/i],
     ['material envMap', (scene) => {
       const envMap = invalidRawTexture(new Uint8Array([255, 0]))
       envMap.mapping = THREE.EquirectangularReflectionMapping
@@ -11721,11 +11724,24 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
         new THREE.MeshBasicMaterial({ envMap }),
       ))
     }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['mismatched material envMap', (scene) => {
+      const envMap = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
+      envMap.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap }),
+      ))
+    }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering.*mismatched/i],
     ['reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: invalidRawTexture(new Uint8Array([255, 0])) },
       }
     }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering/i],
+    ['mismatched reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture: invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1])) },
+      }
+    }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering.*mismatched/i],
     ['FloatType environment', (scene) => {
       scene.environment = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
     }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
