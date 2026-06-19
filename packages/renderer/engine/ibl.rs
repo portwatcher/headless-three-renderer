@@ -1,4 +1,7 @@
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 
 use anyhow::{Context, Result};
@@ -21,7 +24,9 @@ const PREFILTER_MIP_LEVELS: u32 = 5;
 type RotationColumns = [[f32; 4]; 3];
 
 static BRDF_LUT: OnceLock<Vec<u8>> = OnceLock::new();
+static IBL_MAPS: OnceLock<Mutex<HashMap<IblCacheKey, IblMaps>>> = OnceLock::new();
 
+#[derive(Clone)]
 pub struct IblMaps {
     /// Diffuse irradiance cubemap: 6 faces, IRRADIANCE_SIZE x IRRADIANCE_SIZE, RGBA32F stored as RGBA8.
     pub irradiance_faces: Vec<Vec<u8>>,
@@ -41,6 +46,53 @@ pub struct EnvMap {
     pub pixels: Vec<[f32; 3]>,
     pub width: u32,
     pub height: u32,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct IblCacheKey {
+    width: u32,
+    height: u32,
+    pixels_len: usize,
+    pixels_hash: u64,
+    rotation: [[u32; 3]; 3],
+}
+
+impl IblCacheKey {
+    fn new(env_map: &EnvMap, rotation: RotationColumns) -> Self {
+        let mut hasher = DefaultHasher::new();
+        for pixel in &env_map.pixels {
+            for channel in pixel {
+                f32_key(*channel).hash(&mut hasher);
+            }
+        }
+        Self {
+            width: env_map.width,
+            height: env_map.height,
+            pixels_len: env_map.pixels.len(),
+            pixels_hash: hasher.finish(),
+            rotation: [
+                [
+                    f32_key(rotation[0][0]),
+                    f32_key(rotation[0][1]),
+                    f32_key(rotation[0][2]),
+                ],
+                [
+                    f32_key(rotation[1][0]),
+                    f32_key(rotation[1][1]),
+                    f32_key(rotation[1][2]),
+                ],
+                [
+                    f32_key(rotation[2][0]),
+                    f32_key(rotation[2][1]),
+                    f32_key(rotation[2][2]),
+                ],
+            ],
+        }
+    }
+}
+
+fn f32_key(value: f32) -> u32 {
+    if value == 0.0 { 0 } else { value.to_bits() }
 }
 
 impl EnvMap {
@@ -172,6 +224,28 @@ fn decode_ldr_environment_channel(value: u8, is_srgb: bool) -> f32 {
 }
 
 pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
+    let key = IblCacheKey::new(env_map, rotation);
+    if let Some(maps) = IBL_MAPS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(&key)
+        .cloned()
+    {
+        return maps;
+    }
+
+    let maps = compute_ibl_uncached(env_map, rotation);
+    IBL_MAPS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .entry(key)
+        .or_insert_with(|| maps.clone())
+        .clone()
+}
+
+fn compute_ibl_uncached(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
     let irradiance_faces = compute_irradiance(env_map, rotation);
     let prefilter_faces = compute_prefiltered_env(env_map, rotation);
     let brdf_lut = cached_brdf_lut();
@@ -563,7 +637,7 @@ fn half_to_f32(h: u16) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{BRDF_LUT_SIZE, cached_brdf_lut};
+    use super::{BRDF_LUT_SIZE, EnvMap, IblCacheKey, cached_brdf_lut};
 
     #[test]
     fn cached_brdf_lut_is_stable() {
@@ -576,6 +650,50 @@ mod tests {
             first
                 .chunks_exact(4)
                 .all(|texel| texel[2] == 0 && texel[3] == 255)
+        );
+    }
+
+    #[test]
+    fn ibl_cache_keys_track_pixels_and_rotation() {
+        let env = EnvMap {
+            pixels: vec![[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+            width: 2,
+            height: 1,
+        };
+        let identity = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ];
+        let mut rotated = identity;
+        rotated[0][0] = 0.0;
+        rotated[0][2] = 1.0;
+
+        assert_eq!(
+            IblCacheKey::new(&env, identity),
+            IblCacheKey::new(
+                &env,
+                [
+                    [1.0, -0.0, 0.0, 42.0],
+                    [0.0, 1.0, -0.0, 42.0],
+                    [0.0, 0.0, 1.0, 42.0],
+                ]
+            ),
+            "unused rotation lanes and signed zero should not split the cache",
+        );
+        assert_ne!(
+            IblCacheKey::new(&env, identity),
+            IblCacheKey::new(&env, rotated)
+        );
+
+        let changed_env = EnvMap {
+            pixels: vec![[0.1, 0.2, 0.35], [0.4, 0.5, 0.6]],
+            width: 2,
+            height: 1,
+        };
+        assert_ne!(
+            IblCacheKey::new(&env, identity),
+            IblCacheKey::new(&changed_env, identity),
         );
     }
 }
