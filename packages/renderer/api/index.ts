@@ -346,6 +346,7 @@ class RendererDebugState {
 class RendererDomElementState {
   width = 0
   height = 0
+  private readonly listeners = new Map<string, Set<(event: unknown) => void>>()
 
   readonly style = {
     width: '0px',
@@ -365,6 +366,37 @@ class RendererDomElementState {
     throw new Error(
       'Renderer.domElement.getContext() is not supported by @headless-three/renderer because the domElement is an inert offscreen compatibility object, not a browser canvas.',
     )
+  }
+
+  addEventListener(type: unknown, listener: unknown, _options?: unknown): void {
+    assertEventListener(type, listener, 'Renderer.domElement.addEventListener')
+    const eventType = type as string
+    const eventListener = listener as (event: unknown) => void
+    let typeListeners = this.listeners.get(eventType)
+    if (!typeListeners) {
+      typeListeners = new Set()
+      this.listeners.set(eventType, typeListeners)
+    }
+    typeListeners.add(eventListener)
+  }
+
+  removeEventListener(type: unknown, listener: unknown, _options?: unknown): void {
+    assertEventListener(type, listener, 'Renderer.domElement.removeEventListener')
+    this.listeners.get(type as string)?.delete(listener as (event: unknown) => void)
+  }
+
+  dispatchEvent(event: unknown): boolean {
+    if (event == null || typeof event !== 'object' || Array.isArray(event)) {
+      throw new TypeError('Renderer.domElement.dispatchEvent event must be an event-like object.')
+    }
+    const type = (event as { type?: unknown }).type
+    if (typeof type !== 'string' || type.length === 0) {
+      throw new TypeError('Renderer.domElement.dispatchEvent event.type must be a non-empty string.')
+    }
+    for (const listener of [...(this.listeners.get(type) ?? [])]) {
+      listener.call(this, event)
+    }
+    return true
   }
 }
 

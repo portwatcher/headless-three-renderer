@@ -30121,6 +30121,32 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.deepEqual(renderer.domElement.style, { width: '40px', height: '20px' })
   assert.equal(renderer.getPixelRatio(), 2)
 
+  const eventCalls = []
+  function onContextLost(event) {
+    eventCalls.push([event.type, this === renderer.domElement])
+  }
+  renderer.domElement.addEventListener('webglcontextlost', onContextLost)
+  assert.equal(renderer.domElement.dispatchEvent({ type: 'webglcontextlost' }), true)
+  renderer.domElement.removeEventListener('webglcontextlost', onContextLost)
+  assert.equal(renderer.domElement.dispatchEvent({ type: 'webglcontextlost' }), true)
+  assert.deepEqual(eventCalls, [['webglcontextlost', true]])
+  assert.throws(
+    () => renderer.domElement.addEventListener('', onContextLost),
+    /Renderer\.domElement\.addEventListener type must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.domElement.removeEventListener('webglcontextlost', null),
+    /Renderer\.domElement\.removeEventListener listener must be a function/i,
+  )
+  assert.throws(
+    () => renderer.domElement.dispatchEvent({ type: '' }),
+    /Renderer\.domElement\.dispatchEvent event\.type must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.domElement.dispatchEvent(null),
+    /Renderer\.domElement\.dispatchEvent event must be an event-like object/i,
+  )
+
   const rgba = renderer.render(scene, camera, { format: 'rgba' })
   assert.equal(rgba.length, 40 * 20 * 4)
   const mean = meanRegion(rgba, 40, 20, 12, 6, 28, 14)
