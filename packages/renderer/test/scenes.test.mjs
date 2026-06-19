@@ -17629,6 +17629,48 @@ test('Renderer.setRenderTarget state writes regular targets', () => {
   assert.equal(renderer.getRenderTarget(), null)
 })
 
+test('Renderer.setRenderTarget state honors typed single-attachment target arrays', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const options = { width: 32, height: 32, outputColorSpace: THREE.LinearSRGBColorSpace }
+  const center = ((16 * 32) + 16) * 2
+  const cases = [
+    ['target.texture array', { texture: [{ format: THREE.RGFormat, type: THREE.FloatType }] }, (target) => target.texture[0]],
+    ['target.textures array', { textures: [{ format: THREE.RGFormat, type: THREE.FloatType }] }, (target) => target.textures[0]],
+    ['single-attachment MRT target', { isWebGLMultipleRenderTargets: true, textures: [{ format: THREE.RGFormat, type: THREE.FloatType }] }, (target) => target.textures[0]],
+  ]
+
+  for (const [label, target, colorTexture] of cases) {
+    renderer.setRenderTarget(target)
+    const returned = renderer.render(scene, camera, options)
+    const data = colorTexture(target).image.data
+
+    assert.equal(returned, target.data, `${label} render should return target.data`)
+    assert.strictEqual(renderer.getRenderTarget(), target, `${label} should remain the active target`)
+    assert.equal(target.width, 32, `${label} should receive render width`)
+    assert.equal(target.height, 32, `${label} should receive render height`)
+    assert.ok(Buffer.isBuffer(target.data), `${label} top-level target.data should remain RGBA8`)
+    assert.ok(data instanceof Float32Array, `${label} should receive Float32Array data`)
+    assert.equal(data.length, 32 * 32 * 2, `${label} should receive two channels per pixel`)
+    assert.equal(colorTexture(target).source.data.data, data, `${label} source should reference typed data`)
+    assert.ok(data[center] > 0.5, `${label} red channel should be normalized (${data[center]})`)
+    assert.ok(data[center + 1] < 0.05, `${label} green channel should stay near zero (${data[center + 1]})`)
+  }
+
+  renderer.setRenderTarget(null)
+  assert.equal(renderer.getRenderTarget(), null)
+})
+
 test('renderToTarget and options.target populate depthTexture with normalized RGBA depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
