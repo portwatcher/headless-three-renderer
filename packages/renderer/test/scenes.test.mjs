@@ -9362,9 +9362,17 @@ test('LineBasicMaterial and LineDashedMaterial cutouts affect directional shadow
   }
 })
 
-test('LineBasicMaterial cutouts affect spot and point shadows', () => {
-  function makeLineSegments(cutoutKind, opaque) {
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
+test('LineBasicMaterial and LineDashedMaterial cutouts affect spot and point shadows', () => {
+  function makeLineSegments(materialKind, cutoutKind, opaque) {
+    const material = materialKind === 'dashed'
+      ? new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        linewidth: 6,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+      : new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
     material.colorWrite = false
     material.depthWrite = false
     material.alphaTest = 0.5
@@ -9382,11 +9390,12 @@ test('LineBasicMaterial cutouts affect spot and point shadows', () => {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const line = new THREE.LineSegments(geometry, material)
+    if (materialKind === 'dashed') line.computeLineDistances()
     line.castShadow = true
     return line
   }
 
-  function renderLineCutoutShadow(lightKind, cutoutKind, opaque) {
+  function renderLineCutoutShadow(lightKind, materialKind, cutoutKind, opaque) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -9397,7 +9406,7 @@ test('LineBasicMaterial cutouts affect spot and point shadows', () => {
     receiver.rotation.x = -Math.PI / 2
     receiver.receiveShadow = true
     scene.add(receiver)
-    scene.add(makeLineSegments(cutoutKind, opaque))
+    scene.add(makeLineSegments(materialKind, cutoutKind, opaque))
 
     if (lightKind === 'spot') {
       const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
@@ -9427,12 +9436,14 @@ test('LineBasicMaterial cutouts affect spot and point shadows', () => {
   }
 
   for (const lightKind of ['spot', 'point']) {
-    for (const cutoutKind of ['map', 'alphaMap']) {
-      const opaqueCaster = renderLineCutoutShadow(lightKind, cutoutKind, true)
-      const cutoutCaster = renderLineCutoutShadow(lightKind, cutoutKind, false)
-      const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
-      const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
-      assert.ok(cutoutLum > opaqueLum + 4, `${lightKind} ${cutoutKind} should remove the line caster shadow (${cutoutLum} vs ${opaqueLum})`)
+    for (const materialKind of ['basic', 'dashed']) {
+      for (const cutoutKind of ['map', 'alphaMap']) {
+        const opaqueCaster = renderLineCutoutShadow(lightKind, materialKind, cutoutKind, true)
+        const cutoutCaster = renderLineCutoutShadow(lightKind, materialKind, cutoutKind, false)
+        const opaqueLum = opaqueCaster.r + opaqueCaster.g + opaqueCaster.b
+        const cutoutLum = cutoutCaster.r + cutoutCaster.g + cutoutCaster.b
+        assert.ok(cutoutLum > opaqueLum + 4, `${lightKind} ${materialKind} ${cutoutKind} should remove the line caster shadow (${cutoutLum} vs ${opaqueLum})`)
+      }
     }
   }
 })
