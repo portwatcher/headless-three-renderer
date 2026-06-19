@@ -346,11 +346,20 @@ class RendererDebugState {
 class RendererDomElementState {
   width = 0
   height = 0
+  private readonly attributes = new Map<string, string>()
   private readonly listeners = new Map<string, Set<(event: unknown) => void>>()
 
   readonly style = {
     width: '0px',
     height: '0px',
+  }
+
+  get clientWidth(): number {
+    return this.stylePixelSize(this.style.width, this.width)
+  }
+
+  get clientHeight(): number {
+    return this.stylePixelSize(this.style.height, this.height)
   }
 
   setSize(width: number, height: number, updateStyle = true): void {
@@ -360,6 +369,26 @@ class RendererDomElementState {
       this.style.width = `${width}px`
       this.style.height = `${height}px`
     }
+  }
+
+  setAttribute(name: unknown, value: unknown): void {
+    assertDomElementAttributeName(name, 'Renderer.domElement.setAttribute name')
+    this.attributes.set(name, String(value))
+  }
+
+  getAttribute(name: unknown): string | null {
+    assertDomElementAttributeName(name, 'Renderer.domElement.getAttribute name')
+    return this.attributes.get(name) ?? null
+  }
+
+  hasAttribute(name: unknown): boolean {
+    assertDomElementAttributeName(name, 'Renderer.domElement.hasAttribute name')
+    return this.attributes.has(name)
+  }
+
+  removeAttribute(name: unknown): void {
+    assertDomElementAttributeName(name, 'Renderer.domElement.removeAttribute name')
+    this.attributes.delete(name)
   }
 
   getContext(): never {
@@ -397,6 +426,11 @@ class RendererDomElementState {
       listener.call(this, event)
     }
     return true
+  }
+
+  private stylePixelSize(value: unknown, fallback: number): number {
+    const size = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value) : Number.NaN
+    return Number.isFinite(size) && size >= 0 ? Math.round(size) : fallback
   }
 }
 
@@ -4056,6 +4090,12 @@ function assertEventListener(type: unknown, listener: unknown, label: string): v
   }
   if (typeof listener !== 'function') {
     throw new TypeError(`${label} listener must be a function.`)
+  }
+}
+
+function assertDomElementAttributeName(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
   }
 }
 

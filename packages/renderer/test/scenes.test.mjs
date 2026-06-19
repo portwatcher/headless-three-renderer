@@ -30099,6 +30099,8 @@ test('Renderer domElement is an inert output-size mirror', () => {
 
   assert.equal(renderer.domElement.width, 0)
   assert.equal(renderer.domElement.height, 0)
+  assert.equal(renderer.domElement.clientWidth, 0)
+  assert.equal(renderer.domElement.clientHeight, 0)
   assert.deepEqual(renderer.domElement.style, { width: '0px', height: '0px' })
   assert.throws(
     () => renderer.domElement.getContext('webgl'),
@@ -30108,18 +30110,49 @@ test('Renderer domElement is an inert output-size mirror', () => {
   renderer.setSize(64, 32)
   assert.equal(renderer.domElement.width, 64)
   assert.equal(renderer.domElement.height, 32)
+  assert.equal(renderer.domElement.clientWidth, 64)
+  assert.equal(renderer.domElement.clientHeight, 32)
   assert.deepEqual(renderer.domElement.style, { width: '64px', height: '32px' })
 
   renderer.setSize(48, 24, false)
   assert.equal(renderer.domElement.width, 48)
   assert.equal(renderer.domElement.height, 24)
+  assert.equal(renderer.domElement.clientWidth, 64)
+  assert.equal(renderer.domElement.clientHeight, 32)
   assert.deepEqual(renderer.domElement.style, { width: '64px', height: '32px' })
 
   renderer.setDrawingBufferSize(40, 20, 2)
   assert.equal(renderer.domElement.width, 40)
   assert.equal(renderer.domElement.height, 20)
+  assert.equal(renderer.domElement.clientWidth, 40)
+  assert.equal(renderer.domElement.clientHeight, 20)
   assert.deepEqual(renderer.domElement.style, { width: '40px', height: '20px' })
   assert.equal(renderer.getPixelRatio(), 2)
+  renderer.domElement.style.width = '12.5px'
+  renderer.domElement.style.height = 'invalid'
+  assert.equal(renderer.domElement.clientWidth, 13)
+  assert.equal(renderer.domElement.clientHeight, 20)
+  renderer.domElement.style.width = '40px'
+  renderer.domElement.style.height = '20px'
+
+  assert.equal(renderer.domElement.getAttribute('data-renderer'), null)
+  assert.equal(renderer.domElement.hasAttribute('data-renderer'), false)
+  renderer.domElement.setAttribute('data-renderer', 'headless')
+  renderer.domElement.setAttribute('data-count', 3)
+  assert.equal(renderer.domElement.getAttribute('data-renderer'), 'headless')
+  assert.equal(renderer.domElement.getAttribute('data-count'), '3')
+  assert.equal(renderer.domElement.hasAttribute('data-renderer'), true)
+  renderer.domElement.removeAttribute('data-renderer')
+  assert.equal(renderer.domElement.getAttribute('data-renderer'), null)
+  assert.equal(renderer.domElement.hasAttribute('data-renderer'), false)
+  assert.throws(
+    () => renderer.domElement.setAttribute('', 'value'),
+    /Renderer\.domElement\.setAttribute name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.domElement.getAttribute(null),
+    /Renderer\.domElement\.getAttribute name must be a non-empty string/i,
+  )
 
   const eventCalls = []
   function onContextLost(event) {
