@@ -9676,8 +9676,15 @@ test('LineBasicMaterial and LineDashedMaterial alphaHash and alphaToCoverage aff
 })
 
 test('Line shadow casters honor material and group clipShadows', () => {
-  function makeLineSegments() {
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+  function makeLineSegments(materialKind) {
+    const material = materialKind === 'dashed'
+      ? new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+      : new THREE.LineBasicMaterial({ color: 0xffffff })
     material.colorWrite = false
     material.depthWrite = false
 
@@ -9689,11 +9696,12 @@ test('Line shadow casters honor material and group clipShadows', () => {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const line = new THREE.LineSegments(geometry, material)
+    if (materialKind === 'dashed') line.computeLineDistances()
     line.castShadow = true
     return line
   }
 
-  function renderLineClipShadows(source, clipShadows) {
+  function renderLineClipShadows(materialKind, source, clipShadows) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -9705,7 +9713,7 @@ test('Line shadow casters honor material and group clipShadows', () => {
     receiver.receiveShadow = true
     scene.add(receiver)
 
-    const line = makeLineSegments()
+    const line = makeLineSegments(materialKind)
     const clippingPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -10)
     if (source === 'material') {
       line.material.clippingPlanes = [clippingPlane]
@@ -9740,18 +9748,28 @@ test('Line shadow casters honor material and group clipShadows', () => {
     return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
   }
 
-  for (const source of ['material', 'group']) {
-    const unclipped = renderLineClipShadows(source, false)
-    const clipped = renderLineClipShadows(source, true)
-    const unclippedLum = unclipped.r + unclipped.g + unclipped.b
-    const clippedLum = clipped.r + clipped.g + clipped.b
-    assert.ok(clippedLum > unclippedLum + 2, `${source} clipShadows should remove the line caster shadow (${clippedLum} vs ${unclippedLum})`)
+  for (const materialKind of ['basic', 'dashed']) {
+    for (const source of ['material', 'group']) {
+      const unclipped = renderLineClipShadows(materialKind, source, false)
+      const clipped = renderLineClipShadows(materialKind, source, true)
+      const unclippedLum = unclipped.r + unclipped.g + unclipped.b
+      const clippedLum = clipped.r + clipped.g + clipped.b
+      assert.ok(clippedLum > unclippedLum + 2, `${materialKind} ${source} clipShadows should remove the line caster shadow (${clippedLum} vs ${unclippedLum})`)
+    }
   }
 })
 
 test('Line shadow casters honor material and group clipShadows for spot and point lights', () => {
-  function makeLineSegments() {
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
+  function makeLineSegments(materialKind) {
+    const material = materialKind === 'dashed'
+      ? new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        linewidth: 6,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+      : new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
     material.colorWrite = false
     material.depthWrite = false
 
@@ -9763,11 +9781,12 @@ test('Line shadow casters honor material and group clipShadows for spot and poin
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const line = new THREE.LineSegments(geometry, material)
+    if (materialKind === 'dashed') line.computeLineDistances()
     line.castShadow = true
     return line
   }
 
-  function renderLineClipShadows(lightKind, source, clipShadows) {
+  function renderLineClipShadows(lightKind, materialKind, source, clipShadows) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -9779,7 +9798,7 @@ test('Line shadow casters honor material and group clipShadows for spot and poin
     receiver.receiveShadow = true
     scene.add(receiver)
 
-    const line = makeLineSegments()
+    const line = makeLineSegments(materialKind)
     const clippingPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -10)
     if (source === 'material') {
       line.material.clippingPlanes = [clippingPlane]
@@ -9822,12 +9841,14 @@ test('Line shadow casters honor material and group clipShadows for spot and poin
   }
 
   for (const lightKind of ['spot', 'point']) {
-    for (const source of ['material', 'group']) {
-      const unclipped = renderLineClipShadows(lightKind, source, false)
-      const clipped = renderLineClipShadows(lightKind, source, true)
-      const unclippedLum = unclipped.r + unclipped.g + unclipped.b
-      const clippedLum = clipped.r + clipped.g + clipped.b
-      assert.ok(clippedLum > unclippedLum + 4, `${lightKind} ${source} clipShadows should remove the line caster shadow (${clippedLum} vs ${unclippedLum})`)
+    for (const materialKind of ['basic', 'dashed']) {
+      for (const source of ['material', 'group']) {
+        const unclipped = renderLineClipShadows(lightKind, materialKind, source, false)
+        const clipped = renderLineClipShadows(lightKind, materialKind, source, true)
+        const unclippedLum = unclipped.r + unclipped.g + unclipped.b
+        const clippedLum = clipped.r + clipped.g + clipped.b
+        assert.ok(clippedLum > unclippedLum + 4, `${lightKind} ${materialKind} ${source} clipShadows should remove the line caster shadow (${clippedLum} vs ${unclippedLum})`)
+      }
     }
   }
 })
