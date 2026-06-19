@@ -29552,8 +29552,18 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   )
   assert.throws(
     () => renderer.copyFramebufferToTexture(source),
-    /Renderer\.copyFramebufferToTexture\(\).*not supported.*readRenderTargetPixels/i,
+    /Renderer\.copyFramebufferToTexture\(\) requires an active render target.*setRenderTarget/i,
   )
+  renderer.setRenderTarget({ texture: {} })
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(source),
+    /Renderer\.copyFramebufferToTexture target has no readable color data.*Render into the target/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(source, null, 1),
+    /Renderer\.copyFramebufferToTexture level only supports level 0/i,
+  )
+  renderer.setRenderTarget(null)
   assert.throws(
     () => renderer.setRenderTargetTextures(null, externalColorTexture),
     /Renderer\.setRenderTargetTextures renderTarget must be a target-like object/i,
@@ -29629,6 +29639,47 @@ test('Renderer copyTextureToTexture copies readable raw texture data on the CPU'
   assert.deepEqual(pixel(1, 2), [255, 255, 0, 255])
   assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after CPU copy')
+})
+
+test('Renderer copyFramebufferToTexture copies active render target color data on the CPU', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const target = { texture: {} }
+  renderer.setRenderTarget(target)
+  renderer.render(scene, camera, {
+    width: 4,
+    height: 4,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  const destinationData = new Uint8Array(6 * 6 * 4)
+  destinationData.fill(9)
+  const destination = new THREE.DataTexture(destinationData, 6, 6, THREE.RGBAFormat)
+  const initialVersion = destination.version
+
+  renderer.copyFramebufferToTexture(destination, { x: 1, y: 2 })
+
+  function pixel(x, y) {
+    const offset = (y * 6 + x) * 4
+    return Array.from(destination.image.data.slice(offset, offset + 4))
+  }
+
+  const copiedTopLeft = pixel(1, 2)
+  const copiedBottomRight = pixel(4, 5)
+  assert.ok(copiedTopLeft[0] > 200 && copiedTopLeft[1] < 20 && copiedTopLeft[2] < 20 && copiedTopLeft[3] === 255, `top-left copied framebuffer pixel should be red (${copiedTopLeft})`)
+  assert.ok(copiedBottomRight[0] > 200 && copiedBottomRight[1] < 20 && copiedBottomRight[2] < 20 && copiedBottomRight[3] === 255, `bottom-right copied framebuffer pixel should be red (${copiedBottomRight})`)
+  assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after framebuffer copy')
+  renderer.setRenderTarget(null)
 })
 
 test('Renderer clear methods are no-op compatibility hooks', () => {

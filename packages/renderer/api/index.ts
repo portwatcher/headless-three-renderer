@@ -714,11 +714,45 @@ export class Renderer {
     )
   }
 
-  copyFramebufferToTexture(texture: ThreeTextureLike, _position: unknown = null, _level = 0): never {
+  copyFramebufferToTexture(texture: ThreeTextureLike, position: unknown = null, level = 0): void {
     assertThreeTextureLike(texture, 'Renderer.copyFramebufferToTexture texture')
-    throw new Error(
-      'Renderer.copyFramebufferToTexture() is not supported by @headless-three/renderer because there is no persistent browser framebuffer to copy. Render into a target and use Renderer.readRenderTargetPixels() for CPU readback.',
+    assertTextureCopyLevel(level, 'Renderer.copyFramebufferToTexture level')
+    if (!this.currentRenderTarget) {
+      throw new Error(
+        'Renderer.copyFramebufferToTexture() requires an active render target with readable color data. Call Renderer.setRenderTarget(target), render into that target, then copy into a readable raw texture; use Renderer.readRenderTargetPixels() for explicit CPU readback.',
+      )
+    }
+
+    const source = renderTargetReadbackSource(
+      this.currentRenderTarget,
+      isCubeRenderTarget(this.currentRenderTarget) ? this.currentActiveCubeFace : undefined,
+      0,
+      'Renderer.copyFramebufferToTexture',
     )
+    const destination = rawTextureCopyImage(texture, 'Renderer.copyFramebufferToTexture texture')
+    if (source.channels !== destination.channels) {
+      throw new Error(
+        `Renderer.copyFramebufferToTexture framebuffer and destination texture must use the same raw channel count (${source.channels} framebuffer channels, ${destination.channels} destination channels).`,
+      )
+    }
+
+    const destinationPosition = textureCopyDestinationPosition(position, 'Renderer.copyFramebufferToTexture position')
+    if (
+      destinationPosition.x + source.width > destination.width ||
+      destinationPosition.y + source.height > destination.height
+    ) {
+      throw new RangeError('Renderer.copyFramebufferToTexture position and framebuffer size exceed destination texture bounds.')
+    }
+
+    const channels = source.channels
+    for (let row = 0; row < source.height; row += 1) {
+      const sourceStart = row * source.width * channels
+      const destinationStart = (((destinationPosition.y + row) * destination.width) + destinationPosition.x) * channels
+      for (let i = 0; i < source.width * channels; i += 1) {
+        destination.data[destinationStart + i] = source.data[sourceStart + i]
+      }
+    }
+    texture.needsUpdate = true
   }
 
   copyTextureToTexture(
