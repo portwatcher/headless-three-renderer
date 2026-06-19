@@ -2074,7 +2074,7 @@ function imageToRgbaTexture(
   }
 }
 
-function canvasLikeImageToRgba(
+export function canvasLikeImageToRgba(
   image: unknown,
   label: string,
 ): { rgba: Uint8Array; width: number; height: number } | null {

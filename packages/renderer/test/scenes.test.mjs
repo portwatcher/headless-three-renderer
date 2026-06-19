@@ -29670,7 +29670,7 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   )
   assert.throws(
     () => renderer.copyTextureToTexture({ isTexture: true, image: Buffer.from([1, 2, 3, 4]) }, destination),
-    /Renderer\.copyTextureToTexture source texture must provide a readable raw image object/i,
+    /Renderer\.copyTextureToTexture source texture must provide a readable image object.*raw data.*canvas-like pixel access/i,
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, null, null, 1),
@@ -29684,6 +29684,23 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyTextureToTexture(rgbSource, destination),
     /same raw channel count/i,
+  )
+  const canvasDestination = new THREE.Texture({
+    width: 1,
+    height: 1,
+    getContext(type) {
+      if (type !== '2d') return null
+      return {
+        getImageData() {
+          return { data: new Uint8ClampedArray([0, 0, 0, 255]), width: 1, height: 1 }
+        },
+      }
+    },
+  })
+  canvasDestination.needsUpdate = true
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, canvasDestination),
+    /Renderer\.copyTextureToTexture destination texture must provide a readable raw image object/i,
   )
 })
 
@@ -29711,6 +29728,105 @@ test('Renderer copyTextureToTexture copies readable raw texture data on the CPU'
   assert.deepEqual(pixel(1, 2), [255, 255, 0, 255])
   assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after CPU copy')
+})
+
+test('Renderer copyTextureToTexture copies readable canvas-like source data on the CPU', () => {
+  const renderer = new Renderer()
+
+  function canvasLikeTexture(data, width = 2, height = 1) {
+    const pixels = new Uint8ClampedArray(data)
+    const texture = new THREE.Texture({
+      width,
+      height,
+      getContext(type) {
+        if (type !== '2d') return null
+        return {
+          getImageData(x, y, readWidth, readHeight) {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(readWidth, width)
+            assert.equal(readHeight, height)
+            return { data: pixels, width, height }
+          },
+        }
+      },
+    })
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function destinationTexture(width = 3, height = 2) {
+    const data = new Uint8Array(width * height * 4)
+    data.fill(9)
+    return new THREE.DataTexture(data, width, height, THREE.RGBAFormat)
+  }
+
+  function pixel(texture, x, y) {
+    const width = texture.image.width
+    const offset = (y * width + x) * 4
+    return Array.from(texture.image.data.slice(offset, offset + 4))
+  }
+
+  const destination = destinationTexture()
+  renderer.copyTextureToTexture(canvasLikeTexture([
+    10, 20, 30, 255,
+    40, 50, 60, 255,
+  ]), destination, null, { x: 1, y: 1 })
+
+  assert.deepEqual(pixel(destination, 1, 1), [10, 20, 30, 255])
+  assert.deepEqual(pixel(destination, 2, 1), [40, 50, 60, 255])
+  assert.deepEqual(pixel(destination, 0, 0), [9, 9, 9, 9])
+
+  const previousOffscreenCanvas = globalThis.OffscreenCanvas
+  class FakeOffscreenCanvas {
+    constructor(width, height) {
+      this.width = width
+      this.height = height
+      this.pixels = new Uint8ClampedArray(width * height * 4)
+    }
+
+    getContext(type) {
+      if (type !== '2d') return null
+      return {
+        drawImage: (image, x, y, width, height) => {
+          assert.equal(x, 0)
+          assert.equal(y, 0)
+          assert.equal(width, this.width)
+          assert.equal(height, this.height)
+          this.pixels.set(image.pixels)
+        },
+        getImageData: (x, y, width, height) => {
+          assert.equal(x, 0)
+          assert.equal(y, 0)
+          assert.equal(width, this.width)
+          assert.equal(height, this.height)
+          return { data: this.pixels, width: this.width, height: this.height }
+        },
+      }
+    }
+  }
+
+  try {
+    globalThis.OffscreenCanvas = FakeOffscreenCanvas
+    const source = new THREE.Texture({
+      width: 1,
+      height: 1,
+      complete: true,
+      pixels: new Uint8ClampedArray([70, 80, 90, 255]),
+    })
+    source.needsUpdate = true
+    const offscreenDestination = destinationTexture(1, 1)
+
+    renderer.copyTextureToTexture(source, offscreenDestination)
+
+    assert.deepEqual(pixel(offscreenDestination, 0, 0), [70, 80, 90, 255])
+  } finally {
+    if (previousOffscreenCanvas === undefined) {
+      delete globalThis.OffscreenCanvas
+    } else {
+      globalThis.OffscreenCanvas = previousOffscreenCanvas
+    }
+  }
 })
 
 test('Renderer copyFramebufferToTexture copies active render target color data on the CPU', () => {

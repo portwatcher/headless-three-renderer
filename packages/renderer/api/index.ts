@@ -34,7 +34,7 @@ import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPositio
 import { DEFAULT_BACKGROUND_COLOR, cssColorStringToArray, resolveBackground, validatedColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
-import { extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
+import { canvasLikeImageToRgba, extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
 import { clamp01, matrixElements } from './math'
@@ -768,7 +768,7 @@ export class Renderer {
     assertTextureCopyLevel(srcLevel, 'Renderer.copyTextureToTexture source level')
     assertTextureCopyLevel(dstLevel, 'Renderer.copyTextureToTexture destination level')
 
-    const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture')
+    const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture', { allowCanvasRead: true })
     const destination = rawTextureCopyImage(dstTexture, 'Renderer.copyTextureToTexture destination texture')
     if (source.channels !== destination.channels) {
       throw new Error(
@@ -3406,15 +3406,28 @@ interface TextureCopyPosition {
   y: number
 }
 
-function rawTextureCopyImage(texture: ThreeTextureLike, label: string): RawTextureCopyImage {
+function rawTextureCopyImage(
+  texture: ThreeTextureLike,
+  label: string,
+  options: { allowCanvasRead?: boolean } = {},
+): RawTextureCopyImage {
   const image = texture.image ?? texture.source?.data
   if (!image || Array.isArray(image) || Buffer.isBuffer(image) || image instanceof Uint8Array) {
-    throw new TypeError(`${label} must provide a readable raw image object with data, width, and height.`)
+    throw new TypeError(textureCopyReadableImageError(label, options.allowCanvasRead === true))
   }
   if (typeof image !== 'object') {
-    throw new TypeError(`${label} must provide a readable raw image object with data, width, and height.`)
+    throw new TypeError(textureCopyReadableImageError(label, options.allowCanvasRead === true))
   }
   const candidate = image as { data?: unknown; width?: unknown; height?: unknown }
+  if (candidate.data == null) {
+    if (options.allowCanvasRead === true) {
+      const canvasImage = canvasLikeImageToRgba(image, label)
+      if (canvasImage) {
+        return { data: canvasImage.rgba, width: canvasImage.width, height: canvasImage.height, channels: 4 }
+      }
+    }
+    throw new TypeError(textureCopyReadableImageError(label, options.allowCanvasRead === true))
+  }
   const width = textureCopyPositiveInteger(candidate.width, `${label}.width`)
   const height = textureCopyPositiveInteger(candidate.height, `${label}.height`)
   const data = candidate.data
@@ -3430,6 +3443,13 @@ function rawTextureCopyImage(texture: ThreeTextureLike, label: string): RawTextu
     throw new RangeError(`${label}.data must use 1, 2, 3, or 4 channels per pixel.`)
   }
   return { data, width, height, channels }
+}
+
+function textureCopyReadableImageError(label: string, allowCanvasRead: boolean): string {
+  if (allowCanvasRead) {
+    return `${label} must provide a readable image object with raw data, width, and height, or canvas-like pixel access.`
+  }
+  return `${label} must provide a readable raw image object with data, width, and height.`
 }
 
 function isMutableTextureCopyData(value: unknown): value is { length: number; [index: number]: number } {
