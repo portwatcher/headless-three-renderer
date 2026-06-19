@@ -16642,11 +16642,11 @@ test('invalid fog parameter values fail clearly', () => {
   )
 })
 
-test('Fog affects sprites, points, and lines with material fog opt-out', () => {
-  function renderObject(object) {
+test('Fog and FogExp2 affect sprites, points, and lines with material fog opt-out', () => {
+  function renderObject(object, fog = new THREE.Fog(0x00ff00, 0, 1)) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
-    scene.fog = new THREE.Fog(0x00ff00, 0, 1)
+    scene.fog = fog
     scene.add(object)
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
@@ -16696,6 +16696,17 @@ test('Fog affects sprites, points, and lines with material fog opt-out', () => {
       unfogged.r > unfogged.g + 40,
       `${label} fog=false should keep the red material color (${unfogged.r} vs ${unfogged.g})`,
     )
+
+    const exp2 = meanRegion(
+      renderObject(makeObject(true), new THREE.FogExp2(0x0000ff, 1.0)),
+      64,
+      64,
+      24,
+      24,
+      40,
+      40,
+    )
+    assert.ok(exp2.b > exp2.r + 40, `${label} should be mixed toward blue FogExp2 (${exp2.b} vs ${exp2.r})`)
   }
 
   const foggedLine = renderObject(makeLine(true))
@@ -16722,6 +16733,19 @@ test('Fog affects sprites, points, and lines with material fog opt-out', () => {
   )
   assert.ok(greenLinePixels > 2, `line should be mixed toward green fog (${greenLinePixels})`)
   assert.ok(redLinePixels > 2, `line fog=false should keep the red material color (${redLinePixels})`)
+
+  const exp2Line = renderObject(makeLine(true), new THREE.FogExp2(0x0000ff, 1.0))
+  const blueLinePixels = countRegionPixels(
+    exp2Line,
+    64,
+    64,
+    8,
+    28,
+    56,
+    36,
+    (r, g, b) => b > r + 30 && b > g + 30,
+  )
+  assert.ok(blueLinePixels > 2, `line should be mixed toward blue FogExp2 (${blueLinePixels})`)
 })
 
 test('PBR scene with lights renders and shows lighting variation', () => {
