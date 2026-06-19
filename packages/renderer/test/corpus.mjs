@@ -35,6 +35,7 @@ export function createSceneCorpus() {
     meshDistanceMaterialCorpus(),
     meshDistanceMaterialWireframeCorpus(),
     meshNormalMaterialCorpus(),
+    meshNormalMaterialNormalMapCorpus(),
     meshMatcapMaterialCorpus(),
     meshToonMaterialCorpus(),
     meshToonAlphaMapCorpus(),
@@ -1772,6 +1773,47 @@ function meshNormalMaterialCorpus() {
       const greenFaces = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => g > r + 40 && g > b + 40 && g > 100)
       if (blueFaces < 300 || greenFaces < 80) {
         throw new Error(`normal material corpus should render distinct normal-color faces, got blue=${blueFaces} green=${greenFaces}`)
+      }
+    },
+  }
+}
+
+function meshNormalMaterialNormalMapCorpus() {
+  function makeScene(normalMap) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({ normalMap }),
+    ))
+    return scene
+  }
+
+  const flatScene = makeScene(null)
+  const mappedScene = makeScene(solidTexture(255, 128, 128))
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let flatCenter = null
+  let mappedCenter = null
+
+  return {
+    name: 'mesh-normal-material-normal-map',
+    scene: mappedScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(flatScene, camera, options)
+      flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
+      const mapped = renderer.render(mappedScene, camera, options)
+      mappedCenter = meanRegion(mapped, options.width, 32, 32, 64, 64)
+      return mapped
+    },
+    validate() {
+      if (!(mappedCenter.r > flatCenter.r + 40 && flatCenter.b > mappedCenter.b + 40)) {
+        throw new Error(`normal-map corpus should tilt MeshNormalMaterial output, flat=${JSON.stringify(flatCenter)} mapped=${JSON.stringify(mappedCenter)}`)
       }
     },
   }
