@@ -74,6 +74,7 @@ export function createSceneCorpus() {
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
     pointsMaterialTextureCorpus(),
+    pointsMaterialUvChannelCorpus(),
     instancedLinesPointsCorpus(),
     instancedTextureUvCorpus(),
     renderableFrustumCullingCorpus(),
@@ -3421,6 +3422,63 @@ function pointsMaterialTextureCorpus() {
       )
       if (greenPixels < 400 || redPixels > 4) {
         throw new Error(`textured point corpus should render green alpha-tested point-sprite UVs, got green=${greenPixels} red=${redPixels}`)
+      }
+    },
+  }
+}
+
+function pointsMaterialUvChannelCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const map = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+  map.needsUpdate = true
+
+  const material = new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 32,
+    sizeAttenuation: false,
+  })
+
+  const spriteUvGeometry = new THREE.BufferGeometry()
+  spriteUvGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.58, 0, 0,
+  ]), 3))
+  scene.add(new THREE.Points(spriteUvGeometry, material))
+
+  const selectedUvGeometry = new THREE.BufferGeometry()
+  selectedUvGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0.58, 0, 0,
+  ]), 3))
+  selectedUvGeometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+  ]), 2))
+  selectedUvGeometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+  ]), 2))
+  scene.add(new THREE.Points(selectedUvGeometry, material.clone()))
+
+  return {
+    name: 'points-material-uv-channel-selection',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const spriteLeft = meanRegion(rgba, width, 16, 40, 26, 56)
+      const spriteRight = meanRegion(rgba, width, 32, 40, 42, 56)
+      const selected = meanRegion(rgba, width, 60, 40, 76, 56)
+      if (!(spriteLeft.r > spriteLeft.g + 60 && spriteRight.g > spriteRight.r + 60 && selected.g > selected.r + 60)) {
+        throw new Error(`points UV corpus should use point-sprite UVs without geometry UVs and selected uv1 when present, got spriteLeft=${JSON.stringify(spriteLeft)} spriteRight=${JSON.stringify(spriteRight)} selected=${JSON.stringify(selected)}`)
       }
     },
   }
