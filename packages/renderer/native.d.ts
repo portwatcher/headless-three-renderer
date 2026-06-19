@@ -399,6 +399,8 @@ export interface SceneMesh {
   sheenRoughnessMapAnisotropy?: number
   /** Sheen roughness map UV transform `[a, c, tx, b, d, ty]`. */
   sheenRoughnessMapTransform?: Array<number>
+  /** Sheen roughness map color space metadata. Alpha roughness sampling is unchanged. */
+  sheenRoughnessMapColorSpace?: string
   /** Whether sheen roughness map sampling uses the secondary UV stream. */
   sheenRoughnessMapUsesUv2?: boolean
   /** Anisotropy strength (0..1). Defaults to 0. */
@@ -579,6 +581,8 @@ export interface SceneMesh {
   specularIntensityMapAnisotropy?: number
   /** Specular intensity map UV transform `[a, c, tx, b, d, ty]`. */
   specularIntensityMapTransform?: Array<number>
+  /** Specular intensity map color space metadata. Alpha intensity sampling is unchanged. */
+  specularIntensityMapColorSpace?: string
   /** Whether specular intensity map sampling uses the secondary UV stream. */
   specularIntensityMapUsesUv2?: boolean
   /** MeshPhongMaterial specular color `[r, g, b]` in 0..1 range. */

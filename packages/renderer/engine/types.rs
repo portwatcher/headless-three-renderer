@@ -365,6 +365,8 @@ pub struct SceneMesh {
     pub sheen_roughness_map_anisotropy: Option<f64>,
     /// Sheen roughness map UV transform `[a, c, tx, b, d, ty]`.
     pub sheen_roughness_map_transform: Option<Vec<f64>>,
+    /// Sheen roughness map color space metadata. Alpha roughness sampling is unchanged.
+    pub sheen_roughness_map_color_space: Option<String>,
     /// Whether sheen roughness map sampling uses the secondary UV stream.
     pub sheen_roughness_map_uses_uv2: Option<bool>,
     /// Anisotropy strength (0..1). Defaults to 0.
@@ -545,6 +547,8 @@ pub struct SceneMesh {
     pub specular_intensity_map_anisotropy: Option<f64>,
     /// Specular intensity map UV transform `[a, c, tx, b, d, ty]`.
     pub specular_intensity_map_transform: Option<Vec<f64>>,
+    /// Specular intensity map color space metadata. Alpha intensity sampling is unchanged.
+    pub specular_intensity_map_color_space: Option<String>,
     /// Whether specular intensity map sampling uses the secondary UV stream.
     pub specular_intensity_map_uses_uv2: Option<bool>,
     /// MeshPhongMaterial specular color `[r, g, b]` in 0..1 range.

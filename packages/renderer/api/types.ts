@@ -785,6 +785,7 @@ export interface NativeSceneMesh {
   sheenRoughnessMapMinFilter?: string
   sheenRoughnessMapAnisotropy?: number
   sheenRoughnessMapTransform?: number[]
+  sheenRoughnessMapColorSpace?: string
   sheenRoughnessMapUsesUv2?: boolean
   anisotropy?: number
   anisotropyRotation?: number
@@ -875,6 +876,7 @@ export interface NativeSceneMesh {
   specularIntensityMapMinFilter?: string
   specularIntensityMapAnisotropy?: number
   specularIntensityMapTransform?: number[]
+  specularIntensityMapColorSpace?: string
   specularIntensityMapUsesUv2?: boolean
   emissive?: number[]
   emissiveIntensity?: number
@@ -1189,6 +1191,7 @@ export interface PbrProperties {
   sheenRoughnessMapMinFilter?: string
   sheenRoughnessMapAnisotropy?: number
   sheenRoughnessMapTransform?: number[]
+  sheenRoughnessMapColorSpace?: string
   sheenRoughnessMapUsesUv2?: boolean
   anisotropy?: number
   anisotropyRotation?: number
@@ -1285,6 +1288,7 @@ export interface PbrProperties {
   specularIntensityMapMinFilter?: string
   specularIntensityMapAnisotropy?: number
   specularIntensityMapTransform?: number[]
+  specularIntensityMapColorSpace?: string
   specularIntensityMapUsesUv2?: boolean
   emissive?: number[]
   emissiveIntensity?: number

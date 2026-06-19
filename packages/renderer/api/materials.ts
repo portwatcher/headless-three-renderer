@@ -685,6 +685,7 @@ export function extractPbrProperties(
     props.sheenRoughnessMapMinFilter = minFilterModeToString(material.sheenRoughnessMap)
     props.sheenRoughnessMapAnisotropy = textureAnisotropy(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
     props.sheenRoughnessMapTransform = textureTransform(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
+    props.sheenRoughnessMapColorSpace = textureColorSpace(material.sheenRoughnessMap)
     props.sheenRoughnessMapUsesUv2 = textureUvChannel(material.sheenRoughnessMap) > 0
   }
 
@@ -849,6 +850,7 @@ export function extractPbrProperties(
     props.specularIntensityMapMinFilter = minFilterModeToString(material.specularIntensityMap)
     props.specularIntensityMapAnisotropy = textureAnisotropy(material.specularIntensityMap, 'material.specularIntensityMap')
     props.specularIntensityMapTransform = textureTransform(material.specularIntensityMap, 'material.specularIntensityMap')
+    props.specularIntensityMapColorSpace = textureColorSpace(material.specularIntensityMap)
     props.specularIntensityMapUsesUv2 = textureUvChannel(material.specularIntensityMap) > 0
   }
 

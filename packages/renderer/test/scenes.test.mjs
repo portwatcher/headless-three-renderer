@@ -17053,6 +17053,27 @@ test('unsupported texture colorSpace and encoding values fail clearly', () => {
     )
   }
 
+  function assertPhysicalAlphaMapColorSpaceFailure(slot, extra, configure, pattern, label) {
+    const map = solidTexture(255, 255, 255)
+    configure(map)
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        ...extra,
+        [slot]: map,
+      }),
+    ))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+      pattern,
+      label,
+    )
+  }
+
   assertMaterialColorSpaceFailure(
     (map) => { map.colorSpace = 'display-p3' },
     /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
@@ -17063,6 +17084,27 @@ test('unsupported texture colorSpace and encoding values fail clearly', () => {
     /texture\.encoding 999.*not supported.*sRGBEncoding.*LinearEncoding.*texture\.colorSpace/i,
     'material encoding',
   )
+
+  const physicalAlphaSlots = [
+    ['sheenRoughnessMap', { sheen: 1 }],
+    ['specularIntensityMap', { specularIntensity: 1 }],
+  ]
+  for (const [slot, extra] of physicalAlphaSlots) {
+    assertPhysicalAlphaMapColorSpaceFailure(
+      slot,
+      extra,
+      (map) => { map.colorSpace = 'display-p3' },
+      /texture\.colorSpace display-p3.*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
+      `MeshPhysicalMaterial.${slot} colorSpace`,
+    )
+    assertPhysicalAlphaMapColorSpaceFailure(
+      slot,
+      extra,
+      (map) => { map.encoding = 999 },
+      /texture\.encoding 999.*not supported.*sRGBEncoding.*LinearEncoding.*texture\.colorSpace/i,
+      `MeshPhysicalMaterial.${slot} encoding`,
+    )
+  }
 
   const background = solidTexture(255, 255, 255)
   background.colorSpace = 'display-p3'
