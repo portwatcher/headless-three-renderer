@@ -228,6 +228,61 @@ mod tests {
     }
 
     #[test]
+    fn accepts_mesh_with_multiple_builtin_texture_maps() {
+        let scene = RenderScene {
+            meshes: Some(vec![SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                uvs: Some(vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                texture: Some(vec![255u8, 128, 64, 255].into()),
+                texture_width: Some(1),
+                texture_height: Some(1),
+                normal_map: Some(vec![128u8, 128, 255, 255].into()),
+                normal_map_width: Some(1),
+                normal_map_height: Some(1),
+                bump_map: Some(vec![64u8, 64, 64, 255].into()),
+                bump_map_width: Some(1),
+                bump_map_height: Some(1),
+                displacement_map: Some(vec![0u8, 0, 0, 255].into()),
+                displacement_map_width: Some(1),
+                displacement_map_height: Some(1),
+                displacement_scale: Some(0.0),
+                metallic_roughness_texture: Some(vec![0u8, 128, 255, 255].into()),
+                metallic_roughness_texture_width: Some(1),
+                metallic_roughness_texture_height: Some(1),
+                emissive_map: Some(vec![20u8, 40, 60, 255].into()),
+                emissive_map_width: Some(1),
+                emissive_map_height: Some(1),
+                ao_map: Some(vec![180u8, 0, 0, 255].into()),
+                ao_map_width: Some(1),
+                ao_map_height: Some(1),
+                light_map: Some(vec![20u8, 30, 40, 255].into()),
+                light_map_width: Some(1),
+                light_map_height: Some(1),
+                alpha_map: Some(vec![0u8, 0, 0, 200].into()),
+                alpha_map_width: Some(1),
+                alpha_map_height: Some(1),
+                specular_map: Some(vec![90u8, 0, 0, 255].into()),
+                specular_map_width: Some(1),
+                specular_map_height: Some(1),
+                ..SceneMesh::default()
+            }]),
+            ..RenderScene::default()
+        };
+
+        let meshes = prepare_meshes(&scene).unwrap();
+        let mesh = &meshes[0];
+        assert!(mesh.texture.is_some());
+        assert!(mesh.normal_map.is_some());
+        assert!(mesh.bump_map.is_some());
+        assert!(mesh.metallic_roughness_texture.is_some());
+        assert!(mesh.emissive_map.is_some());
+        assert!(mesh.ao_map.is_some());
+        assert!(mesh.light_map.is_some());
+        assert!(mesh.alpha_map.is_some());
+        assert!(mesh.specular_map.is_some());
+    }
+
+    #[test]
     fn accepts_mesh_with_physical_extension_maps() {
         let scene = RenderScene {
             meshes: Some(vec![SceneMesh {

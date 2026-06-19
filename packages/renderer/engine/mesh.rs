@@ -892,251 +892,26 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
     let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
 
-    let normal_map = match &mesh.normal_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.normal_map_width,
-                mesh.normal_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.normal_map_wrap_s.as_deref(),
-                mesh.normal_map_wrap_t.as_deref(),
-                mesh.normal_map_mag_filter.as_deref(),
-                mesh.normal_map_min_filter.as_deref(),
-                mesh.normal_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-
-    let normal_map_type = NormalMapType::from_str_opt(mesh.normal_map_type.as_deref(), mesh_index)?;
-    let normal_scale = match mesh.normal_scale.as_deref() {
-        Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
-        _ => [1.0, 1.0],
-    };
-    let bump_map = match &mesh.bump_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.bump_map_width,
-                mesh.bump_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.bump_map_wrap_s.as_deref(),
-                mesh.bump_map_wrap_t.as_deref(),
-                mesh.bump_map_mag_filter.as_deref(),
-                mesh.bump_map_min_filter.as_deref(),
-                mesh.bump_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-    let bump_scale = finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?;
-
-    let displacement_map = match &mesh.displacement_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.displacement_map_width,
-                mesh.displacement_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.displacement_map_wrap_s.as_deref(),
-                mesh.displacement_map_wrap_t.as_deref(),
-                mesh.displacement_map_mag_filter.as_deref(),
-                mesh.displacement_map_min_filter.as_deref(),
-                mesh.displacement_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-    let displacement_scale = finite_f32(
-        mesh.displacement_scale.unwrap_or(1.0),
-        "mesh displacementScale",
-    )?;
-    let displacement_bias = finite_f32(
-        mesh.displacement_bias.unwrap_or(0.0),
-        "mesh displacementBias",
-    )?;
-
-    let gradient_map = match &mesh.gradient_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.gradient_map_width,
-                mesh.gradient_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.gradient_map_wrap_s.as_deref(),
-                mesh.gradient_map_wrap_t.as_deref(),
-                mesh.gradient_map_mag_filter.as_deref(),
-                mesh.gradient_map_min_filter.as_deref(),
-                mesh.gradient_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-    let matcap_map = match &mesh.matcap_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.matcap_map_width,
-                mesh.matcap_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.matcap_map_wrap_s.as_deref(),
-                mesh.matcap_map_wrap_t.as_deref(),
-                mesh.matcap_map_mag_filter.as_deref(),
-                mesh.matcap_map_min_filter.as_deref(),
-                mesh.matcap_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-
-    let metallic_roughness_texture = match &mesh.metallic_roughness_texture {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.metallic_roughness_texture_width,
-                mesh.metallic_roughness_texture_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.metallic_roughness_texture_wrap_s.as_deref(),
-                mesh.metallic_roughness_texture_wrap_t.as_deref(),
-                mesh.metallic_roughness_texture_mag_filter.as_deref(),
-                mesh.metallic_roughness_texture_min_filter.as_deref(),
-                mesh.metallic_roughness_texture_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-
-    let specular_map = match &mesh.specular_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.specular_map_width,
-                mesh.specular_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.specular_map_wrap_s.as_deref(),
-                mesh.specular_map_wrap_t.as_deref(),
-                mesh.specular_map_mag_filter.as_deref(),
-                mesh.specular_map_min_filter.as_deref(),
-                mesh.specular_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-
-    let emissive_map = match &mesh.emissive_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.emissive_map_width,
-                mesh.emissive_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.emissive_map_wrap_s.as_deref(),
-                mesh.emissive_map_wrap_t.as_deref(),
-                mesh.emissive_map_mag_filter.as_deref(),
-                mesh.emissive_map_min_filter.as_deref(),
-                mesh.emissive_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-
-    let ao_map = match &mesh.ao_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex =
-                decode_texture(tex_data, mesh.ao_map_width, mesh.ao_map_height, mesh_index)?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.ao_map_wrap_s.as_deref(),
-                mesh.ao_map_wrap_t.as_deref(),
-                mesh.ao_map_mag_filter.as_deref(),
-                mesh.ao_map_min_filter.as_deref(),
-                mesh.ao_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-    let ao_map_intensity = clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32;
-
-    let light_map = match &mesh.light_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.light_map_width,
-                mesh.light_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.light_map_wrap_s.as_deref(),
-                mesh.light_map_wrap_t.as_deref(),
-                mesh.light_map_mag_filter.as_deref(),
-                mesh.light_map_min_filter.as_deref(),
-                mesh.light_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-    let light_map_intensity = finite_f32(
-        mesh.light_map_intensity.unwrap_or(1.0),
-        "mesh lightMapIntensity",
-    )?
-    .max(0.0);
-
-    let alpha_map = match &mesh.alpha_map {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.alpha_map_width,
-                mesh.alpha_map_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.alpha_map_wrap_s.as_deref(),
-                mesh.alpha_map_wrap_t.as_deref(),
-                mesh.alpha_map_mag_filter.as_deref(),
-                mesh.alpha_map_min_filter.as_deref(),
-                mesh.alpha_map_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
+    let CommonTextureInputs {
+        normal_map,
+        normal_map_type,
+        normal_scale,
+        bump_map,
+        bump_scale,
+        displacement_map,
+        displacement_scale,
+        displacement_bias,
+        gradient_map,
+        matcap_map,
+        metallic_roughness_texture,
+        specular_map,
+        emissive_map,
+        ao_map,
+        ao_map_intensity,
+        light_map,
+        light_map_intensity,
+        alpha_map,
+    } = prepare_common_texture_inputs(mesh, mesh_index)?;
 
     let PhysicalTextureInputs {
         clearcoat_map,
@@ -1891,6 +1666,283 @@ fn apply_texture_sampling(
     texture.min_filter = TextureFilter::from_min_filter_str(min_filter);
     texture.mipmap_filter = MipmapFilter::from_min_filter_str(min_filter);
     texture.anisotropy = texture_anisotropy(anisotropy);
+}
+
+#[derive(Default)]
+struct CommonTextureInputs {
+    normal_map: Option<PreparedTexture>,
+    normal_map_type: NormalMapType,
+    normal_scale: [f32; 2],
+    bump_map: Option<PreparedTexture>,
+    bump_scale: f32,
+    displacement_map: Option<PreparedTexture>,
+    displacement_scale: f32,
+    displacement_bias: f32,
+    gradient_map: Option<PreparedTexture>,
+    matcap_map: Option<PreparedTexture>,
+    metallic_roughness_texture: Option<PreparedTexture>,
+    specular_map: Option<PreparedTexture>,
+    emissive_map: Option<PreparedTexture>,
+    ao_map: Option<PreparedTexture>,
+    ao_map_intensity: f32,
+    light_map: Option<PreparedTexture>,
+    light_map_intensity: f32,
+    alpha_map: Option<PreparedTexture>,
+}
+
+fn prepare_common_texture_inputs(
+    mesh: &SceneMesh,
+    mesh_index: usize,
+) -> Result<CommonTextureInputs> {
+    if !has_common_texture_input(mesh) {
+        return Ok(CommonTextureInputs {
+            normal_map_type: NormalMapType::from_str_opt(
+                mesh.normal_map_type.as_deref(),
+                mesh_index,
+            )?,
+            normal_scale: match mesh.normal_scale.as_deref() {
+                Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
+                _ => [1.0, 1.0],
+            },
+            bump_scale: finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?,
+            displacement_scale: finite_f32(
+                mesh.displacement_scale.unwrap_or(1.0),
+                "mesh displacementScale",
+            )?,
+            displacement_bias: finite_f32(
+                mesh.displacement_bias.unwrap_or(0.0),
+                "mesh displacementBias",
+            )?,
+            ao_map_intensity: clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32,
+            light_map_intensity: finite_f32(
+                mesh.light_map_intensity.unwrap_or(1.0),
+                "mesh lightMapIntensity",
+            )?
+            .max(0.0),
+            ..CommonTextureInputs::default()
+        });
+    }
+
+    thread::scope(|scope| {
+        let normal_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.normal_map.as_deref(),
+                mesh.normal_map_width,
+                mesh.normal_map_height,
+                mesh_index,
+                mesh.normal_map_wrap_s.as_deref(),
+                mesh.normal_map_wrap_t.as_deref(),
+                mesh.normal_map_mag_filter.as_deref(),
+                mesh.normal_map_min_filter.as_deref(),
+                mesh.normal_map_anisotropy,
+            )
+        });
+        let bump_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.bump_map.as_deref(),
+                mesh.bump_map_width,
+                mesh.bump_map_height,
+                mesh_index,
+                mesh.bump_map_wrap_s.as_deref(),
+                mesh.bump_map_wrap_t.as_deref(),
+                mesh.bump_map_mag_filter.as_deref(),
+                mesh.bump_map_min_filter.as_deref(),
+                mesh.bump_map_anisotropy,
+            )
+        });
+        let displacement_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.displacement_map.as_deref(),
+                mesh.displacement_map_width,
+                mesh.displacement_map_height,
+                mesh_index,
+                mesh.displacement_map_wrap_s.as_deref(),
+                mesh.displacement_map_wrap_t.as_deref(),
+                mesh.displacement_map_mag_filter.as_deref(),
+                mesh.displacement_map_min_filter.as_deref(),
+                mesh.displacement_map_anisotropy,
+            )
+        });
+        let gradient_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.gradient_map.as_deref(),
+                mesh.gradient_map_width,
+                mesh.gradient_map_height,
+                mesh_index,
+                mesh.gradient_map_wrap_s.as_deref(),
+                mesh.gradient_map_wrap_t.as_deref(),
+                mesh.gradient_map_mag_filter.as_deref(),
+                mesh.gradient_map_min_filter.as_deref(),
+                mesh.gradient_map_anisotropy,
+            )
+        });
+        let matcap_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.matcap_map.as_deref(),
+                mesh.matcap_map_width,
+                mesh.matcap_map_height,
+                mesh_index,
+                mesh.matcap_map_wrap_s.as_deref(),
+                mesh.matcap_map_wrap_t.as_deref(),
+                mesh.matcap_map_mag_filter.as_deref(),
+                mesh.matcap_map_min_filter.as_deref(),
+                mesh.matcap_map_anisotropy,
+            )
+        });
+        let metallic_roughness_texture = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.metallic_roughness_texture.as_deref(),
+                mesh.metallic_roughness_texture_width,
+                mesh.metallic_roughness_texture_height,
+                mesh_index,
+                mesh.metallic_roughness_texture_wrap_s.as_deref(),
+                mesh.metallic_roughness_texture_wrap_t.as_deref(),
+                mesh.metallic_roughness_texture_mag_filter.as_deref(),
+                mesh.metallic_roughness_texture_min_filter.as_deref(),
+                mesh.metallic_roughness_texture_anisotropy,
+            )
+        });
+        let specular_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.specular_map.as_deref(),
+                mesh.specular_map_width,
+                mesh.specular_map_height,
+                mesh_index,
+                mesh.specular_map_wrap_s.as_deref(),
+                mesh.specular_map_wrap_t.as_deref(),
+                mesh.specular_map_mag_filter.as_deref(),
+                mesh.specular_map_min_filter.as_deref(),
+                mesh.specular_map_anisotropy,
+            )
+        });
+        let emissive_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.emissive_map.as_deref(),
+                mesh.emissive_map_width,
+                mesh.emissive_map_height,
+                mesh_index,
+                mesh.emissive_map_wrap_s.as_deref(),
+                mesh.emissive_map_wrap_t.as_deref(),
+                mesh.emissive_map_mag_filter.as_deref(),
+                mesh.emissive_map_min_filter.as_deref(),
+                mesh.emissive_map_anisotropy,
+            )
+        });
+        let ao_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.ao_map.as_deref(),
+                mesh.ao_map_width,
+                mesh.ao_map_height,
+                mesh_index,
+                mesh.ao_map_wrap_s.as_deref(),
+                mesh.ao_map_wrap_t.as_deref(),
+                mesh.ao_map_mag_filter.as_deref(),
+                mesh.ao_map_min_filter.as_deref(),
+                mesh.ao_map_anisotropy,
+            )
+        });
+        let light_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.light_map.as_deref(),
+                mesh.light_map_width,
+                mesh.light_map_height,
+                mesh_index,
+                mesh.light_map_wrap_s.as_deref(),
+                mesh.light_map_wrap_t.as_deref(),
+                mesh.light_map_mag_filter.as_deref(),
+                mesh.light_map_min_filter.as_deref(),
+                mesh.light_map_anisotropy,
+            )
+        });
+        let alpha_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.alpha_map.as_deref(),
+                mesh.alpha_map_width,
+                mesh.alpha_map_height,
+                mesh_index,
+                mesh.alpha_map_wrap_s.as_deref(),
+                mesh.alpha_map_wrap_t.as_deref(),
+                mesh.alpha_map_mag_filter.as_deref(),
+                mesh.alpha_map_min_filter.as_deref(),
+                mesh.alpha_map_anisotropy,
+            )
+        });
+
+        let normal_map = join_texture_worker(normal_map, "normal map worker")?;
+        let normal_map_type =
+            NormalMapType::from_str_opt(mesh.normal_map_type.as_deref(), mesh_index)?;
+        let normal_scale = match mesh.normal_scale.as_deref() {
+            Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
+            _ => [1.0, 1.0],
+        };
+        let bump_map = join_texture_worker(bump_map, "bump map worker")?;
+        let bump_scale = finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?;
+        let displacement_map = join_texture_worker(displacement_map, "displacement map worker")?;
+        let displacement_scale = finite_f32(
+            mesh.displacement_scale.unwrap_or(1.0),
+            "mesh displacementScale",
+        )?;
+        let displacement_bias = finite_f32(
+            mesh.displacement_bias.unwrap_or(0.0),
+            "mesh displacementBias",
+        )?;
+        let gradient_map = join_texture_worker(gradient_map, "gradient map worker")?;
+        let matcap_map = join_texture_worker(matcap_map, "matcap map worker")?;
+        let metallic_roughness_texture = join_texture_worker(
+            metallic_roughness_texture,
+            "metallic roughness texture worker",
+        )?;
+        let specular_map = join_texture_worker(specular_map, "specular map worker")?;
+        let emissive_map = join_texture_worker(emissive_map, "emissive map worker")?;
+        let ao_map = join_texture_worker(ao_map, "ao map worker")?;
+        let ao_map_intensity = clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32;
+        let light_map = join_texture_worker(light_map, "light map worker")?;
+        let light_map_intensity = finite_f32(
+            mesh.light_map_intensity.unwrap_or(1.0),
+            "mesh lightMapIntensity",
+        )?
+        .max(0.0);
+        let alpha_map = join_texture_worker(alpha_map, "alpha map worker")?;
+
+        Ok(CommonTextureInputs {
+            normal_map,
+            normal_map_type,
+            normal_scale,
+            bump_map,
+            bump_scale,
+            displacement_map,
+            displacement_scale,
+            displacement_bias,
+            gradient_map,
+            matcap_map,
+            metallic_roughness_texture,
+            specular_map,
+            emissive_map,
+            ao_map,
+            ao_map_intensity,
+            light_map,
+            light_map_intensity,
+            alpha_map,
+        })
+    })
+}
+
+fn has_common_texture_input(mesh: &SceneMesh) -> bool {
+    [
+        mesh.normal_map.as_deref(),
+        mesh.bump_map.as_deref(),
+        mesh.displacement_map.as_deref(),
+        mesh.gradient_map.as_deref(),
+        mesh.matcap_map.as_deref(),
+        mesh.metallic_roughness_texture.as_deref(),
+        mesh.specular_map.as_deref(),
+        mesh.emissive_map.as_deref(),
+        mesh.ao_map.as_deref(),
+        mesh.light_map.as_deref(),
+        mesh.alpha_map.as_deref(),
+    ]
+    .into_iter()
+    .any(|data| data.is_some_and(|data| !data.is_empty()))
 }
 
 #[derive(Default)]
