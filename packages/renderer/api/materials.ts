@@ -378,6 +378,7 @@ function extractEnvironmentMapFromTexture(
   options: { allowRefraction?: boolean } = {},
 ): EnvironmentMapInfo | null {
   assertSupportedEnvironmentTexture(envTex, label, options)
+  const premultiplyAlpha = optionalTextureBoolean(envTex.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
   if (isCubeEnvironmentTexture(envTex, label)) {
     const cube = cubeTextureToEquirectangular(envTex, label)
     return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex) }
@@ -399,7 +400,7 @@ function extractEnvironmentMapFromTexture(
           `${label} HalfFloatType environment maps must provide Uint16Array one-channel, two-channel, RGB, or RGBA pixel data.`,
         )
       }
-      const buf = rawHalfFloatTextureDataToRgba(rawData, image.width, image.height, label, 'environment map rendering')
+      const buf = rawHalfFloatTextureDataToRgba(rawData, image.width, image.height, label, 'environment map rendering', { premultiplyAlpha })
       return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
@@ -409,15 +410,16 @@ function extractEnvironmentMapFromTexture(
           `${label} FloatType environment maps must provide Float32Array one-channel, two-channel, RGB, or RGBA pixel data.`,
         )
       }
-      const buf = rawFloatTextureDataToRgba(rawData, image.width, image.height, label, 'environment map rendering')
+      const buf = rawFloatTextureDataToRgba(rawData, image.width, image.height, label, 'environment map rendering', { premultiplyAlpha })
       return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
     // UnsignedByteType / default: convert to RGBA8
     const rgba = toRgba8(rawData as any, image.width, image.height, { type: texType })
     if (rgba) {
+      const data = premultiplyAlpha ? premultiplyRgbaAlpha(rgba) : rgba
       return {
-        data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength),
+        data: Buffer.from(data.buffer, data.byteOffset, data.byteLength),
         width: image.width,
         height: image.height,
         intensity,
@@ -429,9 +431,11 @@ function extractEnvironmentMapFromTexture(
 
   // Encoded image buffer (e.g. loaded HDR encoded as PNG/EXR)
   if (Buffer.isBuffer(image)) {
+    assertNoEncodedPremultiplyAlpha(envTex, label)
     return { data: image, width: 0, height: 0, intensity, colorSpace: textureColorSpace(envTex) }
   }
   if (image instanceof Uint8Array && !((image as any).width > 0)) {
+    assertNoEncodedPremultiplyAlpha(envTex, label)
     return {
       data: Buffer.from(image.buffer, image.byteOffset, image.byteLength),
       width: 0,
@@ -1894,7 +1898,8 @@ function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { d
     )
   }
 
-  const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`, map.type))
+  const premultiplyAlpha = optionalTextureBoolean(map.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
+  const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`, map.type, { premultiplyAlpha }))
   const faceWidth = faceTextures[0].width
   const faceHeight = faceTextures[0].height
   if (faceWidth !== faceHeight) {
@@ -1941,7 +1946,12 @@ function cubeFaceImages(map: ThreeTextureLike, label = 'texture'): TextureImageI
   return null
 }
 
-function imageToRgbaTexture(image: TextureImageInput, label: string, textureType?: number): { rgba: Uint8Array; width: number; height: number } {
+function imageToRgbaTexture(
+  image: TextureImageInput,
+  label: string,
+  textureType?: number,
+  options: { premultiplyAlpha?: boolean } = {},
+): { rgba: Uint8Array; width: number; height: number } {
   if (Buffer.isBuffer(image) || image instanceof Uint8Array) {
     const buffer = Buffer.isBuffer(image)
       ? image
@@ -1956,7 +1966,11 @@ function imageToRgbaTexture(image: TextureImageInput, label: string, textureType
     if (rgba.byteLength !== decoded.width! * decoded.height! * 4) {
       throw new Error(`${label} encoded cube face image decoded to an unexpected RGBA byte length.`)
     }
-    return { rgba, width: decoded.width!, height: decoded.height! }
+    return {
+      rgba: options.premultiplyAlpha === true ? premultiplyRgbaAlpha(rgba) : rgba,
+      width: decoded.width!,
+      height: decoded.height!,
+    }
   }
   if (!image || !image.data || !(image.width! > 0) || !(image.height! > 0)) {
     throw new Error(`${label} must provide raw face data, width, and height for cube background rendering.`)
@@ -1965,7 +1979,11 @@ function imageToRgbaTexture(image: TextureImageInput, label: string, textureType
   if (!rgba) {
     throw new Error(`${label} must contain RGB or RGBA numeric pixel data for cube background rendering.`)
   }
-  return { rgba, width: image.width!, height: image.height! }
+  return {
+    rgba: options.premultiplyAlpha === true ? premultiplyRgbaAlpha(rgba) : rgba,
+    width: image.width!,
+    height: image.height!,
+  }
 }
 
 function premultiplyRgbaAlpha(data: Uint8Array | Uint8ClampedArray): Uint8Array {
@@ -1976,6 +1994,30 @@ function premultiplyRgbaAlpha(data: Uint8Array | Uint8ClampedArray): Uint8Array 
     out[i + 1] = Math.round((data[i + 1] * alpha) / 255)
     out[i + 2] = Math.round((data[i + 2] * alpha) / 255)
     out[i + 3] = alpha
+  }
+  return out
+}
+
+function premultiplyFloatRgba(data: Float32Array): Float32Array {
+  const out = new Float32Array(data.length)
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3]
+    out[i] = data[i] * alpha
+    out[i + 1] = data[i + 1] * alpha
+    out[i + 2] = data[i + 2] * alpha
+    out[i + 3] = alpha
+  }
+  return out
+}
+
+function premultiplyHalfFloatRgba(data: Uint16Array): Uint16Array {
+  const out = new Uint16Array(data.length)
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = halfFloatToNumber(data[i + 3])
+    out[i] = numberToHalfFloat(halfFloatToNumber(data[i]) * alpha)
+    out[i + 1] = numberToHalfFloat(halfFloatToNumber(data[i + 1]) * alpha)
+    out[i + 2] = numberToHalfFloat(halfFloatToNumber(data[i + 2]) * alpha)
+    out[i + 3] = data[i + 3]
   }
   return out
 }
@@ -2316,10 +2358,12 @@ function rawHalfFloatTextureDataToRgba(
   height: number,
   label: string,
   usage: string,
+  options: { premultiplyAlpha?: boolean } = {},
 ): Buffer {
   const channels = rawTextureChannelCount(rawData, width, height, label, usage)
   if (channels === 4) {
-    return Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+    const data = options.premultiplyAlpha === true ? premultiplyHalfFloatRgba(rawData) : rawData
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength)
   }
   const pixels = width * height
   const out = new Uint16Array(pixels * 4)
@@ -2345,10 +2389,12 @@ function rawFloatTextureDataToRgba(
   height: number,
   label: string,
   usage: string,
+  options: { premultiplyAlpha?: boolean } = {},
 ): Buffer {
   const channels = rawTextureChannelCount(rawData, width, height, label, usage)
   if (channels === 4) {
-    return Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+    const data = options.premultiplyAlpha === true ? premultiplyFloatRgba(rawData) : rawData
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength)
   }
   const pixels = width * height
   const out = new Float32Array(pixels * 4)
@@ -3071,17 +3117,42 @@ function halfFloatDataToRgba8(
 }
 
 function halfFloatToByte(bits: number): number {
+  const value = halfFloatToNumber(bits)
+  if (!Number.isFinite(value)) return value > 0 ? 255 : 0
+  return Math.max(0, Math.min(255, Math.round(value * 255)))
+}
+
+function halfFloatToNumber(bits: number): number {
   const sign = bits & 0x8000 ? -1 : 1
   const exponent = (bits >> 10) & 0x1f
   const mantissa = bits & 0x03ff
-  let value: number
   if (exponent === 0) {
-    value = sign * (mantissa / 0x400) * (2 ** -14)
-  } else if (exponent === 0x1f) {
-    value = mantissa === 0 ? sign * Infinity : Number.NaN
-  } else {
-    value = sign * (1 + mantissa / 0x400) * (2 ** (exponent - 15))
+    return sign * (mantissa / 0x400) * (2 ** -14)
   }
-  if (!Number.isFinite(value)) return value > 0 ? 255 : 0
-  return Math.max(0, Math.min(255, Math.round(value * 255)))
+  if (exponent === 0x1f) {
+    return mantissa === 0 ? sign * Infinity : Number.NaN
+  }
+  return sign * (1 + mantissa / 0x400) * (2 ** (exponent - 15))
+}
+
+function numberToHalfFloat(value: number): number {
+  if (Number.isNaN(value)) return 0x7e00
+  const sign = value < 0 || Object.is(value, -0) ? 0x8000 : 0
+  const abs = Math.abs(value)
+  if (abs === 0) return sign
+  if (!Number.isFinite(abs)) return sign | 0x7c00
+  if (abs >= 65504) return sign | 0x7bff
+  if (abs < 2 ** -14) {
+    return sign | Math.round(abs / (2 ** -24))
+  }
+
+  const exponent = Math.floor(Math.log2(abs))
+  let mantissa = Math.round((abs / (2 ** exponent) - 1) * 0x400)
+  let biasedExponent = exponent + 15
+  if (mantissa === 0x400) {
+    mantissa = 0
+    biasedExponent += 1
+  }
+  if (biasedExponent >= 31) return sign | 0x7bff
+  return sign | (biasedExponent << 10) | mantissa
 }

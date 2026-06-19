@@ -3,10 +3,12 @@ import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
+import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
 const { Renderer, render, renderToTarget } = pkg
 const { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } = lightsApi
+const { extractEnvironmentMap } = materialsApi
 
 const SIZE = 128
 const BG = [26, 26, 26] // 0.1 * 255
@@ -15280,6 +15282,91 @@ test('float raw environment textures decode for IBL', () => {
   }
 })
 
+test('float raw environment textures honor premultiplyAlpha before IBL upload', () => {
+  const scene = new THREE.Scene()
+
+  const floatEnvironment = new THREE.DataTexture(
+    new Float32Array([0.5, 0.25, 1, 0.5]),
+    1,
+    1,
+    THREE.RGBAFormat,
+    THREE.FloatType,
+  )
+  floatEnvironment.mapping = THREE.EquirectangularReflectionMapping
+  floatEnvironment.premultiplyAlpha = true
+  floatEnvironment.needsUpdate = true
+  scene.environment = floatEnvironment
+
+  const extractedFloat = extractEnvironmentMap(scene)
+  assert.ok(extractedFloat)
+  const floatData = new Float32Array(extractedFloat.data.buffer, extractedFloat.data.byteOffset, extractedFloat.data.byteLength / 4)
+  assert.ok(Math.abs(floatData[0] - 0.25) < 0.001, `FloatType premultiplied red should be 0.25 (${floatData[0]})`)
+  assert.ok(Math.abs(floatData[1] - 0.125) < 0.001, `FloatType premultiplied green should be 0.125 (${floatData[1]})`)
+  assert.ok(Math.abs(floatData[2] - 0.5) < 0.001, `FloatType premultiplied blue should be 0.5 (${floatData[2]})`)
+  assert.ok(Math.abs(floatData[3] - 0.5) < 0.001, `FloatType alpha should remain 0.5 (${floatData[3]})`)
+
+  const halfEnvironment = new THREE.DataTexture(
+    new Uint16Array([0x3800, 0x3400, 0x3c00, 0x3800]),
+    1,
+    1,
+    THREE.RGBAFormat,
+    THREE.HalfFloatType,
+  )
+  halfEnvironment.mapping = THREE.EquirectangularReflectionMapping
+  halfEnvironment.premultiplyAlpha = true
+  halfEnvironment.needsUpdate = true
+  scene.environment = halfEnvironment
+
+  const extractedHalf = extractEnvironmentMap(scene)
+  assert.ok(extractedHalf)
+  const halfData = new Uint16Array(extractedHalf.data.buffer, extractedHalf.data.byteOffset, extractedHalf.data.byteLength / 2)
+  assert.ok(Math.abs(halfFloatToNumber(halfData[0]) - 0.25) < 0.001, `HalfFloatType premultiplied red should be 0.25 (${halfFloatToNumber(halfData[0])})`)
+  assert.ok(Math.abs(halfFloatToNumber(halfData[1]) - 0.125) < 0.001, `HalfFloatType premultiplied green should be 0.125 (${halfFloatToNumber(halfData[1])})`)
+  assert.ok(Math.abs(halfFloatToNumber(halfData[2]) - 0.5) < 0.001, `HalfFloatType premultiplied blue should be 0.5 (${halfFloatToNumber(halfData[2])})`)
+  assert.ok(Math.abs(halfFloatToNumber(halfData[3]) - 0.5) < 0.001, `HalfFloatType alpha should remain 0.5 (${halfFloatToNumber(halfData[3])})`)
+})
+
+test('raw environment textures honor premultiplyAlpha for IBL', () => {
+  function environmentTexture(premultiplyAlpha) {
+    const texture = solidTexture(220, 120, 60, 128)
+    texture.colorSpace = THREE.LinearSRGBColorSpace
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    texture.premultiplyAlpha = premultiplyAlpha
+    return texture
+  }
+
+  function renderEnvironment(kind, premultiplyAlpha) {
+    const texture = environmentTexture(premultiplyAlpha)
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 })
+    if (kind === 'scene') {
+      scene.environment = texture
+      scene.environmentIntensity = 2.5
+    } else if (kind === 'reflectionProbe') {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture, intensity: 2.5 },
+      }
+    } else {
+      material.envMap = texture
+      material.envMapIntensity = 2.5
+    }
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), material))
+    return meanRegion(renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  for (const kind of ['scene', 'reflectionProbe', 'materialEnvMap']) {
+    const straight = renderEnvironment(kind, false)
+    const premultiplied = renderEnvironment(kind, true)
+    assert.ok(straight.r > premultiplied.r + 7, `${kind} premultiplyAlpha should reduce red IBL (${straight.r} vs ${premultiplied.r})`)
+    assert.ok(straight.g > premultiplied.g + 9, `${kind} premultiplyAlpha should reduce green IBL (${straight.g} vs ${premultiplied.g})`)
+  }
+})
+
 test('packed raw environment textures unpack for IBL', () => {
   const cases = [
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x84ff]), [136, 68, 255]],
@@ -15549,6 +15636,13 @@ test('unsupported texture inputs fail clearly for background and environment slo
   const mipmappedTexture = solidTexture(255, 255, 255)
   mipmappedTexture.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
 
+  function encodedPremultiplyEnvironmentTexture() {
+    const texture = encodedPngTexture()
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    texture.premultiplyAlpha = true
+    return texture
+  }
+
   function addMaterialEnvMap(scene, envMap) {
     envMap.mapping = THREE.EquirectangularReflectionMapping
     scene.add(new THREE.Mesh(
@@ -15595,6 +15689,15 @@ test('unsupported texture inputs fail clearly for background and environment slo
     ['mipmapped reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: mipmappedTexture } }
     }, /explicit texture mipmaps.*not uploaded/i],
+    ['encoded environment premultiplyAlpha', (scene) => {
+      scene.environment = encodedPremultiplyEnvironmentTexture()
+    }, /scene\.environment\.premultiplyAlpha is only supported for readable raw texture image data/i],
+    ['encoded material envMap premultiplyAlpha', (scene) => {
+      addMaterialEnvMap(scene, encodedPremultiplyEnvironmentTexture())
+    }, /material\.envMap\.premultiplyAlpha is only supported for readable raw texture image data/i],
+    ['encoded reflection probe premultiplyAlpha', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: encodedPremultiplyEnvironmentTexture() } }
+    }, /reflectionProbe\.texture\.premultiplyAlpha is only supported for readable raw texture image data/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
