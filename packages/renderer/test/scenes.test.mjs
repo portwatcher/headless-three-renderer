@@ -20160,6 +20160,16 @@ test('renderToTarget and options.target use target viewport and scissor fields',
   assert.equal(rendererReturned, rendererTarget.target.data, 'Renderer.setRenderTarget should return target.data')
   assertTargetClip('Renderer.setRenderTarget', rendererTarget.target, rendererTarget.depthTexture)
   renderer.setRenderTarget(null)
+
+  const disabledScissor = makeTarget()
+  disabledScissor.target.scissorTest = false
+  renderToTarget(scene, camera, disabledScissor.target, { width: 64, height: 64 })
+  const previouslyScissored = meanRegion(disabledScissor.target.data, 64, 64, 18, 26, 22, 38)
+  const viewportOutside = meanRegion(disabledScissor.target.data, 64, 64, 4, 26, 12, 38)
+  const depthPreviouslyScissored = meanRegion(disabledScissor.depthTexture.image.data, 64, 64, 18, 26, 22, 38)
+  assert.ok(previouslyScissored.r > previouslyScissored.b + 80, `disabled target scissor should render inside the viewport (${previouslyScissored.r} vs ${previouslyScissored.b})`)
+  assert.ok(viewportOutside.b > viewportOutside.r + 80, `disabled target scissor should still preserve the viewport boundary (${viewportOutside.b} vs ${viewportOutside.r})`)
+  assert.ok(depthPreviouslyScissored.r > 0, `disabled target scissor should write depth inside the viewport (${depthPreviouslyScissored.r})`)
 })
 
 test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
