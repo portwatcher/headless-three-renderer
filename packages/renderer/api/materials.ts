@@ -1810,12 +1810,6 @@ function isCubeEnvironmentTexture(map: ThreeTextureLike, label = 'texture'): boo
 }
 
 function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
-  if (map.mapping === CubeUVReflectionMapping) {
-    throw new Error(
-      `${label} uses PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a six-face CubeTexture, a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
-    )
-  }
-
   const cube = cubeTextureToEquirectangular(map, label)
   return {
     ...cube,
@@ -1832,6 +1826,11 @@ function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): Tex
 function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { data: Buffer; width: number; height: number } {
   const faces = cubeFaceImages(map, label)
   if (!faces) {
+    if (map.mapping === CubeUVReflectionMapping) {
+      throw new Error(
+        `${label} uses PMREM/CubeUV background mapping without readable six-face cube images, which is not supported by @headless-three/renderer yet. Provide a CubeUV-mapped CubeTexture with six readable faces, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
+      )
+    }
     throw new Error(
       `${label} uses a cube texture without six raw or encoded face images. Provide a CubeTexture with six DataTexture-style or encoded PNG/JPEG/WebP face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
     )
@@ -2297,7 +2296,7 @@ function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string):
     map.mapping === CubeUVReflectionMapping
   ) {
     throw new Error(
-      `${label} uses a cube or PMREM/CubeUV texture mapping, which is not supported as a background yet. Use a 2D/equirectangular texture or pre-render the background to a 2D image before rendering.`,
+      `${label} uses a cube or PMREM/CubeUV texture mapping in a 2D background texture path. Use a readable six-face CubeTexture, a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
     )
   }
 }
