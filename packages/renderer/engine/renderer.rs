@@ -163,6 +163,7 @@ pub struct GpuRenderer {
     sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
     texture_cache: Mutex<HashMap<TextureCacheKey, wgpu::Texture>>,
     physical_layers_texture_cache: Mutex<HashMap<PhysicalLayersTextureCacheKey, wgpu::Texture>>,
+    texture_bind_group_cache: Mutex<HashMap<TextureBindGroupKey, wgpu::BindGroup>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -269,6 +270,21 @@ struct PhysicalLayersTextureCacheKey {
     scalar: TextureCacheKey,
     anisotropy: Option<TextureCacheKey>,
     iridescence: Option<TextureCacheKey>,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+enum TextureBindGroupKind {
+    BaseColor,
+    NormalOrBump,
+    MetallicRoughness,
+    Emissive,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct TextureBindGroupKey {
+    kind: TextureBindGroupKind,
+    texture: TextureCacheKey,
+    sampler: SamplerKey,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -384,6 +400,23 @@ fn matching_layer_key(
     layer
         .filter(|texture| texture.width == scalar.width && texture.height == scalar.height)
         .map(TextureCacheKey::from_texture)
+}
+
+impl TextureBindGroupKey {
+    fn new(kind: TextureBindGroupKind, texture: &PreparedTexture) -> Self {
+        Self {
+            kind,
+            texture: TextureCacheKey::from_texture(texture),
+            sampler: SamplerKey::new(
+                texture.wrap_s,
+                texture.wrap_t,
+                texture.mag_filter,
+                texture.min_filter,
+                texture.mipmap_filter,
+                texture.anisotropy,
+            ),
+        }
+    }
 }
 
 fn hash_bytes(bytes: &[u8]) -> u64 {
@@ -1754,6 +1787,7 @@ impl GpuRenderer {
             sampler_cache: Mutex::new(HashMap::new()),
             texture_cache: Mutex::new(HashMap::new()),
             physical_layers_texture_cache: Mutex::new(HashMap::new()),
+            texture_bind_group_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -2550,6 +2584,60 @@ impl GpuRenderer {
         gpu_texture
     }
 
+    fn texture_bind_group_for(
+        &self,
+        kind: TextureBindGroupKind,
+        layout: &wgpu::BindGroupLayout,
+        texture_label: &'static str,
+        bind_group_label: &'static str,
+        tex: &PreparedTexture,
+    ) -> (wgpu::BindGroup, wgpu::Texture) {
+        let gpu_texture = self.upload_texture(texture_label, tex);
+        let key = TextureBindGroupKey::new(kind, tex);
+        if let Some(bind_group) = self
+            .texture_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return (bind_group, gpu_texture);
+        }
+
+        let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler_for_tex = self.sampler_for_texture(
+            tex.wrap_s,
+            tex.wrap_t,
+            tex.mag_filter,
+            tex.min_filter,
+            tex.mipmap_filter,
+            tex.anisotropy,
+        );
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(bind_group_label),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&tex_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
+                },
+            ],
+        });
+
+        let bind_group = self
+            .texture_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| bind_group.clone())
+            .clone();
+        (bind_group, gpu_texture)
+    }
+
     fn upload_physical_layers_texture(
         &self,
         label: &'static str,
@@ -3252,31 +3340,14 @@ impl GpuRenderer {
 
         let (texture_bind_group, _mesh_texture) = match &mesh.texture {
             Some(tex) => {
-                let gpu_texture = self.upload_texture("headless-three-renderer mesh texture", tex);
-                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let sampler_for_tex = self.sampler_for_texture(
-                    tex.wrap_s,
-                    tex.wrap_t,
-                    tex.mag_filter,
-                    tex.min_filter,
-                    tex.mipmap_filter,
-                    tex.anisotropy,
+                let (bind_group, texture) = self.texture_bind_group_for(
+                    TextureBindGroupKind::BaseColor,
+                    &self.texture_layout,
+                    "headless-three-renderer mesh texture",
+                    "headless-three-renderer mesh texture bind group",
+                    tex,
                 );
-                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("headless-three-renderer mesh texture bind group"),
-                    layout: &self.texture_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&tex_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
-                        },
-                    ],
-                });
-                (tex_bind_group, Some(gpu_texture))
+                (bind_group, Some(texture))
             }
             None => (self.default_texture_bind_group.clone(), None),
         };
@@ -3284,96 +3355,42 @@ impl GpuRenderer {
         let (normal_map_bind_group, _normal_map_texture) =
             match mesh.normal_map.as_ref().or(mesh.bump_map.as_ref()) {
                 Some(tex) => {
-                    let gpu_texture =
-                        self.upload_texture("headless-three-renderer normal or bump map", tex);
-                    let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                    let sampler_for_tex = self.sampler_for_texture(
-                        tex.wrap_s,
-                        tex.wrap_t,
-                        tex.mag_filter,
-                        tex.min_filter,
-                        tex.mipmap_filter,
-                        tex.anisotropy,
+                    let (bind_group, texture) = self.texture_bind_group_for(
+                        TextureBindGroupKind::NormalOrBump,
+                        &self.normal_map_layout,
+                        "headless-three-renderer normal or bump map",
+                        "headless-three-renderer normal or bump map bind group",
+                        tex,
                     );
-                    let tex_bind_group =
-                        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                            label: Some("headless-three-renderer normal or bump map bind group"),
-                            layout: &self.normal_map_layout,
-                            entries: &[
-                                wgpu::BindGroupEntry {
-                                    binding: 0,
-                                    resource: wgpu::BindingResource::TextureView(&tex_view),
-                                },
-                                wgpu::BindGroupEntry {
-                                    binding: 1,
-                                    resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
-                                },
-                            ],
-                        });
-                    (tex_bind_group, Some(gpu_texture))
+                    (bind_group, Some(texture))
                 }
                 None => (self.default_normal_map_bind_group.clone(), None),
             };
 
         let (mr_map_bind_group, _mr_map_texture) = match &mesh.metallic_roughness_texture {
             Some(tex) => {
-                let gpu_texture =
-                    self.upload_texture("headless-three-renderer metallic-roughness map", tex);
-                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let sampler_for_tex = self.sampler_for_texture(
-                    tex.wrap_s,
-                    tex.wrap_t,
-                    tex.mag_filter,
-                    tex.min_filter,
-                    tex.mipmap_filter,
-                    tex.anisotropy,
+                let (bind_group, texture) = self.texture_bind_group_for(
+                    TextureBindGroupKind::MetallicRoughness,
+                    &self.mr_map_layout,
+                    "headless-three-renderer metallic-roughness map",
+                    "headless-three-renderer metallic-roughness bind group",
+                    tex,
                 );
-                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("headless-three-renderer metallic-roughness bind group"),
-                    layout: &self.mr_map_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&tex_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
-                        },
-                    ],
-                });
-                (tex_bind_group, Some(gpu_texture))
+                (bind_group, Some(texture))
             }
             None => (self.default_mr_map_bind_group.clone(), None),
         };
 
         let (emissive_map_bind_group, _emissive_map_texture) = match &mesh.emissive_map {
             Some(tex) => {
-                let gpu_texture = self.upload_texture("headless-three-renderer emissive map", tex);
-                let tex_view = gpu_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let sampler_for_tex = self.sampler_for_texture(
-                    tex.wrap_s,
-                    tex.wrap_t,
-                    tex.mag_filter,
-                    tex.min_filter,
-                    tex.mipmap_filter,
-                    tex.anisotropy,
+                let (bind_group, texture) = self.texture_bind_group_for(
+                    TextureBindGroupKind::Emissive,
+                    &self.emissive_map_layout,
+                    "headless-three-renderer emissive map",
+                    "headless-three-renderer emissive map bind group",
+                    tex,
                 );
-                let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("headless-three-renderer emissive map bind group"),
-                    layout: &self.emissive_map_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&tex_view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&sampler_for_tex),
-                        },
-                    ],
-                });
-                (tex_bind_group, Some(gpu_texture))
+                (bind_group, Some(texture))
             }
             None => (self.default_emissive_map_bind_group.clone(), None),
         };
@@ -4810,7 +4827,8 @@ fn create_cubemap_with_mips(
 mod tests {
     use super::{
         CustomBlendPipelineKey, MeshBufferCacheKey, PhysicalLayersTextureCacheKey, SamplerKey,
-        TextureCacheKey, downsample_rgba_mip, f32_key, texture_mip_level_count,
+        TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey, downsample_rgba_mip, f32_key,
+        texture_mip_level_count,
     };
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
@@ -5052,6 +5070,35 @@ mod tests {
                 Some(&anisotropy),
                 Some(&iridescence),
             ),
+        );
+    }
+
+    #[test]
+    fn texture_bind_group_keys_track_slot_texture_and_sampler() {
+        let base = single_pixel_texture([255, 0, 0, 255]);
+        let same = single_pixel_texture([255, 0, 0, 255]);
+        assert_eq!(
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &base),
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &same),
+        );
+        assert_ne!(
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &base),
+            TextureBindGroupKey::new(TextureBindGroupKind::NormalOrBump, &same),
+            "different bind group layouts cannot share entries",
+        );
+
+        let different_texture = single_pixel_texture([0, 255, 0, 255]);
+        assert_ne!(
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &base),
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &different_texture),
+        );
+
+        let mut repeat_sampler = single_pixel_texture([255, 0, 0, 255]);
+        repeat_sampler.wrap_s = WrapMode::Repeat;
+        assert_ne!(
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &base),
+            TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &repeat_sampler),
+            "sampler state is part of the bind group resource set",
         );
     }
 
