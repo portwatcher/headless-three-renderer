@@ -43,6 +43,7 @@ export function createSceneCorpus() {
     meshMatcapMaterialNormalMapCorpus(),
     meshMatcapMaterialObjectSpaceNormalMapCorpus(),
     meshMatcapMaterialBumpMapCorpus(),
+    meshToonMaterialFallbackBandsCorpus(),
     meshToonMaterialCorpus(),
     meshToonMaterialNormalMapCorpus(),
     meshToonMaterialBumpMapCorpus(),
@@ -2284,6 +2285,48 @@ function meshToonMaterialCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.b > center.g + 40 && center.g > center.r + 80)) {
         throw new Error(`toon gradient corpus should sample the blue-green ramp, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function meshToonMaterialFallbackBandsCorpus() {
+  function makeScene(material) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material))
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(2, 0, 3)
+    scene.add(light)
+    return scene
+  }
+
+  const toonScene = makeScene(new THREE.MeshToonMaterial({ color: 0xffffff }))
+  const lambertScene = makeScene(new THREE.MeshLambertMaterial({ color: 0xffffff }))
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let toonMean = null
+  let lambertMean = null
+
+  return {
+    name: 'mesh-toon-fallback-bands',
+    scene: toonScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.1,
+    browserReference: false,
+    render(renderer) {
+      const lambert = renderer.render(lambertScene, camera, options)
+      lambertMean = meanRegion(lambert, options.width, 0, 0, options.width, options.height)
+      const toon = renderer.render(toonScene, camera, options)
+      toonMean = meanRegion(toon, options.width, 0, 0, options.width, options.height)
+      return toon
+    },
+    validate() {
+      if (!(toonMean.r > lambertMean.r + 8)) {
+        throw new Error(`toon fallback corpus should produce broader lit bands than Lambert, toon=${JSON.stringify(toonMean)} lambert=${JSON.stringify(lambertMean)}`)
       }
     },
   }
