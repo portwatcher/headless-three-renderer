@@ -131,6 +131,13 @@ function encodedCubeTexture() {
   return texture
 }
 
+function encodedPngTexture() {
+  const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==', 'base64')
+  const texture = new THREE.Texture(image)
+  texture.needsUpdate = true
+  return texture
+}
+
 function constantUvPlane(u, v) {
   const geometry = new THREE.PlaneGeometry(2, 2)
   const uv = new Float32Array(geometry.getAttribute('uv').count * 2)
@@ -14391,6 +14398,56 @@ test('base color maps honor texture flipY', () => {
   assert.ok(flipped.g > flipped.r + 40, `flipY=true should sample the opposite texture row as green (${flipped.g} vs ${flipped.r})`)
 })
 
+test('base color maps honor raw texture premultiplyAlpha', () => {
+  function renderPremultiplyAlpha(premultiplyAlpha) {
+    const map = solidTexture(200, 100, 50, 128)
+    map.premultiplyAlpha = premultiplyAlpha
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 22, 22, 42, 42)
+  }
+
+  const straight = renderPremultiplyAlpha(false)
+  const premultiplied = renderPremultiplyAlpha(true)
+  assert.ok(straight.r > premultiplied.r + 50, `premultiplyAlpha should reduce red by alpha (${straight.r} vs ${premultiplied.r})`)
+  assert.ok(straight.g > premultiplied.g + 25, `premultiplyAlpha should reduce green by alpha (${straight.g} vs ${premultiplied.g})`)
+  assert.ok(premultiplied.r > premultiplied.g + 35, `premultiplied texture should preserve channel ratios (${premultiplied.r} vs ${premultiplied.g})`)
+})
+
+test('background textures honor raw texture premultiplyAlpha', () => {
+  function renderPremultiplyAlpha(premultiplyAlpha) {
+    const background = solidTexture(180, 90, 40, 128)
+    background.premultiplyAlpha = premultiplyAlpha
+
+    const scene = new THREE.Scene()
+    scene.background = background
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, {
+      width: 32,
+      height: 32,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const straight = renderPremultiplyAlpha(false)
+  const premultiplied = renderPremultiplyAlpha(true)
+  assert.ok(straight.r > premultiplied.r + 60, `background premultiplyAlpha should reduce red by alpha (${straight.r} vs ${premultiplied.r})`)
+  assert.ok(straight.g > premultiplied.g + 25, `background premultiplyAlpha should reduce green by alpha (${straight.g} vs ${premultiplied.g})`)
+})
+
 test('base color maps honor explicit texture matrices', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
@@ -14673,6 +14730,13 @@ test('invalid texture transform values fail clearly', () => {
       scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
       return scene
     }, /material\.map\.matrixAutoUpdate must be a boolean/i],
+    ['material map premultiplyAlpha', () => {
+      const map = solidTexture(255, 255, 255)
+      map.premultiplyAlpha = 'yes'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.premultiplyAlpha must be a boolean/i],
     ['background rotation', () => {
       const background = solidTexture(0, 0, 255)
       background.rotation = Number.POSITIVE_INFINITY
@@ -14698,6 +14762,20 @@ test('invalid texture transform values fail clearly', () => {
       label,
     )
   }
+})
+
+test('encoded texture premultiplyAlpha inputs fail clearly', () => {
+  const map = encodedPngTexture()
+  map.premultiplyAlpha = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    /material\.map\.premultiplyAlpha is only supported for readable raw texture image data/i,
+  )
 })
 
 test('one- and two-channel raw DataTexture maps and backgrounds expand for texture rendering', () => {

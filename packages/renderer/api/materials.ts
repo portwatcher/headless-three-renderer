@@ -1968,6 +1968,18 @@ function imageToRgbaTexture(image: TextureImageInput, label: string, textureType
   return { rgba, width: image.width!, height: image.height! }
 }
 
+function premultiplyRgbaAlpha(data: Uint8Array | Uint8ClampedArray): Uint8Array {
+  const out = new Uint8Array(data.byteLength)
+  for (let i = 0; i < data.byteLength; i += 4) {
+    const alpha = data[i + 3]
+    out[i] = Math.round((data[i] * alpha) / 255)
+    out[i + 1] = Math.round((data[i + 1] * alpha) / 255)
+    out[i + 2] = Math.round((data[i + 2] * alpha) / 255)
+    out[i + 3] = alpha
+  }
+  return out
+}
+
 function sampleCubeFace(
   faces: Array<{ rgba: Uint8Array; width: number; height: number }>,
   dir: readonly [number, number, number],
@@ -2119,10 +2131,12 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   // Encoded image (PNG/JPEG/WebP Buffer from file loaders)
   if (Buffer.isBuffer(image)) {
     assertNoEncodedExplicitMipmaps(map, label)
+    assertNoEncodedPremultiplyAlpha(map, label)
     return { data: image, width: 0, height: 0 }
   }
   if (image instanceof Uint8Array && !((image as any).width > 0)) {
     assertNoEncodedExplicitMipmaps(map, label)
+    assertNoEncodedPremultiplyAlpha(map, label)
     return { data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0 }
   }
 
@@ -2155,6 +2169,13 @@ function assertNoEncodedExplicitMipmaps(map: ThreeTextureLike, label: string): v
   )
 }
 
+function assertNoEncodedPremultiplyAlpha(map: ThreeTextureLike, label: string): void {
+  if (optionalTextureBoolean(map.premultiplyAlpha, `${label}.premultiplyAlpha`) !== true) return
+  throw new Error(
+    `${label}.premultiplyAlpha is only supported for readable raw texture image data. Decode the encoded image to raw RGBA DataTexture-style data before rendering.`,
+  )
+}
+
 function textureBytesWithExplicitMipmaps(
   map: ThreeTextureLike,
   label: string,
@@ -2162,7 +2183,9 @@ function textureBytesWithExplicitMipmaps(
   width: number,
   height: number,
 ): Uint8Array | Uint8ClampedArray {
-  if (!hasExplicitMipmaps(map, label)) return baseRgba
+  const premultiplyAlpha = optionalTextureBoolean(map.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
+  const baseLevel = premultiplyAlpha ? premultiplyRgbaAlpha(baseRgba) : baseRgba
+  if (!hasExplicitMipmaps(map, label)) return baseLevel
   if (width <= 1 && height <= 1) {
     throw new Error(
       `${label} provides explicit texture mipmaps for a ${width}x${height} base image, but no additional mip levels are valid after the 1x1 level.`,
@@ -2170,9 +2193,9 @@ function textureBytesWithExplicitMipmaps(
   }
 
   const levels: Uint8Array[] = [
-    baseRgba instanceof Uint8Array
-      ? new Uint8Array(baseRgba.buffer, baseRgba.byteOffset, baseRgba.byteLength)
-      : new Uint8Array(baseRgba),
+    baseLevel instanceof Uint8Array
+      ? new Uint8Array(baseLevel.buffer, baseLevel.byteOffset, baseLevel.byteLength)
+      : new Uint8Array(baseLevel),
   ]
   let expectedWidth = width
   let expectedHeight = height
@@ -2192,7 +2215,7 @@ function textureBytesWithExplicitMipmaps(
     if (!rgba) {
       throw unsupportedRawTextureDataError(`${label}.mipmaps[${i}]`, 'texture rendering')
     }
-    levels.push(rgba)
+    levels.push(premultiplyAlpha ? premultiplyRgbaAlpha(rgba) : rgba)
 
     if (expectedWidth === 1 && expectedHeight === 1 && i < mipmaps.length - 1) {
       throw new Error(

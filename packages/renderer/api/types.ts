@@ -105,6 +105,7 @@ export interface ThreeTextureLike {
   matrix?: ThreeMatrix3Like
   matrixAutoUpdate?: boolean
   flipY?: boolean
+  premultiplyAlpha?: boolean
   colorSpace?: string
   encoding?: number
 }
