@@ -164,6 +164,7 @@ pub struct GpuRenderer {
     texture_cache: Mutex<HashMap<TextureCacheKey, wgpu::Texture>>,
     physical_layers_texture_cache: Mutex<HashMap<PhysicalLayersTextureCacheKey, wgpu::Texture>>,
     texture_bind_group_cache: Mutex<HashMap<TextureBindGroupKey, wgpu::BindGroup>>,
+    ao_physical_bind_group_cache: Mutex<HashMap<AoPhysicalBindGroupKey, wgpu::BindGroup>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -216,6 +217,17 @@ struct GpuBackground {
     bind_group: wgpu::BindGroup,
     _texture: wgpu::Texture,
     _uniform_buffer: wgpu::Buffer,
+}
+
+struct AoPhysicalBindGroupResources {
+    bind_group: wgpu::BindGroup,
+    ao_texture: Option<wgpu::Texture>,
+    light_texture: Option<wgpu::Texture>,
+    alpha_texture: Option<wgpu::Texture>,
+    physical_layers_texture: Option<wgpu::Texture>,
+    physical_sheen_texture: Option<wgpu::Texture>,
+    physical_specular_texture: Option<wgpu::Texture>,
+    clearcoat_normal_texture: Option<wgpu::Texture>,
 }
 
 #[derive(Clone)]
@@ -285,6 +297,25 @@ struct TextureBindGroupKey {
     kind: TextureBindGroupKind,
     texture: TextureCacheKey,
     sampler: SamplerKey,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct AoPhysicalBindGroupKey {
+    ao: Option<TextureCacheKey>,
+    physical_layers: Option<PhysicalLayersTextureCacheKey>,
+    physical_sheen: Option<TextureCacheKey>,
+    physical_specular: Option<TextureCacheKey>,
+    clearcoat_normal: Option<TextureCacheKey>,
+    alpha: Option<TextureCacheKey>,
+    light: Option<TextureCacheKey>,
+    ao_sampler: SamplerKey,
+    alpha_sampler: SamplerKey,
+    light_sampler: SamplerKey,
+    specular_sampler: SamplerKey,
+    physical_layers_sampler: SamplerKey,
+    physical_sheen_sampler: SamplerKey,
+    physical_specular_sampler: SamplerKey,
+    clearcoat_normal_sampler: SamplerKey,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -407,14 +438,89 @@ impl TextureBindGroupKey {
         Self {
             kind,
             texture: TextureCacheKey::from_texture(texture),
-            sampler: SamplerKey::new(
-                texture.wrap_s,
-                texture.wrap_t,
-                texture.mag_filter,
-                texture.min_filter,
-                texture.mipmap_filter,
-                texture.anisotropy,
-            ),
+            sampler: SamplerKey::from_texture(texture),
+        }
+    }
+}
+
+impl AoPhysicalBindGroupKey {
+    fn new(mesh: &PreparedMesh) -> Self {
+        let physical_layers = match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
+            (Some(maps), _) => Some(PhysicalLayersTextureCacheKey::from_layers(
+                &maps.scalar_map,
+                Some(&maps.anisotropy_map),
+                Some(&maps.iridescence_map),
+            )),
+            (None, Some(tex)) => Some(PhysicalLayersTextureCacheKey::from_layers(tex, None, None)),
+            (None, None) => None,
+        };
+        let physical_sheen = match (
+            mesh.matcap_map.as_ref(),
+            mesh.gradient_map.as_ref(),
+            mesh.physical_maps.as_ref(),
+        ) {
+            (Some(tex), _, _) | (None, Some(tex), _) => Some(TextureCacheKey::from_texture(tex)),
+            (None, None, Some(maps)) => Some(TextureCacheKey::from_texture(&maps.sheen_map)),
+            (None, None, None) => None,
+        };
+
+        Self {
+            ao: mesh.ao_map.as_ref().map(TextureCacheKey::from_texture),
+            physical_layers,
+            physical_sheen,
+            physical_specular: mesh
+                .physical_maps
+                .as_ref()
+                .map(|maps| TextureCacheKey::from_texture(&maps.specular_map)),
+            clearcoat_normal: mesh
+                .clearcoat_normal_map
+                .as_ref()
+                .map(TextureCacheKey::from_texture),
+            alpha: mesh.alpha_map.as_ref().map(TextureCacheKey::from_texture),
+            light: mesh.light_map.as_ref().map(TextureCacheKey::from_texture),
+            ao_sampler: mesh
+                .ao_map
+                .as_ref()
+                .map(SamplerKey::from_texture)
+                .unwrap_or_else(SamplerKey::default_texture),
+            alpha_sampler: mesh
+                .alpha_map
+                .as_ref()
+                .map(SamplerKey::from_texture)
+                .unwrap_or_else(SamplerKey::default_texture),
+            light_sampler: mesh
+                .light_map
+                .as_ref()
+                .map(SamplerKey::from_texture)
+                .unwrap_or_else(SamplerKey::default_texture),
+            specular_sampler: match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
+                (None, Some(tex)) => SamplerKey::from_texture(tex),
+                _ => SamplerKey::default_texture(),
+            },
+            physical_layers_sampler: mesh
+                .physical_maps
+                .as_ref()
+                .map(|maps| SamplerKey::from_settings(maps.physical_layers_sampler))
+                .unwrap_or_else(SamplerKey::default_texture),
+            physical_sheen_sampler: match (
+                mesh.matcap_map.as_ref(),
+                mesh.gradient_map.as_ref(),
+                mesh.physical_maps.as_ref(),
+            ) {
+                (Some(tex), _, _) | (None, Some(tex), _) => SamplerKey::from_texture(tex),
+                (None, None, Some(maps)) => SamplerKey::from_settings(maps.sheen_sampler),
+                (None, None, None) => SamplerKey::default_texture(),
+            },
+            physical_specular_sampler: mesh
+                .physical_maps
+                .as_ref()
+                .map(|maps| SamplerKey::from_settings(maps.specular_sampler))
+                .unwrap_or_else(SamplerKey::default_texture),
+            clearcoat_normal_sampler: mesh
+                .clearcoat_normal_map
+                .as_ref()
+                .map(SamplerKey::from_texture)
+                .unwrap_or_else(SamplerKey::default_texture),
         }
     }
 }
@@ -508,6 +614,39 @@ impl SamplerKey {
             mip_lod_enabled,
             anisotropy_clamp,
         }
+    }
+
+    fn from_texture(texture: &PreparedTexture) -> Self {
+        Self::new(
+            texture.wrap_s,
+            texture.wrap_t,
+            texture.mag_filter,
+            texture.min_filter,
+            texture.mipmap_filter,
+            texture.anisotropy,
+        )
+    }
+
+    fn from_settings(settings: TextureSamplerSettings) -> Self {
+        Self::new(
+            settings.wrap_s,
+            settings.wrap_t,
+            settings.mag_filter,
+            settings.min_filter,
+            settings.mipmap_filter,
+            settings.anisotropy,
+        )
+    }
+
+    fn default_texture() -> Self {
+        Self::new(
+            WrapMode::ClampToEdge,
+            WrapMode::ClampToEdge,
+            TextureFilter::Linear,
+            TextureFilter::Linear,
+            MipmapFilter::None,
+            1,
+        )
     }
 
     fn is_default(self) -> bool {
@@ -1788,6 +1927,7 @@ impl GpuRenderer {
             texture_cache: Mutex::new(HashMap::new()),
             physical_layers_texture_cache: Mutex::new(HashMap::new()),
             texture_bind_group_cache: Mutex::new(HashMap::new()),
+            ao_physical_bind_group_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -2638,6 +2778,323 @@ impl GpuRenderer {
         (bind_group, gpu_texture)
     }
 
+    fn ao_physical_bind_group_for(&self, mesh: &PreparedMesh) -> AoPhysicalBindGroupResources {
+        let key = AoPhysicalBindGroupKey::new(mesh);
+        let ao_texture = mesh
+            .ao_map
+            .as_ref()
+            .map(|tex| self.upload_texture("headless-three-renderer ao map", tex));
+        let light_texture = mesh
+            .light_map
+            .as_ref()
+            .map(|tex| self.upload_texture("headless-three-renderer light map", tex));
+        let alpha_texture = mesh
+            .alpha_map
+            .as_ref()
+            .map(|tex| self.upload_texture("headless-three-renderer alpha map", tex));
+        let physical_layers_texture =
+            match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
+                (Some(maps), _) => Some(self.upload_physical_layers_texture(
+                    "headless-three-renderer physical layers map",
+                    &maps.scalar_map,
+                    Some(&maps.anisotropy_map),
+                    Some(&maps.iridescence_map),
+                )),
+                (None, Some(tex)) => Some(self.upload_physical_layers_texture(
+                    "headless-three-renderer specular and physical layers map",
+                    tex,
+                    None,
+                    None,
+                )),
+                (None, None) => None,
+            };
+        let physical_sheen_texture = match (
+            mesh.matcap_map.as_ref(),
+            mesh.gradient_map.as_ref(),
+            mesh.physical_maps.as_ref(),
+        ) {
+            (Some(tex), _, _) => {
+                Some(self.upload_texture("headless-three-renderer matcap color map", tex))
+            }
+            (None, Some(tex), _) => {
+                Some(self.upload_texture("headless-three-renderer toon gradient map", tex))
+            }
+            (None, None, Some(maps)) => Some(self.upload_texture(
+                "headless-three-renderer physical sheen map",
+                &maps.sheen_map,
+            )),
+            (None, None, None) => None,
+        };
+        let physical_specular_texture = mesh.physical_maps.as_ref().map(|maps| {
+            self.upload_texture(
+                "headless-three-renderer physical specular map",
+                &maps.specular_map,
+            )
+        });
+        let clearcoat_normal_texture = mesh
+            .clearcoat_normal_map
+            .as_ref()
+            .map(|tex| self.upload_texture("headless-three-renderer clearcoat normal map", tex));
+
+        if let Some(bind_group) = self
+            .ao_physical_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return AoPhysicalBindGroupResources {
+                bind_group,
+                ao_texture,
+                light_texture,
+                alpha_texture,
+                physical_layers_texture,
+                physical_sheen_texture,
+                physical_specular_texture,
+                clearcoat_normal_texture,
+            };
+        }
+
+        let default_white_view = self
+            ._default_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let default_normal_view = self
+            ._default_normal_map_texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let default_physical_layers_view =
+            self._default_physical_layers_texture
+                .create_view(&wgpu::TextureViewDescriptor {
+                    dimension: Some(wgpu::TextureViewDimension::D2Array),
+                    ..Default::default()
+                });
+        let ao_view = ao_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let light_view = light_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let alpha_view = alpha_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let physical_layers_view = physical_layers_texture.as_ref().map(|texture| {
+            texture.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::D2Array),
+                ..Default::default()
+            })
+        });
+        let physical_sheen_view = physical_sheen_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let physical_specular_view = physical_specular_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let clearcoat_normal_view = clearcoat_normal_texture
+            .as_ref()
+            .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let ao_sampler = mesh
+            .ao_map
+            .as_ref()
+            .map(|tex| {
+                self.sampler_for_texture(
+                    tex.wrap_s,
+                    tex.wrap_t,
+                    tex.mag_filter,
+                    tex.min_filter,
+                    tex.mipmap_filter,
+                    tex.anisotropy,
+                )
+            })
+            .unwrap_or_else(|| self.sampler.clone());
+        let alpha_sampler = mesh
+            .alpha_map
+            .as_ref()
+            .map(|tex| {
+                self.sampler_for_texture(
+                    tex.wrap_s,
+                    tex.wrap_t,
+                    tex.mag_filter,
+                    tex.min_filter,
+                    tex.mipmap_filter,
+                    tex.anisotropy,
+                )
+            })
+            .unwrap_or_else(|| self.sampler.clone());
+        let light_sampler = mesh
+            .light_map
+            .as_ref()
+            .map(|tex| {
+                self.sampler_for_texture(
+                    tex.wrap_s,
+                    tex.wrap_t,
+                    tex.mag_filter,
+                    tex.min_filter,
+                    tex.mipmap_filter,
+                    tex.anisotropy,
+                )
+            })
+            .unwrap_or_else(|| self.sampler.clone());
+        let specular_sampler = match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
+            (None, Some(tex)) => self.sampler_for_texture(
+                tex.wrap_s,
+                tex.wrap_t,
+                tex.mag_filter,
+                tex.min_filter,
+                tex.mipmap_filter,
+                tex.anisotropy,
+            ),
+            _ => self.sampler.clone(),
+        };
+        let physical_layers_sampler = mesh
+            .physical_maps
+            .as_ref()
+            .map(|maps| self.sampler_for_settings(maps.physical_layers_sampler))
+            .unwrap_or_else(|| self.sampler.clone());
+        let physical_sheen_sampler = match (
+            mesh.matcap_map.as_ref(),
+            mesh.gradient_map.as_ref(),
+            mesh.physical_maps.as_ref(),
+        ) {
+            (Some(tex), _, _) | (None, Some(tex), _) => self.sampler_for_texture(
+                tex.wrap_s,
+                tex.wrap_t,
+                tex.mag_filter,
+                tex.min_filter,
+                tex.mipmap_filter,
+                tex.anisotropy,
+            ),
+            (None, None, Some(maps)) => self.sampler_for_settings(maps.sheen_sampler),
+            (None, None, None) => self.sampler.clone(),
+        };
+        let physical_specular_sampler = mesh
+            .physical_maps
+            .as_ref()
+            .map(|maps| self.sampler_for_settings(maps.specular_sampler))
+            .unwrap_or_else(|| self.sampler.clone());
+        let clearcoat_normal_sampler = mesh
+            .clearcoat_normal_map
+            .as_ref()
+            .map(|tex| {
+                self.sampler_for_texture(
+                    tex.wrap_s,
+                    tex.wrap_t,
+                    tex.mag_filter,
+                    tex.min_filter,
+                    tex.mipmap_filter,
+                    tex.anisotropy,
+                )
+            })
+            .unwrap_or_else(|| self.sampler.clone());
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer ao and physical maps bind group"),
+            layout: &self.ao_map_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(
+                        ao_view.as_ref().unwrap_or(&default_white_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(
+                        physical_layers_view
+                            .as_ref()
+                            .unwrap_or(&default_physical_layers_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(
+                        physical_sheen_view.as_ref().unwrap_or(&default_white_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(
+                        physical_specular_view
+                            .as_ref()
+                            .unwrap_or(&default_white_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(
+                        clearcoat_normal_view
+                            .as_ref()
+                            .unwrap_or(&default_normal_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: wgpu::BindingResource::TextureView(
+                        alpha_view.as_ref().unwrap_or(&default_white_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: wgpu::BindingResource::TextureView(
+                        light_view.as_ref().unwrap_or(&default_white_view),
+                    ),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 8,
+                    resource: wgpu::BindingResource::Sampler(&ao_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 9,
+                    resource: wgpu::BindingResource::Sampler(&alpha_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 10,
+                    resource: wgpu::BindingResource::Sampler(&light_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 11,
+                    resource: wgpu::BindingResource::Sampler(&specular_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 12,
+                    resource: wgpu::BindingResource::Sampler(&physical_layers_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 13,
+                    resource: wgpu::BindingResource::Sampler(&physical_sheen_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 14,
+                    resource: wgpu::BindingResource::Sampler(&physical_specular_sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 15,
+                    resource: wgpu::BindingResource::Sampler(&clearcoat_normal_sampler),
+                },
+            ],
+        });
+        let bind_group = self
+            .ao_physical_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| bind_group.clone())
+            .clone();
+
+        AoPhysicalBindGroupResources {
+            bind_group,
+            ao_texture,
+            light_texture,
+            alpha_texture,
+            physical_layers_texture,
+            physical_sheen_texture,
+            physical_specular_texture,
+            clearcoat_normal_texture,
+        }
+    }
+
     fn upload_physical_layers_texture(
         &self,
         label: &'static str,
@@ -3413,290 +3870,16 @@ impl GpuRenderer {
             || mesh.physical_maps.is_some()
             || mesh.clearcoat_normal_map.is_some()
         {
-            let ao_texture = mesh
-                .ao_map
-                .as_ref()
-                .map(|tex| self.upload_texture("headless-three-renderer ao map", tex));
-            let light_texture = mesh
-                .light_map
-                .as_ref()
-                .map(|tex| self.upload_texture("headless-three-renderer light map", tex));
-            let alpha_texture = mesh
-                .alpha_map
-                .as_ref()
-                .map(|tex| self.upload_texture("headless-three-renderer alpha map", tex));
-            let physical_layers_texture =
-                match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
-                    (Some(maps), _) => Some(self.upload_physical_layers_texture(
-                        "headless-three-renderer physical layers map",
-                        &maps.scalar_map,
-                        Some(&maps.anisotropy_map),
-                        Some(&maps.iridescence_map),
-                    )),
-                    (None, Some(tex)) => Some(self.upload_physical_layers_texture(
-                        "headless-three-renderer specular and physical layers map",
-                        tex,
-                        None,
-                        None,
-                    )),
-                    (None, None) => None,
-                };
-            let physical_sheen_texture = match (
-                mesh.matcap_map.as_ref(),
-                mesh.gradient_map.as_ref(),
-                mesh.physical_maps.as_ref(),
-            ) {
-                (Some(tex), _, _) => {
-                    Some(self.upload_texture("headless-three-renderer matcap color map", tex))
-                }
-                (None, Some(tex), _) => {
-                    Some(self.upload_texture("headless-three-renderer toon gradient map", tex))
-                }
-                (None, None, Some(maps)) => Some(self.upload_texture(
-                    "headless-three-renderer physical sheen map",
-                    &maps.sheen_map,
-                )),
-                (None, None, None) => None,
-            };
-            let physical_specular_texture = mesh.physical_maps.as_ref().map(|maps| {
-                self.upload_texture(
-                    "headless-three-renderer physical specular map",
-                    &maps.specular_map,
-                )
-            });
-            let clearcoat_normal_texture = mesh.clearcoat_normal_map.as_ref().map(|tex| {
-                self.upload_texture("headless-three-renderer clearcoat normal map", tex)
-            });
-
-            let default_white_view = self
-                ._default_texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            let default_normal_view = self
-                ._default_normal_map_texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            let default_physical_layers_view =
-                self._default_physical_layers_texture
-                    .create_view(&wgpu::TextureViewDescriptor {
-                        dimension: Some(wgpu::TextureViewDimension::D2Array),
-                        ..Default::default()
-                    });
-            let ao_view = ao_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
-            let light_view = light_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
-            let alpha_view = alpha_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
-            let physical_layers_view = physical_layers_texture.as_ref().map(|texture| {
-                texture.create_view(&wgpu::TextureViewDescriptor {
-                    dimension: Some(wgpu::TextureViewDimension::D2Array),
-                    ..Default::default()
-                })
-            });
-            let physical_sheen_view = physical_sheen_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
-            let physical_specular_view = physical_specular_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
-            let clearcoat_normal_view = clearcoat_normal_texture
-                .as_ref()
-                .map(|texture| texture.create_view(&wgpu::TextureViewDescriptor::default()));
-            let ao_sampler = mesh
-                .ao_map
-                .as_ref()
-                .map(|tex| {
-                    self.sampler_for_texture(
-                        tex.wrap_s,
-                        tex.wrap_t,
-                        tex.mag_filter,
-                        tex.min_filter,
-                        tex.mipmap_filter,
-                        tex.anisotropy,
-                    )
-                })
-                .unwrap_or_else(|| self.sampler.clone());
-            let alpha_sampler = mesh
-                .alpha_map
-                .as_ref()
-                .map(|tex| {
-                    self.sampler_for_texture(
-                        tex.wrap_s,
-                        tex.wrap_t,
-                        tex.mag_filter,
-                        tex.min_filter,
-                        tex.mipmap_filter,
-                        tex.anisotropy,
-                    )
-                })
-                .unwrap_or_else(|| self.sampler.clone());
-            let light_sampler = mesh
-                .light_map
-                .as_ref()
-                .map(|tex| {
-                    self.sampler_for_texture(
-                        tex.wrap_s,
-                        tex.wrap_t,
-                        tex.mag_filter,
-                        tex.min_filter,
-                        tex.mipmap_filter,
-                        tex.anisotropy,
-                    )
-                })
-                .unwrap_or_else(|| self.sampler.clone());
-            let specular_sampler = match (mesh.physical_maps.as_ref(), mesh.specular_map.as_ref()) {
-                (None, Some(tex)) => self.sampler_for_texture(
-                    tex.wrap_s,
-                    tex.wrap_t,
-                    tex.mag_filter,
-                    tex.min_filter,
-                    tex.mipmap_filter,
-                    tex.anisotropy,
-                ),
-                _ => self.sampler.clone(),
-            };
-            let physical_layers_sampler = mesh
-                .physical_maps
-                .as_ref()
-                .map(|maps| self.sampler_for_settings(maps.physical_layers_sampler))
-                .unwrap_or_else(|| self.sampler.clone());
-            let physical_sheen_sampler = match (
-                mesh.matcap_map.as_ref(),
-                mesh.gradient_map.as_ref(),
-                mesh.physical_maps.as_ref(),
-            ) {
-                (Some(tex), _, _) | (None, Some(tex), _) => self.sampler_for_texture(
-                    tex.wrap_s,
-                    tex.wrap_t,
-                    tex.mag_filter,
-                    tex.min_filter,
-                    tex.mipmap_filter,
-                    tex.anisotropy,
-                ),
-                (None, None, Some(maps)) => self.sampler_for_settings(maps.sheen_sampler),
-                (None, None, None) => self.sampler.clone(),
-            };
-            let physical_specular_sampler = mesh
-                .physical_maps
-                .as_ref()
-                .map(|maps| self.sampler_for_settings(maps.specular_sampler))
-                .unwrap_or_else(|| self.sampler.clone());
-            let clearcoat_normal_sampler = mesh
-                .clearcoat_normal_map
-                .as_ref()
-                .map(|tex| {
-                    self.sampler_for_texture(
-                        tex.wrap_s,
-                        tex.wrap_t,
-                        tex.mag_filter,
-                        tex.min_filter,
-                        tex.mipmap_filter,
-                        tex.anisotropy,
-                    )
-                })
-                .unwrap_or_else(|| self.sampler.clone());
-
-            let tex_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("headless-three-renderer ao and physical maps bind group"),
-                layout: &self.ao_map_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(
-                            ao_view.as_ref().unwrap_or(&default_white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(
-                            physical_layers_view
-                                .as_ref()
-                                .unwrap_or(&default_physical_layers_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(
-                            physical_sheen_view.as_ref().unwrap_or(&default_white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: wgpu::BindingResource::TextureView(
-                            physical_specular_view
-                                .as_ref()
-                                .unwrap_or(&default_white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: wgpu::BindingResource::TextureView(
-                            clearcoat_normal_view
-                                .as_ref()
-                                .unwrap_or(&default_normal_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 5,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 6,
-                        resource: wgpu::BindingResource::TextureView(
-                            alpha_view.as_ref().unwrap_or(&default_white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 7,
-                        resource: wgpu::BindingResource::TextureView(
-                            light_view.as_ref().unwrap_or(&default_white_view),
-                        ),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 8,
-                        resource: wgpu::BindingResource::Sampler(&ao_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 9,
-                        resource: wgpu::BindingResource::Sampler(&alpha_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 10,
-                        resource: wgpu::BindingResource::Sampler(&light_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 11,
-                        resource: wgpu::BindingResource::Sampler(&specular_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 12,
-                        resource: wgpu::BindingResource::Sampler(&physical_layers_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 13,
-                        resource: wgpu::BindingResource::Sampler(&physical_sheen_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 14,
-                        resource: wgpu::BindingResource::Sampler(&physical_specular_sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 15,
-                        resource: wgpu::BindingResource::Sampler(&clearcoat_normal_sampler),
-                    },
-                ],
-            });
+            let resources = self.ao_physical_bind_group_for(mesh);
             (
-                tex_bind_group,
-                ao_texture,
-                light_texture,
-                alpha_texture,
-                physical_layers_texture,
-                physical_sheen_texture,
-                physical_specular_texture,
-                clearcoat_normal_texture,
+                resources.bind_group,
+                resources.ao_texture,
+                resources.light_texture,
+                resources.alpha_texture,
+                resources.physical_layers_texture,
+                resources.physical_sheen_texture,
+                resources.physical_specular_texture,
+                resources.clearcoat_normal_texture,
             )
         } else {
             (
@@ -4826,9 +5009,9 @@ fn create_cubemap_with_mips(
 #[cfg(test)]
 mod tests {
     use super::{
-        CustomBlendPipelineKey, MeshBufferCacheKey, PhysicalLayersTextureCacheKey, SamplerKey,
-        TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey, downsample_rgba_mip, f32_key,
-        texture_mip_level_count,
+        AoPhysicalBindGroupKey, CustomBlendPipelineKey, MeshBufferCacheKey,
+        PhysicalLayersTextureCacheKey, SamplerKey, TextureBindGroupKey, TextureBindGroupKind,
+        TextureCacheKey, downsample_rgba_mip, f32_key, texture_mip_level_count,
     };
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
@@ -5099,6 +5282,48 @@ mod tests {
             TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &base),
             TextureBindGroupKey::new(TextureBindGroupKind::BaseColor, &repeat_sampler),
             "sampler state is part of the bind group resource set",
+        );
+    }
+
+    fn ao_physical_key(ao: Option<&PreparedTexture>) -> AoPhysicalBindGroupKey {
+        let default_sampler = SamplerKey::default_texture();
+        AoPhysicalBindGroupKey {
+            ao: ao.map(TextureCacheKey::from_texture),
+            physical_layers: None,
+            physical_sheen: None,
+            physical_specular: None,
+            clearcoat_normal: None,
+            alpha: None,
+            light: None,
+            ao_sampler: ao.map(SamplerKey::from_texture).unwrap_or(default_sampler),
+            alpha_sampler: default_sampler,
+            light_sampler: default_sampler,
+            specular_sampler: default_sampler,
+            physical_layers_sampler: default_sampler,
+            physical_sheen_sampler: default_sampler,
+            physical_specular_sampler: default_sampler,
+            clearcoat_normal_sampler: default_sampler,
+        }
+    }
+
+    #[test]
+    fn ao_physical_bind_group_keys_track_resources_and_samplers() {
+        let ao = single_pixel_texture([255, 0, 0, 255]);
+        let same_ao = single_pixel_texture([255, 0, 0, 255]);
+        assert_eq!(ao_physical_key(Some(&ao)), ao_physical_key(Some(&same_ao)));
+
+        let different_ao = single_pixel_texture([0, 255, 0, 255]);
+        assert_ne!(
+            ao_physical_key(Some(&ao)),
+            ao_physical_key(Some(&different_ao)),
+        );
+
+        let mut repeated_ao = single_pixel_texture([255, 0, 0, 255]);
+        repeated_ao.wrap_s = WrapMode::Repeat;
+        assert_ne!(
+            ao_physical_key(Some(&ao)),
+            ao_physical_key(Some(&repeated_ao)),
+            "AO sampler state is part of the combined bind group",
         );
     }
 
