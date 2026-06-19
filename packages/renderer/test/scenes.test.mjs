@@ -3020,6 +3020,68 @@ test('MeshMatcapMaterial normalMap changes matcap lookup', () => {
   assert.ok(tangentRight.g > tangentRight.r + 40, `normalMap should shift matcap lookup toward the green texel (${tangentRight.g} vs ${tangentRight.r})`)
 })
 
+test('MeshMatcapMaterial supports object-space normal maps', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    -1, 1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0, 0,
+    0, 1,
+    1, 0,
+    0, 1,
+    1, 1,
+    1, 0,
+  ]), 2))
+
+  function renderNormalType(normalMapType) {
+    const matcap = rgbaTexture([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      255, 255, 0, 255,
+    ], 2, 2)
+    matcap.magFilter = THREE.LinearFilter
+    matcap.minFilter = THREE.LinearFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap,
+        normalMap: solidTexture(255, 128, 128),
+        normalMapType,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const tangentSpace = renderNormalType(THREE.TangentSpaceNormalMap)
+  const objectSpace = renderNormalType(THREE.ObjectSpaceNormalMap)
+  const diff = meanAbsDiff(tangentSpace, objectSpace)
+  assert.ok(diff > 20, `object-space normalMap should change MeshMatcapMaterial lookup (diff=${diff.toFixed(2)})`)
+})
+
 test('MeshMatcapMaterial bumpMap changes matcap lookup', () => {
   function renderMatcap(bumpScale) {
     const matcap = rgbaTexture([

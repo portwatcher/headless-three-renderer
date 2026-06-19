@@ -40,6 +40,7 @@ export function createSceneCorpus() {
     meshNormalMaterialBumpMapCorpus(),
     meshMatcapMaterialCorpus(),
     meshMatcapMaterialNormalMapCorpus(),
+    meshMatcapMaterialObjectSpaceNormalMapCorpus(),
     meshMatcapMaterialBumpMapCorpus(),
     meshToonMaterialCorpus(),
     meshToonMaterialNormalMapCorpus(),
@@ -2035,6 +2036,89 @@ function meshMatcapMaterialNormalMapCorpus() {
     validate() {
       if (!(flatCenter.r > flatCenter.g + 40 && mappedCenter.g > mappedCenter.r + 40)) {
         throw new Error(`matcap normal-map corpus should shift lookup from red to green, flat=${JSON.stringify(flatCenter)} mapped=${JSON.stringify(mappedCenter)}`)
+      }
+    },
+  }
+}
+
+function meshMatcapMaterialObjectSpaceNormalMapCorpus() {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    -1, 1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0, 0,
+    0, 1,
+    1, 0,
+    0, 1,
+    1, 1,
+    1, 0,
+  ]), 2))
+
+  function makeMatcap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      255, 255, 0, 255,
+    ]), 2, 2, THREE.RGBAFormat)
+    texture.magFilter = THREE.LinearFilter
+    texture.minFilter = THREE.LinearFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(normalMapType) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: makeMatcap(),
+        normalMap: solidTexture(255, 128, 128),
+        normalMapType,
+      }),
+    ))
+    return scene
+  }
+
+  const tangentScene = makeScene(THREE.TangentSpaceNormalMap)
+  const objectScene = makeScene(THREE.ObjectSpaceNormalMap)
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let normalTypeDiff = 0
+
+  return {
+    name: 'mesh-matcap-material-object-space-normal-map',
+    scene: objectScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const tangent = renderer.render(tangentScene, camera, options).slice()
+      const objectSpace = renderer.render(objectScene, camera, options)
+      normalTypeDiff = meanAbsDiff(tangent, objectSpace)
+      return objectSpace
+    },
+    validate() {
+      if (!(normalTypeDiff > 20)) {
+        throw new Error(`matcap object-space normal-map corpus should change lookup from tangent-space output, diff=${normalTypeDiff.toFixed(3)}`)
       }
     },
   }
