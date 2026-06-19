@@ -20701,6 +20701,46 @@ test('scene environmentRotation rotates cube IBL', () => {
   assert.ok(diff > 1.0, `rotated cube IBL should change the reflection, diff=${diff.toFixed(3)}`)
 })
 
+test('options.environmentRotation overrides scene environmentRotation for cube IBL', () => {
+  const environment = cubeTexture([
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+  ])
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.environment = environment
+  scene.environmentIntensity = 4
+  scene.environmentRotation = new THREE.Euler(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const sceneRotation = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  const optionRotation = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    environmentRotation: new THREE.Euler(0, -Math.PI / 2, 0),
+  })
+
+  const diff = meanAbsDiff(sceneRotation, optionRotation)
+  assert.ok(diff > 1.0, `options.environmentRotation should override cube IBL scene rotation, diff=${diff.toFixed(3)}`)
+})
+
 test('scene environment colorSpace controls RGBA8 IBL decode', () => {
   function renderColorSpace(colorSpace) {
     const data = new Uint8Array([
@@ -25864,7 +25904,7 @@ test('cube DataTexture backgrounds sample from camera direction', () => {
   background.magFilter = THREE.NearestFilter
   background.minFilter = THREE.NearestFilter
 
-  function renderFacing(target, yRotation = 0) {
+  function renderFacing(target, yRotation = 0, options = {}) {
     const scene = new THREE.Scene()
     scene.background = background
     scene.backgroundRotation = new THREE.Euler(0, yRotation, 0)
@@ -25875,6 +25915,7 @@ test('cube DataTexture backgrounds sample from camera direction', () => {
       width: 64,
       height: 64,
       outputColorSpace: THREE.LinearSRGBColorSpace,
+      ...options,
     }), 64, 64, 28, 28, 36, 36)
   }
 
@@ -25885,6 +25926,14 @@ test('cube DataTexture backgrounds sample from camera direction', () => {
 
   const rotatedNegativeZ = renderFacing(new THREE.Vector3(0, 0, -1), Math.PI)
   assert.ok(rotatedNegativeZ.g > rotatedNegativeZ.r + 80, `rotated -Z cube background should render +Z green (${rotatedNegativeZ.g} vs ${rotatedNegativeZ.r})`)
+
+  const optionRotatedNegativeZ = renderFacing(new THREE.Vector3(0, 0, -1), 0, {
+    backgroundRotation: new THREE.Euler(0, Math.PI, 0),
+  })
+  assert.ok(
+    optionRotatedNegativeZ.g > optionRotatedNegativeZ.r + 80,
+    `options.backgroundRotation should override cube background scene rotation to +Z green (${optionRotatedNegativeZ.g} vs ${optionRotatedNegativeZ.r})`,
+  )
 })
 
 test('cube background textures decode sRGB colorSpace before output conversion', () => {
