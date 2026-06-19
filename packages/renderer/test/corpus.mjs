@@ -17,6 +17,7 @@ export function createSceneCorpus() {
     cubeBackgroundTextureCorpus(),
     cubeBackgroundOptionRotationCorpus(),
     cubeUvBackgroundTextureCorpus(),
+    packedCubeUvBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
     cubeCameraCaptureCorpus(),
     cubeCameraUpdateCorpus(),
@@ -26,6 +27,7 @@ export function createSceneCorpus() {
     materialEnvMapBasicLambertCorpus(),
     materialEnvMapPbrCorpus(),
     cubeUvMaterialEnvMapCorpus(),
+    packedCubeUvMaterialEnvMapCorpus(),
     cubeEnvironmentOptionRotationCorpus(),
     narrowRawIblCorpus(),
     meshBasicMaterialWireframeCorpus(),
@@ -173,8 +175,55 @@ function cubeUvGreenCubeTexture() {
   return texture
 }
 
+function packedCubeUvTexture(faceColors, faceSize = 16) {
+  const width = 3 * Math.max(faceSize, 16 * 7)
+  const height = 4 * faceSize
+  const data = new Uint8Array(width * height * 4)
+  const atlasFaceToCubeFace = [0, 2, 4, 1, 3, 5]
+  for (let atlasFace = 0; atlasFace < 6; atlasFace += 1) {
+    const [r, g, b, a = 255] = faceColors[atlasFaceToCubeFace[atlasFace]]
+    const col = atlasFace % 3
+    const row = atlasFace > 2 ? 1 : 0
+    for (let y = 0; y < faceSize; y += 1) {
+      for (let x = 0; x < faceSize; x += 1) {
+        const offset = (((row * faceSize + y) * width) + (col * faceSize + x)) * 4
+        data[offset] = r
+        data[offset + 1] = g
+        data[offset + 2] = b
+        data[offset + 3] = a
+      }
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat)
+  texture.mapping = THREE.CubeUVReflectionMapping
+  texture.needsUpdate = true
+  return texture
+}
+
+function packedCubeUvGreenTexture() {
+  return packedCubeUvTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])
+}
+
 function coloredCubeBackgroundTexture() {
   return cubeTexture([
+    [48, 80, 255],
+    [255, 225, 72],
+    [255, 64, 220],
+    [32, 210, 220],
+    [32, 200, 96],
+    [255, 48, 32],
+  ])
+}
+
+function packedCubeUvColoredBackgroundTexture() {
+  return packedCubeUvTexture([
     [48, 80, 255],
     [255, 225, 72],
     [255, 64, 220],
@@ -1765,6 +1814,38 @@ function cubeUvMaterialEnvMapCorpus() {
   }
 }
 
+function packedCubeUvMaterialEnvMapCorpus() {
+  const envMap = packedCubeUvGreenTexture()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.025)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.45, 1.45),
+    new THREE.MeshBasicMaterial({
+      color: 0xaa3322,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+    }),
+  ))
+
+  return {
+    name: 'packed-cubeuv-material-env-map',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 5, 6],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 45 && center.g > center.b + 20)) {
+        throw new Error(`packed CubeUV material envMap corpus should render green IBL, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
 function cubeEnvironmentOptionRotationCorpus() {
   const environment = cubeTexture([
     [255, 0, 0],
@@ -3222,6 +3303,30 @@ function cubeUvBackgroundTextureCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
         throw new Error(`CubeUV cube background corpus should sample the green face, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function packedCubeUvBackgroundTextureCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = packedCubeUvColoredBackgroundTexture()
+  scene.background.magFilter = THREE.NearestFilter
+  scene.background.minFilter = THREE.NearestFilter
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI, 0)
+
+  return {
+    name: 'packed-cubeuv-background-texture',
+    scene,
+    camera: makeCamera([0, 0, 0], [0, 0, -1]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
+        throw new Error(`packed CubeUV background corpus should sample the green face, got ${JSON.stringify(center)}`)
       }
     },
   }
