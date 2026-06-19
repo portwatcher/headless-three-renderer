@@ -34,6 +34,7 @@ export function createSceneCorpus() {
     meshDepthDisplacementMapCorpus(),
     meshDepthMaterialWireframeCorpus(),
     meshDistanceMaterialCorpus(),
+    meshDistanceDisplacementMapCorpus(),
     meshDistanceMaterialWireframeCorpus(),
     meshNormalMaterialCorpus(),
     meshNormalMaterialNormalMapCorpus(),
@@ -1849,6 +1850,73 @@ function meshDistanceMaterialCorpus() {
       const far = meanRegion(rgba, width, 60, 36, 80, 60)
       if (!(near.r < 30 && near.g < 5 && near.b < 5 && far.r > 180 && far.g < 5 && far.b < 5)) {
         throw new Error(`distance material corpus should render the far plane bright red and near plane dark, got near=${JSON.stringify(near)} far=${JSON.stringify(far)}`)
+      }
+    },
+  }
+}
+
+function meshDistanceDisplacementMapCorpus() {
+  function makeDisplacementMap(channel) {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.channel = channel
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(channel) {
+    const geometry = constantUvPlane(0.25, 0.5)
+    const uv1 = new Float32Array(geometry.getAttribute('position').count * 2)
+    for (let i = 0; i < geometry.getAttribute('position').count; i += 1) {
+      uv1[i * 2] = 0.75
+      uv1[i * 2 + 1] = 0.5
+    }
+    geometry.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshDistanceMaterial({
+        displacementMap: makeDisplacementMap(channel),
+        displacementScale: 1.2,
+        displacementBias: 0,
+      }),
+    ))
+    return scene
+  }
+
+  const primaryScene = makeScene(0)
+  const secondaryScene = makeScene(1)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 8)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let primaryCenter = null
+  let secondaryCenter = null
+
+  return {
+    name: 'mesh-distance-material-displacement-map',
+    scene: secondaryScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const primary = renderer.render(primaryScene, camera, options)
+      primaryCenter = meanRegion(primary, options.width, 32, 32, 64, 64)
+      const secondary = renderer.render(secondaryScene, camera, options)
+      secondaryCenter = meanRegion(secondary, options.width, 32, 32, 64, 64)
+      return secondary
+    },
+    validate() {
+      if (!(primaryCenter.r > secondaryCenter.r + 15)) {
+        throw new Error(`distance displacement corpus should move the uv1-selected plane closer, primary=${JSON.stringify(primaryCenter)} secondary=${JSON.stringify(secondaryCenter)}`)
       }
     },
   }
