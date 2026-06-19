@@ -407,6 +407,55 @@ test('scene.overrideMaterial owns material envMap discovery', () => {
   assert.ok(mean.g > mean.b + 40, `override envMap should replace source material blue output (${mean.g} vs ${mean.b})`)
 })
 
+test('scene.overrideMaterial replaces line point and sprite materials', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const lineGeometry = new THREE.BufferGeometry()
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.75, 0.65, 0,
+    0.75, 0.65, 0,
+  ]), 3))
+  scene.add(new THREE.Line(
+    lineGeometry,
+    new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 }),
+  ))
+
+  const pointGeometry = new THREE.BufferGeometry()
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.55, -0.55, 0,
+  ]), 3))
+  scene.add(new THREE.Points(
+    pointGeometry,
+    new THREE.PointsMaterial({ color: 0xff0000, size: 12, sizeAttenuation: false }),
+  ))
+
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x0000ff }))
+  sprite.position.set(0.55, -0.55, 0)
+  sprite.scale.set(0.35, 0.35, 1)
+  scene.add(sprite)
+
+  const overrideMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, toneMapped: false })
+  overrideMaterial.linewidth = 10
+  overrideMaterial.size = 20
+  overrideMaterial.sizeAttenuation = false
+  scene.overrideMaterial = overrideMaterial
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+
+  for (const [label, mean] of [
+    ['line', meanRegion(rgba, 96, 96, 24, 13, 72, 21)],
+    ['point', meanRegion(rgba, 96, 96, 14, 66, 30, 82)],
+    ['sprite', meanRegion(rgba, 96, 96, 68, 68, 82, 82)],
+  ]) {
+    assert.ok(mean.g > mean.r + 80, `override material should replace ${label} red channel (${mean.g} vs ${mean.r})`)
+    assert.ok(mean.g > mean.b + 80, `override material should replace ${label} blue channel (${mean.g} vs ${mean.b})`)
+  }
+})
+
 test('invalid scene.overrideMaterial values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.overrideMaterial = 'green'
