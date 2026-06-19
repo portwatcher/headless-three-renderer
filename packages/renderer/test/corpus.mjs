@@ -38,6 +38,7 @@ export function createSceneCorpus() {
     meshNormalMaterialNormalMapCorpus(),
     meshNormalMaterialBumpMapCorpus(),
     meshMatcapMaterialCorpus(),
+    meshMatcapMaterialNormalMapCorpus(),
     meshToonMaterialCorpus(),
     meshToonAlphaMapCorpus(),
     globalClippingPlaneCorpus(),
@@ -1906,6 +1907,60 @@ function meshMatcapMaterialCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.b > center.r + 20 && center.g > center.r + 10)) {
         throw new Error(`matcap corpus should sample the blue-green matcap blend, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function meshMatcapMaterialNormalMapCorpus() {
+  function makeMatcap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(normalMap) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: makeMatcap(),
+        normalMap,
+      }),
+    ))
+    return scene
+  }
+
+  const flatScene = makeScene(null)
+  const mappedScene = makeScene(solidTexture(255, 128, 128))
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let flatCenter = null
+  let mappedCenter = null
+
+  return {
+    name: 'mesh-matcap-material-normal-map',
+    scene: mappedScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(flatScene, camera, options)
+      flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
+      const mapped = renderer.render(mappedScene, camera, options)
+      mappedCenter = meanRegion(mapped, options.width, 32, 32, 64, 64)
+      return mapped
+    },
+    validate() {
+      if (!(flatCenter.r > flatCenter.g + 40 && mappedCenter.g > mappedCenter.r + 40)) {
+        throw new Error(`matcap normal-map corpus should shift lookup from red to green, flat=${JSON.stringify(flatCenter)} mapped=${JSON.stringify(mappedCenter)}`)
       }
     },
   }
