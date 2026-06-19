@@ -30379,6 +30379,17 @@ test('Renderer setEffects is an inert validated compatibility hook', () => {
 test('Renderer renderBufferDirect fails clearly as unsupported', () => {
   const renderer = new Renderer()
 
+  assert.equal(renderer.getRenderObjectFunction(), null)
+  assert.equal(renderer.setRenderObjectFunction(null), undefined)
+  assert.equal(renderer.getRenderObjectFunction(), null)
+  assert.throws(
+    () => renderer.setRenderObjectFunction('renderObject'),
+    /Renderer\.setRenderObjectFunction renderObjectFunction must be a function or null/i,
+  )
+  assert.throws(
+    () => renderer.setRenderObjectFunction(() => {}),
+    /Renderer\.setRenderObjectFunction\(\) is not supported.*render-object dispatch.*Renderer\.render\(\) or renderToTarget\(\)/i,
+  )
   assert.throws(
     () => renderer.renderBufferDirect(),
     /Renderer\.renderBufferDirect\(\) is not supported.*WebGL buffer binding.*Renderer\.render\(\) or renderToTarget\(\)/i,

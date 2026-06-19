@@ -887,6 +887,20 @@ export class Renderer {
     assertEffectsArrayOrNull(effects, 'Renderer.setEffects effects')
   }
 
+  setRenderObjectFunction(renderObjectFunction: ((...args: unknown[]) => unknown) | null): void {
+    if (renderObjectFunction === null) return
+    if (typeof renderObjectFunction !== 'function') {
+      throw new TypeError('Renderer.setRenderObjectFunction renderObjectFunction must be a function or null.')
+    }
+    throw new Error(
+      'Renderer.setRenderObjectFunction() is not supported by @headless-three/renderer because it does not expose renderer-internal render-object dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
+    )
+  }
+
+  getRenderObjectFunction(): null {
+    return null
+  }
+
   renderBufferDirect(): never {
     throw new Error(
       'Renderer.renderBufferDirect() is not supported by @headless-three/renderer because it does not expose WebGL buffer binding or direct material program dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',

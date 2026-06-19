@@ -123,7 +123,7 @@ The public API accepts only Three.js-like objects:
 - `Renderer.transmissionResolutionScale` is stored as positive finite WebGLRenderer compatibility state and scales the scene-color texture sampled by physical transmission
 - `Renderer.isWebGLRenderer` is exposed for Three.js helper branches that use WebGLRenderer-compatible readback signatures, including `LightProbeGenerator.fromCubeRenderTarget()` cube-target readback and `EXRExporter`/`KTX2Exporter` render-target export paths, while WebGL context access still fails clearly
 - `Renderer.state` exposes inert `buffers.color`, `buffers.depth`, and `buffers.stencil` no-op setter probes plus `buffers.depth.getReversed()` and no-op `reset()`/`unbindTexture()` hooks for WebGLRenderer-adjacent helpers
-- `Renderer.renderBufferDirect()` fails clearly because direct WebGL buffer binding and material program dispatch are outside the scene-oriented API
+- `Renderer.renderBufferDirect()` and non-null `Renderer.setRenderObjectFunction()` fail clearly because direct WebGL buffer binding, renderer-internal render-object dispatch, and material program dispatch are outside the scene-oriented API; `Renderer.getRenderObjectFunction()` returns `null`, and `Renderer.setRenderObjectFunction(null)` is accepted as a clear operation
 - perspective, orthographic, and custom projection matrices
 
 ### Materials & Textures
