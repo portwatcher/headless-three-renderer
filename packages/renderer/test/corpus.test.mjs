@@ -13,7 +13,9 @@ test('representative scene corpus renders without crashes', async (t) => {
 
   for (const fixture of corpus) {
     await t.test(fixture.name, () => {
-      const rgba = renderer.render(fixture.scene, fixture.camera, fixture.options)
+      const rgba = typeof fixture.render === 'function'
+        ? fixture.render(renderer)
+        : renderer.render(fixture.scene, fixture.camera, fixture.options)
       const width = fixture.options.width
       const height = fixture.options.height
       assert.equal(rgba.length, width * height * 4)

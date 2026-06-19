@@ -15,6 +15,7 @@ export function createSceneCorpus() {
     cubeBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
     cubeCameraCaptureCorpus(),
+    cubeCameraUpdateCorpus(),
     viewportScissorCorpus(),
     customSortGroupCorpus(),
     materialEnvMapCorpus(),
@@ -1684,24 +1685,7 @@ function arrayCameraViewportCorpus() {
 }
 
 function cubeCameraCaptureCorpus() {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  const addPlane = (position, rotation, color) => {
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
-      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
-    )
-    plane.position.set(position[0], position[1], position[2])
-    plane.rotation.set(rotation[0], rotation[1], rotation[2])
-    scene.add(plane)
-  }
-  addPlane([2, 0, 0], [0, Math.PI / 2, 0], 0xff0000)
-  addPlane([-2, 0, 0], [0, Math.PI / 2, 0], 0x00ff00)
-  addPlane([0, 2, 0], [Math.PI / 2, 0, 0], 0x0000ff)
-  addPlane([0, -2, 0], [Math.PI / 2, 0, 0], 0xffff00)
-  addPlane([0, 0, 2], [0, 0, 0], 0xff00ff)
-  addPlane([0, 0, -2], [0, 0, 0], 0x00ffff)
-
+  const scene = makeCubeCaptureScene()
   const target = new THREE.WebGLCubeRenderTarget(CORPUS_RENDER_SIZE)
   const camera = new THREE.CubeCamera(0.01, 100, target)
 
@@ -1721,6 +1705,55 @@ function cubeCameraCaptureCorpus() {
       }
     },
   }
+}
+
+function cubeCameraUpdateCorpus() {
+  const scene = makeCubeCaptureScene()
+  const target = new THREE.WebGLCubeRenderTarget(CORPUS_RENDER_SIZE)
+  const camera = new THREE.CubeCamera(0.01, 100, target)
+  camera.activeMipmapLevel = 1
+
+  return {
+    name: 'cube-camera-update-active-mip',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE / 2, height: CORPUS_RENDER_SIZE / 2, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      camera.update(renderer, scene)
+      return target.texture.mipmaps[1].image[0].data
+    },
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 24, 24)
+      const corner = pixelAt(rgba, width, 2, 2)
+      if (!(center.r > center.g + 180 && center.r > center.b + 180 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
+        throw new Error(`cube camera update corpus should capture the red +X active mip face, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function makeCubeCaptureScene() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const addPlane = (position, rotation, color) => {
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+    )
+    plane.position.set(position[0], position[1], position[2])
+    plane.rotation.set(rotation[0], rotation[1], rotation[2])
+    scene.add(plane)
+  }
+  addPlane([2, 0, 0], [0, Math.PI / 2, 0], 0xff0000)
+  addPlane([-2, 0, 0], [0, Math.PI / 2, 0], 0x00ff00)
+  addPlane([0, 2, 0], [Math.PI / 2, 0, 0], 0x0000ff)
+  addPlane([0, -2, 0], [Math.PI / 2, 0, 0], 0xffff00)
+  addPlane([0, 0, 2], [0, 0, 0], 0xff00ff)
+  addPlane([0, 0, -2], [0, 0, 0], 0x00ffff)
+  return scene
 }
 
 function equirectangularBackgroundCorpus() {
