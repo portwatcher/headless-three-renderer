@@ -724,16 +724,39 @@ export class Renderer {
   copyTextureToTexture(
     srcTexture: ThreeTextureLike,
     dstTexture: ThreeTextureLike,
-    _srcRegion: unknown = null,
-    _dstPosition: unknown = null,
-    _srcLevel = 0,
-    _dstLevel = 0,
-  ): never {
+    srcRegion: unknown = null,
+    dstPosition: unknown = null,
+    srcLevel = 0,
+    dstLevel = 0,
+  ): void {
     assertThreeTextureLike(srcTexture, 'Renderer.copyTextureToTexture source texture')
     assertThreeTextureLike(dstTexture, 'Renderer.copyTextureToTexture destination texture')
-    throw new Error(
-      'Renderer.copyTextureToTexture() is not supported by @headless-three/renderer because GPU texture-to-texture copies are outside the scene-oriented API. Copy readable texture data on the CPU before rendering, or render into a target and use Renderer.readRenderTargetPixels() for CPU readback.',
-    )
+    assertTextureCopyLevel(srcLevel, 'Renderer.copyTextureToTexture source level')
+    assertTextureCopyLevel(dstLevel, 'Renderer.copyTextureToTexture destination level')
+
+    const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture')
+    const destination = rawTextureCopyImage(dstTexture, 'Renderer.copyTextureToTexture destination texture')
+    if (source.channels !== destination.channels) {
+      throw new Error(
+        `Renderer.copyTextureToTexture textures must use the same raw channel count (${source.channels} source channels, ${destination.channels} destination channels).`,
+      )
+    }
+
+    const region = textureCopySourceRegion(srcRegion, source.width, source.height, 'Renderer.copyTextureToTexture source region')
+    const position = textureCopyDestinationPosition(dstPosition, 'Renderer.copyTextureToTexture destination position')
+    if (position.x + region.width > destination.width || position.y + region.height > destination.height) {
+      throw new RangeError('Renderer.copyTextureToTexture destination position and source region exceed destination texture bounds.')
+    }
+
+    const channels = source.channels
+    for (let row = 0; row < region.height; row += 1) {
+      const sourceStart = (((region.y + row) * source.width) + region.x) * channels
+      const destinationStart = (((position.y + row) * destination.width) + position.x) * channels
+      for (let i = 0; i < region.width * channels; i += 1) {
+        destination.data[destinationStart + i] = source.data[sourceStart + i]
+      }
+    }
+    dstTexture.needsUpdate = true
   }
 
   setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
@@ -3328,6 +3351,148 @@ function assertExternalWebGlObjectLike(value: unknown, label: string): void {
 function assertOptionalExternalWebGlObjectLike(value: unknown, label: string): void {
   if (value == null) return
   assertExternalWebGlObjectLike(value, label)
+}
+
+interface RawTextureCopyImage {
+  data: { length: number; [index: number]: number }
+  width: number
+  height: number
+  channels: number
+}
+
+interface TextureCopyRegion {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+interface TextureCopyPosition {
+  x: number
+  y: number
+}
+
+function rawTextureCopyImage(texture: ThreeTextureLike, label: string): RawTextureCopyImage {
+  const image = texture.image ?? texture.source?.data
+  if (!image || Array.isArray(image) || Buffer.isBuffer(image) || image instanceof Uint8Array) {
+    throw new TypeError(`${label} must provide a readable raw image object with data, width, and height.`)
+  }
+  if (typeof image !== 'object') {
+    throw new TypeError(`${label} must provide a readable raw image object with data, width, and height.`)
+  }
+  const candidate = image as { data?: unknown; width?: unknown; height?: unknown }
+  const width = textureCopyPositiveInteger(candidate.width, `${label}.width`)
+  const height = textureCopyPositiveInteger(candidate.height, `${label}.height`)
+  const data = candidate.data
+  if (!isMutableTextureCopyData(data)) {
+    throw new TypeError(`${label}.data must be a mutable numeric array or typed array.`)
+  }
+  const pixels = width * height
+  if (data.length === 0 || data.length % pixels !== 0) {
+    throw new RangeError(`${label}.data length must be a positive multiple of width * height.`)
+  }
+  const channels = data.length / pixels
+  if (!Number.isInteger(channels) || channels < 1 || channels > 4) {
+    throw new RangeError(`${label}.data must use 1, 2, 3, or 4 channels per pixel.`)
+  }
+  return { data, width, height, channels }
+}
+
+function isMutableTextureCopyData(value: unknown): value is { length: number; [index: number]: number } {
+  return (
+    (Array.isArray(value) || ArrayBuffer.isView(value)) &&
+    typeof (value as { length?: unknown }).length === 'number'
+  )
+}
+
+function assertTextureCopyLevel(value: unknown, label: string): void {
+  const level = value == null ? 0 : value
+  if (!Number.isInteger(level) || (level as number) < 0) {
+    throw new TypeError(`${label} must be a non-negative integer.`)
+  }
+  if (level !== 0) {
+    throw new Error(`${label} only supports level 0 for readable CPU texture copies.`)
+  }
+}
+
+function textureCopySourceRegion(value: unknown, sourceWidth: number, sourceHeight: number, label: string): TextureCopyRegion {
+  if (value == null) {
+    return { x: 0, y: 0, width: sourceWidth, height: sourceHeight }
+  }
+  let region: TextureCopyRegion
+  if (Array.isArray(value)) {
+    region = {
+      x: textureCopyInteger(value[0], `${label}.x`),
+      y: textureCopyInteger(value[1], `${label}.y`),
+      width: textureCopyPositiveInteger(value[2], `${label}.width`),
+      height: textureCopyPositiveInteger(value[3], `${label}.height`),
+    }
+  } else if (typeof value === 'object') {
+    const candidate = value as {
+      x?: unknown
+      y?: unknown
+      width?: unknown
+      height?: unknown
+      min?: { x?: unknown; y?: unknown }
+      max?: { x?: unknown; y?: unknown }
+    }
+    if (candidate.min && candidate.max) {
+      const x = textureCopyInteger(candidate.min.x, `${label}.min.x`)
+      const y = textureCopyInteger(candidate.min.y, `${label}.min.y`)
+      const maxX = textureCopyInteger(candidate.max.x, `${label}.max.x`)
+      const maxY = textureCopyInteger(candidate.max.y, `${label}.max.y`)
+      region = { x, y, width: maxX - x, height: maxY - y }
+      if (region.width <= 0 || region.height <= 0) {
+        throw new RangeError(`${label} box must have positive width and height.`)
+      }
+    } else {
+      region = {
+        x: textureCopyInteger(candidate.x, `${label}.x`),
+        y: textureCopyInteger(candidate.y, `${label}.y`),
+        width: textureCopyPositiveInteger(candidate.width, `${label}.width`),
+        height: textureCopyPositiveInteger(candidate.height, `${label}.height`),
+      }
+    }
+  } else {
+    throw new TypeError(`${label} must be a rectangle object, Box2-like object, array, or null.`)
+  }
+  if (region.x < 0 || region.y < 0 || region.x + region.width > sourceWidth || region.y + region.height > sourceHeight) {
+    throw new RangeError(`${label} must fit inside the source texture bounds.`)
+  }
+  return region
+}
+
+function textureCopyDestinationPosition(value: unknown, label: string): TextureCopyPosition {
+  if (value == null) return { x: 0, y: 0 }
+  if (Array.isArray(value)) {
+    const x = textureCopyInteger(value[0], `${label}.x`)
+    const y = textureCopyInteger(value[1], `${label}.y`)
+    if (x < 0 || y < 0) throw new RangeError(`${label} must be non-negative.`)
+    return { x, y }
+  }
+  if (typeof value === 'object') {
+    const candidate = value as { x?: unknown; y?: unknown }
+    const x = textureCopyInteger(candidate.x, `${label}.x`)
+    const y = textureCopyInteger(candidate.y, `${label}.y`)
+    if (x < 0 || y < 0) throw new RangeError(`${label} must be non-negative.`)
+    return { x, y }
+  }
+  throw new TypeError(`${label} must be a vector object, array, or null.`)
+}
+
+function textureCopyInteger(value: unknown, label: string): number {
+  if (!Number.isInteger(value)) {
+    throw new TypeError(`${label} must be an integer.`)
+  }
+  return value as number
+}
+
+function textureCopyPositiveInteger(value: unknown, label: string): number {
+  const integer = textureCopyInteger(value, label)
+  if (integer <= 0) {
+    throw new RangeError(`${label} must be a positive integer.`)
+  }
+  return integer
 }
 
 function assertEulerOption(value: unknown, label: string): void {

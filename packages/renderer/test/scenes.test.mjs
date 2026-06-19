@@ -29449,10 +29449,6 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     /Renderer\.copyFramebufferToTexture\(\).*not supported.*readRenderTargetPixels/i,
   )
   assert.throws(
-    () => renderer.copyTextureToTexture(source, destination),
-    /Renderer\.copyTextureToTexture\(\).*not supported.*Copy readable texture data on the CPU/i,
-  )
-  assert.throws(
     () => renderer.setRenderTargetTextures(null, externalColorTexture),
     /Renderer\.setRenderTargetTextures renderTarget must be a target-like object/i,
   )
@@ -29484,6 +29480,49 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     () => renderer.copyTextureToTexture(source, null),
     /Renderer\.copyTextureToTexture destination texture must be a texture-like object/i,
   )
+  assert.throws(
+    () => renderer.copyTextureToTexture({ isTexture: true, image: Buffer.from([1, 2, 3, 4]) }, destination),
+    /Renderer\.copyTextureToTexture source texture must provide a readable raw image object/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, destination, null, null, 1),
+    /Renderer\.copyTextureToTexture source level only supports level 0/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, destination, { x: 0, y: 0, width: 2, height: 1 }),
+    /Renderer\.copyTextureToTexture source region must fit inside the source texture bounds/i,
+  )
+  const rgbSource = new THREE.DataTexture(new Uint8Array([255, 0, 0]), 1, 1, THREE.RGBFormat)
+  assert.throws(
+    () => renderer.copyTextureToTexture(rgbSource, destination),
+    /same raw channel count/i,
+  )
+})
+
+test('Renderer copyTextureToTexture copies readable raw texture data on the CPU', () => {
+  const renderer = new Renderer()
+  const source = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 0, 255, 255,
+    255, 255, 0, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  const destinationData = new Uint8Array(3 * 3 * 4)
+  destinationData.fill(9)
+  const destination = new THREE.DataTexture(destinationData, 3, 3, THREE.RGBAFormat)
+  const initialVersion = destination.version
+
+  renderer.copyTextureToTexture(source, destination, { x: 1, y: 0, width: 1, height: 2 }, { x: 1, y: 1 })
+
+  function pixel(x, y) {
+    const offset = (y * 3 + x) * 4
+    return Array.from(destination.image.data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(pixel(1, 1), [0, 255, 0, 255])
+  assert.deepEqual(pixel(1, 2), [255, 255, 0, 255])
+  assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after CPU copy')
 })
 
 test('Renderer clear methods are no-op compatibility hooks', () => {

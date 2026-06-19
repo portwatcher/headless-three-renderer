@@ -117,6 +117,7 @@ export interface ThreeTextureLike {
   format?: number
   type?: number
   generateMipmaps?: boolean
+  needsUpdate?: boolean
   mipmaps?: Array<{
     data?: ArrayLike<number>
     width?: number
