@@ -1138,138 +1138,20 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         _ => None,
     };
 
-    let clearcoat_map = decode_optional_texture_with_sampling(
-        mesh.clearcoat_map.as_deref(),
-        mesh.clearcoat_map_width,
-        mesh.clearcoat_map_height,
-        mesh_index,
-        mesh.clearcoat_map_wrap_s.as_deref(),
-        mesh.clearcoat_map_wrap_t.as_deref(),
-        mesh.clearcoat_map_mag_filter.as_deref(),
-        mesh.clearcoat_map_min_filter.as_deref(),
-        mesh.clearcoat_map_anisotropy,
-    )?;
-    let clearcoat_roughness_map = decode_optional_texture_with_sampling(
-        mesh.clearcoat_roughness_map.as_deref(),
-        mesh.clearcoat_roughness_map_width,
-        mesh.clearcoat_roughness_map_height,
-        mesh_index,
-        mesh.clearcoat_roughness_map_wrap_s.as_deref(),
-        mesh.clearcoat_roughness_map_wrap_t.as_deref(),
-        mesh.clearcoat_roughness_map_mag_filter.as_deref(),
-        mesh.clearcoat_roughness_map_min_filter.as_deref(),
-        mesh.clearcoat_roughness_map_anisotropy,
-    )?;
-    let clearcoat_normal_map = decode_optional_texture_with_sampling(
-        mesh.clearcoat_normal_map.as_deref(),
-        mesh.clearcoat_normal_map_width,
-        mesh.clearcoat_normal_map_height,
-        mesh_index,
-        mesh.clearcoat_normal_map_wrap_s.as_deref(),
-        mesh.clearcoat_normal_map_wrap_t.as_deref(),
-        mesh.clearcoat_normal_map_mag_filter.as_deref(),
-        mesh.clearcoat_normal_map_min_filter.as_deref(),
-        mesh.clearcoat_normal_map_anisotropy,
-    )?;
-    let sheen_color_map = decode_optional_texture_with_sampling(
-        mesh.sheen_color_map.as_deref(),
-        mesh.sheen_color_map_width,
-        mesh.sheen_color_map_height,
-        mesh_index,
-        mesh.sheen_color_map_wrap_s.as_deref(),
-        mesh.sheen_color_map_wrap_t.as_deref(),
-        mesh.sheen_color_map_mag_filter.as_deref(),
-        mesh.sheen_color_map_min_filter.as_deref(),
-        mesh.sheen_color_map_anisotropy,
-    )?;
-    let sheen_roughness_map = decode_optional_texture_with_sampling(
-        mesh.sheen_roughness_map.as_deref(),
-        mesh.sheen_roughness_map_width,
-        mesh.sheen_roughness_map_height,
-        mesh_index,
-        mesh.sheen_roughness_map_wrap_s.as_deref(),
-        mesh.sheen_roughness_map_wrap_t.as_deref(),
-        mesh.sheen_roughness_map_mag_filter.as_deref(),
-        mesh.sheen_roughness_map_min_filter.as_deref(),
-        mesh.sheen_roughness_map_anisotropy,
-    )?;
-    let anisotropy_map = decode_optional_texture_with_sampling(
-        mesh.anisotropy_map.as_deref(),
-        mesh.anisotropy_map_width,
-        mesh.anisotropy_map_height,
-        mesh_index,
-        mesh.anisotropy_map_wrap_s.as_deref(),
-        mesh.anisotropy_map_wrap_t.as_deref(),
-        mesh.anisotropy_map_mag_filter.as_deref(),
-        mesh.anisotropy_map_min_filter.as_deref(),
-        mesh.anisotropy_map_anisotropy,
-    )?;
-    let iridescence_map = decode_optional_texture_with_sampling(
-        mesh.iridescence_map.as_deref(),
-        mesh.iridescence_map_width,
-        mesh.iridescence_map_height,
-        mesh_index,
-        mesh.iridescence_map_wrap_s.as_deref(),
-        mesh.iridescence_map_wrap_t.as_deref(),
-        mesh.iridescence_map_mag_filter.as_deref(),
-        mesh.iridescence_map_min_filter.as_deref(),
-        mesh.iridescence_map_anisotropy,
-    )?;
-    let iridescence_thickness_map = decode_optional_texture_with_sampling(
-        mesh.iridescence_thickness_map.as_deref(),
-        mesh.iridescence_thickness_map_width,
-        mesh.iridescence_thickness_map_height,
-        mesh_index,
-        mesh.iridescence_thickness_map_wrap_s.as_deref(),
-        mesh.iridescence_thickness_map_wrap_t.as_deref(),
-        mesh.iridescence_thickness_map_mag_filter.as_deref(),
-        mesh.iridescence_thickness_map_min_filter.as_deref(),
-        mesh.iridescence_thickness_map_anisotropy,
-    )?;
-    let transmission_map = decode_optional_texture_with_sampling(
-        mesh.transmission_map.as_deref(),
-        mesh.transmission_map_width,
-        mesh.transmission_map_height,
-        mesh_index,
-        mesh.transmission_map_wrap_s.as_deref(),
-        mesh.transmission_map_wrap_t.as_deref(),
-        mesh.transmission_map_mag_filter.as_deref(),
-        mesh.transmission_map_min_filter.as_deref(),
-        mesh.transmission_map_anisotropy,
-    )?;
-    let thickness_map = decode_optional_texture_with_sampling(
-        mesh.thickness_map.as_deref(),
-        mesh.thickness_map_width,
-        mesh.thickness_map_height,
-        mesh_index,
-        mesh.thickness_map_wrap_s.as_deref(),
-        mesh.thickness_map_wrap_t.as_deref(),
-        mesh.thickness_map_mag_filter.as_deref(),
-        mesh.thickness_map_min_filter.as_deref(),
-        mesh.thickness_map_anisotropy,
-    )?;
-    let specular_color_map = decode_optional_texture_with_sampling(
-        mesh.specular_color_map.as_deref(),
-        mesh.specular_color_map_width,
-        mesh.specular_color_map_height,
-        mesh_index,
-        mesh.specular_color_map_wrap_s.as_deref(),
-        mesh.specular_color_map_wrap_t.as_deref(),
-        mesh.specular_color_map_mag_filter.as_deref(),
-        mesh.specular_color_map_min_filter.as_deref(),
-        mesh.specular_color_map_anisotropy,
-    )?;
-    let specular_intensity_map = decode_optional_texture_with_sampling(
-        mesh.specular_intensity_map.as_deref(),
-        mesh.specular_intensity_map_width,
-        mesh.specular_intensity_map_height,
-        mesh_index,
-        mesh.specular_intensity_map_wrap_s.as_deref(),
-        mesh.specular_intensity_map_wrap_t.as_deref(),
-        mesh.specular_intensity_map_mag_filter.as_deref(),
-        mesh.specular_intensity_map_min_filter.as_deref(),
-        mesh.specular_intensity_map_anisotropy,
-    )?;
+    let PhysicalTextureInputs {
+        clearcoat_map,
+        clearcoat_roughness_map,
+        clearcoat_normal_map,
+        sheen_color_map,
+        sheen_roughness_map,
+        anisotropy_map,
+        iridescence_map,
+        iridescence_thickness_map,
+        transmission_map,
+        thickness_map,
+        specular_color_map,
+        specular_intensity_map,
+    } = prepare_physical_texture_inputs(mesh, mesh_index)?;
     let physical_maps = pack_physical_maps(PhysicalMapInputs {
         clearcoat: clearcoat_map.as_ref(),
         clearcoat_roughness: clearcoat_roughness_map.as_ref(),
@@ -2009,6 +1891,249 @@ fn apply_texture_sampling(
     texture.min_filter = TextureFilter::from_min_filter_str(min_filter);
     texture.mipmap_filter = MipmapFilter::from_min_filter_str(min_filter);
     texture.anisotropy = texture_anisotropy(anisotropy);
+}
+
+#[derive(Default)]
+struct PhysicalTextureInputs {
+    clearcoat_map: Option<PreparedTexture>,
+    clearcoat_roughness_map: Option<PreparedTexture>,
+    clearcoat_normal_map: Option<PreparedTexture>,
+    sheen_color_map: Option<PreparedTexture>,
+    sheen_roughness_map: Option<PreparedTexture>,
+    anisotropy_map: Option<PreparedTexture>,
+    iridescence_map: Option<PreparedTexture>,
+    iridescence_thickness_map: Option<PreparedTexture>,
+    transmission_map: Option<PreparedTexture>,
+    thickness_map: Option<PreparedTexture>,
+    specular_color_map: Option<PreparedTexture>,
+    specular_intensity_map: Option<PreparedTexture>,
+}
+
+fn prepare_physical_texture_inputs(
+    mesh: &SceneMesh,
+    mesh_index: usize,
+) -> Result<PhysicalTextureInputs> {
+    if !has_physical_texture_input(mesh) {
+        return Ok(PhysicalTextureInputs::default());
+    }
+
+    thread::scope(|scope| {
+        let clearcoat_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.clearcoat_map.as_deref(),
+                mesh.clearcoat_map_width,
+                mesh.clearcoat_map_height,
+                mesh_index,
+                mesh.clearcoat_map_wrap_s.as_deref(),
+                mesh.clearcoat_map_wrap_t.as_deref(),
+                mesh.clearcoat_map_mag_filter.as_deref(),
+                mesh.clearcoat_map_min_filter.as_deref(),
+                mesh.clearcoat_map_anisotropy,
+            )
+        });
+        let clearcoat_roughness_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.clearcoat_roughness_map.as_deref(),
+                mesh.clearcoat_roughness_map_width,
+                mesh.clearcoat_roughness_map_height,
+                mesh_index,
+                mesh.clearcoat_roughness_map_wrap_s.as_deref(),
+                mesh.clearcoat_roughness_map_wrap_t.as_deref(),
+                mesh.clearcoat_roughness_map_mag_filter.as_deref(),
+                mesh.clearcoat_roughness_map_min_filter.as_deref(),
+                mesh.clearcoat_roughness_map_anisotropy,
+            )
+        });
+        let clearcoat_normal_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.clearcoat_normal_map.as_deref(),
+                mesh.clearcoat_normal_map_width,
+                mesh.clearcoat_normal_map_height,
+                mesh_index,
+                mesh.clearcoat_normal_map_wrap_s.as_deref(),
+                mesh.clearcoat_normal_map_wrap_t.as_deref(),
+                mesh.clearcoat_normal_map_mag_filter.as_deref(),
+                mesh.clearcoat_normal_map_min_filter.as_deref(),
+                mesh.clearcoat_normal_map_anisotropy,
+            )
+        });
+        let sheen_color_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.sheen_color_map.as_deref(),
+                mesh.sheen_color_map_width,
+                mesh.sheen_color_map_height,
+                mesh_index,
+                mesh.sheen_color_map_wrap_s.as_deref(),
+                mesh.sheen_color_map_wrap_t.as_deref(),
+                mesh.sheen_color_map_mag_filter.as_deref(),
+                mesh.sheen_color_map_min_filter.as_deref(),
+                mesh.sheen_color_map_anisotropy,
+            )
+        });
+        let sheen_roughness_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.sheen_roughness_map.as_deref(),
+                mesh.sheen_roughness_map_width,
+                mesh.sheen_roughness_map_height,
+                mesh_index,
+                mesh.sheen_roughness_map_wrap_s.as_deref(),
+                mesh.sheen_roughness_map_wrap_t.as_deref(),
+                mesh.sheen_roughness_map_mag_filter.as_deref(),
+                mesh.sheen_roughness_map_min_filter.as_deref(),
+                mesh.sheen_roughness_map_anisotropy,
+            )
+        });
+        let anisotropy_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.anisotropy_map.as_deref(),
+                mesh.anisotropy_map_width,
+                mesh.anisotropy_map_height,
+                mesh_index,
+                mesh.anisotropy_map_wrap_s.as_deref(),
+                mesh.anisotropy_map_wrap_t.as_deref(),
+                mesh.anisotropy_map_mag_filter.as_deref(),
+                mesh.anisotropy_map_min_filter.as_deref(),
+                mesh.anisotropy_map_anisotropy,
+            )
+        });
+        let iridescence_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.iridescence_map.as_deref(),
+                mesh.iridescence_map_width,
+                mesh.iridescence_map_height,
+                mesh_index,
+                mesh.iridescence_map_wrap_s.as_deref(),
+                mesh.iridescence_map_wrap_t.as_deref(),
+                mesh.iridescence_map_mag_filter.as_deref(),
+                mesh.iridescence_map_min_filter.as_deref(),
+                mesh.iridescence_map_anisotropy,
+            )
+        });
+        let iridescence_thickness_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.iridescence_thickness_map.as_deref(),
+                mesh.iridescence_thickness_map_width,
+                mesh.iridescence_thickness_map_height,
+                mesh_index,
+                mesh.iridescence_thickness_map_wrap_s.as_deref(),
+                mesh.iridescence_thickness_map_wrap_t.as_deref(),
+                mesh.iridescence_thickness_map_mag_filter.as_deref(),
+                mesh.iridescence_thickness_map_min_filter.as_deref(),
+                mesh.iridescence_thickness_map_anisotropy,
+            )
+        });
+        let transmission_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.transmission_map.as_deref(),
+                mesh.transmission_map_width,
+                mesh.transmission_map_height,
+                mesh_index,
+                mesh.transmission_map_wrap_s.as_deref(),
+                mesh.transmission_map_wrap_t.as_deref(),
+                mesh.transmission_map_mag_filter.as_deref(),
+                mesh.transmission_map_min_filter.as_deref(),
+                mesh.transmission_map_anisotropy,
+            )
+        });
+        let thickness_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.thickness_map.as_deref(),
+                mesh.thickness_map_width,
+                mesh.thickness_map_height,
+                mesh_index,
+                mesh.thickness_map_wrap_s.as_deref(),
+                mesh.thickness_map_wrap_t.as_deref(),
+                mesh.thickness_map_mag_filter.as_deref(),
+                mesh.thickness_map_min_filter.as_deref(),
+                mesh.thickness_map_anisotropy,
+            )
+        });
+        let specular_color_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.specular_color_map.as_deref(),
+                mesh.specular_color_map_width,
+                mesh.specular_color_map_height,
+                mesh_index,
+                mesh.specular_color_map_wrap_s.as_deref(),
+                mesh.specular_color_map_wrap_t.as_deref(),
+                mesh.specular_color_map_mag_filter.as_deref(),
+                mesh.specular_color_map_min_filter.as_deref(),
+                mesh.specular_color_map_anisotropy,
+            )
+        });
+        let specular_intensity_map = scope.spawn(|| {
+            decode_optional_texture_with_sampling(
+                mesh.specular_intensity_map.as_deref(),
+                mesh.specular_intensity_map_width,
+                mesh.specular_intensity_map_height,
+                mesh_index,
+                mesh.specular_intensity_map_wrap_s.as_deref(),
+                mesh.specular_intensity_map_wrap_t.as_deref(),
+                mesh.specular_intensity_map_mag_filter.as_deref(),
+                mesh.specular_intensity_map_min_filter.as_deref(),
+                mesh.specular_intensity_map_anisotropy,
+            )
+        });
+
+        Ok(PhysicalTextureInputs {
+            clearcoat_map: join_texture_worker(clearcoat_map, "clearcoat map worker")?,
+            clearcoat_roughness_map: join_texture_worker(
+                clearcoat_roughness_map,
+                "clearcoat roughness map worker",
+            )?,
+            clearcoat_normal_map: join_texture_worker(
+                clearcoat_normal_map,
+                "clearcoat normal map worker",
+            )?,
+            sheen_color_map: join_texture_worker(sheen_color_map, "sheen color map worker")?,
+            sheen_roughness_map: join_texture_worker(
+                sheen_roughness_map,
+                "sheen roughness map worker",
+            )?,
+            anisotropy_map: join_texture_worker(anisotropy_map, "anisotropy map worker")?,
+            iridescence_map: join_texture_worker(iridescence_map, "iridescence map worker")?,
+            iridescence_thickness_map: join_texture_worker(
+                iridescence_thickness_map,
+                "iridescence thickness map worker",
+            )?,
+            transmission_map: join_texture_worker(transmission_map, "transmission map worker")?,
+            thickness_map: join_texture_worker(thickness_map, "thickness map worker")?,
+            specular_color_map: join_texture_worker(
+                specular_color_map,
+                "specular color map worker",
+            )?,
+            specular_intensity_map: join_texture_worker(
+                specular_intensity_map,
+                "specular intensity map worker",
+            )?,
+        })
+    })
+}
+
+fn has_physical_texture_input(mesh: &SceneMesh) -> bool {
+    [
+        mesh.clearcoat_map.as_deref(),
+        mesh.clearcoat_roughness_map.as_deref(),
+        mesh.clearcoat_normal_map.as_deref(),
+        mesh.sheen_color_map.as_deref(),
+        mesh.sheen_roughness_map.as_deref(),
+        mesh.anisotropy_map.as_deref(),
+        mesh.iridescence_map.as_deref(),
+        mesh.iridescence_thickness_map.as_deref(),
+        mesh.transmission_map.as_deref(),
+        mesh.thickness_map.as_deref(),
+        mesh.specular_color_map.as_deref(),
+        mesh.specular_intensity_map.as_deref(),
+    ]
+    .into_iter()
+    .any(|data| data.is_some_and(|data| !data.is_empty()))
+}
+
+fn join_texture_worker<T>(
+    handle: thread::ScopedJoinHandle<'_, Result<T>>,
+    label: &str,
+) -> Result<T> {
+    handle.join().unwrap_or_else(|_| panic!("{label} panicked"))
 }
 
 struct PhysicalMapInputs<'a> {

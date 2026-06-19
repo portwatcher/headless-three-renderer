@@ -227,6 +227,47 @@ mod tests {
         assert_eq!(mr_tex.height, 1);
     }
 
+    #[test]
+    fn accepts_mesh_with_physical_extension_maps() {
+        let scene = RenderScene {
+            meshes: Some(vec![SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                uvs: Some(vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                clearcoat_map: Some(vec![255u8, 0, 0, 255].into()),
+                clearcoat_map_width: Some(1),
+                clearcoat_map_height: Some(1),
+                clearcoat_normal_map: Some(vec![128u8, 128, 255, 255].into()),
+                clearcoat_normal_map_width: Some(1),
+                clearcoat_normal_map_height: Some(1),
+                transmission_map: Some(vec![128u8, 0, 0, 255].into()),
+                transmission_map_width: Some(1),
+                transmission_map_height: Some(1),
+                thickness_map: Some(vec![0u8, 64, 0, 255].into()),
+                thickness_map_width: Some(1),
+                thickness_map_height: Some(1),
+                specular_color_map: Some(vec![10u8, 20, 30, 255].into()),
+                specular_color_map_width: Some(1),
+                specular_color_map_height: Some(1),
+                specular_intensity_map: Some(vec![0u8, 0, 0, 77].into()),
+                specular_intensity_map_width: Some(1),
+                specular_intensity_map_height: Some(1),
+                ..SceneMesh::default()
+            }]),
+            ..RenderScene::default()
+        };
+
+        let meshes = prepare_meshes(&scene).unwrap();
+        let mesh = &meshes[0];
+        assert!(mesh.clearcoat_normal_map.is_some());
+        let physical_maps = mesh.physical_maps.as_ref().unwrap();
+        assert_eq!(physical_maps.scalar_map.width, 1);
+        assert_eq!(physical_maps.scalar_map.height, 1);
+        assert_eq!(physical_maps.scalar_map.rgba[0], 255);
+        assert_eq!(physical_maps.scalar_map.rgba[2], 128);
+        assert_eq!(physical_maps.scalar_map.rgba[3], 64);
+        assert_eq!(&physical_maps.specular_map.rgba[..4], &[10, 20, 30, 77]);
+    }
+
     /// End-to-end smoke test for directional shadow maps. Renders a ground
     /// quad that receives shadows from a box above it under a downward-
     /// pointing directional light. We can't pixel-match without a reference,
