@@ -30288,13 +30288,17 @@ test('Renderer viewport and scissor state apply as render fallbacks', () => {
   renderer.setScissorTest(true)
 
   assert.deepEqual(renderer.getViewport(), { x: 16, y: 16, width: 40, height: 32 })
+  assert.deepEqual(renderer.getCurrentViewport(), { x: 16, y: 16, width: 40, height: 32 })
   assert.deepEqual(renderer.getScissor(), { x: 24, y: 20, width: 24, height: 24 })
   assert.equal(renderer.getScissorTest(), true)
   const viewportTarget = new THREE.Vector4()
+  const currentViewportTarget = new THREE.Vector4()
   const scissorTarget = { x: 0, y: 0, width: 0, height: 0 }
   const viewportArray = [0, 0, 0, 0]
   assert.strictEqual(renderer.getViewport(viewportTarget), viewportTarget)
   assert.deepEqual(viewportTarget.toArray(), [16, 16, 40, 32])
+  assert.strictEqual(renderer.getCurrentViewport(currentViewportTarget), currentViewportTarget)
+  assert.deepEqual(currentViewportTarget.toArray(), [16, 16, 40, 32])
   assert.strictEqual(renderer.getScissor(scissorTarget), scissorTarget)
   assert.deepEqual(scissorTarget, { x: 24, y: 20, width: 24, height: 24, z: 24, w: 24 })
   assert.strictEqual(renderer.getViewport(viewportArray), viewportArray)
@@ -30328,8 +30332,10 @@ test('Renderer viewport and scissor state apply as render fallbacks', () => {
   renderer.setViewport(null)
   renderer.setScissor(null)
   assert.equal(renderer.getViewport(), null)
+  assert.equal(renderer.getCurrentViewport(), null)
   assert.equal(renderer.getScissor(), null)
   assert.equal(renderer.getViewport(new THREE.Vector4()), null)
+  assert.equal(renderer.getCurrentViewport(new THREE.Vector4()), null)
   assert.equal(renderer.getScissor({}), null)
 })
 

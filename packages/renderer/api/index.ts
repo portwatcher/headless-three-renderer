@@ -932,6 +932,14 @@ export class Renderer {
       : clonePixelRect(this.currentViewport, target)
   }
 
+  getCurrentViewport(): RenderPixelRectLike | null
+  getCurrentViewport<T extends RenderPixelRectLike>(target: T): T | null
+  getCurrentViewport(target?: RenderPixelRectLike): RenderPixelRectLike | null {
+    return target === undefined
+      ? clonePixelRect(this.currentViewport)
+      : clonePixelRect(this.currentViewport, target)
+  }
+
   setScissor(rect: RenderPixelRectLike | null): void
   setScissor(x: number, y: number, width: number, height: number): void
   setScissor(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
