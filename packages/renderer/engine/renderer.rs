@@ -162,6 +162,7 @@ pub struct GpuRenderer {
     sampler: wgpu::Sampler,
     sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
     texture_cache: Mutex<HashMap<TextureCacheKey, wgpu::Texture>>,
+    mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
     shadow_sampler: wgpu::Sampler,
@@ -213,6 +214,24 @@ struct GpuBackground {
     bind_group: wgpu::BindGroup,
     _texture: wgpu::Texture,
     _uniform_buffer: wgpu::Buffer,
+}
+
+#[derive(Clone)]
+struct CachedMeshBuffers {
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: Option<wgpu::Buffer>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct MeshBufferCacheKey {
+    vertex: BufferCacheKey,
+    index: Option<BufferCacheKey>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct BufferCacheKey {
+    len: usize,
+    hash: u64,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -285,6 +304,33 @@ struct CustomBlendPipelineKey {
 struct CustomPipelineKey {
     state: StatePipelineKey,
     fragment_body: String,
+}
+
+impl MeshBufferCacheKey {
+    fn from_mesh(mesh: &PreparedMesh) -> Self {
+        let vertex_bytes = bytemuck::cast_slice::<Vertex, u8>(&mesh.vertices);
+        let index_bytes = mesh
+            .indices
+            .as_ref()
+            .map(|indices| bytemuck::cast_slice::<u32, u8>(indices));
+        Self::from_bytes(vertex_bytes, index_bytes)
+    }
+
+    fn from_bytes(vertex_bytes: &[u8], index_bytes: Option<&[u8]>) -> Self {
+        Self {
+            vertex: BufferCacheKey::from_bytes(vertex_bytes),
+            index: index_bytes.map(BufferCacheKey::from_bytes),
+        }
+    }
+}
+
+impl BufferCacheKey {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        Self {
+            len: bytes.len(),
+            hash: hash_bytes(bytes),
+        }
+    }
 }
 
 impl TextureCacheKey {
@@ -1676,6 +1722,7 @@ impl GpuRenderer {
             sampler,
             sampler_cache: Mutex::new(HashMap::new()),
             texture_cache: Mutex::new(HashMap::new()),
+            mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
             shadow_sampler,
@@ -2806,23 +2853,49 @@ impl GpuRenderer {
             })
     }
 
-    fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
-        let vertex_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("headless-three-renderer vertex buffer"),
-                contents: bytemuck::cast_slice(&mesh.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+    fn mesh_buffers_for(&self, mesh: &PreparedMesh) -> CachedMeshBuffers {
+        let key = MeshBufferCacheKey::from_mesh(mesh);
+        if let Some(buffers) = self
+            .mesh_buffer_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return buffers;
+        }
 
-        let index_buffer = mesh.indices.as_ref().map(|indices| {
-            self.device
+        let buffers = CachedMeshBuffers {
+            vertex_buffer: self
+                .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("headless-three-renderer index buffer"),
-                    contents: bytemuck::cast_slice(indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                })
-        });
+                    label: Some("headless-three-renderer vertex buffer"),
+                    contents: bytemuck::cast_slice(&mesh.vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                }),
+            index_buffer: mesh.indices.as_ref().map(|indices| {
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("headless-three-renderer index buffer"),
+                        contents: bytemuck::cast_slice(indices),
+                        usage: wgpu::BufferUsages::INDEX,
+                    })
+            }),
+        };
+
+        self.mesh_buffer_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| buffers.clone())
+            .clone()
+    }
+
+    fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
+        let CachedMeshBuffers {
+            vertex_buffer,
+            index_buffer,
+        } = self.mesh_buffers_for(mesh);
 
         let model = mesh.transform;
         let mvp = settings.view_projection * model;
@@ -4676,8 +4749,8 @@ fn create_cubemap_with_mips(
 #[cfg(test)]
 mod tests {
     use super::{
-        CustomBlendPipelineKey, SamplerKey, TextureCacheKey, downsample_rgba_mip, f32_key,
-        texture_mip_level_count,
+        CustomBlendPipelineKey, MeshBufferCacheKey, SamplerKey, TextureCacheKey,
+        downsample_rgba_mip, f32_key, texture_mip_level_count,
     };
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
@@ -4849,6 +4922,42 @@ mod tests {
             TextureCacheKey::from_texture(&first),
             TextureCacheKey::from_texture(&second),
             "explicit mipmaps are distinct from generated mip-chain uploads",
+        );
+    }
+
+    #[test]
+    fn mesh_buffer_cache_keys_track_vertex_and_index_bytes() {
+        let base = MeshBufferCacheKey::from_bytes(
+            &[1, 2, 3, 4, 5, 6, 7, 8],
+            Some(&[0, 0, 0, 0, 1, 0, 0, 0]),
+        );
+        assert_eq!(
+            base,
+            MeshBufferCacheKey::from_bytes(
+                &[1, 2, 3, 4, 5, 6, 7, 8],
+                Some(&[0, 0, 0, 0, 1, 0, 0, 0]),
+            ),
+        );
+        assert_ne!(
+            base,
+            MeshBufferCacheKey::from_bytes(
+                &[8, 7, 6, 5, 4, 3, 2, 1],
+                Some(&[0, 0, 0, 0, 1, 0, 0, 0]),
+            ),
+            "vertex data changes need a distinct buffer entry",
+        );
+        assert_ne!(
+            base,
+            MeshBufferCacheKey::from_bytes(&[1, 2, 3, 4, 5, 6, 7, 8], None),
+            "indexed and non-indexed geometry cannot share a buffer entry",
+        );
+        assert_ne!(
+            base,
+            MeshBufferCacheKey::from_bytes(
+                &[1, 2, 3, 4, 5, 6, 7, 8],
+                Some(&[1, 0, 0, 0, 0, 0, 0, 0]),
+            ),
+            "index data changes need a distinct buffer entry",
         );
     }
 
