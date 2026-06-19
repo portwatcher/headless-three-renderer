@@ -10,7 +10,7 @@ target platform and GPU backend.
 |---|---:|---|
 | Mesh count | 900 meshes | `scale.test.mjs` renders a 30 x 30 grid of separate mesh objects with shared lightweight geometry and a small material set. |
 | Mixed mesh/texture/light scene | 48 meshes | A 6 x 8 grid of transformed box meshes renders with eight unique raw textures and supported punctual lights. |
-| Instanced mesh expansion | 2,500 instances | A single `InstancedMesh` renders a 50 x 50 grid with per-instance matrices and colors. |
+| Instanced mesh expansion | 3,600 instances | A single `InstancedMesh` renders a 60 x 60 grid with per-instance matrices and colors. |
 | Unique material textures | 100 maps | A texture-heavy scene renders a 10 x 10 grid where every plane has a unique `DataTexture`. |
 | Unique encoded material textures | 64 maps | An encoded-texture scene renders an 8 x 8 grid where every plane has a unique PNG buffer texture. |
 | NodePerformanceTest-shaped glTF graph | 10,000 nodes, meshes, materials, and texture definitions | A generated glTF loader stress fixture mirrors the upstream Khronos sample's scene-graph scale with 100 shared encoded PNG images, 40,000 bufferViews, and 40,000 accessors without rendering the full graph in CI. |
