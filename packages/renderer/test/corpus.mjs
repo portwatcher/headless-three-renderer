@@ -40,6 +40,8 @@ export function createSceneCorpus() {
     meshMatcapMaterialCorpus(),
     meshMatcapMaterialNormalMapCorpus(),
     meshToonMaterialCorpus(),
+    meshToonMaterialNormalMapCorpus(),
+    meshToonMaterialBumpMapCorpus(),
     meshToonAlphaMapCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
@@ -1993,6 +1995,127 @@ function meshToonMaterialCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.b > center.g + 40 && center.g > center.r + 80)) {
         throw new Error(`toon gradient corpus should sample the blue-green ramp, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function meshToonMaterialNormalMapCorpus() {
+  function makeScene(normalScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        normalMap: solidTexture(255, 128, 128),
+        normalScale: new THREE.Vector2(normalScale, normalScale),
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 3)
+    light.position.set(3, 0, 0.25)
+    scene.add(light)
+    return scene
+  }
+
+  const flatScene = makeScene(0)
+  const mappedScene = makeScene(1)
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let flatCenter = null
+  let mappedCenter = null
+
+  return {
+    name: 'mesh-toon-material-normal-map',
+    scene: mappedScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(flatScene, camera, options)
+      flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
+      const mapped = renderer.render(mappedScene, camera, options)
+      mappedCenter = meanRegion(mapped, options.width, 32, 32, 64, 64)
+      return mapped
+    },
+    validate() {
+      if (!(mappedCenter.r > flatCenter.r + 5)) {
+        throw new Error(`toon normal-map corpus should tilt lighting toward the oblique light, flat=${JSON.stringify(flatCenter)} mapped=${JSON.stringify(mappedCenter)}`)
+      }
+    },
+  }
+}
+
+function meshToonMaterialBumpMapCorpus() {
+  function makeBumpMap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.LinearFilter
+    texture.minFilter = THREE.LinearFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeGradientMap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.LinearFilter
+    texture.minFilter = THREE.LinearFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(bumpScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        bumpMap: makeBumpMap(),
+        bumpScale,
+        gradientMap: makeGradientMap(),
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 3)
+    light.position.set(3, 0, 0.25)
+    scene.add(light)
+    return scene
+  }
+
+  const flatScene = makeScene(0)
+  const bumpedScene = makeScene(8)
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let flatCenter = null
+  let bumpedCenter = null
+
+  return {
+    name: 'mesh-toon-material-bump-map',
+    scene: bumpedScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(flatScene, camera, options)
+      flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
+      const bumped = renderer.render(bumpedScene, camera, options)
+      bumpedCenter = meanRegion(bumped, options.width, 32, 32, 64, 64)
+      return bumped
+    },
+    validate() {
+      if (!(flatCenter.r > bumpedCenter.r + 8)) {
+        throw new Error(`toon bump-map corpus should perturb the ramp lookup, flat=${JSON.stringify(flatCenter)} bumped=${JSON.stringify(bumpedCenter)}`)
       }
     },
   }
