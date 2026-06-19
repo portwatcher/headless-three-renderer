@@ -295,14 +295,86 @@ class RendererDomElementState {
   }
 }
 
+class RendererColorBufferState {
+  setMask(colorMask: unknown): void {
+    rendererStateBoolean(colorMask, 'Renderer.state.buffers.color.setMask mask')
+  }
+
+  setLocked(lock: unknown): void {
+    rendererStateBoolean(lock, 'Renderer.state.buffers.color.setLocked lock')
+  }
+
+  setClear(r: unknown, g: unknown, b: unknown, a: unknown, premultipliedAlpha?: unknown): void {
+    rendererStateClearAlpha(r, 'Renderer.state.buffers.color.setClear r')
+    rendererStateClearAlpha(g, 'Renderer.state.buffers.color.setClear g')
+    rendererStateClearAlpha(b, 'Renderer.state.buffers.color.setClear b')
+    rendererStateClearAlpha(a, 'Renderer.state.buffers.color.setClear a')
+    if (premultipliedAlpha !== undefined) {
+      rendererStateBoolean(premultipliedAlpha, 'Renderer.state.buffers.color.setClear premultipliedAlpha')
+    }
+  }
+}
+
 class RendererDepthBufferState {
   getReversed(): boolean {
     return false
   }
+
+  setTest(depthTest: unknown): void {
+    rendererStateBoolean(depthTest, 'Renderer.state.buffers.depth.setTest test')
+  }
+
+  setMask(depthMask: unknown): void {
+    rendererStateBoolean(depthMask, 'Renderer.state.buffers.depth.setMask mask')
+  }
+
+  setFunc(depthFunc: unknown): void {
+    rendererStateClearStencil(depthFunc, 'Renderer.state.buffers.depth.setFunc func')
+  }
+
+  setLocked(lock: unknown): void {
+    rendererStateBoolean(lock, 'Renderer.state.buffers.depth.setLocked lock')
+  }
+
+  setClear(depth: unknown): void {
+    rendererStateClearDepth(depth, 'Renderer.state.buffers.depth.setClear depth')
+  }
+}
+
+class RendererStencilBufferState {
+  setTest(stencilTest: unknown): void {
+    rendererStateBoolean(stencilTest, 'Renderer.state.buffers.stencil.setTest test')
+  }
+
+  setMask(stencilMask: unknown): void {
+    rendererStateClearStencil(stencilMask, 'Renderer.state.buffers.stencil.setMask mask')
+  }
+
+  setFunc(stencilFunc: unknown, stencilRef: unknown, stencilMask: unknown): void {
+    rendererStateClearStencil(stencilFunc, 'Renderer.state.buffers.stencil.setFunc func')
+    rendererStateClearStencil(stencilRef, 'Renderer.state.buffers.stencil.setFunc ref')
+    rendererStateClearStencil(stencilMask, 'Renderer.state.buffers.stencil.setFunc mask')
+  }
+
+  setOp(stencilFail: unknown, stencilZFail: unknown, stencilZPass: unknown): void {
+    rendererStateClearStencil(stencilFail, 'Renderer.state.buffers.stencil.setOp fail')
+    rendererStateClearStencil(stencilZFail, 'Renderer.state.buffers.stencil.setOp zFail')
+    rendererStateClearStencil(stencilZPass, 'Renderer.state.buffers.stencil.setOp zPass')
+  }
+
+  setLocked(lock: unknown): void {
+    rendererStateBoolean(lock, 'Renderer.state.buffers.stencil.setLocked lock')
+  }
+
+  setClear(stencil: unknown): void {
+    rendererStateClearStencil(stencil, 'Renderer.state.buffers.stencil.setClear stencil')
+  }
 }
 
 class RendererStateBuffersState {
+  readonly color = new RendererColorBufferState()
   readonly depth = new RendererDepthBufferState()
+  readonly stencil = new RendererStencilBufferState()
 }
 
 class RendererState {

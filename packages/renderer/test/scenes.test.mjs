@@ -30102,9 +30102,43 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
   assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
   assert.equal(renderer.extensions.init(), undefined)
+  assert.equal(renderer.state.buffers.color.setMask(false), undefined)
+  assert.equal(renderer.state.buffers.color.setLocked(true), undefined)
+  assert.equal(renderer.state.buffers.color.setClear(0.1, 0.2, 0.3, 0.4, true), undefined)
   assert.equal(renderer.state.buffers.depth.getReversed(), false)
+  assert.equal(renderer.state.buffers.depth.setTest(true), undefined)
+  assert.equal(renderer.state.buffers.depth.setMask(true), undefined)
+  assert.equal(renderer.state.buffers.depth.setFunc(THREE.LessEqualDepth), undefined)
+  assert.equal(renderer.state.buffers.depth.setClear(0.5), undefined)
+  assert.equal(renderer.state.buffers.depth.setLocked(false), undefined)
+  assert.equal(renderer.state.buffers.stencil.setTest(true), undefined)
+  assert.equal(renderer.state.buffers.stencil.setMask(0xff), undefined)
+  assert.equal(renderer.state.buffers.stencil.setFunc(THREE.AlwaysStencilFunc, 1, 0xff), undefined)
+  assert.equal(renderer.state.buffers.stencil.setOp(
+    THREE.ReplaceStencilOp,
+    THREE.KeepStencilOp,
+    THREE.KeepStencilOp,
+  ), undefined)
+  assert.equal(renderer.state.buffers.stencil.setClear(1), undefined)
+  assert.equal(renderer.state.buffers.stencil.setLocked(false), undefined)
   assert.equal(renderer.state.reset(), undefined)
   assert.equal(renderer.state.unbindTexture(), undefined)
+  assert.throws(
+    () => renderer.state.buffers.color.setMask(1),
+    /Renderer\.state\.buffers\.color\.setMask mask must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.buffers.depth.setFunc('less'),
+    /Renderer\.state\.buffers\.depth\.setFunc func must be a finite integer/i,
+  )
+  assert.throws(
+    () => renderer.state.buffers.stencil.setTest(1),
+    /Renderer\.state\.buffers\.stencil\.setTest test must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.buffers.stencil.setClear(0.5),
+    /Renderer\.state\.buffers\.stencil\.setClear stencil must be a finite integer/i,
+  )
 
   const object = {}
   assert.equal(renderer.properties.has(object), false)
