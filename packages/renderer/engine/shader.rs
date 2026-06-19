@@ -45,7 +45,7 @@ struct Uniforms {
   ao_params: vec4<f32>,
   // x = 1/width, y = 1/height, z = width, w = height
   render_params: vec4<f32>,
-  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped.
+  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped; z = alpha-to-coverage active.
   output_params: vec4<f32>,
   // texture_transform1.xyz / texture_transform2.xyz = base-color texture transform rows.
   // texture_transform1.w = base texture uses secondary UV stream.
@@ -858,6 +858,36 @@ fn is_clipped_by_planes(world_pos: vec3<f32>) -> bool {
   return false;
 }
 
+fn clipping_plane_alpha_coverage(world_pos: vec3<f32>) -> f32 {
+  let total_count = min(u32(uniforms.clipping_params.y), MAX_CLIPPING_PLANES);
+  let union_count = min(u32(uniforms.clipping_params.x), total_count);
+  var clip_opacity = 1.0;
+
+  for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+    if i < union_count {
+      let plane = uniforms.clipping_planes[i];
+      let distance_to_plane = dot(plane.xyz, world_pos) + plane.w;
+      let distance_gradient = max((abs(dpdx(distance_to_plane)) + abs(dpdy(distance_to_plane))) * 0.5, 0.000001);
+      clip_opacity = clip_opacity * smoothstep(-distance_gradient, distance_gradient, distance_to_plane);
+    }
+  }
+
+  if union_count < total_count {
+    var intersection_clip_opacity = 1.0;
+    for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+      if i >= union_count && i < total_count {
+        let plane = uniforms.clipping_planes[i];
+        let distance_to_plane = dot(plane.xyz, world_pos) + plane.w;
+        let distance_gradient = max((abs(dpdx(distance_to_plane)) + abs(dpdy(distance_to_plane))) * 0.5, 0.000001);
+        intersection_clip_opacity = intersection_clip_opacity * (1.0 - smoothstep(-distance_gradient, distance_gradient, distance_to_plane));
+      }
+    }
+    clip_opacity = clip_opacity * (1.0 - intersection_clip_opacity);
+  }
+
+  return clip_opacity;
+}
+
 fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
   let pixel = floor(position.xy);
   return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
@@ -934,7 +964,13 @@ fn pack_depth_to_rg(v: f32) -> vec2<f32> {
 
 @fragment
 fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
-  if is_clipped_by_planes(input.world_pos) {
+  var clip_opacity = 1.0;
+  if uniforms.output_params.z > 0.5 {
+    clip_opacity = clipping_plane_alpha_coverage(input.world_pos);
+    if clip_opacity <= 0.0 {
+      discard;
+    }
+  } else if is_clipped_by_planes(input.world_pos) {
     discard;
   }
 
@@ -948,6 +984,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
     alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
   }
+  alpha = alpha * clip_opacity;
 
   // Alpha test: discard fragments below the cutoff threshold
   let alpha_cutoff = uniforms.emissive.w;
@@ -1659,6 +1696,36 @@ fn is_clipped_by_planes(world_pos: vec3<f32>) -> bool {
   return false;
 }
 
+fn clipping_plane_alpha_coverage(world_pos: vec3<f32>) -> f32 {
+  let total_count = min(u32(uniforms.clipping_params.y), MAX_CLIPPING_PLANES);
+  let union_count = min(u32(uniforms.clipping_params.x), total_count);
+  var clip_opacity = 1.0;
+
+  for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+    if i < union_count {
+      let plane = uniforms.clipping_planes[i];
+      let distance_to_plane = dot(plane.xyz, world_pos) + plane.w;
+      let distance_gradient = max((abs(dpdx(distance_to_plane)) + abs(dpdy(distance_to_plane))) * 0.5, 0.000001);
+      clip_opacity = clip_opacity * smoothstep(-distance_gradient, distance_gradient, distance_to_plane);
+    }
+  }
+
+  if union_count < total_count {
+    var intersection_clip_opacity = 1.0;
+    for (var i = 0u; i < MAX_CLIPPING_PLANES; i = i + 1u) {
+      if i >= union_count && i < total_count {
+        let plane = uniforms.clipping_planes[i];
+        let distance_to_plane = dot(plane.xyz, world_pos) + plane.w;
+        let distance_gradient = max((abs(dpdx(distance_to_plane)) + abs(dpdy(distance_to_plane))) * 0.5, 0.000001);
+        intersection_clip_opacity = intersection_clip_opacity * (1.0 - smoothstep(-distance_gradient, distance_gradient, distance_to_plane));
+      }
+    }
+    clip_opacity = clip_opacity * (1.0 - intersection_clip_opacity);
+  }
+
+  return clip_opacity;
+}
+
 fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
   let pixel = floor(position.xy);
   return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
@@ -1688,7 +1755,13 @@ fn custom_fragment_body(
 
 @fragment
 fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
-  if is_clipped_by_planes(input.world_pos) {
+  var clip_opacity = 1.0;
+  if uniforms.output_params.z > 0.5 {
+    clip_opacity = clipping_plane_alpha_coverage(input.world_pos);
+    if clip_opacity <= 0.0 {
+      discard;
+    }
+  } else if is_clipped_by_planes(input.world_pos) {
     discard;
   }
 
@@ -1704,6 +1777,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
     alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
   }
+  alpha = alpha * clip_opacity;
   let alpha_cutoff = uniforms.emissive.w;
   if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
     discard;
