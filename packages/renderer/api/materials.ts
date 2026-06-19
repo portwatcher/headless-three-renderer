@@ -378,6 +378,7 @@ function extractEnvironmentMapFromTexture(
   options: { allowRefraction?: boolean } = {},
 ): EnvironmentMapInfo | null {
   assertSupportedEnvironmentTexture(envTex, label, options)
+  textureUnpackAlignment(envTex, label)
   const premultiplyAlpha = optionalTextureBoolean(envTex.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
   if (isCubeEnvironmentTexture(envTex, label)) {
     const cube = cubeTextureToEquirectangular(envTex, label)
@@ -1886,6 +1887,7 @@ function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): Tex
 }
 
 function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { data: Buffer; width: number; height: number } {
+  textureUnpackAlignment(map, label)
   const faces = cubeFaceImages(map, label)
   if (!faces) {
     if (map.mapping === CubeUVReflectionMapping) {
@@ -2154,6 +2156,7 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   if (!map) return null
   assertSupportedTextureInput(map, label, { allowMipmaps: true })
   assertSupportedTwoDimensionalTextureSlot(map, label)
+  textureUnpackAlignment(map, label)
 
   const sourceData = textureSourceData(map, label)
   const image = (map as any).image ?? sourceData
@@ -2581,6 +2584,18 @@ function textureAnisotropy(map: ThreeTextureLike | null | undefined, label: stri
   }
   if (value <= 1) return undefined
   return Math.max(1, Math.min(16, Math.floor(value)))
+}
+
+function textureUnpackAlignment(map: ThreeTextureLike | null | undefined, label: string): number | undefined {
+  const value = map?.unpackAlignment
+  if (value == null) return undefined
+  if (!Number.isInteger(value)) {
+    throw new TypeError(`${label}.unpackAlignment must be an integer.`)
+  }
+  if (value === 1 || value === 2 || value === 4 || value === 8) return value
+  throw new Error(
+    `${label}.unpackAlignment ${value} is not supported by @headless-three/renderer. Use 1, 2, 4, or 8.`,
+  )
 }
 
 function textureTransform(map: ThreeTextureLike | null | undefined, label: string): number[] | undefined {

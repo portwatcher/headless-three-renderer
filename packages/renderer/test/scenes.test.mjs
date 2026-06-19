@@ -14649,6 +14649,39 @@ test('texture anisotropy inputs render with native samplers', () => {
   assert.ok(mean.r > 120 && mean.g > 120 && mean.b > 120, `anisotropic mapped plane should render visibly (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('texture unpackAlignment values are accepted for supported texture uploads', () => {
+  for (const unpackAlignment of [1, 2, 4, 8]) {
+    const map = solidTexture(255, 255, 255)
+    map.unpackAlignment = unpackAlignment
+
+    const mapScene = new THREE.Scene()
+    mapScene.background = new THREE.Color(0, 0, 0)
+    mapScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+    const mapCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    mapCamera.position.set(0, 0, 3)
+    mapCamera.lookAt(0, 0, 0)
+    const mapMean = meanRegion(renderRgba(mapScene, mapCamera, { width: 32, height: 32 }), 32, 32, 10, 10, 22, 22)
+    assert.ok(mapMean.r > 120 && mapMean.g > 120 && mapMean.b > 120, `unpackAlignment=${unpackAlignment} material map should render visibly`)
+
+    const background = solidTexture(0, 0, 255)
+    background.unpackAlignment = unpackAlignment
+    const backgroundScene = new THREE.Scene()
+    backgroundScene.background = background
+    const backgroundMean = meanRgba(renderRgba(backgroundScene, makeCamera(), { width: 32, height: 32 }))
+    assert.ok(backgroundMean.b > backgroundMean.r + 80, `unpackAlignment=${unpackAlignment} background should render blue`)
+
+    const environment = solidTexture(255, 255, 255)
+    environment.mapping = THREE.EquirectangularReflectionMapping
+    environment.unpackAlignment = unpackAlignment
+    const environmentScene = new THREE.Scene()
+    environmentScene.environment = environment
+    const extracted = extractEnvironmentMap(environmentScene)
+    assert.ok(extracted, `unpackAlignment=${unpackAlignment} environment should extract`)
+    assert.equal(extracted.width, 1)
+    assert.equal(extracted.height, 1)
+  }
+})
+
 test('invalid texture anisotropy values fail clearly', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
@@ -14732,6 +14765,20 @@ test('invalid texture transform values fail clearly', () => {
       scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
       return scene
     }, /material\.map\.matrixAutoUpdate must be a boolean/i],
+    ['material map unpackAlignment type', () => {
+      const map = solidTexture(255, 255, 255)
+      map.unpackAlignment = '4'
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map })))
+      return scene
+    }, /material\.map\.unpackAlignment must be an integer/i],
+    ['background unpackAlignment value', () => {
+      const background = solidTexture(0, 0, 255)
+      background.unpackAlignment = 3
+      const scene = new THREE.Scene()
+      scene.background = background
+      return scene
+    }, /background\.unpackAlignment 3 is not supported.*1, 2, 4, or 8/i],
     ['material map premultiplyAlpha', () => {
       const map = solidTexture(255, 255, 255)
       map.premultiplyAlpha = 'yes'
@@ -15984,6 +16031,12 @@ test('malformed environment and reflection probe texture values fail clearly', (
     ['image-less scene environment texture', (scene) => {
       scene.environment = new THREE.Texture()
     }, /scene\.environment.*texture image object.*not readable.*environment map rendering/i],
+    ['invalid scene environment unpackAlignment', (scene) => {
+      const environment = solidTexture(255, 255, 255)
+      environment.mapping = THREE.EquirectangularReflectionMapping
+      environment.unpackAlignment = 3
+      scene.environment = environment
+    }, /scene\.environment\.unpackAlignment 3 is not supported.*1, 2, 4, or 8/i],
     ['string reflection probe texture', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: 'bright' } }
     }, /reflectionProbe\.texture must be a Three\.js texture or null/i],
