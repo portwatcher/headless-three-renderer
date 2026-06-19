@@ -3681,6 +3681,41 @@ test('MeshBasicMaterial material envMap uses legacy combine modes', () => {
   assert.ok(mixFull.g > mixFull.r + 40, `MixOperation should replace with green env reflection (${mixFull.r}, ${mixFull.g})`)
 })
 
+test('CubeUV-mapped cube material envMap feeds supported material paths', () => {
+  const envMap = cubeTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])
+  envMap.mapping = THREE.CubeUVReflectionMapping
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+    }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const mean = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 24, 24, 40, 40)
+
+  assert.ok(mean.g > mean.r + 40, `CubeUV-mapped cube material envMap should replace with green (${mean.r}, ${mean.g})`)
+})
+
 test('MeshBasicMaterial material envMap supports refraction mapping', () => {
   function renderBasicEnvironmentMapping(mapping) {
     const scene = new THREE.Scene()
@@ -4041,8 +4076,8 @@ test('unsupported material envMap inputs fail clearly', () => {
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /material\.envMap.*refraction or PMREM\/CubeUV environment mapping.*not supported/i,
-      'material envMap CubeUV mapping',
+      /material\.envMap uses PMREM\/CubeUV environment mapping without readable six-face cube images.*not supported/i,
+      'material envMap 2D CubeUV mapping',
     )
   }
 
@@ -18304,11 +18339,23 @@ test('cube scene environments feed physical IBL', () => {
     [0, 255, 0],
     [0, 255, 0],
   ])), camera)
+  const cubeUvEnvironment = cubeTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])
+  cubeUvEnvironment.mapping = THREE.CubeUVReflectionMapping
+  const cubeUvCube = renderRgba(makeScene(cubeUvEnvironment), camera)
   const encodedCube = renderRgba(makeScene(encodedCubeTexture()), camera)
 
   const rawDiff = meanAbsDiff(noEnvironment, rawCube)
+  const cubeUvDiff = meanAbsDiff(noEnvironment, cubeUvCube)
   const encodedDiff = meanAbsDiff(noEnvironment, encodedCube)
   assert.ok(rawDiff > 0.5, `raw cube environment should affect metallic IBL, diff=${rawDiff.toFixed(3)}`)
+  assert.ok(cubeUvDiff > 0.5, `CubeUV-mapped cube environment should affect metallic IBL, diff=${cubeUvDiff.toFixed(3)}`)
   assert.ok(encodedDiff > 0.5, `encoded cube environment should affect metallic IBL, diff=${encodedDiff.toFixed(3)}`)
 })
 
@@ -18341,8 +18388,20 @@ test('cube reflection probes feed physical IBL', () => {
 
   const noProbe = renderRgba(withoutProbe, camera)
   const withCubeProbe = renderRgba(makeScene(encodedCubeTexture()), camera)
+  const cubeUvProbe = cubeTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])
+  cubeUvProbe.mapping = THREE.CubeUVReflectionMapping
+  const withCubeUvProbe = renderRgba(makeScene(cubeUvProbe), camera)
   const diff = meanAbsDiff(noProbe, withCubeProbe)
+  const cubeUvDiff = meanAbsDiff(noProbe, withCubeUvProbe)
   assert.ok(diff > 0.5, `encoded cube reflection probe should affect metallic IBL, diff=${diff.toFixed(3)}`)
+  assert.ok(cubeUvDiff > 0.5, `CubeUV-mapped cube reflection probe should affect metallic IBL, diff=${cubeUvDiff.toFixed(3)}`)
 })
 
 test('scene environmentRotation rotates equirectangular IBL', () => {
@@ -18565,36 +18624,36 @@ test('cube environment and reflection probe colorSpace controls IBL decode', () 
 
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
-    ['CubeUV scene environment', (scene) => {
+    ['2D CubeUV scene environment', (scene) => {
       scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping })
-    }],
+    }, /PMREM\/CubeUV environment mapping without readable six-face cube images.*not supported/i],
     ['refraction scene environment', (scene) => {
       scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.EquirectangularRefractionMapping })
-    }],
-    ['CubeUV reflection probe', (scene) => {
+    }, /refraction environment mapping.*not supported/i],
+    ['2D CubeUV reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: {
           texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping }),
         },
       }
-    }],
+    }, /PMREM\/CubeUV environment mapping without readable six-face cube images.*not supported/i],
     ['refraction reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: {
           texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.EquirectangularRefractionMapping }),
         },
       }
-    }],
+    }, /refraction environment mapping.*not supported/i],
   ]
 
-  for (const [name, setup] of cases) {
+  for (const [name, setup, pattern] of cases) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     setup(scene)
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /refraction or PMREM\/CubeUV environment mapping.*not supported/i,
+      pattern,
       name,
     )
   }
