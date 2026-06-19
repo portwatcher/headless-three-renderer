@@ -847,6 +847,7 @@ function appendPoints(
     const outputUvs2: number[] | undefined = pointUvStreams?.uvs2 ? [] : undefined
     const outputColors: number[] | undefined = useVertexColors ? [] : undefined
     const outputIndices: number[] = []
+    const outputPointRefs: Array<{ pointIndex: number, instance: number }> = []
     const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
 
     for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
@@ -874,6 +875,7 @@ function appendPoints(
         if (worldSize <= 0) continue
 
         const vertexBase = outputPositions.length / 3
+        outputPointRefs.push({ pointIndex, instance })
         const corners = [
           [-0.5, -0.5, 0, 0],
           [0.5, -0.5, 1, 0],
@@ -912,6 +914,18 @@ function appendPoints(
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
     const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
+    const effectiveCustomShadowMaterial = usesCustomShadowMaterial
+      ? shadowMaterialWithSourceShadowState(customShadowMaterial, material)
+      : null
+    const pointShadowUvStreams = primaryPointUvs && effectiveCustomShadowMaterial && (
+      effectiveCustomShadowMaterial.map ||
+      effectiveCustomShadowMaterial.alphaMap
+    )
+      ? textureUvStreamsForMapAlphaMaterial(pointUvChannels, {
+        map: effectiveCustomShadowMaterial.map,
+        alphaMap: effectiveCustomShadowMaterial.alphaMap,
+      })
+      : null
 
     pushMesh(meshes, {
       positions: outputPositions,
@@ -956,10 +970,26 @@ function appendPoints(
         materialContext,
         outputPositions,
         outputIndices,
-        outputUvs,
+        pointShadowUvStreams?.uvs ? expandPointBillboardUvStream(pointShadowUvStreams.uvs, outputPointRefs) : outputUvs,
+        pointShadowUvStreams?.uvs2 ? expandPointBillboardUvStream(pointShadowUvStreams.uvs2, outputPointRefs) : undefined,
+        pointShadowUvStreams?.textureUsesUv2 ?? false,
+        pointShadowUvStreams?.alphaMapUsesUv2 ?? false,
       )
     }
   }
+}
+
+function expandPointBillboardUvStream(
+  channel: UvChannel,
+  pointRefs: Array<{ pointIndex: number, instance: number }>,
+): number[] {
+  const outputUvs: number[] = []
+  for (const { pointIndex, instance } of pointRefs) {
+    for (let corner = 0; corner < 4; corner += 1) {
+      appendUvForVertex(outputUvs, channel, pointIndex, instance)
+    }
+  }
+  return outputUvs
 }
 
 function appendShadowOnlyBillboardMesh(
@@ -975,6 +1005,9 @@ function appendShadowOnlyBillboardMesh(
   positions: number[],
   indices: number[],
   uvs: number[],
+  uvs2: number[] | undefined = undefined,
+  textureUsesUv2 = false,
+  alphaMapUsesUv2 = false,
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
   const textureInfo = extractTextureData(shadowMaterial)
@@ -982,12 +1015,13 @@ function appendShadowOnlyBillboardMesh(
   const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
   const hiddenMainPass = shadowOnlyMainPassState()
   const shadowProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
-  shadowProps.alphaMapUsesUv2 = false
+  shadowProps.alphaMapUsesUv2 = alphaMapUsesUv2
 
   pushMesh(meshes, {
     positions,
     indices,
     uvs,
+    uvs2,
     color: materialColor(shadowMaterial),
     texture: textureInfo?.data,
     textureWidth: textureInfo?.width ?? undefined,
@@ -999,7 +1033,7 @@ function appendShadowOnlyBillboardMesh(
     textureAnisotropy: textureInfo?.anisotropy,
     textureTransform: textureInfo?.transform,
     textureColorSpace: textureInfo?.colorSpace,
-    textureUsesUv2: false,
+    textureUsesUv2,
     transform: IDENTITY_4X4.slice(),
     topology: 'triangles',
     castShadow: true,
