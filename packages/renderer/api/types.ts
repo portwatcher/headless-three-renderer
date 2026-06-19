@@ -427,7 +427,7 @@ export interface ThreeObject3DLike {
 export interface ThreeSceneRootLike extends ThreeObject3DLike {
   isScene?: boolean
   overrideMaterial?: ThreeMaterialLike | null
-  background?: ThreeColorLike | ThreeTextureLike | null
+  background?: string | ThreeColorLike | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
   backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null
@@ -502,7 +502,7 @@ export type RenderSortFunction = (a: RenderSortItem, b: RenderSortItem) => numbe
 export interface RenderOptions {
   width?: number
   height?: number
-  background?: number[] | ThreeColorLike | ThreeTextureLike | null
+  background?: number[] | string | ThreeColorLike | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
   backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null

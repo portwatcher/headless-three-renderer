@@ -34,6 +34,7 @@ export function colorLikeToArray(value: unknown): Color4 | null {
 export function strictColorLikeToArray(value: unknown, label: string): Color4 | null {
   if (!value) return null
   if (Array.isArray(value)) return normalizeColorArray(value, label)
+  if (typeof value === 'string') return cssColorStringToArray(value, label)
   if (typeof value !== 'object') return null
 
   const color = value as ColorLikeWithAlpha

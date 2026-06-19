@@ -27287,8 +27287,8 @@ test('invalid background color values fail clearly', () => {
     /options\.background must be \[r, g, b\] or \[r, g, b, a\]/i,
   )
   assert.throws(
-    () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: 'red' }),
-    /options\.background must be a color, texture, or null/i,
+    () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: 'not-a-color' }),
+    /options\.background "not-a-color" is not a supported CSS color string/i,
   )
   assert.throws(
     () => renderRgba(new THREE.Scene(), camera, { width: 32, height: 32, background: {} }),
@@ -27301,10 +27301,10 @@ test('invalid background color values fail clearly', () => {
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
     /scene\.background\.g must be a finite number/i,
   )
-  scene.background = 'red'
+  scene.background = 'not-a-color'
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
-    /scene\.background must be a color, texture, or null/i,
+    /scene\.background "not-a-color" is not a supported CSS color string/i,
   )
   scene.background = {}
   assert.throws(
@@ -27992,6 +27992,23 @@ test('render option texture backgrounds honor option intensity and blurriness co
   assert.ok(dimmed.r < sharp.r - 60, `options.backgroundIntensity should dim the option texture background (${dimmed.r} vs ${sharp.r})`)
   assert.ok(blurred.g > sharp.g + 80, `options.backgroundBlurriness should mix in the green texel (${blurred.g} vs ${sharp.g})`)
   assert.ok(sharp.r > blurred.r + 20, `options.backgroundBlurriness should soften the red texel (${sharp.r} vs ${blurred.r})`)
+})
+
+test('CSS color backgrounds render for scene and options', () => {
+  const camera = makeCamera()
+  const scene = new THREE.Scene()
+  scene.background = 'rgb(32, 64, 128)'
+
+  const sceneMean = meanRgba(renderRgba(scene, camera, { width: 32, height: 32 }))
+  assertRgbClose(sceneMean, [0x20, 0x40, 0x80], 'scene.background CSS color')
+
+  scene.background = solidTexture(0, 255, 0)
+  const optionMean = meanRgba(renderRgba(scene, camera, {
+    width: 32,
+    height: 32,
+    background: '#204080',
+  }))
+  assertRgbClose(optionMean, [0x20, 0x40, 0x80], 'options.background CSS color')
 })
 
 test('render option color backgrounds override scene texture backgrounds', () => {
