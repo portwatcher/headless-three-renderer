@@ -5396,7 +5396,7 @@ test('MeshDistanceMaterial base texture alpha cuts out discarded fragments', () 
   assert.ok(visible.r > 60, `opaque base texture region should write distance (${visible.r})`)
 })
 
-test('MeshDistanceMaterial displacementMap samples the selected secondary UV channel', () => {
+test('MeshDistanceMaterial displacementMap samples selected uv1-uv3 texture channels', () => {
   function renderDisplaced(channel) {
     const displacementMap = rgbaTexture([
       0, 0, 0, 255,
@@ -5405,7 +5405,9 @@ test('MeshDistanceMaterial displacementMap samples the selected secondary UV cha
     displacementMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -5425,8 +5427,10 @@ test('MeshDistanceMaterial displacementMap samples the selected secondary UV cha
   }
 
   const primary = renderDisplaced(0)
-  const secondary = renderDisplaced(1)
-  assert.ok(primary.r > secondary.r + 15, `displacementMap channel=1 should move the distance plane closer (${primary.r} vs ${secondary.r})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderDisplaced(channel)
+    assert.ok(primary.r > secondary.r + 15, `displacementMap channel=${channel} should move the distance plane closer (${primary.r} vs ${secondary.r})`)
+  }
 })
 
 test('SpriteMaterial renders texture maps and opacity as a camera-facing billboard', () => {
