@@ -19,6 +19,7 @@ import type {
   Color4,
   RenderObjectIdEntry,
   ThreeEulerLike,
+  ThreePlaneLike,
   ThreeTextureLike,
   RenderSortFunction,
   RenderAnimationLoopCallback,
@@ -504,6 +505,7 @@ export class Renderer {
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly capabilities = new RendererCapabilitiesState()
+  clippingPlanes: ThreePlaneLike[] = []
   readonly extensions = new RendererExtensionsState()
   readonly info = new RendererInfoState()
   readonly properties = new RendererPropertiesState()
@@ -1194,13 +1196,16 @@ export class Renderer {
 
   private resolveRenderOptions(options: RenderOptions, fallbackTarget: RenderTargetLike | null | undefined = options.target): InternalRenderOptions {
     const sizeOptions = this.optionsWithRendererSizeFallback(options, fallbackTarget)
+    const hasExplicitClippingPlanes = sizeOptions.clippingPlanes !== undefined
     return {
       ...sizeOptions,
+      clippingPlanes: hasExplicitClippingPlanes ? sizeOptions.clippingPlanes : this.clippingPlanes,
       outputColorSpace: sizeOptions.outputColorSpace ?? this.outputColorSpace,
       localClippingEnabled: sizeOptions.localClippingEnabled ?? this.localClippingEnabled,
       sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
       opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
       transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
+      __headlessThreeClippingPlanesLabel: hasExplicitClippingPlanes ? undefined : 'Renderer.clippingPlanes',
       __headlessThreeRendererClearColor: cloneColor4(this.currentClearColor),
       __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
       __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
@@ -1416,7 +1421,10 @@ function toNativeInput(
       hasBackgroundOverride || options.backgroundIntensity !== undefined ? 'options.backgroundIntensity' : 'scene.backgroundIntensity',
     )
     : undefined
-  const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
+  const clippingPlanes = extractClippingPlanes(
+    options.clippingPlanes,
+    (options as InternalRenderOptions).__headlessThreeClippingPlanesLabel ?? 'options.clippingPlanes',
+  )
   const rendererShadowMapEnabled = (options as InternalRenderOptions).__headlessThreeRendererShadowMapEnabled !== false
   const rendererShadowMapType = (options as InternalRenderOptions).__headlessThreeRendererShadowMapType ?? PCFShadowMap
   const rendererToneMapping = (options as InternalRenderOptions).__headlessThreeRendererToneMapping ?? ACESFilmicToneMapping
@@ -1930,6 +1938,7 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeRendererScissorTest?: boolean
   __headlessThreeRendererShadowMapEnabled?: boolean
   __headlessThreeRendererShadowMapType?: number
+  __headlessThreeClippingPlanesLabel?: string
   __headlessThreeRendererToneMapping?: number
   __headlessThreeRendererToneMappingExposure?: number
 }

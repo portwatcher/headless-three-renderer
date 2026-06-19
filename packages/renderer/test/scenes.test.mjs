@@ -9425,6 +9425,54 @@ test('render option clippingPlanes apply as global union planes', () => {
   assert.ok(clippedBottom.b > clippedBottom.g + 80, `bottom side should reveal blue background (${clippedBottom.b} vs ${clippedBottom.g})`)
 })
 
+test('Renderer clippingPlanes state applies as global render fallback', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.deepEqual(renderer.clippingPlanes, [])
+  renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)]
+
+  const fallback = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  const fallbackTop = meanRegion(fallback, 64, 64, 22, 12, 42, 24)
+  const fallbackBottom = meanRegion(fallback, 64, 64, 22, 40, 42, 52)
+  assert.ok(fallbackTop.g > fallbackTop.b + 80, `Renderer clippingPlanes should keep the top side visible (${fallbackTop.g} vs ${fallbackTop.b})`)
+  assert.ok(fallbackBottom.b > fallbackBottom.g + 80, `Renderer clippingPlanes should clip the bottom side (${fallbackBottom.b} vs ${fallbackBottom.g})`)
+
+  const explicitOverride = renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    clippingPlanes: [],
+  })
+  const overrideBottom = meanRegion(explicitOverride, 64, 64, 22, 40, 42, 52)
+  assert.ok(overrideBottom.g > overrideBottom.b + 80, `explicit empty clippingPlanes should override renderer state (${overrideBottom.g} vs ${overrideBottom.b})`)
+
+  const target = renderer.renderToTarget(scene, camera, {}, { width: 64, height: 64 })
+  const targetBottom = meanRegion(target.data, 64, 64, 22, 40, 42, 52)
+  assert.ok(targetBottom.b > targetBottom.g + 80, `renderToTarget should use Renderer clippingPlanes fallback (${targetBottom.b} vs ${targetBottom.g})`)
+
+  renderer.clippingPlanes = 'planes'
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }),
+    /Renderer\.clippingPlanes must be an array of clipping planes/i,
+  )
+
+  renderer.clippingPlanes = [{ normal: { x: 0, y: 1, z: 0 }, constant: Number.NaN }]
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }),
+    /Renderer\.clippingPlanes\[0\]\.constant must be a finite number/i,
+  )
+})
+
 test('clippingPlanes over the native plane budget fail clearly', () => {
   function planes(count) {
     return Array.from({ length: count }, (_, index) => new THREE.Plane(new THREE.Vector3(1, 0, 0), -index - 1))
