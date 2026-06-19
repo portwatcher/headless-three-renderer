@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use anyhow::{Context, Result};
 
 /// IBL data precomputed on the CPU from an equirectangular HDR/LDR environment map.
@@ -16,6 +18,8 @@ const IRRADIANCE_SIZE: u32 = 32;
 const PREFILTER_BASE_SIZE: u32 = 128;
 const PREFILTER_MIP_LEVELS: u32 = 5;
 type RotationColumns = [[f32; 4]; 3];
+
+static BRDF_LUT: OnceLock<Vec<u8>> = OnceLock::new();
 
 pub struct IblMaps {
     /// Diffuse irradiance cubemap: 6 faces, IRRADIANCE_SIZE x IRRADIANCE_SIZE, RGBA32F stored as RGBA8.
@@ -169,7 +173,7 @@ fn decode_ldr_environment_channel(value: u8, is_srgb: bool) -> f32 {
 pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
     let irradiance_faces = compute_irradiance(env_map, rotation);
     let prefilter_faces = compute_prefiltered_env(env_map, rotation);
-    let brdf_lut = compute_brdf_lut();
+    let brdf_lut = cached_brdf_lut();
 
     IblMaps {
         irradiance_faces,
@@ -180,6 +184,10 @@ pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
         brdf_lut,
         brdf_lut_size: BRDF_LUT_SIZE,
     }
+}
+
+fn cached_brdf_lut() -> Vec<u8> {
+    BRDF_LUT.get_or_init(compute_brdf_lut).clone()
 }
 
 fn sample_rotated(env_map: &EnvMap, rotation: RotationColumns, dir: [f32; 3]) -> [f32; 3] {
@@ -516,4 +524,23 @@ fn half_to_f32(h: u16) -> f32 {
     }
     let f_exp = exp + (127 - 15);
     f32::from_bits((sign << 31) | (f_exp << 23) | (mant << 13))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BRDF_LUT_SIZE, cached_brdf_lut};
+
+    #[test]
+    fn cached_brdf_lut_is_stable() {
+        let first = cached_brdf_lut();
+        let second = cached_brdf_lut();
+
+        assert_eq!(first, second);
+        assert_eq!(first.len(), (BRDF_LUT_SIZE * BRDF_LUT_SIZE * 4) as usize);
+        assert!(
+            first
+                .chunks_exact(4)
+                .all(|texel| texel[2] == 0 && texel[3] == 255)
+        );
+    }
 }
