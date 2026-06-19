@@ -5157,7 +5157,7 @@ test('displacementMap honors explicit texture matrices before depth output', () 
   assert.ok(displaced.r > flat.r + 15, `explicit displacementMap matrix should move the plane nearer (${displaced.r} vs ${flat.r})`)
 })
 
-test('displacementMap samples the selected secondary UV channel before depth output', () => {
+test('displacementMap samples selected uv1-uv3 texture channels before depth output', () => {
   function renderDisplaced(channel) {
     const displacementMap = rgbaTexture([
       0, 0, 0, 255,
@@ -5166,7 +5166,9 @@ test('displacementMap samples the selected secondary UV channel before depth out
     displacementMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -5186,8 +5188,10 @@ test('displacementMap samples the selected secondary UV channel before depth out
   }
 
   const primary = renderDisplaced(0)
-  const secondary = renderDisplaced(1)
-  assert.ok(secondary.r > primary.r + 15, `displacementMap channel=1 should sample uv1's displaced texel (${secondary.r} vs ${primary.r})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderDisplaced(channel)
+    assert.ok(secondary.r > primary.r + 15, `displacementMap channel=${channel} should sample uv${channel}'s displaced texel (${secondary.r} vs ${primary.r})`)
+  }
 })
 
 test('MeshDistanceMaterial renders farther fragments with higher red distance', () => {
@@ -13339,7 +13343,7 @@ test('metallicRoughness maps honor explicit texture matrices', () => {
   assert.ok(Math.abs(smooth - rough) > 20, `explicit roughnessMap matrix should change the sampled texel (${smooth} vs ${rough})`)
 })
 
-test('metallicRoughness maps sample the selected secondary UV channel', () => {
+test('metallicRoughness maps sample selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const roughnessMap = rgbaTexture([
       0, 255, 0, 255,
@@ -13348,7 +13352,9 @@ test('metallicRoughness maps sample the selected secondary UV channel', () => {
     roughnessMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -13374,8 +13380,10 @@ test('metallicRoughness maps sample the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  assert.ok(Math.abs(secondary - primary) > 20, `roughnessMap channel=1 should sample uv1's different texel (${secondary} vs ${primary})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(Math.abs(secondary - primary) > 20, `roughnessMap channel=${channel} should sample uv${channel}'s different texel (${secondary} vs ${primary})`)
+  }
 })
 
 test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () => {
