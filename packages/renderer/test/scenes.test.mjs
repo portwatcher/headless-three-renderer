@@ -9717,6 +9717,89 @@ test('Line shadow casters honor material and group clipShadows', () => {
   }
 })
 
+test('Line shadow casters honor material and group clipShadows for spot and point lights', () => {
+  function makeLineSegments() {
+    const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
+    material.colorWrite = false
+    material.depthWrite = false
+
+    const positions = []
+    for (let offset = -3; offset <= 3; offset += 0.35) {
+      positions.push(-3, 2, offset, 3, 2, offset)
+      positions.push(offset, 2, -3, offset, 2, 3)
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const line = new THREE.LineSegments(geometry, material)
+    line.castShadow = true
+    return line
+  }
+
+  function renderLineClipShadows(lightKind, source, clipShadows) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const line = makeLineSegments()
+    const clippingPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -10)
+    if (source === 'material') {
+      line.material.clippingPlanes = [clippingPlane]
+      line.material.clipShadows = clipShadows
+      scene.add(line)
+    } else {
+      const group = new THREE.Group()
+      group.isClippingGroup = true
+      group.clippingPlanes = [clippingPlane]
+      group.clipShadows = clipShadows
+      group.add(line)
+      scene.add(group)
+    }
+
+    if (lightKind === 'spot') {
+      const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
+      light.position.set(0, 7, 8)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(512, 512)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 20
+      scene.add(light)
+      scene.add(light.target)
+    } else {
+      const light = new THREE.PointLight(0xffffff, 2)
+      light.position.set(0, 5, 4)
+      light.distance = 12
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 12
+      scene.add(light)
+    }
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const lightKind of ['spot', 'point']) {
+    for (const source of ['material', 'group']) {
+      const unclipped = renderLineClipShadows(lightKind, source, false)
+      const clipped = renderLineClipShadows(lightKind, source, true)
+      const unclippedLum = unclipped.r + unclipped.g + unclipped.b
+      const clippedLum = clipped.r + clipped.g + clipped.b
+      assert.ok(clippedLum > unclippedLum + 4, `${lightKind} ${source} clipShadows should remove the line caster shadow (${clippedLum} vs ${unclippedLum})`)
+    }
+  }
+})
+
 test('alpha-tested shadow casters honor alphaMap cutouts', () => {
   function renderAlphaShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
