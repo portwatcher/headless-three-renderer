@@ -15,6 +15,7 @@ export function createSceneCorpus() {
     signedRawTextureCorpus(),
     equirectangularBackgroundCorpus(),
     cubeBackgroundTextureCorpus(),
+    cubeBackgroundOptionRotationCorpus(),
     cubeUvBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
     cubeCameraCaptureCorpus(),
@@ -25,6 +26,7 @@ export function createSceneCorpus() {
     materialEnvMapBasicLambertCorpus(),
     materialEnvMapPbrCorpus(),
     cubeUvMaterialEnvMapCorpus(),
+    cubeEnvironmentOptionRotationCorpus(),
     narrowRawIblCorpus(),
     meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
@@ -182,6 +184,18 @@ function meanRegion(rgba, width, x0, y0, x1, y1) {
     }
   }
   return { r: r / count, g: g / count, b: b / count }
+}
+
+function meanAbsDiff(a, b) {
+  let total = 0
+  let count = 0
+  for (let i = 0; i < a.length; i += 4) {
+    total += Math.abs(a[i] - b[i])
+    total += Math.abs(a[i + 1] - b[i + 1])
+    total += Math.abs(a[i + 2] - b[i + 2])
+    count += 3
+  }
+  return total / count
 }
 
 function countRegionPixels(rgba, width, x0, y0, x1, y1, predicate) {
@@ -1418,6 +1432,61 @@ function cubeUvMaterialEnvMapCorpus() {
   }
 }
 
+function cubeEnvironmentOptionRotationCorpus() {
+  const environment = cubeTexture([
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+  ])
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.environment = environment
+  scene.environmentIntensity = 4
+  scene.environmentRotation = new THREE.Euler(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0 }),
+  ))
+
+  const camera = makeCamera([0, 0, 3])
+  const baseOptions = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }
+  const options = {
+    ...baseOptions,
+    environmentRotation: new THREE.Euler(0, -Math.PI / 2, 0),
+  }
+  let rotationDiff = 0
+
+  return {
+    name: 'cube-environment-option-rotation',
+    scene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      const sceneRotation = renderer.render(scene, camera, baseOptions).slice()
+      const optionRotation = renderer.render(scene, camera, options)
+      rotationDiff = meanAbsDiff(sceneRotation, optionRotation)
+      return optionRotation
+    },
+    validate() {
+      if (!(rotationDiff > 1.0)) {
+        throw new Error(`cube environment option rotation corpus should change IBL reflections, diff=${rotationDiff.toFixed(3)}`)
+      }
+    },
+  }
+}
+
 function narrowRawIblCorpus() {
   const environment = new THREE.DataTexture(new Uint8Array([220, 64]), 1, 1, THREE.RGFormat)
   environment.colorSpace = THREE.LinearSRGBColorSpace
@@ -1958,6 +2027,35 @@ function cubeBackgroundTextureCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
         throw new Error(`cube background rotation corpus should sample the green face, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function cubeBackgroundOptionRotationCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = coloredCubeBackgroundTexture()
+  scene.background.magFilter = THREE.NearestFilter
+  scene.background.minFilter = THREE.NearestFilter
+  scene.backgroundRotation = new THREE.Euler(0, 0, 0)
+
+  return {
+    name: 'cube-background-option-rotation',
+    scene,
+    camera: makeCamera([0, 0, 0], [0, 0, -1]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      backgroundRotation: new THREE.Euler(0, Math.PI, 0),
+    },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
+        throw new Error(`cube background option rotation corpus should sample the green face, got ${JSON.stringify(center)}`)
       }
     },
   }
