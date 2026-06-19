@@ -965,6 +965,57 @@ test('BatchedMesh material arrays honor packed geometry groups', () => {
   assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right BatchedMesh geometry group should use the green material (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
+test('BatchedMesh material arrays honor non-indexed packed geometry groups', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count * 2,
+    0,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  batched.addGeometry(source.clone())
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+  batched.perObjectFrustumCulled = false
+
+  const range = batched.getGeometryRangeAt(geometryId, {})
+  batched.geometry.clearGroups()
+  batched.geometry.addGroup(range.start, 6, 0)
+  batched.geometry.addGroup(range.start + 6, 6, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
+  const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
+  assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `left non-indexed BatchedMesh group should use the red material (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+  assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right non-indexed BatchedMesh group should use the green material (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+})
+
 test('BatchedMesh packed geometry groups clip to partial draw ranges', () => {
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 3)
