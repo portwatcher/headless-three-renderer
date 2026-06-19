@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
+import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
@@ -2092,6 +2093,24 @@ test('CubeCamera renders cube target faces', () => {
     ),
     /target has no readable color data/i,
   )
+})
+
+test('LightProbeGenerator reads cube targets through the WebGLRenderer marker path', async () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(16)
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  renderToTarget(scene, cubeCamera, cubeTarget)
+
+  const renderer = new Renderer()
+  const probe = await LightProbeGenerator.fromCubeRenderTarget(renderer, cubeTarget)
+  assert.equal(probe.isLightProbe, true)
+  const coefficients = probe.sh.coefficients
+  assert.equal(coefficients.length, 9)
+  const energy = coefficients.reduce((sum, coefficient) => (
+    sum + coefficient.x ** 2 + coefficient.y ** 2 + coefficient.z ** 2
+  ), 0)
+  assert.ok(Number.isFinite(energy), `generated LightProbe coefficients should stay finite (${energy})`)
+  assert.ok(energy > 0.01, `generated LightProbe should contain captured cube radiance (${energy})`)
 })
 
 test('CubeCamera.update works with Renderer render-target state', () => {
