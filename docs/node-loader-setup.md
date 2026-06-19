@@ -102,10 +102,12 @@ node examples/render-vrm.mjs ./avatar.vrm ./dance.vrma render.png
 It supports both callback-style `load()` and promise-style `loadAsync()`. Its
 textures expose encoded PNG/JPEG/WebP bytes through `texture.image` and
 `texture.source.data`, and it reports optional `LoadingManager`
-`itemStart`/`itemEnd`/`itemError` hooks when a manager is supplied. The renderer
-decodes those bytes natively, so no DOM `Image`, canvas, or WebGL context is
-needed for external image files or PNG/JPEG/WebP data URI or Blob URL image
-references.
+`itemStart`/`itemEnd`/`itemError` hooks when a manager is supplied. `setPath()`
+accepts relative, absolute, and `file://` directory prefixes for later relative
+image loads without rewriting data URI, Blob URL, absolute, or fully-qualified
+asset URLs. The renderer decodes those bytes natively, so no DOM `Image`,
+canvas, or WebGL context is needed for external image files or PNG/JPEG/WebP
+data URI or Blob URL image references.
 
 ## FileLoader And Fetch
 

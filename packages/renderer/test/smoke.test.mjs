@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
@@ -60,11 +60,15 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
   const dir = await mkdtemp(path.join(os.tmpdir(), 'headless-three-loader-'))
   try {
     const imagePath = path.join(dir, 'tex.png')
+    const textureDir = path.join(dir, 'textures')
+    const nestedImagePath = path.join(textureDir, 'tex.png')
     const imageBytes = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mP8z8BQDwAFgwJ/l6g+WQAAAABJRU5ErkJggg==',
       'base64',
     )
+    await mkdir(textureDir)
     await writeFile(imagePath, imageBytes)
+    await writeFile(nestedImagePath, imageBytes)
 
     const loader = createEncodedImageTextureLoader(dir)
     const texture = await new Promise((resolve, reject) => {
@@ -83,6 +87,16 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     const fileUrlRootLoader = createEncodedImageTextureLoader(pathToFileURL(dir).href)
     const fileUrlRootTexture = await fileUrlRootLoader.loadAsync('tex.png')
     assert.deepEqual(Buffer.from(fileUrlRootTexture.image), imageBytes)
+
+    const pathLoader = createEncodedImageTextureLoader(dir)
+    pathLoader.setPath('textures')
+    const pathTexture = await pathLoader.loadAsync('tex.png')
+    assert.deepEqual(Buffer.from(pathTexture.image), imageBytes)
+
+    const fileUrlPathLoader = createEncodedImageTextureLoader(dir)
+    fileUrlPathLoader.setPath(pathToFileURL(textureDir).href)
+    const fileUrlPathTexture = await fileUrlPathLoader.loadAsync('tex.png')
+    assert.deepEqual(Buffer.from(fileUrlPathTexture.image), imageBytes)
 
     const managerEvents = []
     const manager = {
@@ -138,7 +152,7 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     const blobUrl = URL.createObjectURL(new Blob([imageBytes], { type: 'image/png' }))
     try {
       const blobTexture = await new Promise((resolve, reject) => {
-        loader.load(blobUrl, resolve, undefined, reject)
+        pathLoader.load(blobUrl, resolve, undefined, reject)
       })
       assert.deepEqual(Buffer.from(blobTexture.image), imageBytes)
       assert.equal(blobTexture.source.data, blobTexture.image)

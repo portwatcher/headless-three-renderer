@@ -188,7 +188,7 @@ export class EncodedImageTextureLoader {
     const assetUrl = requiredString(url, 'url')
     const loadCallback = optionalFunction(onLoad, 'onLoad')
     const errorCallback = optionalFunction(onError, 'onError')
-    const source = /^data:/i.test(assetUrl) ? assetUrl : (this.loaderPath ? `${this.loaderPath}${assetUrl}` : assetUrl)
+    const source = resolveTextureLoaderSource(assetUrl, this.loaderPath)
     const encodedDataUri = encodedImageDataUriBuffer(source)
     const data = encodedDataUri
       ? Promise.resolve(encodedDataUri)
@@ -436,6 +436,29 @@ async function readBlobUrlBuffer(url: string): Promise<Buffer> {
     throw new Error(`Blob URL texture has unsupported content type "${contentType}". Use PNG, JPEG, or WebP embedded images.`)
   }
   return Buffer.from(await response.arrayBuffer())
+}
+
+function resolveTextureLoaderSource(url: string, loaderPath: string): string {
+  if (!loaderPath || isAbsoluteOrSpecialAssetUrl(url)) return url
+  if (path.isAbsolute(loaderPath)) return path.join(loaderPath, url)
+  if (path.win32.isAbsolute(loaderPath)) return path.win32.join(loaderPath, url)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(loaderPath)) {
+    return new URL(url, ensureDirectoryUrl(loaderPath)).href
+  }
+  return path.join(loaderPath, url)
+}
+
+function isAbsoluteOrSpecialAssetUrl(url: string): boolean {
+  return /^data:/i.test(url)
+    || /^blob:/i.test(url)
+    || path.isAbsolute(url)
+    || path.win32.isAbsolute(url)
+    || /^file:/i.test(url)
+    || /^[a-z][a-z0-9+.-]*:/i.test(url)
+}
+
+function ensureDirectoryUrl(url: string): string {
+  return url.endsWith('/') ? url : `${url}/`
 }
 
 export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd()): string {
