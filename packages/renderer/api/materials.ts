@@ -117,6 +117,45 @@ const UnsignedInt101111Type = 35899
 const LinearEncoding = 3000
 const sRGBEncoding = 3001
 
+const CompressedTextureFormats = new Set([
+  33776, // RGB_S3TC_DXT1_Format
+  33777, // RGBA_S3TC_DXT1_Format
+  33778, // RGBA_S3TC_DXT3_Format
+  33779, // RGBA_S3TC_DXT5_Format
+  35840, // RGB_PVRTC_4BPPV1_Format
+  35841, // RGB_PVRTC_2BPPV1_Format
+  35842, // RGBA_PVRTC_4BPPV1_Format
+  35843, // RGBA_PVRTC_2BPPV1_Format
+  36196, // RGB_ETC1_Format
+  36283, // RED_RGTC1_Format
+  36284, // SIGNED_RED_RGTC1_Format
+  36285, // RED_GREEN_RGTC2_Format
+  36286, // SIGNED_RED_GREEN_RGTC2_Format
+  36492, // RGBA_BPTC_Format
+  36494, // RGB_BPTC_SIGNED_Format
+  36495, // RGB_BPTC_UNSIGNED_Format
+  37488, // R11_EAC_Format
+  37489, // SIGNED_R11_EAC_Format
+  37490, // RG11_EAC_Format
+  37491, // SIGNED_RG11_EAC_Format
+  37492, // RGB_ETC2_Format
+  37496, // RGBA_ETC2_EAC_Format
+  37808, // RGBA_ASTC_4x4_Format
+  37809, // RGBA_ASTC_5x4_Format
+  37810, // RGBA_ASTC_5x5_Format
+  37811, // RGBA_ASTC_6x5_Format
+  37812, // RGBA_ASTC_6x6_Format
+  37813, // RGBA_ASTC_8x5_Format
+  37814, // RGBA_ASTC_8x6_Format
+  37815, // RGBA_ASTC_8x8_Format
+  37816, // RGBA_ASTC_10x5_Format
+  37817, // RGBA_ASTC_10x6_Format
+  37818, // RGBA_ASTC_10x8_Format
+  37819, // RGBA_ASTC_10x10_Format
+  37820, // RGBA_ASTC_12x10_Format
+  37821, // RGBA_ASTC_12x12_Format
+])
+
 const DefaultOnBeforeCompileSource = 'onBeforeCompile( /* shaderobject, renderer */ ) {}'
 
 export interface EnvironmentMapInfo {
@@ -2307,6 +2346,11 @@ function assertSupportedTextureInput(
   ) {
     throw new Error(
       `${label} uses a compressed texture. KTX2, Basis, and THREE.CompressedTexture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
+    )
+  }
+  if (CompressedTextureFormats.has(map.format ?? Number.NaN)) {
+    throw new Error(
+      `${label} uses a compressed texture format. KTX2, Basis, and compressed texture formats are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
     )
   }
   if (

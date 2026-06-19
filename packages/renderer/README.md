@@ -170,7 +170,7 @@ Texture image data can be:
 - Raw one-channel, two-channel, RGB, or RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`), including `UnsignedByteType`, normalized `ByteType`/`ShortType`/`UnsignedShortType`/`IntType`/`UnsignedIntType`, packed `UnsignedShort4444Type`/`UnsignedShort5551Type`, normalized float arrays, and `HalfFloatType` `Uint16Array` binary16 data
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
 
-Compressed KTX2/Basis/`THREE.CompressedTexture` inputs are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Browser `Image`/`ImageBitmap`/canvas-like texture objects are not readable in Node and fail clearly until normalized to encoded bytes or raw pixel data. Mismatched-length raw texture payloads fail clearly.
+Compressed KTX2/Basis/`THREE.CompressedTexture` inputs and compressed texture format constants are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Browser `Image`/`ImageBitmap`/canvas-like texture objects are not readable in Node and fail clearly until normalized to encoded bytes or raw pixel data. Mismatched-length raw texture payloads fail clearly.
 
 ### Lights
 

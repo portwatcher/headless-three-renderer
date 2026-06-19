@@ -12903,6 +12903,11 @@ test('unsupported texture inputs fail clearly for background and environment slo
     image: { width: 4, height: 4 },
     mipmaps: [{ data: new Uint8Array(16), width: 4, height: 4 }],
   }
+  function compressedFormatTexture() {
+    const texture = new THREE.DataTexture(new Uint8Array(16), 4, 4, THREE.RGBA_S3TC_DXT5_Format)
+    texture.needsUpdate = true
+    return texture
+  }
   const mipmappedTexture = solidTexture(255, 255, 255)
   mipmappedTexture.mipmaps = [{ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }]
 
@@ -12930,6 +12935,21 @@ test('unsupported texture inputs fail clearly for background and environment slo
     ['compressed reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: compressedTexture } }
     }, /compressed texture.*pre-decode/i],
+    ['compressed-format material map', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: compressedFormatTexture() }),
+      ))
+    }, /compressed texture format.*pre-decode/i],
+    ['compressed-format background', (scene) => { scene.background = compressedFormatTexture() }, /compressed texture format.*pre-decode/i],
+    ['compressed-format environment', (scene) => { scene.environment = compressedFormatTexture() }, /compressed texture format.*pre-decode/i],
+    ['compressed-format material envMap', (scene) => {
+      addMaterialEnvMap(scene, compressedFormatTexture())
+    }, /compressed texture format.*pre-decode/i],
+    ['compressed-format reflection probe', (scene) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: compressedFormatTexture() } }
+    }, /compressed texture format.*pre-decode/i],
     ['mipmapped environment', (scene) => { scene.environment = mipmappedTexture }, /explicit texture mipmaps.*not uploaded/i],
     ['mipmapped material envMap', (scene) => {
       addMaterialEnvMap(scene, mipmappedTexture)
