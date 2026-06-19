@@ -346,54 +346,25 @@ function extractEnvironmentMapFromTexture(
     if (texType === HalfFloatType) {
       if (!(rawData instanceof Uint16Array)) {
         throw new Error(
-          `${label} HalfFloatType environment maps must provide Uint16Array RGB or RGBA pixel data.`,
+          `${label} HalfFloatType environment maps must provide Uint16Array one-channel, two-channel, RGB, or RGBA pixel data.`,
         )
       }
-      const channels = rawTextureChannelCount(rawData, image.width, image.height, label, 'environment map rendering')
-      let buf: Buffer
-      if (channels === 3) {
-        // Expand RGB16F → RGBA16F (half=0x3C00 is 1.0 for alpha)
-        const pixels = image.width * image.height
-        const out = new Uint16Array(pixels * 4)
-        for (let i = 0; i < pixels; i++) {
-          out[i * 4] = rawData[i * 3]
-          out[i * 4 + 1] = rawData[i * 3 + 1]
-          out[i * 4 + 2] = rawData[i * 3 + 2]
-          out[i * 4 + 3] = 0x3C00 // 1.0 in half-float
-        }
-        buf = Buffer.from(out.buffer, out.byteOffset, out.byteLength)
-      } else {
-        buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
-      }
+      const buf = rawHalfFloatTextureDataToRgba(rawData, image.width, image.height, label, 'environment map rendering')
       return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
     if (texType === FloatType) {
       if (!(rawData instanceof Float32Array)) {
         throw new Error(
-          `${label} FloatType environment maps must provide Float32Array RGB or RGBA pixel data.`,
+          `${label} FloatType environment maps must provide Float32Array one-channel, two-channel, RGB, or RGBA pixel data.`,
         )
       }
-      const channels = rawTextureChannelCount(rawData, image.width, image.height, label, 'environment map rendering')
-      let buf: Buffer
-      if (channels === 3) {
-        const pixels = image.width * image.height
-        const out = new Float32Array(pixels * 4)
-        for (let i = 0; i < pixels; i++) {
-          out[i * 4] = rawData[i * 3]
-          out[i * 4 + 1] = rawData[i * 3 + 1]
-          out[i * 4 + 2] = rawData[i * 3 + 2]
-          out[i * 4 + 3] = 1.0
-        }
-        buf = Buffer.from(out.buffer, out.byteOffset, out.byteLength)
-      } else {
-        buf = Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
-      }
+      const buf = rawFloatTextureDataToRgba(rawData, image.width, image.height, label, 'environment map rendering')
       return { data: buf, width: image.width, height: image.height, intensity, colorSpace: textureColorSpace(envTex) }
     }
 
     // UnsignedByteType / default: convert to RGBA8
-    const rgba = toRgba8(rawData as any, image.width, image.height, { narrowChannels: false, type: texType })
+    const rgba = toRgba8(rawData as any, image.width, image.height, { type: texType })
     if (rgba) {
       return {
         data: Buffer.from(rgba.buffer, rgba.byteOffset, rgba.byteLength),
@@ -2143,12 +2114,8 @@ function textureBytesWithExplicitMipmaps(
 }
 
 function unsupportedRawTextureDataError(label: string, usage: string): Error {
-  const supported = usage === 'texture rendering'
-    ? 'one-channel, two-channel, RGB, or RGBA numeric pixel data'
-    : 'RGB or RGBA numeric pixel data'
-  const unsupported = usage === 'texture rendering'
-    ? 'mismatched data lengths are not supported yet'
-    : 'one-channel, two-channel, and mismatched data lengths are not supported yet'
+  const supported = 'one-channel, two-channel, RGB, or RGBA numeric pixel data'
+  const unsupported = 'mismatched data lengths are not supported yet'
   return new Error(
     `${label} raw texture data must contain ${supported} for ${usage}; ${unsupported}.`,
   )
@@ -2204,12 +2171,70 @@ function rawTextureChannelCount(
   height: number,
   label: string,
   usage: string,
-): 3 | 4 {
+): 1 | 2 | 3 | 4 {
   const pixels = width * height
   const length = typeof data.length === 'number' ? data.length : Number.NaN
   const channels = length / pixels
-  if (channels === 3 || channels === 4) return channels
+  if (channels === 1 || channels === 2 || channels === 3 || channels === 4) return channels
   throw unsupportedRawTextureDataError(label, usage)
+}
+
+function rawHalfFloatTextureDataToRgba(
+  rawData: Uint16Array,
+  width: number,
+  height: number,
+  label: string,
+  usage: string,
+): Buffer {
+  const channels = rawTextureChannelCount(rawData, width, height, label, usage)
+  if (channels === 4) {
+    return Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+  }
+  const pixels = width * height
+  const out = new Uint16Array(pixels * 4)
+  for (let i = 0; i < pixels; i += 1) {
+    if (channels === 1) {
+      const value = rawData[i]
+      out[i * 4] = value
+      out[i * 4 + 1] = value
+      out[i * 4 + 2] = value
+    } else {
+      out[i * 4] = rawData[i * channels]
+      out[i * 4 + 1] = rawData[i * channels + 1]
+      out[i * 4 + 2] = channels === 3 ? rawData[i * channels + 2] : 0
+    }
+    out[i * 4 + 3] = 0x3C00
+  }
+  return Buffer.from(out.buffer, out.byteOffset, out.byteLength)
+}
+
+function rawFloatTextureDataToRgba(
+  rawData: Float32Array,
+  width: number,
+  height: number,
+  label: string,
+  usage: string,
+): Buffer {
+  const channels = rawTextureChannelCount(rawData, width, height, label, usage)
+  if (channels === 4) {
+    return Buffer.from(rawData.buffer, rawData.byteOffset, rawData.byteLength)
+  }
+  const pixels = width * height
+  const out = new Float32Array(pixels * 4)
+  for (let i = 0; i < pixels; i += 1) {
+    if (channels === 1) {
+      const value = rawData[i]
+      out[i * 4] = value
+      out[i * 4 + 1] = value
+      out[i * 4 + 2] = value
+    } else {
+      out[i * 4] = rawData[i * channels]
+      out[i * 4 + 1] = rawData[i * channels + 1]
+      out[i * 4 + 2] = channels === 3 ? rawData[i * channels + 2] : 0
+    }
+    out[i * 4 + 3] = 1.0
+  }
+  return Buffer.from(out.buffer, out.byteOffset, out.byteLength)
 }
 
 function assertSupportedBackgroundTexture(map: ThreeTextureLike, label: string): void {

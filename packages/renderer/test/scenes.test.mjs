@@ -12271,6 +12271,85 @@ test('normalized unsigned integer raw environment textures decode for IBL', () =
   }
 })
 
+test('one- and two-channel raw environment textures decode for IBL', () => {
+  function byteEnvironmentTexture([r, g, b]) {
+    const texture = solidTexture(r, g, b)
+    texture.colorSpace = THREE.LinearSRGBColorSpace
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  function rawEnvironmentTexture(data, format, type = THREE.UnsignedByteType) {
+    const texture = new THREE.DataTexture(data, 1, 1, format, type)
+    texture.colorSpace = THREE.LinearSRGBColorSpace
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function renderEnvironment(kind, texture) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 })
+    if (kind === 'scene') {
+      scene.environment = texture
+      scene.environmentIntensity = 2.5
+    } else if (kind === 'reflectionProbe') {
+      scene.userData.headlessThreeRenderer = {
+        reflectionProbe: { texture, intensity: 2.5 },
+      }
+    } else {
+      material.envMap = texture
+      material.envMapIntensity = 2.5
+    }
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 16),
+      material,
+    ))
+    return renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const cases = [
+    [
+      'byte RedFormat',
+      ['scene', 'reflectionProbe', 'materialEnvMap'],
+      () => rawEnvironmentTexture(new Uint8Array([180]), THREE.RedFormat),
+      [180, 180, 180],
+    ],
+    [
+      'byte RGFormat',
+      ['scene'],
+      () => rawEnvironmentTexture(new Uint8Array([180, 64]), THREE.RGFormat),
+      [180, 64, 0],
+    ],
+    [
+      'FloatType RGFormat',
+      ['scene', 'reflectionProbe', 'materialEnvMap'],
+      () => rawEnvironmentTexture(new Float32Array([0.5, 0.25]), THREE.RGFormat, THREE.FloatType),
+      [128, 64, 0],
+    ],
+    [
+      'HalfFloatType RedFormat',
+      ['scene', 'reflectionProbe', 'materialEnvMap'],
+      () => rawEnvironmentTexture(new Uint16Array([0x3800]), THREE.RedFormat, THREE.HalfFloatType),
+      [128, 128, 128],
+    ],
+  ]
+
+  for (const [label, kinds, makeTexture, equivalentByteColor] of cases) {
+    for (const kind of kinds) {
+      const byteRender = renderEnvironment(kind, byteEnvironmentTexture(equivalentByteColor))
+      const rawRender = renderEnvironment(kind, makeTexture())
+      const diff = meanAbsDiff(byteRender, rawRender)
+      assert.ok(diff < 3, `${kind} ${label} environment should match equivalent linear RGBA8 IBL (diff=${diff.toFixed(3)})`)
+    }
+  }
+})
+
 test('normalized signed integer raw environment textures decode for IBL', () => {
   function byteEnvironmentTexture() {
     const texture = solidTexture(129, 64, 255)
@@ -12845,20 +12924,9 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
     ['background', (scene) => {
       scene.background = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
     }, /background.*raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*texture rendering.*mismatched/i],
-    ['environment', (scene) => {
-      scene.environment = invalidRawTexture(new Uint8Array([255, 0]))
-    }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
     ['mismatched environment', (scene) => {
       scene.environment = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
-    }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering.*mismatched/i],
-    ['material envMap', (scene) => {
-      const envMap = invalidRawTexture(new Uint8Array([255, 0]))
-      envMap.mapping = THREE.EquirectangularReflectionMapping
-      scene.add(new THREE.Mesh(
-        new THREE.PlaneGeometry(2, 2),
-        new THREE.MeshBasicMaterial({ envMap }),
-      ))
-    }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering/i],
+    }, /scene\.environment raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*environment map rendering.*mismatched/i],
     ['mismatched material envMap', (scene) => {
       const envMap = invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1]))
       envMap.mapping = THREE.EquirectangularReflectionMapping
@@ -12866,33 +12934,12 @@ test('unsupported raw DataTexture channel layouts fail clearly', () => {
         new THREE.PlaneGeometry(2, 2),
         new THREE.MeshBasicMaterial({ envMap }),
       ))
-    }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering.*mismatched/i],
-    ['reflection probe', (scene) => {
-      scene.userData.headlessThreeRenderer = {
-        reflectionProbe: { texture: invalidRawTexture(new Uint8Array([255, 0])) },
-      }
-    }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering/i],
+    }, /material\.envMap raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*environment map rendering.*mismatched/i],
     ['mismatched reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: { texture: invalidRawTexture(new Uint8Array([255, 0, 0, 255, 1])) },
       }
-    }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering.*mismatched/i],
-    ['FloatType environment', (scene) => {
-      scene.environment = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
-    }, /scene\.environment raw texture data.*RGB or RGBA.*environment map rendering/i],
-    ['FloatType material envMap', (scene) => {
-      const envMap = invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType)
-      envMap.mapping = THREE.EquirectangularReflectionMapping
-      scene.add(new THREE.Mesh(
-        new THREE.PlaneGeometry(2, 2),
-        new THREE.MeshBasicMaterial({ envMap }),
-      ))
-    }, /material\.envMap raw texture data.*RGB or RGBA.*environment map rendering/i],
-    ['FloatType reflection probe', (scene) => {
-      scene.userData.headlessThreeRenderer = {
-        reflectionProbe: { texture: invalidRawTexture(new Float32Array([1, 0]), THREE.FloatType) },
-      }
-    }, /reflectionProbe\.texture raw texture data.*RGB or RGBA.*environment map rendering/i],
+    }, /reflectionProbe\.texture raw texture data.*one-channel.*two-channel.*RGB.*RGBA.*environment map rendering.*mismatched/i],
   ]
 
   for (const [name, setup, pattern] of cases) {
