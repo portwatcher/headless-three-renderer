@@ -7278,6 +7278,116 @@ test('material stencil z-pass operations update stencil values', () => {
   }
 })
 
+test('material stencil masks limit writes and comparisons', () => {
+  function renderWriteMask(stencilWriteMask) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const preload = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        colorWrite: false,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilRef: 1,
+        stencilZPass: THREE.ReplaceStencilOp,
+      }),
+    )
+    preload.position.x = -0.5
+    preload.renderOrder = 0
+    scene.add(preload)
+
+    const operation = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        colorWrite: false,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilWriteMask,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilRef: 2,
+        stencilZPass: THREE.ReplaceStencilOp,
+      }),
+    )
+    operation.position.x = -0.5
+    operation.renderOrder = 1
+    scene.add(operation)
+
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x0000ff,
+        stencilWrite: true,
+        stencilWriteMask: 0,
+        stencilFunc: THREE.EqualStencilFunc,
+        stencilRef: 2,
+        stencilZPass: THREE.KeepStencilOp,
+      }),
+    )
+    fill.renderOrder = 2
+    scene.add(fill)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 16, 24, 28, 40)
+  }
+
+  function renderFuncMask(stencilFuncMask) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const mask = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        colorWrite: false,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilRef: 2,
+        stencilZPass: THREE.ReplaceStencilOp,
+      }),
+    )
+    mask.position.x = -0.5
+    mask.renderOrder = 0
+    scene.add(mask)
+
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x0000ff,
+        stencilWrite: true,
+        stencilWriteMask: 0,
+        stencilFunc: THREE.EqualStencilFunc,
+        stencilRef: 3,
+        stencilFuncMask,
+        stencilZPass: THREE.KeepStencilOp,
+      }),
+    )
+    fill.renderOrder = 1
+    scene.add(fill)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 16, 24, 28, 40)
+  }
+
+  const writeAllowed = renderWriteMask(0xff)
+  const writeBlocked = renderWriteMask(0)
+  assert.ok(writeAllowed.b > 150, `full stencilWriteMask should allow replacement writes (${writeAllowed.b})`)
+  assert.ok(writeBlocked.b < 10, `zero stencilWriteMask should preserve the previous stencil value (${writeBlocked.b})`)
+
+  const unmaskedComparison = renderFuncMask(0xff)
+  const maskedComparison = renderFuncMask(0x02)
+  assert.ok(unmaskedComparison.b < 10, `full stencilFuncMask should reject distinct stencil refs (${unmaskedComparison.b})`)
+  assert.ok(maskedComparison.b > 150, `masked stencilFuncMask should compare only selected bits (${maskedComparison.b})`)
+})
+
 function assertMaterialRenderStateFails(material, pattern) {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
