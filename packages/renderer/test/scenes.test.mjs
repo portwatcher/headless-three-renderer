@@ -22042,6 +22042,52 @@ test('LineSegments with InstancedBufferGeometry default instanceCount expands in
   assert.ok(greenPixels > 4, `right instanced line uv should sample green (${greenPixels})`)
 })
 
+test('LineSegments with InstancedBufferGeometry expands selected instanced map UV channels', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.25, 0, 0,
+    0.25, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    linewidth: 8,
+    map,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 12, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(redPixels > 4, `left selected instanced line uv1 should sample red (${redPixels})`)
+  assert.ok(greenPixels > 4, `right selected instanced line uv1 should sample green (${greenPixels})`)
+})
+
 test('Line and LineLoop with InstancedBufferGeometry expand instanced map UV attributes', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
@@ -22999,6 +23045,52 @@ test('Points with InstancedBufferGeometry default instanceCount expands instance
   const right = meanRegion(rgba, 96, 96, 54, 38, 72, 58)
   assert.ok(left.r > left.g + 50, `left instanced point uv should sample red (${left.r} vs ${left.g})`)
   assert.ok(right.g > right.r + 50, `right instanced point uv should sample green (${right.g} vs ${right.r})`)
+})
+
+test('Points with InstancedBufferGeometry expands selected instanced map UV channels', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.35, 0, 0,
+    0.35, 0, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+    color: 0xffffff,
+    map,
+    size: 24,
+    sizeAttenuation: false,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const left = meanRegion(rgba, 96, 96, 24, 38, 42, 58)
+  const right = meanRegion(rgba, 96, 96, 54, 38, 72, 58)
+  assert.ok(left.r > left.g + 50, `left selected instanced point uv1 should sample red (${left.r} vs ${left.g})`)
+  assert.ok(right.g > right.r + 50, `right selected instanced point uv1 should sample green (${right.g} vs ${right.r})`)
 })
 
 test('Points receiveShadow is accepted as an unlit WebGL-compatible no-op', () => {
