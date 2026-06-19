@@ -421,6 +421,33 @@ class RendererDomElementState {
     )
   }
 
+  toDataURL(_type?: unknown, _quality?: unknown): never {
+    throw new Error(
+      'Renderer.domElement.toDataURL() is not supported by @headless-three/renderer because the domElement is an inert offscreen compatibility object, not a browser canvas. Use Renderer.render() without format: "rgba" to receive a PNG Buffer.',
+    )
+  }
+
+  toBlob(callback: unknown, _type?: unknown, _quality?: unknown): never {
+    if (typeof callback !== 'function') {
+      throw new TypeError('Renderer.domElement.toBlob callback must be a function.')
+    }
+    throw new Error(
+      'Renderer.domElement.toBlob() is not supported by @headless-three/renderer because the domElement is an inert offscreen compatibility object, not a browser canvas. Use Renderer.render() without format: "rgba" to receive a PNG Buffer.',
+    )
+  }
+
+  captureStream(_frameRate?: unknown): never {
+    throw new Error(
+      'Renderer.domElement.captureStream() is not supported by @headless-three/renderer because the domElement is an inert offscreen compatibility object, not a browser canvas.',
+    )
+  }
+
+  transferToImageBitmap(): never {
+    throw new Error(
+      'Renderer.domElement.transferToImageBitmap() is not supported by @headless-three/renderer because the domElement is an inert offscreen compatibility object, not an OffscreenCanvas.',
+    )
+  }
+
   addEventListener(type: unknown, listener: unknown, _options?: unknown): void {
     assertEventListener(type, listener, 'Renderer.domElement.addEventListener')
     const eventType = type as string

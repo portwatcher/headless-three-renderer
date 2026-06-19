@@ -30140,6 +30140,26 @@ test('Renderer domElement is an inert output-size mirror', () => {
     () => renderer.domElement.getContext('webgl'),
     /Renderer\.domElement\.getContext\(\) is not supported.*inert offscreen compatibility object/i,
   )
+  assert.throws(
+    () => renderer.domElement.toDataURL('image/png'),
+    /Renderer\.domElement\.toDataURL\(\) is not supported.*Renderer\.render\(\).*PNG Buffer/i,
+  )
+  assert.throws(
+    () => renderer.domElement.toBlob(() => {}, 'image/png'),
+    /Renderer\.domElement\.toBlob\(\) is not supported.*Renderer\.render\(\).*PNG Buffer/i,
+  )
+  assert.throws(
+    () => renderer.domElement.toBlob(null),
+    /Renderer\.domElement\.toBlob callback must be a function/i,
+  )
+  assert.throws(
+    () => renderer.domElement.captureStream(),
+    /Renderer\.domElement\.captureStream\(\) is not supported.*inert offscreen compatibility object/i,
+  )
+  assert.throws(
+    () => renderer.domElement.transferToImageBitmap(),
+    /Renderer\.domElement\.transferToImageBitmap\(\) is not supported.*not an OffscreenCanvas/i,
+  )
 
   renderer.setSize(64, 32)
   assert.equal(renderer.domElement.width, 64)
