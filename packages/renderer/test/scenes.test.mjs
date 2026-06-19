@@ -10738,6 +10738,174 @@ test('Sprite and Points source alphaToCoverage opacity applies to custom shadow 
   }
 })
 
+test('Sprite and Points custom shadow maps apply texture UV transforms', () => {
+  function cutoffTexture(slot, offsetX) {
+    const texture = slot === 'alphaMap'
+      ? rgbaTexture([
+        255, 0, 255, 255,
+        255, 255, 255, 255,
+      ], 2, 1)
+      : rgbaTexture([
+        255, 255, 255, 0,
+        255, 255, 255, 255,
+      ], 2, 1)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.offset.set(offsetX, 0)
+    return texture
+  }
+
+  function sourceBillboardMaterial(kind, slot, offsetX, inheritFromSource) {
+    const params = {
+      color: 0xffffff,
+      alphaTest: inheritFromSource ? 0.5 : 0,
+    }
+    if (inheritFromSource) {
+      params[slot] = cutoffTexture(slot, offsetX)
+    }
+    const material = kind === 'sprite'
+      ? new THREE.SpriteMaterial(params)
+      : new THREE.PointsMaterial({
+        ...params,
+        size: 48,
+        sizeAttenuation: false,
+      })
+    material.colorWrite = false
+    material.depthWrite = false
+    return material
+  }
+
+  function customShadowMaterial(shadowKind, slot, offsetX, inheritFromSource) {
+    const material = shadowKind === 'distance'
+      ? new THREE.MeshDistanceMaterial()
+      : new THREE.MeshDepthMaterial()
+    if (!inheritFromSource) {
+      material[slot] = cutoffTexture(slot, offsetX)
+      material.alphaTest = 0.5
+    }
+    return material
+  }
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function addBillboard(scene, kind, material, shadowProperty, shadowMaterial, position) {
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(material)
+      sprite.position.set(...position)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = true
+      sprite[shadowProperty] = shadowMaterial
+      scene.add(sprite)
+      return
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
+    const points = new THREE.Points(geometry, material)
+    points.castShadow = true
+    points[shadowProperty] = shadowMaterial
+    scene.add(points)
+  }
+
+  function renderDirectionalCustomDepth(kind, slot, offsetX, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    addBillboard(
+      scene,
+      kind,
+      sourceBillboardMaterial(kind, slot, offsetX, inheritFromSource),
+      'customDepthMaterial',
+      customShadowMaterial('depth', slot, offsetX, inheritFromSource),
+      [0, 4, 0],
+    )
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 6, 8)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  function renderPointCustomDistance(kind, slot, offsetX, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    addBillboard(
+      scene,
+      kind,
+      sourceBillboardMaterial(kind, slot, offsetX, inheritFromSource),
+      'customDistanceMaterial',
+      customShadowMaterial('distance', slot, offsetX, inheritFromSource),
+      [0, 2.2, 1.8],
+    )
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    for (const slot of ['map', 'alphaMap']) {
+      for (const inheritFromSource of [false, true]) {
+        const label = `${kind} ${inheritFromSource ? 'source material' : 'custom shadow material'} ${slot}`
+
+        if (kind === 'sprite') {
+          const transparentDepth = renderDirectionalCustomDepth(kind, slot, 0, inheritFromSource)
+          const offsetDepth = renderDirectionalCustomDepth(kind, slot, 0.5, inheritFromSource)
+          const transparentDepthLum = transparentDepth.r + transparentDepth.g + transparentDepth.b
+          const offsetDepthLum = offsetDepth.r + offsetDepth.g + offsetDepth.b
+          assert.ok(
+            offsetDepthLum < transparentDepthLum - 10,
+            `${label} offset should darken the customDepthMaterial caster shadow (${offsetDepthLum} vs ${transparentDepthLum})`,
+          )
+        }
+
+        const transparentDistance = renderPointCustomDistance(kind, slot, 0, inheritFromSource)
+        const offsetDistance = renderPointCustomDistance(kind, slot, 0.5, inheritFromSource)
+        const transparentDistanceLum = transparentDistance.r + transparentDistance.g + transparentDistance.b
+        const offsetDistanceLum = offsetDistance.r + offsetDistance.g + offsetDistance.b
+        assert.ok(
+          offsetDistanceLum < transparentDistanceLum - 8,
+          `${label} offset should darken the customDistanceMaterial caster shadow (${offsetDistanceLum} vs ${transparentDistanceLum})`,
+        )
+      }
+    }
+  }
+})
+
 test('customDepthMaterial alphaMap controls directional shadow casters', () => {
   function renderCustomDepthShadow(alphaMapGreen) {
     const scene = new THREE.Scene()
