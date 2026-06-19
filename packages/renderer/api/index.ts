@@ -592,6 +592,7 @@ export class Renderer {
   private readonly contextAttributes: RendererContextAttributesLike
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
+  readonly isWebGLRenderer = true
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
   readonly debug = new RendererDebugState()
