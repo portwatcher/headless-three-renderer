@@ -6761,7 +6761,7 @@ test('transparent materials honor default depthWrite=true', () => {
 })
 
 test('material depthFunc controls depth comparison', () => {
-  function renderBehind(depthFunc) {
+  function renderLater(depthFunc, z) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
 
@@ -6777,7 +6777,7 @@ test('material depthFunc controls depth comparison', () => {
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshBasicMaterial({ color: 0x0000ff, depthFunc }),
     )
-    behind.position.z = -0.2
+    behind.position.z = z
     behind.renderOrder = 1
     scene.add(behind)
 
@@ -6788,13 +6788,41 @@ test('material depthFunc controls depth comparison', () => {
     return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
   }
 
-  const lessEqual = renderBehind(THREE.LessEqualDepth)
-  const always = renderBehind(THREE.AlwaysDepth)
-  const greater = renderBehind(THREE.GreaterDepth)
+  const fartherCases = [
+    ['NeverDepth', THREE.NeverDepth, 'red'],
+    ['LessDepth', THREE.LessDepth, 'red'],
+    ['LessEqualDepth', THREE.LessEqualDepth, 'red'],
+    ['EqualDepth', THREE.EqualDepth, 'red'],
+    ['GreaterEqualDepth', THREE.GreaterEqualDepth, 'blue'],
+    ['GreaterDepth', THREE.GreaterDepth, 'blue'],
+    ['NotEqualDepth', THREE.NotEqualDepth, 'blue'],
+    ['AlwaysDepth', THREE.AlwaysDepth, 'blue'],
+  ]
+  for (const [label, depthFunc, expected] of fartherCases) {
+    const mean = renderLater(depthFunc, -0.2)
+    if (expected === 'red') {
+      assert.ok(mean.r > mean.b + 80, `${label} should reject the later farther blue plane (${mean.r} vs ${mean.b})`)
+    } else {
+      assert.ok(mean.b > mean.r + 80, `${label} should pass the later farther blue plane (${mean.b} vs ${mean.r})`)
+    }
+  }
 
-  assert.ok(lessEqual.r > lessEqual.b + 80, `LessEqualDepth should reject the later blue plane behind red (${lessEqual.r} vs ${lessEqual.b})`)
-  assert.ok(always.b > always.r + 80, `AlwaysDepth should render the later blue plane over red (${always.b} vs ${always.r})`)
-  assert.ok(greater.b > greater.r + 80, `GreaterDepth should pass the farther blue depth over red (${greater.b} vs ${greater.r})`)
+  const coplanarCases = [
+    ['LessDepth', THREE.LessDepth, 'red'],
+    ['LessEqualDepth', THREE.LessEqualDepth, 'blue'],
+    ['EqualDepth', THREE.EqualDepth, 'blue'],
+    ['GreaterEqualDepth', THREE.GreaterEqualDepth, 'blue'],
+    ['GreaterDepth', THREE.GreaterDepth, 'red'],
+    ['NotEqualDepth', THREE.NotEqualDepth, 'red'],
+  ]
+  for (const [label, depthFunc, expected] of coplanarCases) {
+    const mean = renderLater(depthFunc, 0.2)
+    if (expected === 'red') {
+      assert.ok(mean.r > mean.b + 80, `${label} should reject the later coplanar blue plane (${mean.r} vs ${mean.b})`)
+    } else {
+      assert.ok(mean.b > mean.r + 80, `${label} should pass the later coplanar blue plane (${mean.b} vs ${mean.r})`)
+    }
+  }
 })
 
 test('unsupported material depthFunc values fail clearly', () => {
