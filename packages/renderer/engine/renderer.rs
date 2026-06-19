@@ -169,6 +169,8 @@ pub struct GpuRenderer {
     ibl_bind_group_cache: Mutex<HashMap<IblBindGroupKey, wgpu::BindGroup>>,
     uniform_bind_group_cache: Mutex<HashMap<UniformBindGroupKey, CachedUniformBindGroup>>,
     post_uniform_buffer: Mutex<Option<wgpu::Buffer>>,
+    scene_color_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
+    post_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -234,6 +236,12 @@ struct CachedUniformBindGroup {
 struct CachedBackgroundBindGroup {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct ScratchTextureKey {
+    width: u32,
+    height: u32,
 }
 
 struct AoPhysicalBindGroupResources {
@@ -434,6 +442,15 @@ impl UniformBindGroupKey {
         Self {
             len: bytes.len(),
             hash: hash_bytes(bytes),
+        }
+    }
+}
+
+impl ScratchTextureKey {
+    fn from_extent(size: wgpu::Extent3d) -> Self {
+        Self {
+            width: size.width,
+            height: size.height,
         }
     }
 }
@@ -2013,6 +2030,8 @@ impl GpuRenderer {
             ibl_bind_group_cache: Mutex::new(HashMap::new()),
             uniform_bind_group_cache: Mutex::new(HashMap::new()),
             post_uniform_buffer: Mutex::new(None),
+            scene_color_texture_cache: Mutex::new(HashMap::new()),
+            post_texture_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -2097,6 +2116,8 @@ impl GpuRenderer {
             .iter()
             .map(|mesh| self.upload_mesh(settings, mesh))
             .collect::<Result<Vec<_>>>()?;
+        let mut scene_color_texture_guard = None;
+        let mut post_texture_guard = None;
 
         let ibl_bind_group = match &settings.ibl {
             Some(ibl) => self.ibl_bind_group_for(ibl),
@@ -2245,16 +2266,13 @@ impl GpuRenderer {
         }
 
         if !transmissive_order.is_empty() || !transparent_order.is_empty() {
-            let scene_color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("headless-three-renderer scene color texture"),
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: COLOR_FORMAT,
-                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            });
+            let (scene_color_texture, guard) = self.cached_scratch_texture(
+                &self.scene_color_texture_cache,
+                texture_size,
+                "headless-three-renderer scene color texture",
+                wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+            );
+            scene_color_texture_guard = Some(guard);
             encoder.copy_texture_to_texture(
                 wgpu::TexelCopyTextureInfo {
                     texture: &color_texture,
@@ -2349,16 +2367,13 @@ impl GpuRenderer {
 
         let mut post_uniform_buffer_guard = None;
         if settings.post_processing.active {
-            let post_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("headless-three-renderer post color texture"),
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: COLOR_FORMAT,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-                view_formats: &[],
-            });
+            let (post_texture, guard) = self.cached_scratch_texture(
+                &self.post_texture_cache,
+                texture_size,
+                "headless-three-renderer post color texture",
+                wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            );
+            post_texture_guard = Some(guard);
             let post_view = post_texture.create_view(&wgpu::TextureViewDescriptor::default());
             let post_uniforms = post_uniforms(settings.post_processing);
             let mut guard = self
@@ -2457,8 +2472,44 @@ impl GpuRenderer {
         drop(padded_data);
         output_buffer.unmap();
         drop(post_uniform_buffer_guard);
+        drop(post_texture_guard);
+        drop(scene_color_texture_guard);
 
         Ok(rgba)
+    }
+
+    fn cached_scratch_texture<'a>(
+        &self,
+        cache: &'a Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
+        size: wgpu::Extent3d,
+        label: &'static str,
+        usage: wgpu::TextureUsages,
+    ) -> (
+        wgpu::Texture,
+        MutexGuard<'a, HashMap<ScratchTextureKey, wgpu::Texture>>,
+    ) {
+        let key = ScratchTextureKey::from_extent(size);
+        let mut guard = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let texture = if let Some(texture) = guard.get(&key) {
+            texture.clone()
+        } else {
+            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(label),
+                size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: COLOR_FORMAT,
+                usage,
+                view_formats: &[],
+            });
+            guard.insert(key, texture.clone());
+            texture
+        };
+
+        (texture, guard)
     }
 
     /// Render the scene's shadow casters into a shared depth-only texture array

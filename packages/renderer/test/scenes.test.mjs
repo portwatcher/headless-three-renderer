@@ -20403,6 +20403,45 @@ test('reusable renderer reflects mutated reflection-probe texture bytes', () => 
   assert.ok(redAgain.r > redAgain.g + 20, `mutated reflection probe should update back to red bytes (${redAgain.r} vs ${redAgain.g})`)
 })
 
+test('reusable renderer updates cached scene-color texture for transmission', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(3, 3),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.05,
+      transmission: 1,
+      thickness: 0,
+      ior: 1.5,
+    }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function sampleCenter() {
+    return meanRegion(renderer.render(scene, camera, {
+      width: 64,
+      height: 64,
+      format: 'rgba',
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const red = sampleCenter()
+  scene.background.set(0, 1, 0)
+  const green = sampleCenter()
+  scene.background.set(1, 0, 0)
+  const redAgain = sampleCenter()
+
+  assert.ok(red.r > red.g + 40, `initial transmission scene color should be red (${red.r} vs ${red.g})`)
+  assert.ok(green.g > green.r + 40, `updated transmission scene color should be green (${green.g} vs ${green.r})`)
+  assert.ok(redAgain.r > redAgain.g + 40, `transmission scene color should update back to red (${redAgain.r} vs ${redAgain.g})`)
+})
+
 test('invalid post-processing option values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
