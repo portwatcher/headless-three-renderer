@@ -13221,25 +13221,94 @@ test('unsupported array and 3D texture inputs fail clearly', () => {
 })
 
 test('unsupported cube texture material slots fail clearly', () => {
+  function makeCubeMap() {
+    return cubeTexture([
+      [255, 0, 0],
+      [0, 255, 0],
+      [0, 0, 255],
+      [255, 255, 0],
+      [255, 0, 255],
+      [0, 255, 255],
+    ])
+  }
+
+  function makeCubeUvMap() {
+    const texture = solidTexture(255, 255, 255)
+    texture.mapping = THREE.CubeUVReflectionMapping
+    return texture
+  }
+
+  const textureFactories = [
+    ['CubeTexture', makeCubeMap],
+    ['CubeUV texture', makeCubeUvMap],
+  ]
+  const slots = [
+    ['MeshBasicMaterial.map', (texture) => new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map: texture }),
+    ), /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['MeshBasicMaterial.alphaMap', (texture) => new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ alphaMap: texture, alphaTest: 0.5 }),
+    ), /material\.alphaMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['MeshStandardMaterial.normalMap', (texture) => new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({ normalMap: texture }),
+    ), /material\.normalMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['MeshPhongMaterial.specularMap', (texture) => new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhongMaterial({ specularMap: texture }),
+    ), /material\.specularMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['MeshPhysicalMaterial.clearcoatMap', (texture) => new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({ clearcoat: 1, clearcoatMap: texture }),
+    ), /material\.clearcoatMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['SpriteMaterial.map', (texture) => new THREE.Sprite(new THREE.SpriteMaterial({ map: texture })),
+      /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['PointsMaterial.alphaMap', (texture) => {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      return new THREE.Points(geometry, new THREE.PointsMaterial({ alphaMap: texture, alphaTest: 0.5 }))
+    }, /material\.alphaMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ['LineBasicMaterial.map', (texture) => {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0]), 3))
+      return new THREE.Line(geometry, new THREE.LineBasicMaterial({ map: texture }))
+    }, /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+  ]
+
+  for (const [textureName, makeTexture] of textureFactories) {
+    for (const [slotName, makeObject, pattern] of slots) {
+      const scene = new THREE.Scene()
+      scene.add(makeObject(makeTexture()))
+
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+        pattern,
+        `${slotName} ${textureName} should fail clearly`,
+      )
+    }
+  }
+})
+
+test('cube textures remain supported for background and environment slots', () => {
   const scene = new THREE.Scene()
+  scene.background = cubeTexture([
+    [255, 0, 0],
+    [0, 255, 0],
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+  ])
+  scene.environment = scene.background
   scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({
-      map: cubeTexture([
-        [255, 0, 0],
-        [0, 255, 0],
-        [0, 0, 255],
-        [255, 255, 0],
-        [255, 0, 255],
-        [0, 255, 255],
-      ]),
-    }),
+    new THREE.SphereGeometry(1, 16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.25 }),
   ))
 
-  assert.throws(
-    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-    /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i,
-  )
+  const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+  assert.ok(mean.r > 20 || mean.g > 20 || mean.b > 20, `cube background/environment should still render visibly (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('malformed environment and reflection probe texture values fail clearly', () => {

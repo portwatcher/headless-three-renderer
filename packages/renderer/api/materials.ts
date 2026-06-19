@@ -567,7 +567,7 @@ export function extractPbrProperties(
   if (clearcoat !== undefined) {
     props.clearcoat = clamp01(clearcoat)
   }
-  const clearcoatMapInfo = extractTextureFromSlot(material.clearcoatMap)
+  const clearcoatMapInfo = extractTextureFromSlot(material.clearcoatMap, 'material.clearcoatMap')
   if (clearcoatMapInfo) {
     props.clearcoatMap = clearcoatMapInfo.data
     props.clearcoatMapWidth = clearcoatMapInfo.width
@@ -584,7 +584,7 @@ export function extractPbrProperties(
   if (clearcoatRoughness !== undefined) {
     props.clearcoatRoughness = clamp01(clearcoatRoughness)
   }
-  const clearcoatRoughnessMapInfo = extractTextureFromSlot(material.clearcoatRoughnessMap)
+  const clearcoatRoughnessMapInfo = extractTextureFromSlot(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
   if (clearcoatRoughnessMapInfo) {
     props.clearcoatRoughnessMap = clearcoatRoughnessMapInfo.data
     props.clearcoatRoughnessMapWidth = clearcoatRoughnessMapInfo.width
@@ -597,7 +597,7 @@ export function extractPbrProperties(
     props.clearcoatRoughnessMapTransform = textureTransform(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
     props.clearcoatRoughnessMapUsesUv2 = textureUvChannel(material.clearcoatRoughnessMap) > 0
   }
-  const clearcoatNormalMapInfo = extractTextureFromSlot(material.clearcoatNormalMap)
+  const clearcoatNormalMapInfo = extractTextureFromSlot(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
   if (clearcoatNormalMapInfo) {
     props.clearcoatNormalMap = clearcoatNormalMapInfo.data
     props.clearcoatNormalMapWidth = clearcoatNormalMapInfo.width
@@ -633,7 +633,7 @@ export function extractPbrProperties(
   if (sheenRoughness !== undefined) {
     props.sheenRoughness = clamp01(sheenRoughness)
   }
-  const sheenColorMapInfo = extractTextureFromSlot(material.sheenColorMap)
+  const sheenColorMapInfo = extractTextureFromSlot(material.sheenColorMap, 'material.sheenColorMap')
   if (sheenColorMapInfo) {
     props.sheenColorMap = sheenColorMapInfo.data
     props.sheenColorMapWidth = sheenColorMapInfo.width
@@ -647,7 +647,7 @@ export function extractPbrProperties(
     props.sheenColorMapColorSpace = textureColorSpace(material.sheenColorMap)
     props.sheenColorMapUsesUv2 = textureUvChannel(material.sheenColorMap) > 0
   }
-  const sheenRoughnessMapInfo = extractTextureFromSlot(material.sheenRoughnessMap)
+  const sheenRoughnessMapInfo = extractTextureFromSlot(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
   if (sheenRoughnessMapInfo) {
     props.sheenRoughnessMap = sheenRoughnessMapInfo.data
     props.sheenRoughnessMapWidth = sheenRoughnessMapInfo.width
@@ -669,7 +669,7 @@ export function extractPbrProperties(
   if (anisotropyRotation !== undefined) {
     props.anisotropyRotation = anisotropyRotation
   }
-  const anisotropyMapInfo = extractTextureFromSlot(material.anisotropyMap)
+  const anisotropyMapInfo = extractTextureFromSlot(material.anisotropyMap, 'material.anisotropyMap')
   if (anisotropyMapInfo) {
     props.anisotropyMap = anisotropyMapInfo.data
     props.anisotropyMapWidth = anisotropyMapInfo.width
@@ -687,7 +687,7 @@ export function extractPbrProperties(
   if (iridescence !== undefined) {
     props.iridescence = clamp01(iridescence)
   }
-  const iridescenceMapInfo = extractTextureFromSlot(material.iridescenceMap)
+  const iridescenceMapInfo = extractTextureFromSlot(material.iridescenceMap, 'material.iridescenceMap')
   if (iridescenceMapInfo) {
     props.iridescenceMap = iridescenceMapInfo.data
     props.iridescenceMapWidth = iridescenceMapInfo.width
@@ -713,7 +713,7 @@ export function extractPbrProperties(
     props.iridescenceThicknessMin = Math.max(0, min)
     props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
   }
-  const iridescenceThicknessMapInfo = extractTextureFromSlot(material.iridescenceThicknessMap)
+  const iridescenceThicknessMapInfo = extractTextureFromSlot(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
   if (iridescenceThicknessMapInfo) {
     props.iridescenceThicknessMap = iridescenceThicknessMapInfo.data
     props.iridescenceThicknessMapWidth = iridescenceThicknessMapInfo.width
@@ -735,7 +735,7 @@ export function extractPbrProperties(
   if (dispersion !== undefined) {
     props.dispersion = Math.max(0, dispersion)
   }
-  const transmissionMapInfo = extractTextureFromSlot(material.transmissionMap)
+  const transmissionMapInfo = extractTextureFromSlot(material.transmissionMap, 'material.transmissionMap')
   if (transmissionMapInfo) {
     props.transmissionMap = transmissionMapInfo.data
     props.transmissionMapWidth = transmissionMapInfo.width
@@ -756,7 +756,7 @@ export function extractPbrProperties(
   if (thickness !== undefined) {
     props.thickness = Math.max(0, thickness)
   }
-  const thicknessMapInfo = extractTextureFromSlot(material.thicknessMap)
+  const thicknessMapInfo = extractTextureFromSlot(material.thicknessMap, 'material.thicknessMap')
   if (thicknessMapInfo) {
     props.thicknessMap = thicknessMapInfo.data
     props.thicknessMapWidth = thicknessMapInfo.width
@@ -792,7 +792,7 @@ export function extractPbrProperties(
   if (specularIntensity !== undefined) {
     props.physicalSpecularIntensity = clamp01(specularIntensity)
   }
-  const specularColorMapInfo = extractTextureFromSlot(material.specularColorMap)
+  const specularColorMapInfo = extractTextureFromSlot(material.specularColorMap, 'material.specularColorMap')
   if (specularColorMapInfo) {
     props.specularColorMap = specularColorMapInfo.data
     props.specularColorMapWidth = specularColorMapInfo.width
@@ -806,7 +806,7 @@ export function extractPbrProperties(
     props.specularColorMapColorSpace = textureColorSpace(material.specularColorMap)
     props.specularColorMapUsesUv2 = textureUvChannel(material.specularColorMap) > 0
   }
-  const specularIntensityMapInfo = extractTextureFromSlot(material.specularIntensityMap)
+  const specularIntensityMapInfo = extractTextureFromSlot(material.specularIntensityMap, 'material.specularIntensityMap')
   if (specularIntensityMapInfo) {
     props.specularIntensityMap = specularIntensityMapInfo.data
     props.specularIntensityMapWidth = specularIntensityMapInfo.width
@@ -838,7 +838,7 @@ export function extractPbrProperties(
     props.emissiveIntensity = finiteNumberOrDefault(material.emissiveIntensity, 'material.emissiveIntensity', 1)
   }
 
-  const normalMapInfo = extractTextureFromSlot(material.normalMap)
+  const normalMapInfo = extractTextureFromSlot(material.normalMap, 'material.normalMap')
   if (normalMapInfo) {
     props.normalMap = normalMapInfo.data
     props.normalMapWidth = normalMapInfo.width
@@ -861,7 +861,7 @@ export function extractPbrProperties(
       finiteNumberOrDefault(material.normalScale.y, 'material.normalScale.y', 1),
     ]
   }
-  const bumpMapInfo = extractTextureFromSlot(material.bumpMap)
+  const bumpMapInfo = extractTextureFromSlot(material.bumpMap, 'material.bumpMap')
   if (bumpMapInfo) {
     props.bumpMap = bumpMapInfo.data
     props.bumpMapWidth = bumpMapInfo.width
@@ -876,7 +876,7 @@ export function extractPbrProperties(
     props.bumpScale = finiteNumberOrDefault(material.bumpScale, 'material.bumpScale', 1)
   }
   if (material.isMeshMatcapMaterial) {
-    const matcapMapInfo = extractTextureFromSlot(material.map)
+    const matcapMapInfo = extractTextureFromSlot(material.map, 'material.map')
     if (matcapMapInfo) {
       props.matcapMap = matcapMapInfo.data
       props.matcapMapWidth = matcapMapInfo.width
@@ -924,7 +924,7 @@ export function extractPbrProperties(
     }
   }
 
-  const gradientMapInfo = extractTextureFromSlot(material.gradientMap)
+  const gradientMapInfo = extractTextureFromSlot(material.gradientMap, 'material.gradientMap')
   if (gradientMapInfo) {
     props.gradientMap = gradientMapInfo.data
     props.gradientMapWidth = gradientMapInfo.width
@@ -937,7 +937,7 @@ export function extractPbrProperties(
     props.gradientMapColorSpace = textureColorSpace(material.gradientMap)
   }
 
-  const displacementMapInfo = extractTextureFromSlot(material.displacementMap)
+  const displacementMapInfo = extractTextureFromSlot(material.displacementMap, 'material.displacementMap')
   if (displacementMapInfo) {
     props.displacementMap = displacementMapInfo.data
     props.displacementMapWidth = displacementMapInfo.width
@@ -953,9 +953,10 @@ export function extractPbrProperties(
     props.displacementBias = finiteNumberOrDefault(material.displacementBias, 'material.displacementBias', 0)
   }
 
-  const mrMapInfo = extractTextureFromSlot(material.metalnessMap ?? material.roughnessMap)
+  const mrMap = material.metalnessMap ?? material.roughnessMap
+  const mrMapLabel = material.metalnessMap ? 'material.metalnessMap' : 'material.roughnessMap'
+  const mrMapInfo = extractTextureFromSlot(mrMap, mrMapLabel)
   if (mrMapInfo) {
-    const mrMap = material.metalnessMap ?? material.roughnessMap
     props.metallicRoughnessTexture = mrMapInfo.data
     props.metallicRoughnessTextureWidth = mrMapInfo.width
     props.metallicRoughnessTextureHeight = mrMapInfo.height
@@ -965,16 +966,16 @@ export function extractPbrProperties(
     props.metallicRoughnessTextureMinFilter = minFilterModeToString(mrMap)
     props.metallicRoughnessTextureAnisotropy = textureAnisotropy(
       mrMap,
-      material.metalnessMap ? 'material.metalnessMap' : 'material.roughnessMap',
+      mrMapLabel,
     )
     props.metallicRoughnessTextureTransform = textureTransform(
       mrMap,
-      material.metalnessMap ? 'material.metalnessMap' : 'material.roughnessMap',
+      mrMapLabel,
     )
     props.metallicRoughnessTextureUsesUv2 = textureUvChannel(mrMap) > 0
   }
 
-  const specularMapInfo = extractTextureFromSlot(material.specularMap)
+  const specularMapInfo = extractTextureFromSlot(material.specularMap, 'material.specularMap')
   if (specularMapInfo) {
     props.specularMap = specularMapInfo.data
     props.specularMapWidth = specularMapInfo.width
@@ -988,7 +989,7 @@ export function extractPbrProperties(
     props.specularMapUsesUv2 = textureUvChannel(material.specularMap) > 0
   }
 
-  const emissiveMapInfo = extractTextureFromSlot(material.emissiveMap)
+  const emissiveMapInfo = extractTextureFromSlot(material.emissiveMap, 'material.emissiveMap')
   if (emissiveMapInfo) {
     props.emissiveMap = emissiveMapInfo.data
     props.emissiveMapWidth = emissiveMapInfo.width
@@ -1003,7 +1004,7 @@ export function extractPbrProperties(
     props.emissiveMapUsesUv2 = textureUvChannel(material.emissiveMap) > 0
   }
 
-  const aoMapInfo = extractTextureFromSlot(material.aoMap)
+  const aoMapInfo = extractTextureFromSlot(material.aoMap, 'material.aoMap')
   if (aoMapInfo) {
     props.aoMap = aoMapInfo.data
     props.aoMapWidth = aoMapInfo.width
@@ -1018,7 +1019,7 @@ export function extractPbrProperties(
     props.aoMapIntensity = finiteNumberOrDefault(material.aoMapIntensity, 'material.aoMapIntensity', 1)
   }
 
-  const lightMapInfo = extractTextureFromSlot(material.lightMap)
+  const lightMapInfo = extractTextureFromSlot(material.lightMap, 'material.lightMap')
   if (lightMapInfo) {
     props.lightMap = lightMapInfo.data
     props.lightMapWidth = lightMapInfo.width
@@ -1034,7 +1035,7 @@ export function extractPbrProperties(
     props.lightMapIntensity = finiteNumberOrDefault(material.lightMapIntensity, 'material.lightMapIntensity', 1)
   }
 
-  const alphaMapInfo = extractTextureFromSlot(material.alphaMap)
+  const alphaMapInfo = extractTextureFromSlot(material.alphaMap, 'material.alphaMap')
   if (alphaMapInfo) {
     props.alphaMap = alphaMapInfo.data
     props.alphaMapWidth = alphaMapInfo.width
