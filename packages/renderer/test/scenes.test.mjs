@@ -16653,6 +16653,10 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
   const reinhard = renderToneMappingState()
   renderer.toneMapping = THREE.CineonToneMapping
   const cineon = renderToneMappingState()
+  renderer.toneMapping = THREE.AgXToneMapping
+  const agx = renderToneMappingState()
+  renderer.toneMapping = THREE.NeutralToneMapping
+  const neutral = renderToneMappingState()
   assert.ok(linear.r > 245, `LinearToneMapping should preserve unclipped white at exposure 1 (${linear.r})`)
   assert.ok(
     reinhard.r < linear.r - 70,
@@ -16662,14 +16666,22 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
     cineon.r > reinhard.r + 20 && cineon.r < linear.r - 20,
     `CineonToneMapping should land between Reinhard and linear white (${cineon.r}, ${reinhard.r}, ${linear.r})`,
   )
+  assert.ok(
+    agx.r > 0 && agx.r < linear.r - 20,
+    `AgXToneMapping should render finite compressed white (${agx.r} vs ${linear.r})`,
+  )
+  assert.ok(
+    neutral.r > 0 && neutral.r < linear.r - 5,
+    `NeutralToneMapping should render finite compressed white (${neutral.r} vs ${linear.r})`,
+  )
 
   assert.throws(
     () => { renderer.toneMapping = 'aces' },
     /Renderer\.toneMapping must be a Three\.js tone mapping constant/i,
   )
   assert.throws(
-    () => { renderer.toneMapping = THREE.AgXToneMapping },
-    /Renderer\.toneMapping 6 is not supported.*NoToneMapping.*LinearToneMapping.*ReinhardToneMapping.*CineonToneMapping.*ACESFilmicToneMapping/i,
+    () => { renderer.toneMapping = THREE.CustomToneMapping },
+    /Renderer\.toneMapping 5 is not supported.*NoToneMapping.*LinearToneMapping.*ReinhardToneMapping.*CineonToneMapping.*ACESFilmicToneMapping.*AgXToneMapping.*NeutralToneMapping/i,
   )
   assert.throws(
     () => { renderer.toneMappingExposure = Number.NaN },

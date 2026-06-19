@@ -46,12 +46,16 @@ const LinearToneMapping = 1
 const ReinhardToneMapping = 2
 const CineonToneMapping = 3
 const ACESFilmicToneMapping = 4
+const AgXToneMapping = 6
+const NeutralToneMapping = 7
 const SupportedRendererToneMappings = new Set([
   NoToneMapping,
   LinearToneMapping,
   ReinhardToneMapping,
   CineonToneMapping,
   ACESFilmicToneMapping,
+  AgXToneMapping,
+  NeutralToneMapping,
 ])
 
 export {
@@ -2383,7 +2387,7 @@ function rendererStateToneMapping(value: unknown): number {
   }
   if (!Number.isInteger(value) || !SupportedRendererToneMappings.has(value)) {
     throw new TypeError(
-      `Renderer.toneMapping ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.NoToneMapping, THREE.LinearToneMapping, THREE.ReinhardToneMapping, THREE.CineonToneMapping, or THREE.ACESFilmicToneMapping.`,
+      `Renderer.toneMapping ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.NoToneMapping, THREE.LinearToneMapping, THREE.ReinhardToneMapping, THREE.CineonToneMapping, THREE.ACESFilmicToneMapping, THREE.AgXToneMapping, or THREE.NeutralToneMapping.`,
     )
   }
   return value
