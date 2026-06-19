@@ -230,6 +230,47 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
+test('instanced mesh budget renders thousands of transformed colored instances', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 50
+  const rows = 50
+  const count = columns * rows
+  const mesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(0.035, 0.035),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    count,
+  )
+
+  const matrix = new THREE.Matrix4()
+  const color = new THREE.Color()
+  for (let i = 0; i < count; i += 1) {
+    const col = i % columns
+    const row = Math.floor(i / columns)
+    matrix.makeTranslation((col - (columns - 1) / 2) * 0.04, (row - (rows - 1) / 2) * 0.04, 0)
+    mesh.setMatrixAt(i, matrix)
+    color.setRGB(
+      0.25 + 0.75 * (col / (columns - 1)),
+      0.25 + 0.75 * (row / (rows - 1)),
+      0.25 + 0.75 * ((col + row) / (columns + rows - 2)),
+    )
+    mesh.setColorAt(i, color)
+  }
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1.1, 1.1, 1.1, -1.1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.4, `instanced scale scene should fill much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 40 && mean.g > 40 && mean.b > 40, `instanced colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('texture-heavy scene budget renders many unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
