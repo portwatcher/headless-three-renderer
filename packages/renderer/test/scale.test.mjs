@@ -272,11 +272,11 @@ test('instanced mesh budget renders thousands of transformed colored instances',
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 60
-  const rows = 60
+  const columns = 64
+  const rows = 64
   const count = columns * rows
   const mesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(0.03, 0.03),
+    new THREE.PlaneGeometry(0.028, 0.028),
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
     count,
   )
@@ -286,7 +286,7 @@ test('instanced mesh budget renders thousands of transformed colored instances',
   for (let i = 0; i < count; i += 1) {
     const col = i % columns
     const row = Math.floor(i / columns)
-    matrix.makeTranslation((col - (columns - 1) / 2) * 0.034, (row - (rows - 1) / 2) * 0.034, 0)
+    matrix.makeTranslation((col - (columns - 1) / 2) * 0.032, (row - (rows - 1) / 2) * 0.032, 0)
     mesh.setMatrixAt(i, matrix)
     color.setRGB(
       0.25 + 0.75 * (col / (columns - 1)),
