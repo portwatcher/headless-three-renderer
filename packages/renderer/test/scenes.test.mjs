@@ -18097,9 +18097,13 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'options.target compressed color texture'],
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'options.target compressed color format'],
+    [{ depthTexture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target\.depthTexture\.format uses a compressed texture format/i, 'options.target compressed depth format'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'options.target sampleCount'],
     [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'options.target color texture format'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'options.target depth texture type'],
+    [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'options.target depth texture format'],
+    [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'options.target depth-stencil format with scalar type'],
+    [{ depthTexture: { type: THREE.UnsignedInt248Type, format: THREE.DepthFormat } }, /DepthFormat.*UnsignedInt248Type/i, 'options.target depth format with packed depth-stencil type'],
   ]
 
   for (const [target, pattern, label] of optionsTargetCases) {
