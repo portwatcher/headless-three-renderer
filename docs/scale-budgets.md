@@ -8,7 +8,7 @@ target platform and GPU backend.
 
 | Area | Covered budget | Notes |
 |---|---:|---|
-| Mesh count | 400 meshes | `scale.test.mjs` renders a 20 x 20 grid of separate mesh objects with shared lightweight geometry and a small material set. |
+| Mesh count | 900 meshes | `scale.test.mjs` renders a 30 x 30 grid of separate mesh objects with shared lightweight geometry and a small material set. |
 | Mixed mesh/texture/light scene | 48 meshes | A 6 x 8 grid of transformed box meshes renders with eight unique raw textures and supported punctual lights. |
 | Instanced mesh expansion | 2,500 instances | A single `InstancedMesh` renders a 50 x 50 grid with per-instance matrices and colors. |
 | Unique material textures | 64 maps | A texture-heavy scene renders an 8 x 8 grid where every plane has a unique `DataTexture`. |

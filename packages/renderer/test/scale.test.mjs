@@ -230,13 +230,13 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
-test('mesh render budget handles hundreds of separate mesh objects', () => {
+test('mesh render budget handles 900 separate mesh objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 20
-  const rows = 20
-  const geometry = new THREE.PlaneGeometry(0.075, 0.075)
+  const columns = 30
+  const rows = 30
+  const geometry = new THREE.PlaneGeometry(0.052, 0.052)
   const materials = [
     new THREE.MeshBasicMaterial({ color: 0xf25f5c }),
     new THREE.MeshBasicMaterial({ color: 0x247ba0 }),
@@ -248,7 +248,7 @@ test('mesh render budget handles hundreds of separate mesh objects', () => {
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const mesh = new THREE.Mesh(geometry, materials[(row + col) % materials.length])
-      mesh.position.set((col - (columns - 1) / 2) * 0.095, (row - (rows - 1) / 2) * 0.095, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.068, (row - (rows - 1) / 2) * 0.068, 0)
       mesh.rotation.z = ((row * columns + col) % 7) * 0.04
       scene.add(mesh)
     }
