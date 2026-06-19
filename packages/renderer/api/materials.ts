@@ -185,6 +185,7 @@ type TextureImageInput = {
   data?: ArrayLike<number>
   width?: number
   height?: number
+  getContext?: (contextId: string, options?: unknown) => unknown
 } | Buffer | Uint8Array
 
 /**
@@ -428,6 +429,18 @@ function extractEnvironmentMapFromTexture(
       }
     }
     throw unsupportedRawTextureDataError(label, 'environment map rendering')
+  }
+
+  const canvasImage = canvasLikeImageToRgba(image, label)
+  if (canvasImage) {
+    const data = premultiplyAlpha ? premultiplyRgbaAlpha(canvasImage.rgba) : canvasImage.rgba
+    return {
+      data: Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+      width: canvasImage.width,
+      height: canvasImage.height,
+      intensity,
+      colorSpace: textureColorSpace(envTex),
+    }
   }
 
   // Encoded image buffer (e.g. loaded HDR encoded as PNG/EXR)
@@ -2040,6 +2053,14 @@ function imageToRgbaTexture(
     }
   }
   if (!image || !image.data || !(image.width! > 0) || !(image.height! > 0)) {
+    const canvasImage = canvasLikeImageToRgba(image, label)
+    if (canvasImage) {
+      return {
+        rgba: options.premultiplyAlpha === true ? premultiplyRgbaAlpha(canvasImage.rgba) : canvasImage.rgba,
+        width: canvasImage.width,
+        height: canvasImage.height,
+      }
+    }
     throw new Error(`${label} must provide raw face data, width, and height for cube background rendering.`)
   }
   const rgba = toRgba8(image.data, image.width!, image.height!, { type: textureType })
@@ -2051,6 +2072,66 @@ function imageToRgbaTexture(
     width: image.width!,
     height: image.height!,
   }
+}
+
+function canvasLikeImageToRgba(
+  image: unknown,
+  label: string,
+): { rgba: Uint8Array; width: number; height: number } | null {
+  if (!image || typeof image !== 'object' || typeof (image as { getContext?: unknown }).getContext !== 'function') {
+    return null
+  }
+
+  const candidate = image as {
+    width?: unknown
+    height?: unknown
+    getContext: (contextId: string, options?: unknown) => unknown
+  }
+  const width = canvasLikeImageDimension(candidate.width, `${label}.width`)
+  const height = canvasLikeImageDimension(candidate.height, `${label}.height`)
+
+  let context: unknown
+  try {
+    context = candidate.getContext('2d', { willReadFrequently: true })
+      ?? candidate.getContext('2d')
+  } catch {
+    throw new Error(`${label}.getContext("2d") failed while reading canvas texture pixels.`)
+  }
+  if (!context || typeof context !== 'object' || typeof (context as { getImageData?: unknown }).getImageData !== 'function') {
+    throw new Error(`${label} canvas-like texture images must provide getContext("2d").getImageData().`)
+  }
+
+  let imageData: unknown
+  try {
+    imageData = (context as { getImageData: (x: number, y: number, width: number, height: number) => unknown })
+      .getImageData(0, 0, width, height)
+  } catch {
+    throw new Error(`${label}.getContext("2d").getImageData() failed while reading canvas texture pixels.`)
+  }
+
+  if (!imageData || typeof imageData !== 'object') {
+    throw new Error(`${label}.getContext("2d").getImageData() must return an ImageData-like object.`)
+  }
+  const data = (imageData as { data?: unknown }).data
+  if (!(data instanceof Uint8Array) && !(data instanceof Uint8ClampedArray)) {
+    throw new Error(`${label}.getContext("2d").getImageData().data must be a Uint8Array or Uint8ClampedArray.`)
+  }
+  if (data.length !== width * height * 4) {
+    throw new Error(`${label}.getContext("2d").getImageData().data length must equal width * height * 4.`)
+  }
+
+  return {
+    rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+    width,
+    height,
+  }
+}
+
+function canvasLikeImageDimension(value: unknown, label: string): number {
+  if (!Number.isInteger(value) || (value as number) <= 0) {
+    throw new TypeError(`${label} must be a positive integer for canvas-like texture image reads.`)
+  }
+  return value as number
 }
 
 function premultiplyRgbaAlpha(data: Uint8Array | Uint8ClampedArray): Uint8Array {
@@ -2260,6 +2341,16 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
     }
   }
 
+  const canvasImage = canvasLikeImageToRgba(image, label)
+  if (canvasImage) {
+    const data = textureBytesWithExplicitMipmaps(map, label, canvasImage.rgba, canvasImage.width, canvasImage.height)
+    return {
+      data: Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+      width: canvasImage.width,
+      height: canvasImage.height,
+    }
+  }
+
   throw unsupportedTextureImageError(label, 'texture rendering')
 }
 
@@ -2360,7 +2451,7 @@ function unsupportedRawTextureDataError(label: string, usage: string): Error {
 
 function unsupportedTextureImageError(label: string, usage: string): Error {
   return new Error(
-    `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, or raw one-channel, two-channel, RGB, or RGBA numeric pixel data as { data, width, height } before rendering.`,
+    `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, a canvas-like object with getContext("2d").getImageData(), or raw one-channel, two-channel, RGB, or RGBA numeric pixel data as { data, width, height } before rendering.`,
   )
 }
 

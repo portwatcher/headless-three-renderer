@@ -15982,6 +15982,112 @@ test('texture source.data images render across material, background, and IBL slo
   assert.ok(probeDiff > 0.5, `reflection probe source.data should affect IBL, diff=${probeDiff.toFixed(3)}`)
 })
 
+test('canvas-like texture images render across material, background, and IBL slots', () => {
+  function canvasLikeImage(data, width = 1, height = 1) {
+    const pixels = new Uint8ClampedArray(data)
+    return {
+      width,
+      height,
+      getContext(type) {
+        if (type !== '2d') return null
+        return {
+          getImageData(x, y, readWidth, readHeight) {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(readWidth, width)
+            assert.equal(readHeight, height)
+            return { data: pixels, width, height }
+          },
+        }
+      },
+    }
+  }
+  function canvasTexture(data, width = 1, height = 1) {
+    const texture = new THREE.Texture(canvasLikeImage(data, width, height))
+    texture.needsUpdate = true
+    return texture
+  }
+  function canvasEnvironmentTexture() {
+    const texture = canvasTexture([
+      255, 96, 32, 255,
+      255, 96, 32, 255,
+    ], 2, 1)
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map: canvasTexture([0, 255, 0, 255]) }),
+    ))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 2)
+    camera.lookAt(0, 0, 0)
+
+    const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+    assert.ok(mean.g > mean.r + 80 && mean.g > mean.b + 80, `canvas-like material map should render green (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
+
+  {
+    const scene = new THREE.Scene()
+    scene.background = canvasTexture([0, 0, 255, 255])
+
+    const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+    assert.ok(mean.b > mean.r + 80 && mean.b > mean.g + 80, `canvas-like background should render blue (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
+
+  function reflectiveScene(setup) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (setup) setup(scene)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+    ))
+    return scene
+  }
+
+  const camera = makeCamera()
+  const iblOptions = { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }
+  const noIbl = renderRgba(reflectiveScene(), camera, iblOptions)
+  const sceneEnvironment = renderRgba(reflectiveScene((scene) => {
+    scene.environment = canvasEnvironmentTexture()
+    scene.environmentIntensity = 4
+  }), camera, iblOptions)
+
+  function materialEnvMapScene(envMap = null) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, envMap }),
+    ))
+    return scene
+  }
+
+  const noMaterialEnvMap = renderRgba(materialEnvMapScene(), camera, iblOptions)
+  const materialEnvMap = renderRgba(materialEnvMapScene(canvasEnvironmentTexture()), camera, iblOptions)
+  const reflectionProbe = renderRgba(reflectiveScene((scene) => {
+    scene.userData.headlessThreeRenderer = {
+      reflectionProbe: {
+        texture: canvasEnvironmentTexture(),
+        intensity: 4,
+      },
+    }
+  }), camera, iblOptions)
+
+  const environmentDiff = meanAbsDiff(noIbl, sceneEnvironment)
+  const materialDiff = meanAbsDiff(noMaterialEnvMap, materialEnvMap)
+  const probeDiff = meanAbsDiff(noIbl, reflectionProbe)
+  assert.ok(environmentDiff > 0.5, `canvas-like scene.environment should affect IBL, diff=${environmentDiff.toFixed(3)}`)
+  assert.ok(materialDiff > 0.5, `canvas-like material.envMap should affect material IBL, diff=${materialDiff.toFixed(3)}`)
+  assert.ok(probeDiff > 0.5, `canvas-like reflection probe should affect IBL, diff=${probeDiff.toFixed(3)}`)
+})
+
 test('unsupported array and 3D texture inputs fail clearly', () => {
   function dataArrayTexture() {
     const texture = new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1)
@@ -16297,7 +16403,7 @@ test('unsupported packed-depth raw DataTexture type constants fail clearly', () 
   }
 })
 
-test('browser-like texture image objects fail clearly in Node slots', () => {
+test('opaque browser-like texture image objects fail clearly in Node slots', () => {
   function browserLikeTexture() {
     const texture = new THREE.Texture({ width: 1, height: 1, complete: true })
     texture.needsUpdate = true
