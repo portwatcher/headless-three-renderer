@@ -228,6 +228,8 @@ class RendererXrState {
   private enabledValue = false
   private cameraAutoUpdateValue = true
   private referenceSpaceTypeValue = 'local-floor'
+  private framebufferScaleFactorValue = 1
+  private foveationValue: number | undefined
 
   readonly isPresenting = false
 
@@ -245,6 +247,10 @@ class RendererXrState {
 
   set cameraAutoUpdate(value: boolean) {
     this.cameraAutoUpdateValue = rendererStateBoolean(value, 'Renderer.xr.cameraAutoUpdate')
+  }
+
+  setFramebufferScaleFactor(value: unknown): void {
+    this.framebufferScaleFactorValue = rendererStatePositiveFiniteNumber(value, 'Renderer.xr.setFramebufferScaleFactor value')
   }
 
   getSession(): null {
@@ -280,6 +286,27 @@ class RendererXrState {
 
   getCamera(): null {
     return null
+  }
+
+  getCameraTexture(camera: unknown): null {
+    if (camera === null || typeof camera !== 'object' || Array.isArray(camera)) {
+      throw new TypeError('Renderer.xr.getCameraTexture camera must be an XR camera-like object.')
+    }
+    return null
+  }
+
+  getFoveation(): number | undefined {
+    return this.foveationValue
+  }
+
+  setFoveation(value: unknown): void {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new TypeError('Renderer.xr.setFoveation value must be a finite number.')
+    }
+    if (value < 0 || value > 1) {
+      throw new RangeError('Renderer.xr.setFoveation value must be between 0 and 1.')
+    }
+    this.foveationValue = value
   }
 
   updateCamera(camera: ThreeRenderCameraLike): void {

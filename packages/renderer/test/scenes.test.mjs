@@ -2129,10 +2129,15 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
   assert.equal(renderer.xr.getReferenceSpaceType(), 'local-floor')
   assert.equal(renderer.xr.setReferenceSpaceType('local'), undefined)
   assert.equal(renderer.xr.getReferenceSpaceType(), 'local')
+  assert.equal(renderer.xr.setFramebufferScaleFactor(0.5), undefined)
   assert.equal(renderer.xr.getEnvironmentBlendMode(), 'opaque')
   assert.equal(renderer.xr.hasDepthSensing(), false)
   assert.equal(renderer.xr.getDepthSensingMesh(), null)
   assert.equal(renderer.xr.getCamera(), null)
+  assert.equal(renderer.xr.getCameraTexture({ isArrayCamera: true }), null)
+  assert.equal(renderer.xr.getFoveation(), undefined)
+  assert.equal(renderer.xr.setFoveation(0.75), undefined)
+  assert.equal(renderer.xr.getFoveation(), 0.75)
   assert.equal(renderer.xr.updateCamera(makeCamera()), undefined)
   assert.equal(renderer.xr.setAnimationLoop(() => {}), undefined)
   assert.equal(renderer.xr.setAnimationLoop(null), undefined)
@@ -2151,6 +2156,22 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
   assert.throws(
     () => renderer.xr.setReferenceSpaceType(''),
     /Renderer\.xr\.setReferenceSpaceType type must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.xr.setFramebufferScaleFactor(0),
+    /Renderer\.xr\.setFramebufferScaleFactor value must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.xr.getCameraTexture(null),
+    /Renderer\.xr\.getCameraTexture camera must be an XR camera-like object/i,
+  )
+  assert.throws(
+    () => renderer.xr.setFoveation('full'),
+    /Renderer\.xr\.setFoveation value must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.xr.setFoveation(1.5),
+    /Renderer\.xr\.setFoveation value must be between 0 and 1/i,
   )
   assert.throws(
     () => renderer.xr.addEventListener('', listener),
