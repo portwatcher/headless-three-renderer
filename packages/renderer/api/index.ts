@@ -26,7 +26,7 @@ import type {
 const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
-import { DEFAULT_BACKGROUND_COLOR, resolveBackground, validatedColorLikeToArray } from './color'
+import { DEFAULT_BACKGROUND_COLOR, cssColorStringToArray, resolveBackground, validatedColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
@@ -322,7 +322,7 @@ export class Renderer {
       : clonePixelSize(this.currentSize, target)
   }
 
-  setClearColor(color: number | ThreeColorLike | number[], alpha?: number): void {
+  setClearColor(color: number | string | ThreeColorLike | number[], alpha?: number): void {
     this.currentClearColor = rendererStateClearColor(color, alpha)
   }
 
@@ -2192,12 +2192,14 @@ function rendererStatePixelRectFromComponents(values: unknown[], label: string):
   return { x, y, width, height }
 }
 
-function rendererStateClearColor(color: number | ThreeColorLike | number[], alpha?: number): Color4 {
+function rendererStateClearColor(color: number | string | ThreeColorLike | number[], alpha?: number): Color4 {
   const colorArray = typeof color === 'number'
     ? rendererStateHexColor(color, 'Renderer.setClearColor color')
-    : validatedColorLikeToArray(color, 'Renderer.setClearColor color')
+    : typeof color === 'string'
+      ? cssColorStringToArray(color, 'Renderer.setClearColor color')
+      : validatedColorLikeToArray(color, 'Renderer.setClearColor color')
   if (!colorArray) {
-    throw new TypeError('Renderer.setClearColor color must be a hex number, color-like object, or [r, g, b].')
+    throw new TypeError('Renderer.setClearColor color must be a hex number, CSS color string, color-like object, or [r, g, b].')
   }
   return [
     colorArray[0],

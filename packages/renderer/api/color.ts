@@ -2,6 +2,22 @@ import type { Color4, ThreeColorLike, ThreeSceneRootLike, RenderOptions } from '
 import { clamp01, areFiniteNumbers } from './math'
 
 type ColorLikeWithAlpha = Partial<ThreeColorLike> & { a?: unknown }
+interface ThreeColorStyleParser {
+  r: number
+  g: number
+  b: number
+  setStyle(style: string): this
+  convertLinearToSRGB(): this
+}
+interface ThreeColorManagementState {
+  enabled: boolean
+}
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { Color: ThreeColor, ColorManagement: ThreeColorManagement } = require('three') as {
+  Color: new () => ThreeColorStyleParser
+  ColorManagement: ThreeColorManagementState
+}
 
 export const DEFAULT_BACKGROUND_COLOR: Color4 = [0.04, 0.045, 0.05, 1]
 
@@ -49,6 +65,30 @@ export function validatedColorLikeToArray(value: unknown, label: string): Color4
     clamp01(assertFiniteColorComponent(color.b, `${label}.b`)),
     clamp01(color.a === undefined ? 1 : assertFiniteColorComponent(color.a, `${label}.a`)),
   ]
+}
+
+export function cssColorStringToArray(value: string, label: string): Color4 {
+  if (value.trim() === '') {
+    throw new TypeError(`${label} must be a non-empty CSS color string.`)
+  }
+
+  const warnings: string[] = []
+  const originalWarn = console.warn
+  const originalColorManagementEnabled = ThreeColorManagement.enabled
+  console.warn = (...args: any[]) => { warnings.push(args.map(String).join(' ')) }
+  try {
+    ThreeColorManagement.enabled = true
+    const color = new ThreeColor().setStyle(value)
+    const invalidWarning = warnings.find((message) => /Unknown color|Invalid hex color/i.test(message))
+    if (invalidWarning) {
+      throw new TypeError(`${label} ${JSON.stringify(value)} is not a supported CSS color string.`)
+    }
+    color.convertLinearToSRGB()
+    return [clamp01(color.r), clamp01(color.g), clamp01(color.b), 1]
+  } finally {
+    console.warn = originalWarn
+    ThreeColorManagement.enabled = originalColorManagementEnabled
+  }
 }
 
 export function normalizeColorArray(values: number[], label?: string): Color4 {

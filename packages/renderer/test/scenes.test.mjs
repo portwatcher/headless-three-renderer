@@ -28052,6 +28052,28 @@ test('Renderer clear color state applies as background fallback', () => {
   assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer clear color fallback')
   assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer clear alpha fallback should be half opacity (${clear.a})`)
 
+  renderer.setClearColor('rgb(32, 64, 128)', 0.5)
+  const cssClearColor = renderer.getClearColor()
+  assert.ok(Math.abs(cssClearColor.r - 0x20 / 255) < 1e-3, `CSS clear red should match rgb() input (${cssClearColor.r})`)
+  assert.ok(Math.abs(cssClearColor.g - 0x40 / 255) < 1e-3, `CSS clear green should match rgb() input (${cssClearColor.g})`)
+  assert.ok(Math.abs(cssClearColor.b - 0x80 / 255) < 1e-3, `CSS clear blue should match rgb() input (${cssClearColor.b})`)
+  const cssClear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(cssClear, [0x20, 0x40, 0x80], 'Renderer CSS clear color fallback')
+  assert.ok(Math.abs(cssClear.a - 128) <= 1, `Renderer CSS clear alpha fallback should be half opacity (${cssClear.a})`)
+
+  const originalColorManagementEnabled = THREE.ColorManagement.enabled
+  try {
+    THREE.ColorManagement.enabled = false
+    renderer.setClearColor('rgb(32, 64, 128)', 0.5)
+    const disabledManagementClearColor = renderer.getClearColor()
+    assert.ok(
+      Math.abs(disabledManagementClearColor.r - 0x20 / 255) < 1e-3,
+      `CSS clear red should ignore external ColorManagement state (${disabledManagementClearColor.r})`,
+    )
+  } finally {
+    THREE.ColorManagement.enabled = originalColorManagementEnabled
+  }
+
   scene.background = new THREE.Color(1, 0, 0)
   const sceneBackground = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
   assertRgbClose(sceneBackground, [255, 0, 0], 'scene background should override Renderer clear color')
@@ -28544,8 +28566,8 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
     /Renderer\.setSize height must be a positive integer/i,
   )
   assert.throws(
-    () => renderer.setClearColor('red'),
-    /Renderer\.setClearColor color must be a color-like object/i,
+    () => renderer.setClearColor('not-a-color'),
+    /Renderer\.setClearColor color "not-a-color" is not a supported CSS color string/i,
   )
   assert.throws(
     () => renderer.setClearColor(0x1000000),
