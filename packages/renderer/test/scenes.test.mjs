@@ -6969,6 +6969,87 @@ test('material stencil state masks later draws', () => {
   }
 })
 
+test('material stencil z-pass operations update stencil values', () => {
+  function renderStencilOperation(stencilZPass, expectedRef) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const geometry = new THREE.PlaneGeometry(1, 2)
+    const preload = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        colorWrite: false,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilRef: 1,
+        stencilZPass: THREE.ReplaceStencilOp,
+      }),
+    )
+    preload.position.x = -0.5
+    preload.renderOrder = 0
+    scene.add(preload)
+
+    const operation = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        colorWrite: false,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilRef: 2,
+        stencilZPass,
+      }),
+    )
+    operation.position.x = -0.5
+    operation.renderOrder = 1
+    scene.add(operation)
+
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x0000ff,
+        stencilWrite: true,
+        stencilFunc: THREE.EqualStencilFunc,
+        stencilRef: expectedRef,
+        stencilFail: THREE.KeepStencilOp,
+        stencilZFail: THREE.KeepStencilOp,
+        stencilZPass: THREE.KeepStencilOp,
+        stencilWriteMask: 0,
+      }),
+    )
+    fill.renderOrder = 2
+    scene.add(fill)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    return {
+      left: meanRegion(rgba, 64, 64, 16, 24, 28, 40),
+      right: meanRegion(rgba, 64, 64, 42, 24, 54, 40),
+    }
+  }
+
+  const cases = [
+    ['ZeroStencilOp', THREE.ZeroStencilOp, 0],
+    ['KeepStencilOp', THREE.KeepStencilOp, 1],
+    ['ReplaceStencilOp', THREE.ReplaceStencilOp, 2],
+    ['IncrementStencilOp', THREE.IncrementStencilOp, 2],
+    ['DecrementStencilOp', THREE.DecrementStencilOp, 0],
+    ['IncrementWrapStencilOp', THREE.IncrementWrapStencilOp, 2],
+    ['DecrementWrapStencilOp', THREE.DecrementWrapStencilOp, 0],
+    ['InvertStencilOp', THREE.InvertStencilOp, 254],
+  ]
+  for (const [label, stencilZPass, expectedRef] of cases) {
+    const { left } = renderStencilOperation(stencilZPass, expectedRef)
+    assert.ok(left.b > 150, `${label} should update the left stencil value to ${expectedRef} (${left.b})`)
+  }
+})
+
 function assertMaterialRenderStateFails(material, pattern) {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
