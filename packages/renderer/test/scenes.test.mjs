@@ -29562,6 +29562,34 @@ test('Renderer compile hooks are validated no-op compatibility hooks', async () 
   )
 })
 
+test('Renderer setEffects is an inert validated compatibility hook', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.setEffects(), undefined)
+  assert.equal(renderer.setEffects(null), undefined)
+  assert.equal(renderer.setEffects([{ isOutputPass: true }, { name: 'custom-effect' }]), undefined)
+
+  const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `setEffects should not alter later rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => renderer.setEffects({}),
+    /Renderer\.setEffects effects must be an array or null/i,
+  )
+  assert.throws(
+    () => renderer.setEffects('effects'),
+    /Renderer\.setEffects effects must be an array or null/i,
+  )
+})
+
 test('Renderer resource init hooks are validated no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

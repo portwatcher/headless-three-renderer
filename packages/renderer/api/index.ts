@@ -686,6 +686,10 @@ export class Renderer {
     this.compile(scene, camera, targetScene)
   }
 
+  setEffects(effects: readonly unknown[] | null = null): void {
+    assertEffectsArrayOrNull(effects, 'Renderer.setEffects effects')
+  }
+
   initRenderTarget(target: RenderTargetLike): void {
     assertRenderTargetLike(target, 'Renderer.initRenderTarget target')
     validateUnsupportedRenderTargetOptions(target)
@@ -3031,6 +3035,12 @@ function rendererStateToneMapping(value: unknown): number {
 
 function assertOptionalBoolean(value: unknown, label: string): void {
   rendererStateBoolean(value, label)
+}
+
+function assertEffectsArrayOrNull(value: unknown, label: string): asserts value is readonly unknown[] | null {
+  if (value !== null && !Array.isArray(value)) {
+    throw new TypeError(`${label} must be an array or null.`)
+  }
 }
 
 function clonePixelSize(size: PixelSize | null | undefined): PixelSize | null
