@@ -19,6 +19,7 @@ export interface RendererParametersLike {
   preserveDrawingBuffer?: boolean
   powerPreference?: RendererPowerPreferenceLike
   failIfMajorPerformanceCaveat?: boolean
+  outputBufferType?: number
   logarithmicDepthBuffer?: boolean
   reversedDepthBuffer?: boolean
   reverseDepthBuffer?: boolean

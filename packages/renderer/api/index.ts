@@ -3255,6 +3255,7 @@ function assertRendererParametersLike(value: RendererParametersLike | undefined,
   if (parameters.powerPreference !== undefined) {
     rendererStatePowerPreference(parameters.powerPreference, `${label}.powerPreference`)
   }
+  assertRendererOutputBufferType(parameters.outputBufferType, `${label}.outputBufferType`)
   assertRendererContextParameterAbsent(parameters, 'canvas', label)
   assertRendererContextParameterAbsent(parameters, 'context', label)
   assertRendererUnsupportedDepthParameterFalse(parameters, 'logarithmicDepthBuffer', label)
@@ -3268,6 +3269,18 @@ function rendererStatePowerPreference(value: unknown, label: string): void {
   }
   if (!SupportedRendererPowerPreferences.has(value)) {
     throw new TypeError(`${label} "${value}" is not supported. Use "default", "high-performance", or "low-power".`)
+  }
+}
+
+function assertRendererOutputBufferType(value: unknown, label: string): void {
+  if (value === undefined) return
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new TypeError(`${label} must be a Three.js texture type integer.`)
+  }
+  if (value !== UnsignedByteType) {
+    throw new Error(
+      `${label} ${String(value)} is not supported by @headless-three/renderer because it has no browser drawing buffer. Omit outputBufferType for RGBA8 output, or use a target texture with FloatType or HalfFloatType for typed offscreen readback.`,
+    )
   }
 }
 

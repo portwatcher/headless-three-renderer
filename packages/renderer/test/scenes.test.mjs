@@ -29986,6 +29986,7 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
     preserveDrawingBuffer: true,
     powerPreference: 'high-performance',
     failIfMajorPerformanceCaveat: false,
+    outputBufferType: THREE.UnsignedByteType,
     logarithmicDepthBuffer: false,
     reversedDepthBuffer: false,
   })
@@ -30034,6 +30035,14 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   assert.throws(
     () => new Renderer({ powerPreference: 'maximum-performance' }),
     /Renderer parameters\.powerPreference "maximum-performance" is not supported/i,
+  )
+  assert.throws(
+    () => new Renderer({ outputBufferType: 'HalfFloatType' }),
+    /Renderer parameters\.outputBufferType must be a Three\.js texture type integer/i,
+  )
+  assert.throws(
+    () => new Renderer({ outputBufferType: THREE.HalfFloatType }),
+    /Renderer parameters\.outputBufferType .*not supported.*Omit outputBufferType.*FloatType or HalfFloatType/i,
   )
   assert.throws(
     () => new Renderer({ canvas: {} }),
