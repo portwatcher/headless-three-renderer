@@ -18328,7 +18328,7 @@ test('specularColorMap decodes sRGB colorSpace before shading', () => {
   assert.ok(linear > srgb + 5, `linear specularColorMap should produce brighter highlights than decoded sRGB (${linear} vs ${srgb})`)
 })
 
-test('specularIntensityMap samples the selected secondary UV channel', () => {
+test('specularIntensityMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const specularIntensityMap = rgbaTexture([
       0, 0, 0, 0,
@@ -18337,7 +18337,9 @@ test('specularIntensityMap samples the selected secondary UV channel', () => {
     specularIntensityMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18364,8 +18366,14 @@ test('specularIntensityMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  assert.ok(maxLuminance(secondary) > maxLuminance(primary) + 40, 'specularIntensityMap channel=1 should enable the uv1 specular texel')
+  const primaryLuminance = maxLuminance(primary)
+  for (const channel of [1, 2, 3]) {
+    const secondaryLuminance = maxLuminance(renderWithChannel(channel))
+    assert.ok(
+      secondaryLuminance > primaryLuminance + 40,
+      `specularIntensityMap channel=${channel} should enable the uv${channel} specular texel (${secondaryLuminance} vs ${primaryLuminance})`,
+    )
+  }
 })
 
 test('transmissionMap samples selected uv1-uv3 texture channels', () => {
