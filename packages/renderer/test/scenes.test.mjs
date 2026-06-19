@@ -17427,6 +17427,42 @@ test('outputColorSpace string aliases match Three.js constants', () => {
   )
 })
 
+test('Renderer _outputColorSpace mirrors outputColorSpace compatibility state', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.04, 0.08, 0.12)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 1.5),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.28, 0.12) }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer._outputColorSpace, THREE.SRGBColorSpace)
+
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+  assert.equal(renderer._outputColorSpace, THREE.LinearSRGBColorSpace)
+  const linearViaPublicState = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer._outputColorSpace = THREE.LinearSRGBColorSpace
+  assert.equal(renderer.outputColorSpace, THREE.LinearSRGBColorSpace)
+  assert.deepEqual(
+    renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    linearViaPublicState,
+    'Renderer._outputColorSpace should feed the same output conversion state',
+  )
+
+  renderer._outputColorSpace = 'srgb'
+  assert.equal(renderer.outputColorSpace, THREE.SRGBColorSpace)
+  assert.throws(
+    () => { renderer._outputColorSpace = 'display-p3' },
+    /Renderer\._outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+  )
+})
+
 test('unsupported outputColorSpace values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))

@@ -663,6 +663,14 @@ export class Renderer {
     this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer.outputColorSpace')
   }
 
+  get _outputColorSpace(): RenderOutputColorSpace {
+    return this.outputColorSpaceValue
+  }
+
+  set _outputColorSpace(value: RenderOutputColorSpace) {
+    this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer._outputColorSpace')
+  }
+
   get toneMapping(): number {
     return this.toneMappingValue
   }
