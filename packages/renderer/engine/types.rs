@@ -743,6 +743,8 @@ pub struct SceneMesh {
     pub alpha_map_anisotropy: Option<f64>,
     /// Alpha map UV transform `[a, c, tx, b, d, ty]`.
     pub alpha_map_transform: Option<Vec<f64>>,
+    /// Alpha map color space. `"srgb"` decodes the green channel to linear before opacity.
+    pub alpha_map_color_space: Option<String>,
     /// Whether alpha map sampling uses the secondary UV stream.
     pub alpha_map_uses_uv2: Option<bool>,
     /// Alpha test cutoff threshold (0..1). Fragments with alpha below this are discarded.

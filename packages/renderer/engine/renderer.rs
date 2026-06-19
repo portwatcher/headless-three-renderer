@@ -59,7 +59,7 @@ pub struct Uniforms {
     pub texture_transform1: [f32; 4],
     /// x/y/z = base-color texture transform row 1 (`v' = x*u + y*v + z`), w = base texture is sRGB
     pub texture_transform2: [f32; 4],
-    /// x/y/z = alpha-map texture transform row 0 (`u' = x*u + y*v + z`), w = reserved
+    /// x/y/z = alpha-map texture transform row 0 (`u' = x*u + y*v + z`), w = alpha map is sRGB
     pub alpha_map_transform1: [f32; 4],
     /// x/y/z = alpha-map texture transform row 1 (`v' = x*u + y*v + z`), w = reserved
     pub alpha_map_transform2: [f32; 4],
@@ -3948,7 +3948,7 @@ impl GpuRenderer {
                 mesh.alpha_map_transform[0],
                 mesh.alpha_map_transform[1],
                 mesh.alpha_map_transform[2],
-                0.0,
+                if mesh.alpha_map_is_srgb { 1.0 } else { 0.0 },
             ],
             alpha_map_transform2: [
                 mesh.alpha_map_transform[3],

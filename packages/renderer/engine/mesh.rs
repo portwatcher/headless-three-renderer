@@ -133,6 +133,7 @@ pub struct PreparedMesh {
     pub texture_transform: [f32; 6],
     pub texture_uses_uv2: bool,
     pub alpha_map_transform: [f32; 6],
+    pub alpha_map_is_srgb: bool,
     pub alpha_map_uses_uv2: bool,
     pub normal_map_transform: [f32; 6],
     pub normal_map_uses_uv2: bool,
@@ -857,6 +858,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         transmission_map_transform,
         thickness_map_transform,
         texture_is_srgb,
+        alpha_map_is_srgb,
         matcap_map_is_srgb,
         gradient_map_is_srgb,
         emissive_map_is_srgb,
@@ -1220,6 +1222,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         texture_transform,
         texture_uses_uv2: mesh.texture_uses_uv2.unwrap_or(false),
         alpha_map_transform,
+        alpha_map_is_srgb,
         alpha_map_uses_uv2: mesh.alpha_map_uses_uv2.unwrap_or(false),
         normal_map_transform,
         normal_map_uses_uv2: mesh.normal_map_uses_uv2.unwrap_or(false),
@@ -1668,6 +1671,7 @@ struct SurfaceTextureInputs {
     transmission_map_transform: [f32; 6],
     thickness_map_transform: [f32; 6],
     texture_is_srgb: bool,
+    alpha_map_is_srgb: bool,
     matcap_map_is_srgb: bool,
     gradient_map_is_srgb: bool,
     emissive_map_is_srgb: bool,
@@ -1770,6 +1774,7 @@ fn prepare_surface_texture_inputs(
         let thickness_map_transform =
             parse_texture_transform(mesh.thickness_map_transform.as_deref(), mesh_index)?;
         let texture_is_srgb = matches!(mesh.texture_color_space.as_deref(), Some("srgb"));
+        let alpha_map_is_srgb = matches!(mesh.alpha_map_color_space.as_deref(), Some("srgb"));
         let matcap_map_is_srgb = matches!(mesh.matcap_map_color_space.as_deref(), Some("srgb"));
         let gradient_map_is_srgb = matches!(mesh.gradient_map_color_space.as_deref(), Some("srgb"));
         let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
@@ -1808,6 +1813,7 @@ fn prepare_surface_texture_inputs(
             transmission_map_transform,
             thickness_map_transform,
             texture_is_srgb,
+            alpha_map_is_srgb,
             matcap_map_is_srgb,
             gradient_map_is_srgb,
             emissive_map_is_srgb,

@@ -53,6 +53,7 @@ struct Uniforms {
   texture_transform1: vec4<f32>,
   texture_transform2: vec4<f32>,
   // alpha_map_transform1.xyz / alpha_map_transform2.xyz = alpha-map texture transform rows.
+  // alpha_map_transform1.w = alpha map is sRGB.
   // alpha_map_transform2.w = alpha map uses secondary UV stream.
   alpha_map_transform1: vec4<f32>,
   alpha_map_transform2: vec4<f32>,
@@ -329,7 +330,7 @@ fn fs_shadow(input: ShadowVertexOutput, @builtin(front_facing) front_facing: boo
   var alpha = textureSample(t_diffuse, s_diffuse, transform_map_uv(uv, uv2)).a * input.color.a * uniforms.base_color.a;
   if uniforms.ao_params.z > 0.5 {
     let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
-    alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
+    alpha = alpha * decode_alpha_map_sample(textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g);
   }
 
   let alpha_cutoff = max(uniforms.emissive.w, uniforms.shadow_params4.w);
@@ -792,6 +793,13 @@ fn decode_color_map_sample(sample: vec4<f32>) -> vec4<f32> {
   return sample;
 }
 
+fn decode_alpha_map_sample(sample: f32) -> f32 {
+  if uniforms.alpha_map_transform1.w > 0.5 {
+    return srgb_to_linear_channel(sample);
+  }
+  return sample;
+}
+
 fn decode_matcap_map_sample(sample: vec4<f32>) -> vec4<f32> {
   if uniforms.physical_params4.w > 0.5 {
     return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
@@ -1001,7 +1009,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   var alpha = tex_color.a * input.color.a * uniforms.base_color.a;
   if uniforms.ao_params.z > 0.5 {
     let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
-    alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
+    alpha = alpha * decode_alpha_map_sample(textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g);
   }
   alpha = alpha * clip_opacity;
 
@@ -1714,6 +1722,8 @@ struct Uniforms {
   // texture_transform2.w = base texture is sRGB and must be decoded to linear before shading.
   texture_transform1: vec4<f32>,
   texture_transform2: vec4<f32>,
+  // alpha_map_transform1.w = alpha map is sRGB.
+  // alpha_map_transform2.w = alpha map uses secondary UV stream.
   alpha_map_transform1: vec4<f32>,
   alpha_map_transform2: vec4<f32>,
   map_transform_rows: array<vec4<f32>, 12>,
@@ -1806,6 +1816,13 @@ fn srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
 fn decode_color_map_sample(sample: vec4<f32>) -> vec4<f32> {
   if uniforms.texture_transform2.w > 0.5 {
     return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
+fn decode_alpha_map_sample(sample: f32) -> f32 {
+  if uniforms.alpha_map_transform1.w > 0.5 {
+    return srgb_to_linear_channel(sample);
   }
   return sample;
 }
@@ -1923,7 +1940,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   var alpha = base_color.a;
   if uniforms.ao_params.z > 0.5 {
     let alpha_uv = select(uv, uv2, uniforms.alpha_map_transform2.w > 0.5);
-    alpha = alpha * textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g;
+    alpha = alpha * decode_alpha_map_sample(textureSample(t_alpha, s_alpha, transform_alpha_map_uv(alpha_uv)).g);
   }
   alpha = alpha * clip_opacity;
   let alpha_cutoff = uniforms.emissive.w;

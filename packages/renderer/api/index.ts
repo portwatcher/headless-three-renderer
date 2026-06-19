@@ -1780,6 +1780,7 @@ function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'
     alphaMapMagFilter: mesh.alphaMapMagFilter,
     alphaMapMinFilter: mesh.alphaMapMinFilter,
     alphaMapTransform: mesh.alphaMapTransform,
+    alphaMapColorSpace: mesh.alphaMapColorSpace,
     alphaMapUsesUv2: mesh.alphaMapUsesUv2,
     alphaTest: mesh.alphaTest,
     alphaHash: mesh.alphaHash,

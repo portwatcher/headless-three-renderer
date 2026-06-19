@@ -785,6 +785,8 @@ export interface SceneMesh {
   alphaMapAnisotropy?: number
   /** Alpha map UV transform `[a, c, tx, b, d, ty]`. */
   alphaMapTransform?: Array<number>
+  /** Alpha map color space. `"srgb"` decodes the green channel to linear before opacity. */
+  alphaMapColorSpace?: string
   /** Whether alpha map sampling uses the secondary UV stream. */
   alphaMapUsesUv2?: boolean
   /** Alpha test cutoff threshold (0..1). Fragments with alpha below this are discarded. */

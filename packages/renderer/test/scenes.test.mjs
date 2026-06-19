@@ -9145,6 +9145,35 @@ test('alphaMap green channel contributes to alpha testing', () => {
   assert.ok(mean.g > mean.r + 80, `green-channel alpha map should discard the red plane (${mean.g} vs ${mean.r})`)
 })
 
+test('alphaMap decodes sRGB colorSpace before alpha testing', () => {
+  function renderColorSpace(colorSpace) {
+    const alphaMap = solidTexture(255, 128, 255, 255)
+    alphaMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(3, 3),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        alphaMap,
+        alphaTest: 0.3,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(srgb.b > srgb.r + 80, `decoded sRGB alphaMap should fall below alphaTest and show the blue background (${srgb.b} vs ${srgb.r})`)
+  assert.ok(linear.r > linear.b + 80, `linear alphaMap should stay above alphaTest and keep the red plane (${linear.r} vs ${linear.b})`)
+})
+
 test('alphaMap applies texture UV transforms before alpha testing', () => {
   const alphaMap = rgbaTexture([
     255, 0, 0, 255,

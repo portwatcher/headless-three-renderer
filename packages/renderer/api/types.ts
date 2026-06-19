@@ -993,6 +993,7 @@ export interface NativeSceneMesh {
   alphaMapMinFilter?: string
   alphaMapAnisotropy?: number
   alphaMapTransform?: number[]
+  alphaMapColorSpace?: string
   alphaMapUsesUv2?: boolean
   alphaTest?: number
   alphaHash?: boolean
@@ -1390,6 +1391,7 @@ export interface PbrProperties {
   alphaMapMinFilter?: string
   alphaMapAnisotropy?: number
   alphaMapTransform?: number[]
+  alphaMapColorSpace?: string
   alphaMapUsesUv2?: boolean
   alphaTest?: number
   alphaHash?: boolean

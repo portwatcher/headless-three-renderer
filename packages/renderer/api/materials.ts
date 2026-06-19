@@ -1071,6 +1071,7 @@ export function extractPbrProperties(
     props.alphaMapMinFilter = minFilterModeToString(material.alphaMap)
     props.alphaMapAnisotropy = textureAnisotropy(material.alphaMap, 'material.alphaMap')
     props.alphaMapTransform = textureTransform(material.alphaMap, 'material.alphaMap')
+    props.alphaMapColorSpace = textureColorSpace(material.alphaMap)
     props.alphaMapUsesUv2 = textureUvChannel(material.alphaMap) > 0
   }
 
