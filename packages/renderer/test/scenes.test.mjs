@@ -26910,6 +26910,24 @@ test('backgroundIntensity scales background color clears', () => {
   assert.ok(override.r > dimmed.r + 80, `options.backgroundIntensity should override scene.backgroundIntensity (${override.r} vs ${dimmed.r})`)
 })
 
+test('background color clears preserve alpha components', () => {
+  const scene = new THREE.Scene()
+  scene.background = { r: 1, g: 0, b: 0, a: 0.25 }
+  const camera = makeCamera()
+
+  const sceneAlpha = meanRgba(renderRgba(scene, camera, { width: 32, height: 32 }))
+  const optionAlpha = meanRgba(renderRgba(scene, camera, {
+    width: 32,
+    height: 32,
+    background: [0, 1, 0, 0.5],
+  }))
+
+  assert.ok(sceneAlpha.r > 200, `scene RGBA background should keep red color (${sceneAlpha.r})`)
+  assert.ok(sceneAlpha.a > 60 && sceneAlpha.a < 70, `scene RGBA background should preserve quarter alpha (${sceneAlpha.a})`)
+  assert.ok(optionAlpha.g > 200, `options.background RGBA clear should override to green (${optionAlpha.g})`)
+  assert.ok(optionAlpha.a > 124 && optionAlpha.a < 132, `options.background RGBA clear should preserve half alpha (${optionAlpha.a})`)
+})
+
 test('invalid background control values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
