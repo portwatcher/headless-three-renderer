@@ -7523,6 +7523,9 @@ test('invalid material render-state boolean values fail clearly', () => {
     ['toneMapped', (material) => {
       material.toneMapped = 'yes'
     }, /material\.toneMapped must be a boolean/i],
+    ['dithering', (material) => {
+      material.dithering = 'yes'
+    }, /material\.dithering must be a boolean/i],
     ['transparent', (material) => {
       material.transparent = 'yes'
     }, /material\.transparent must be a boolean/i],
@@ -7632,6 +7635,36 @@ test('material forceSinglePass is accepted as a native single-pass no-op', () =>
   assert.ok(mean.r > 40, `forceSinglePass material should still render visible red output (${mean.r})`)
   assert.ok(mean.r > mean.g + 40, `forceSinglePass material should still render red output (${mean.r} vs ${mean.g})`)
   assert.ok(mean.r > mean.b + 40, `forceSinglePass material should still render red output (${mean.r} vs ${mean.b})`)
+})
+
+test('material dithering is accepted as a compatibility no-op', () => {
+  function renderDithering(dithering) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x40a0ff,
+        dithering,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  assert.deepEqual(
+    renderDithering(true),
+    renderDithering(false),
+    'dithering should be accepted without altering native output',
+  )
 })
 
 test('NoBlending disables blending even for transparent materials', () => {

@@ -169,6 +169,7 @@ export interface ThreeMaterialLike {
   blendAlpha?: number
   premultipliedAlpha?: boolean
   toneMapped?: boolean
+  dithering?: boolean
   map?: ThreeTextureLike | null
   envMap?: ThreeTextureLike | null
   envMapIntensity?: number

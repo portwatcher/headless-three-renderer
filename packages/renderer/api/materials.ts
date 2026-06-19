@@ -1071,6 +1071,7 @@ export function extractPbrProperties(
   if (optionalBoolean(material.toneMapped, 'material.toneMapped') === false) {
     props.toneMapped = false
   }
+  optionalBoolean(material.dithering, 'material.dithering')
   const transparent = optionalBoolean(material.transparent, 'material.transparent')
   if (transparent !== undefined) {
     props.transparent = transparent
