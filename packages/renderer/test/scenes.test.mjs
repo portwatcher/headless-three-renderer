@@ -16778,6 +16778,48 @@ test('LOD selection accounts for camera zoom', () => {
   assert.ok(zoomed.r > zoomed.b + 10, `zoomed LOD distance should render the red level (${zoomed.r} vs ${zoomed.b})`)
 })
 
+test('LOD hysteresis preserves the previous farther level inside its threshold band', () => {
+  function makeScene() {
+    const lod = new THREE.LOD()
+    lod.addLevel(
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 })),
+      0,
+    )
+    const blueFar = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x0000ff }))
+    blueFar.visible = false
+    lod.addLevel(
+      blueFar,
+      4,
+      0.25,
+    )
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(lod)
+    return scene
+  }
+
+  function makeDistanceCamera(distance) {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, distance)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+
+  const bandCamera = makeDistanceCamera(3.2)
+  const baseline = meanRgba(renderRgba(makeScene(), bandCamera, { width: 64, height: 64 }))
+  assert.ok(baseline.r > baseline.b + 10, `fresh LOD should render the red near level before hysteresis is active (${baseline.r} vs ${baseline.b})`)
+
+  const scene = makeScene()
+  const far = meanRgba(renderRgba(scene, makeDistanceCamera(6), { width: 64, height: 64 }))
+  const retained = meanRgba(renderRgba(scene, bandCamera, { width: 64, height: 64 }))
+  const released = meanRgba(renderRgba(scene, makeDistanceCamera(2.8), { width: 64, height: 64 }))
+
+  assert.ok(far.b > far.r + 5, `far camera should render the blue LOD level (${far.b} vs ${far.r})`)
+  assert.ok(retained.b > retained.r + 5, `hysteresis band should retain the blue LOD level (${retained.b} vs ${retained.r})`)
+  assert.ok(released.r > released.b + 10, `inside hysteresis threshold should release back to the red LOD level (${released.r} vs ${released.b})`)
+})
+
 test('LOD autoUpdate=false preserves manual level visibility', () => {
   const redNear = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 }))
   const blueFar = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0x0000ff }))
