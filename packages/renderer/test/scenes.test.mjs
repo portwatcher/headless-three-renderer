@@ -119,6 +119,31 @@ function cubeTexture(faceColors) {
   return texture
 }
 
+function packedCubeUvTexture(faceColors, faceSize = 16) {
+  const width = 3 * Math.max(faceSize, 16 * 7)
+  const height = 4 * faceSize
+  const data = new Uint8Array(width * height * 4)
+  const atlasFaceToCubeFace = [0, 2, 4, 1, 3, 5]
+  for (let atlasFace = 0; atlasFace < 6; atlasFace += 1) {
+    const [r, g, b, a = 255] = faceColors[atlasFaceToCubeFace[atlasFace]]
+    const col = atlasFace % 3
+    const row = atlasFace > 2 ? 1 : 0
+    for (let y = 0; y < faceSize; y += 1) {
+      for (let x = 0; x < faceSize; x += 1) {
+        const offset = (((row * faceSize + y) * width) + (col * faceSize + x)) * 4
+        data[offset] = r
+        data[offset + 1] = g
+        data[offset + 2] = b
+        data[offset + 3] = a
+      }
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat)
+  texture.mapping = THREE.CubeUVReflectionMapping
+  texture.needsUpdate = true
+  return texture
+}
+
 function encodedCubeTexture() {
   const faces = [
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==',
@@ -4171,6 +4196,22 @@ test('CubeUV-mapped cube material envMap feeds supported material paths', () => 
   }), 64, 64, 24, 24, 40, 40)
 
   assert.ok(mean.g > mean.r + 40, `CubeUV-mapped cube material envMap should replace with green (${mean.r}, ${mean.g})`)
+
+  const packedEnvMap = packedCubeUvTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])
+  scene.children[0].material.envMap = packedEnvMap
+  const packedMean = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 24, 24, 40, 40)
+  assert.ok(packedMean.g > packedMean.r + 40, `packed CubeUV material envMap should replace with green (${packedMean.r}, ${packedMean.g})`)
 })
 
 test('legacy material envMap supports refraction mapping', () => {
@@ -4599,7 +4640,7 @@ test('unsupported material envMap inputs fail clearly', () => {
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /material\.envMap uses PMREM\/CubeUV environment mapping without readable six-face cube images.*not supported/i,
+      /material\.envMap packed PMREM\/CubeUV image height must be divisible by 4|material\.envMap packed PMREM\/CubeUV image must use Three\.js' 3-column by 4-row layout/i,
       'material envMap 2D CubeUV mapping',
     )
   }
@@ -22881,13 +22922,23 @@ test('cube scene environments feed physical IBL', () => {
   ])
   cubeUvEnvironment.mapping = THREE.CubeUVReflectionMapping
   const cubeUvCube = renderRgba(makeScene(cubeUvEnvironment), camera)
+  const packedCubeUv = renderRgba(makeScene(packedCubeUvTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])), camera)
   const encodedCube = renderRgba(makeScene(encodedCubeTexture()), camera)
 
   const rawDiff = meanAbsDiff(noEnvironment, rawCube)
   const cubeUvDiff = meanAbsDiff(noEnvironment, cubeUvCube)
+  const packedCubeUvDiff = meanAbsDiff(noEnvironment, packedCubeUv)
   const encodedDiff = meanAbsDiff(noEnvironment, encodedCube)
   assert.ok(rawDiff > 0.5, `raw cube environment should affect metallic IBL, diff=${rawDiff.toFixed(3)}`)
   assert.ok(cubeUvDiff > 0.5, `CubeUV-mapped cube environment should affect metallic IBL, diff=${cubeUvDiff.toFixed(3)}`)
+  assert.ok(packedCubeUvDiff > 0.5, `packed CubeUV environment should affect metallic IBL, diff=${packedCubeUvDiff.toFixed(3)}`)
   assert.ok(encodedDiff > 0.5, `encoded cube environment should affect metallic IBL, diff=${encodedDiff.toFixed(3)}`)
 })
 
@@ -22930,10 +22981,20 @@ test('cube reflection probes feed physical IBL', () => {
   ])
   cubeUvProbe.mapping = THREE.CubeUVReflectionMapping
   const withCubeUvProbe = renderRgba(makeScene(cubeUvProbe), camera)
+  const withPackedCubeUvProbe = renderRgba(makeScene(packedCubeUvTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])), camera)
   const diff = meanAbsDiff(noProbe, withCubeProbe)
   const cubeUvDiff = meanAbsDiff(noProbe, withCubeUvProbe)
+  const packedCubeUvDiff = meanAbsDiff(noProbe, withPackedCubeUvProbe)
   assert.ok(diff > 0.5, `encoded cube reflection probe should affect metallic IBL, diff=${diff.toFixed(3)}`)
   assert.ok(cubeUvDiff > 0.5, `CubeUV-mapped cube reflection probe should affect metallic IBL, diff=${cubeUvDiff.toFixed(3)}`)
+  assert.ok(packedCubeUvDiff > 0.5, `packed CubeUV reflection probe should affect metallic IBL, diff=${packedCubeUvDiff.toFixed(3)}`)
 })
 
 test('scene environmentRotation rotates equirectangular IBL', () => {
@@ -23196,19 +23257,19 @@ test('cube environment and reflection probe colorSpace controls IBL decode', () 
 
 test('unsupported environment and reflection probe mappings fail clearly', () => {
   const cases = [
-    ['2D CubeUV scene environment', (scene) => {
+    ['malformed 2D CubeUV scene environment', (scene) => {
       scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping })
-    }, /PMREM\/CubeUV environment mapping without readable six-face cube images.*not supported/i],
+    }, /scene\.environment packed PMREM\/CubeUV image height must be divisible by 4|scene\.environment packed PMREM\/CubeUV image must use Three\.js' 3-column by 4-row layout/i],
     ['refraction scene environment', (scene) => {
       scene.environment = Object.assign(makeEnvironmentTexture(), { mapping: THREE.EquirectangularRefractionMapping })
     }, /refraction environment mapping.*not supported/i],
-    ['2D CubeUV reflection probe', (scene) => {
+    ['malformed 2D CubeUV reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: {
           texture: Object.assign(makeEnvironmentTexture(), { mapping: THREE.CubeUVReflectionMapping }),
         },
       }
-    }, /PMREM\/CubeUV environment mapping without readable six-face cube images.*not supported/i],
+    }, /reflectionProbe\.texture packed PMREM\/CubeUV image height must be divisible by 4|reflectionProbe\.texture packed PMREM\/CubeUV image must use Three\.js' 3-column by 4-row layout/i],
     ['refraction reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = {
         reflectionProbe: {
@@ -28758,33 +28819,72 @@ test('CubeUV-mapped cube backgrounds sample readable cube faces', () => {
   assert.ok(optionBackground.g > optionBackground.r + 80, `options.background CubeUV cube texture should render green (${optionBackground.g} vs ${optionBackground.r})`)
 })
 
-test('packed CubeUV background texture mappings fail clearly', () => {
-  const cases = [
-    ['scene.background', () => {
-      const scene = new THREE.Scene()
-      scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping })
-      return { scene, options: {} }
-    }],
-    ['options.background', () => {
-      const scene = new THREE.Scene()
-      scene.background = new THREE.Color(0, 0, 0)
-      return {
-        scene,
-        options: {
-          background: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping }),
-        },
-      }
-    }],
-  ]
+test('packed CubeUV background textures decode the sharp atlas faces', () => {
+  const background = packedCubeUvTexture([
+    [0, 0, 255],
+    [255, 255, 0],
+    [255, 0, 255],
+    [0, 255, 255],
+    [0, 255, 0],
+    [255, 0, 0],
+  ])
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
 
-  for (const [name, makeCase] of cases) {
-    const { scene, options } = makeCase()
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64, ...options }),
-      /PMREM\/CubeUV background mapping without readable six-face cube images.*not supported/i,
-      name,
-    )
+  function renderFacing(target) {
+    const scene = new THREE.Scene()
+    scene.background = background
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 0)
+    camera.lookAt(target)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 28, 28, 36, 36)
   }
+
+  const negativeZ = renderFacing(new THREE.Vector3(0, 0, -1))
+  const positiveZ = renderFacing(new THREE.Vector3(0, 0, 1))
+  assert.ok(negativeZ.r > negativeZ.g + 80, `-Z packed CubeUV background should render red (${negativeZ.r} vs ${negativeZ.g})`)
+  assert.ok(positiveZ.g > positiveZ.r + 80, `+Z packed CubeUV background should render green (${positiveZ.g} vs ${positiveZ.r})`)
+
+  const optionScene = new THREE.Scene()
+  optionScene.background = new THREE.Color(1, 0, 0)
+  const optionCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  optionCamera.position.set(0, 0, 0)
+  optionCamera.lookAt(new THREE.Vector3(0, 0, 1))
+  const optionBackground = meanRegion(renderRgba(optionScene, optionCamera, {
+    width: 64,
+    height: 64,
+    background,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 28, 28, 36, 36)
+  assert.ok(optionBackground.g > optionBackground.r + 80, `options.background packed CubeUV texture should render green (${optionBackground.g} vs ${optionBackground.r})`)
+})
+
+test('malformed packed CubeUV background texture layouts fail clearly', () => {
+  const malformedLayout = /packed PMREM\/CubeUV image height must be divisible by 4|packed PMREM\/CubeUV image must use Three\.js' 3-column by 4-row layout/i
+  const scene = new THREE.Scene()
+  scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping })
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+    malformedLayout,
+    'scene.background',
+  )
+
+  const optionScene = new THREE.Scene()
+  optionScene.background = new THREE.Color(0, 0, 0)
+  assert.throws(
+    () => renderRgba(optionScene, makeCamera(), {
+      width: 64,
+      height: 64,
+      background: Object.assign(solidTexture(0, 255, 0), { mapping: THREE.CubeUVReflectionMapping }),
+    }),
+    malformedLayout,
+    'options.background',
+  )
 })
 
 test('render options accept texture backgrounds', () => {

@@ -1869,7 +1869,10 @@ function isCubeEnvironmentTexture(map: ThreeTextureLike, label = 'texture'): boo
   return map.isCubeTexture === true ||
     map.mapping === CubeReflectionMapping ||
     map.mapping === CubeRefractionMapping ||
-    (map.mapping === CubeUVReflectionMapping && cubeFaceImages(map, label) !== null)
+    (
+      map.mapping === CubeUVReflectionMapping &&
+      (cubeFaceImages(map, label) !== null || cubeUvPackedImage(map, label) !== null)
+    )
 }
 
 function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
@@ -1891,9 +1894,9 @@ function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { d
   const faces = cubeFaceImages(map, label)
   if (!faces) {
     if (map.mapping === CubeUVReflectionMapping) {
-      throw new Error(
-        `${label} uses PMREM/CubeUV background mapping without readable six-face cube images, which is not supported by @headless-three/renderer yet. Provide a CubeUV-mapped CubeTexture with six readable faces, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
-      )
+      const packedFaceTextures = packedCubeUvTextureToFaceTextures(map, label)
+      if (packedFaceTextures) return cubeFaceTexturesToEquirectangular(packedFaceTextures, label)
+      throw new Error(`${label} uses PMREM/CubeUV mapping without readable six-face cube images or a readable packed CubeUV image.`)
     }
     throw new Error(
       `${label} uses a cube texture without six raw or encoded face images. Provide a CubeTexture with six DataTexture-style or encoded PNG/JPEG/WebP face images, use a 2D/equirectangular texture, or pre-render the background to a 2D image before rendering.`,
@@ -1902,6 +1905,13 @@ function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { d
 
   const premultiplyAlpha = optionalTextureBoolean(map.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
   const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`, map.type, { premultiplyAlpha }))
+  return cubeFaceTexturesToEquirectangular(faceTextures, label)
+}
+
+function cubeFaceTexturesToEquirectangular(
+  faceTextures: Array<{ rgba: Uint8Array; width: number; height: number }>,
+  label: string,
+): { data: Buffer; width: number; height: number } {
   const faceWidth = faceTextures[0].width
   const faceHeight = faceTextures[0].height
   if (faceWidth !== faceHeight) {
@@ -1946,6 +1956,61 @@ function cubeFaceImages(map: ThreeTextureLike, label = 'texture'): TextureImageI
   const image = (map as any).image ?? sourceData
   if (Array.isArray(image) && image.length >= 6) return image.slice(0, 6) as TextureImageInput[]
   return null
+}
+
+function cubeUvPackedImage(map: ThreeTextureLike, label = 'texture'): TextureImageInput | null {
+  if (map.mapping !== CubeUVReflectionMapping) return null
+  const sourceData = textureSourceData(map, label)
+  const image = (map as any).image ?? sourceData
+  if (!image || Array.isArray(image)) return null
+  if (Buffer.isBuffer(image) || image instanceof Uint8Array) return image
+  if (typeof image === 'object') return image as TextureImageInput
+  return null
+}
+
+function packedCubeUvTextureToFaceTextures(
+  map: ThreeTextureLike,
+  label: string,
+): Array<{ rgba: Uint8Array; width: number; height: number }> | null {
+  const packedImage = cubeUvPackedImage(map, label)
+  if (!packedImage) return null
+
+  const premultiplyAlpha = optionalTextureBoolean(map.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
+  const atlas = imageToRgbaTexture(packedImage, `${label}.image`, map.type, { premultiplyAlpha })
+  if (atlas.height % 4 !== 0) {
+    throw new Error(`${label} packed PMREM/CubeUV image height must be divisible by 4.`)
+  }
+
+  const faceSize = atlas.height / 4
+  if (!Number.isInteger(faceSize) || faceSize < 16 || atlas.width < faceSize * 3) {
+    throw new Error(
+      `${label} packed PMREM/CubeUV image must use Three.js' 3-column by 4-row layout with at least 16x16 face tiles.`,
+    )
+  }
+
+  const atlasFaceToCubeFace = [0, 2, 4, 1, 3, 5]
+  const cubeFaces: Array<{ rgba: Uint8Array; width: number; height: number } | undefined> = []
+  for (let atlasFace = 0; atlasFace < 6; atlasFace += 1) {
+    const col = atlasFace % 3
+    const row = atlasFace > 2 ? 1 : 0
+    cubeFaces[atlasFaceToCubeFace[atlasFace]] = extractRgbaTile(atlas, col * faceSize, row * faceSize, faceSize)
+  }
+
+  return cubeFaces as Array<{ rgba: Uint8Array; width: number; height: number }>
+}
+
+function extractRgbaTile(
+  source: { rgba: Uint8Array; width: number; height: number },
+  x: number,
+  y: number,
+  size: number,
+): { rgba: Uint8Array; width: number; height: number } {
+  const out = new Uint8Array(size * size * 4)
+  for (let row = 0; row < size; row += 1) {
+    const sourceStart = ((y + row) * source.width + x) * 4
+    out.set(source.rgba.subarray(sourceStart, sourceStart + size * 4), row * size * 4)
+  }
+  return { rgba: out, width: size, height: size }
 }
 
 function imageToRgbaTexture(
