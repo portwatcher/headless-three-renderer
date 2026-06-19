@@ -17976,6 +17976,34 @@ test('physical extension maps honor nearest texture filters', () => {
     return maxLuminance(renderRgba(scene, camera, { width: 64, height: 64 }))
   }
 
+  function renderClearcoatRoughness(filter) {
+    const clearcoatRoughnessMap = filteredTexture([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 1,
+        clearcoatRoughnessMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return maxLuminance(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
   function renderSheen(filter) {
     const sheenColorMap = filteredTexture([
       0, 0, 0, 255,
@@ -17998,6 +18026,35 @@ test('physical extension maps honor nearest texture filters', () => {
         sheenColorMap,
       }),
     ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  function renderSpecularColor(filter) {
+    const specularColorMap = filteredTexture([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.05,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+        specularColorMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 450)
+    light.position.set(0, 0, 2)
+    scene.add(light)
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
     camera.position.set(0, 0, 3)
@@ -18095,6 +18152,64 @@ test('physical extension maps honor nearest texture filters', () => {
     return renderRgba(scene, camera, { width: 64, height: 64 })
   }
 
+  function renderSheenRoughness(filter) {
+    const sheenRoughnessMap = filteredTexture([
+      0, 0, 0, 0,
+      0, 0, 0, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        sheen: 1,
+        sheenColor: new THREE.Color(1, 0, 0),
+        sheenRoughness: 1,
+        sheenRoughnessMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function renderAnisotropy(filter) {
+    const anisotropyMap = filteredTexture([
+      128, 128, 0, 255,
+      255, 128, 255, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x111111,
+        roughness: 0.2,
+        metalness: 0,
+        anisotropy: 1,
+        anisotropyRotation: Math.PI / 4,
+        anisotropyMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 250)
+    light.position.set(0.8, 0.8, 2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
   function renderIridescence(filter) {
     const iridescenceMap = filteredTexture([
       0, 0, 0, 255,
@@ -18125,6 +18240,41 @@ test('physical extension maps honor nearest texture filters', () => {
     camera.position.set(0, 0, 3)
     camera.lookAt(0, 0, 0)
     return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function renderThickness(filter) {
+    const thicknessMap = filteredTexture([
+      0, 0, 0, 255,
+      0, 255, 0, 255,
+    ], filter)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        ior: 1.5,
+        thickness: 8,
+        thicknessMap,
+        attenuationColor: new THREE.Color(0.02, 0.02, 1),
+        attenuationDistance: 1,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   }
 
   function renderIridescenceThickness(filter) {
@@ -18163,9 +18313,17 @@ test('physical extension maps honor nearest texture filters', () => {
   const linearClearcoat = renderClearcoat(THREE.LinearFilter)
   assert.ok(linearClearcoat > nearestClearcoat + 25, `LinearFilter should blend in the clearcoat texel (${linearClearcoat} vs ${nearestClearcoat})`)
 
+  const nearestClearcoatRoughness = renderClearcoatRoughness(THREE.NearestFilter)
+  const linearClearcoatRoughness = renderClearcoatRoughness(THREE.LinearFilter)
+  assert.ok(linearClearcoatRoughness > nearestClearcoatRoughness + 0.5, `LinearFilter should blend in clearcoat roughness (${linearClearcoatRoughness} vs ${nearestClearcoatRoughness})`)
+
   const nearestSheen = renderSheen(THREE.NearestFilter)
   const linearSheen = renderSheen(THREE.LinearFilter)
   assert.ok(linearSheen.r > nearestSheen.r + 1.5, `LinearFilter should blend in red sheen (${linearSheen.r} vs ${nearestSheen.r})`)
+
+  const nearestSpecularColor = renderSpecularColor(THREE.NearestFilter)
+  const linearSpecularColor = renderSpecularColor(THREE.LinearFilter)
+  assert.ok(linearSpecularColor.r > nearestSpecularColor.r + 0.5, `LinearFilter should blend in red specular color (${linearSpecularColor.r} vs ${nearestSpecularColor.r})`)
 
   const nearestSpecular = renderSpecularIntensity(THREE.NearestFilter)
   const linearSpecular = renderSpecularIntensity(THREE.LinearFilter)
@@ -18180,10 +18338,25 @@ test('physical extension maps honor nearest texture filters', () => {
   const normalDiff = meanAbsDiff(nearestNormal, linearNormal)
   assert.ok(normalDiff > 2, `LinearFilter should blend clearcoat normals differently than NearestFilter, diff=${normalDiff.toFixed(2)}`)
 
+  const nearestSheenRoughness = renderSheenRoughness(THREE.NearestFilter)
+  const linearSheenRoughness = renderSheenRoughness(THREE.LinearFilter)
+  const sheenRoughnessDiff = meanAbsDiff(nearestSheenRoughness, linearSheenRoughness)
+  assert.ok(sheenRoughnessDiff > 2, `LinearFilter should blend sheen roughness differently than NearestFilter, diff=${sheenRoughnessDiff.toFixed(2)}`)
+
+  const nearestAnisotropy = renderAnisotropy(THREE.NearestFilter)
+  const linearAnisotropy = renderAnisotropy(THREE.LinearFilter)
+  const anisotropyDiff = meanAbsDiff(nearestAnisotropy, linearAnisotropy)
+  assert.ok(anisotropyDiff > 0.5, `LinearFilter should blend anisotropy direction/strength differently than NearestFilter, diff=${anisotropyDiff.toFixed(2)}`)
+
   const nearestIridescence = renderIridescence(THREE.NearestFilter)
   const linearIridescence = renderIridescence(THREE.LinearFilter)
   const iridescenceDiff = meanAbsDiff(nearestIridescence, linearIridescence)
   assert.ok(iridescenceDiff > 0.5, `LinearFilter should blend in iridescence factor, diff=${iridescenceDiff.toFixed(2)}`)
+
+  const nearestVolumeThickness = renderThickness(THREE.NearestFilter)
+  const linearVolumeThickness = renderThickness(THREE.LinearFilter)
+  assert.ok(nearestVolumeThickness.r > linearVolumeThickness.r + 80, `LinearFilter should blend in volume attenuation from thickness (${nearestVolumeThickness.r} vs ${linearVolumeThickness.r})`)
+  assert.ok(linearVolumeThickness.b > linearVolumeThickness.r + 80, `LinearFilter should keep the attenuated volume blue (${linearVolumeThickness.b} vs ${linearVolumeThickness.r})`)
 
   const nearestThickness = renderIridescenceThickness(THREE.NearestFilter)
   const linearThickness = renderIridescenceThickness(THREE.LinearFilter)
