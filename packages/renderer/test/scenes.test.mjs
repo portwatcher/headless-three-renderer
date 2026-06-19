@@ -30168,6 +30168,21 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.equal(renderer.domElement.clientHeight, 20)
   renderer.domElement.style.width = '40px'
   renderer.domElement.style.height = '20px'
+  assert.equal(renderer.domElement.style.getPropertyValue('width'), '40px')
+  renderer.domElement.style.setProperty('width', '12.5px')
+  assert.equal(renderer.domElement.clientWidth, 13)
+  assert.equal(renderer.domElement.style.removeProperty('width'), '12.5px')
+  assert.equal(renderer.domElement.clientWidth, 40)
+  renderer.domElement.style.setProperty('width', '40px')
+  renderer.domElement.style.setProperty('touch-action', 'none')
+  assert.equal(renderer.domElement.style.touchAction, 'none')
+  assert.equal(renderer.domElement.style.getPropertyValue('touch-action'), 'none')
+  assert.equal(renderer.domElement.style.removeProperty('touch-action'), 'none')
+  assert.equal(renderer.domElement.style.getPropertyValue('touch-action'), '')
+  renderer.domElement.style.setProperty('--renderer-mode', 'headless')
+  assert.equal(renderer.domElement.style.getPropertyValue('--renderer-mode'), 'headless')
+  assert.equal(renderer.domElement.style.removeProperty('--renderer-mode'), 'headless')
+  assert.deepEqual(renderer.domElement.style, { width: '40px', height: '20px' })
 
   assert.equal(renderer.domElement.getAttribute('data-renderer'), null)
   assert.equal(renderer.domElement.hasAttribute('data-renderer'), false)
@@ -30186,6 +30201,18 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.throws(
     () => renderer.domElement.getAttribute(null),
     /Renderer\.domElement\.getAttribute name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.domElement.style.setProperty('', 'none'),
+    /Renderer\.domElement\.style\.setProperty propertyName must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.domElement.style.getPropertyValue(null),
+    /Renderer\.domElement\.style\.getPropertyValue propertyName must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.domElement.style.removeProperty('set-property'),
+    /Renderer\.domElement\.style\.removeProperty propertyName must not name a reserved style method/i,
   )
 
   const eventCalls = []

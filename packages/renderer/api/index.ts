@@ -376,10 +376,7 @@ class RendererDomElementState {
   private readonly attributes = new Map<string, string>()
   private readonly listeners = new Map<string, Set<(event: unknown) => void>>()
 
-  readonly style = {
-    width: '0px',
-    height: '0px',
-  }
+  readonly style = createRendererDomElementStyle()
 
   get clientWidth(): number {
     return this.stylePixelSize(this.style.width, this.width)
@@ -459,6 +456,47 @@ class RendererDomElementState {
     const size = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value) : Number.NaN
     return Number.isFinite(size) && size >= 0 ? Math.round(size) : fallback
   }
+}
+
+type RendererDomElementStyle = {
+  width: string
+  height: string
+  setProperty(propertyName: unknown, value?: unknown): void
+  getPropertyValue(propertyName: unknown): string
+  removeProperty(propertyName: unknown): string
+  [key: string]: unknown
+}
+
+function createRendererDomElementStyle(): RendererDomElementStyle {
+  const style = { width: '0px', height: '0px' } as RendererDomElementStyle
+  Object.defineProperties(style, {
+    setProperty: {
+      value: function setProperty(this: RendererDomElementStyle, propertyName: unknown, value: unknown = ''): void {
+        const key = domElementStyleWritablePropertyKey(propertyName, 'Renderer.domElement.style.setProperty propertyName')
+        this[key] = String(value)
+      },
+    },
+    getPropertyValue: {
+      value: function getPropertyValue(this: RendererDomElementStyle, propertyName: unknown): string {
+        const key = domElementStylePropertyKey(propertyName, 'Renderer.domElement.style.getPropertyValue propertyName')
+        const value = this[key]
+        return value === undefined || typeof value === 'function' ? '' : String(value)
+      },
+    },
+    removeProperty: {
+      value: function removeProperty(this: RendererDomElementStyle, propertyName: unknown): string {
+        const key = domElementStyleWritablePropertyKey(propertyName, 'Renderer.domElement.style.removeProperty propertyName')
+        const previous = this.getPropertyValue(propertyName)
+        if (key === 'width' || key === 'height') {
+          this[key] = ''
+        } else {
+          delete this[key]
+        }
+        return previous
+      },
+    },
+  })
+  return style
 }
 
 class RendererColorBufferState {
@@ -4144,6 +4182,22 @@ function assertDomElementAttributeName(value: unknown, label: string): asserts v
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(`${label} must be a non-empty string.`)
   }
+}
+
+function domElementStylePropertyKey(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
+  }
+  if (value.startsWith('--')) return value
+  return value.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase())
+}
+
+function domElementStyleWritablePropertyKey(value: unknown, label: string): string {
+  const key = domElementStylePropertyKey(value, label)
+  if (key === 'setProperty' || key === 'getPropertyValue' || key === 'removeProperty') {
+    throw new TypeError(`${label} must not name a reserved style method.`)
+  }
+  return key
 }
 
 function assertWeakMapKey(value: unknown, label: string): asserts value is object {
