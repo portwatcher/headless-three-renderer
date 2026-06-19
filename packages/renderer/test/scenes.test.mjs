@@ -18425,7 +18425,7 @@ test('transmissionMap samples selected uv1-uv3 texture channels', () => {
   }
 })
 
-test('clearcoatMap samples the selected secondary UV channel', () => {
+test('clearcoatMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const clearcoatMap = rgbaTexture([
       0, 0, 0, 255,
@@ -18434,7 +18434,9 @@ test('clearcoatMap samples the selected secondary UV channel', () => {
     clearcoatMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18460,13 +18462,15 @@ test('clearcoatMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   const primaryLum = 0.2126 * primary.r + 0.7152 * primary.g + 0.0722 * primary.b
-  const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
-  assert.ok(secondaryLum > primaryLum + 80, `clearcoatMap channel=1 should enable stronger clearcoat IBL (${secondaryLum.toFixed(1)} vs ${primaryLum.toFixed(1)})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
+    assert.ok(secondaryLum > primaryLum + 80, `clearcoatMap channel=${channel} should enable stronger clearcoat IBL from uv${channel} (${secondaryLum.toFixed(1)} vs ${primaryLum.toFixed(1)})`)
+  }
 })
 
-test('clearcoatRoughnessMap samples the selected secondary UV channel', () => {
+test('clearcoatRoughnessMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const clearcoatRoughnessMap = rgbaTexture([
       0, 0, 0, 255,
@@ -18475,7 +18479,9 @@ test('clearcoatRoughnessMap samples the selected secondary UV channel', () => {
     clearcoatRoughnessMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18501,13 +18507,15 @@ test('clearcoatRoughnessMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   const primaryLum = 0.2126 * primary.r + 0.7152 * primary.g + 0.0722 * primary.b
-  const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
-  assert.ok(primaryLum > secondaryLum + 20, `clearcoatRoughnessMap channel=0 should keep the clearcoat IBL sharper/brighter (${primaryLum.toFixed(1)} vs ${secondaryLum.toFixed(1)})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
+    assert.ok(primaryLum > secondaryLum + 20, `clearcoatRoughnessMap channel=${channel} should sample the rough uv${channel} texel (${primaryLum.toFixed(1)} vs ${secondaryLum.toFixed(1)})`)
+  }
 })
 
-test('clearcoatNormalMap samples the selected secondary UV channel', () => {
+test('clearcoatNormalMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const clearcoatNormalMap = rgbaTexture([
       128, 128, 255, 255,
@@ -18516,7 +18524,9 @@ test('clearcoatNormalMap samples the selected secondary UV channel', () => {
     clearcoatNormalMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18543,12 +18553,13 @@ test('clearcoatNormalMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  const diff = meanAbsDiff(primary, secondary)
-  assert.ok(diff > 5, `clearcoatNormalMap channel=1 should sample the tilted uv1 normal, mean diff=${diff.toFixed(2)}`)
+  for (const channel of [1, 2, 3]) {
+    const diff = meanAbsDiff(primary, renderWithChannel(channel))
+    assert.ok(diff > 5, `clearcoatNormalMap channel=${channel} should sample the tilted uv${channel} normal, mean diff=${diff.toFixed(2)}`)
+  }
 })
 
-test('sheenColorMap samples the selected secondary UV channel', () => {
+test('sheenColorMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const sheenColorMap = rgbaTexture([
       0, 0, 0, 255,
@@ -18557,7 +18568,9 @@ test('sheenColorMap samples the selected secondary UV channel', () => {
     sheenColorMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18584,9 +18597,11 @@ test('sheenColorMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  assert.ok(secondary.r > primary.r + 3, `sheenColorMap channel=1 should add red sheen from uv1 (${secondary.r} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.g + 3, `sheenColorMap channel=1 should keep the sampled red sheen tint (${secondary.r} vs ${secondary.g})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.r > primary.r + 3, `sheenColorMap channel=${channel} should add red sheen from uv${channel} (${secondary.r} vs ${primary.r})`)
+    assert.ok(secondary.r > secondary.g + 3, `sheenColorMap channel=${channel} should keep the sampled red sheen tint (${secondary.r} vs ${secondary.g})`)
+  }
 })
 
 test('sheenColorMap decodes sRGB colorSpace before shading', () => {
@@ -18622,7 +18637,7 @@ test('sheenColorMap decodes sRGB colorSpace before shading', () => {
   assert.ok(linear > srgb + 3, `linear sheenColorMap should produce brighter sheen than decoded sRGB (${linear} vs ${srgb})`)
 })
 
-test('sheenRoughnessMap samples the selected secondary UV channel', () => {
+test('sheenRoughnessMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const sheenRoughnessMap = rgbaTexture([
       0, 0, 0, 0,
@@ -18631,7 +18646,9 @@ test('sheenRoughnessMap samples the selected secondary UV channel', () => {
     sheenRoughnessMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18658,12 +18675,13 @@ test('sheenRoughnessMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  const diff = meanAbsDiff(primary, secondary)
-  assert.ok(diff > 5, `sheenRoughnessMap channel=1 should sample the rough uv1 texel, mean diff=${diff.toFixed(2)}`)
+  for (const channel of [1, 2, 3]) {
+    const diff = meanAbsDiff(primary, renderWithChannel(channel))
+    assert.ok(diff > 5, `sheenRoughnessMap channel=${channel} should sample the rough uv${channel} texel, mean diff=${diff.toFixed(2)}`)
+  }
 })
 
-test('anisotropyMap samples the selected secondary UV channel', () => {
+test('anisotropyMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const anisotropyMap = rgbaTexture([
       128, 128, 0, 255,
@@ -18672,7 +18690,9 @@ test('anisotropyMap samples the selected secondary UV channel', () => {
     anisotropyMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -18699,12 +18719,13 @@ test('anisotropyMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  const diff = meanAbsDiff(primary, secondary)
-  assert.ok(diff > 1, `anisotropyMap channel=1 should sample the anisotropic uv1 texel, mean diff=${diff.toFixed(2)}`)
+  for (const channel of [1, 2, 3]) {
+    const diff = meanAbsDiff(primary, renderWithChannel(channel))
+    assert.ok(diff > 1, `anisotropyMap channel=${channel} should sample the anisotropic uv${channel} texel, mean diff=${diff.toFixed(2)}`)
+  }
 })
 
-test('thicknessMap samples the selected secondary UV channel', () => {
+test('thicknessMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const thicknessMap = rgbaTexture([
       0, 0, 0, 255,
@@ -18722,7 +18743,9 @@ test('thicknessMap samples the selected secondary UV channel', () => {
     scene.add(back)
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
     scene.add(new THREE.Mesh(
       geometry,
       new THREE.MeshPhysicalMaterial({
@@ -18746,9 +18769,11 @@ test('thicknessMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   assert.ok(primary.r > primary.b - 15, `thicknessMap channel=0 should sample the thin primary UV texel (${primary.r} vs ${primary.b})`)
-  assert.ok(secondary.b > secondary.r + 40, `thicknessMap channel=1 should sample the attenuating uv1 texel (${secondary.b} vs ${secondary.r})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.b > secondary.r + 40, `thicknessMap channel=${channel} should sample the attenuating uv${channel} texel (${secondary.b} vs ${secondary.r})`)
+  }
 })
 
 test('custom WGSL fragment material affects rendered output', () => {
