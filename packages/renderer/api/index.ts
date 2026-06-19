@@ -20,6 +20,7 @@ import type {
   RenderObjectIdEntry,
   ThreeEulerLike,
   RenderSortFunction,
+  RenderAnimationLoopCallback,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -93,6 +94,7 @@ export type {
   RenderOptions,
   RenderTargetLike,
   RenderObjectIdEntry,
+  RenderAnimationLoopCallback,
   RenderSortFunction,
   RenderSortItem,
   PostProcessingOptions,
@@ -197,6 +199,7 @@ export class Renderer {
   private autoClearStencilValue = true
   private outputColorSpaceValue: RenderOutputColorSpace = 'srgb'
   private localClippingEnabledValue = true
+  private animationLoop: RenderAnimationLoopCallback | null = null
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly info = new RendererInfoState()
@@ -275,6 +278,13 @@ export class Renderer {
   setTransparentSort(method: RenderSortFunction | null): void {
     assertSortFunctionOrNull(method, 'Renderer.setTransparentSort')
     this.transparentSort = method
+  }
+
+  setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
+    if (callback !== null && typeof callback !== 'function') {
+      throw new TypeError('Renderer.setAnimationLoop callback must be a function or null.')
+    }
+    this.animationLoop = callback
   }
 
   getRenderTarget(): RenderTargetLike | null {

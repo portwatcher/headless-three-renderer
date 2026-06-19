@@ -5,6 +5,7 @@
 export type RenderOutputFormat = 'png' | 'rgba'
 export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'linearsrgb' | 'linear'
 export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal'
+export type RenderAnimationLoopCallback = (time: number, frame?: unknown) => void
 
 export interface ThreeColorLike {
   r: number

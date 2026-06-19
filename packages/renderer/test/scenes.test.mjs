@@ -28273,6 +28273,26 @@ test('Renderer clear methods are no-op compatibility hooks', () => {
   )
 })
 
+test('Renderer setAnimationLoop is an inert validated compatibility hook', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+  let calls = 0
+
+  renderer.setAnimationLoop(() => { calls += 1 })
+  renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  assert.equal(calls, 0)
+
+  renderer.setAnimationLoop(null)
+  renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  assert.equal(calls, 0)
+
+  assert.throws(
+    () => renderer.setAnimationLoop('loop'),
+    /Renderer\.setAnimationLoop callback must be a function or null/i,
+  )
+})
+
 test('Renderer autoClear flags are validated compatibility state', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
