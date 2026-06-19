@@ -591,7 +591,6 @@ export class Renderer {
   private animationLoop: RenderAnimationLoopCallback | null = null
   private readonly contextAttributes: RendererContextAttributesLike
 
-  readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly isWebGLRenderer = true
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
@@ -610,6 +609,10 @@ export class Renderer {
     assertRendererParametersLike(parameters, 'Renderer parameters')
     this.contextAttributes = rendererContextAttributes(parameters)
     this.native = new native.NativeRenderer()
+  }
+
+  get coordinateSystem(): number {
+    return WEBGL_COORDINATE_SYSTEM
   }
 
   get autoClear(): boolean {

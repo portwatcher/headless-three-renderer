@@ -29547,6 +29547,11 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   const renderer = new Renderer()
 
   assert.equal(renderer.isWebGLRenderer, true)
+  assert.equal(renderer.coordinateSystem, THREE.WebGLCoordinateSystem)
+  assert.throws(
+    () => { renderer.coordinateSystem = THREE.WebGPUCoordinateSystem },
+    /coordinateSystem/i,
+  )
   assert.equal(renderer.capabilities.isWebGL2, false)
   assert.equal(renderer.capabilities.drawBuffers, false)
   assert.equal(renderer.capabilities.precision, 'highp')
