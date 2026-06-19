@@ -26,7 +26,7 @@ import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPositio
 import { resolveBackground, validatedColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
-import { extractBackgroundTexture, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
+import { extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
 import { matrixElements } from './math'
@@ -2018,6 +2018,11 @@ function assertNormalizedNumberOption(value: unknown, label: string): void {
 function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {
   if (!texture) return
   const format = texture.format
+  if (isCompressedTextureFormat(format)) {
+    throw new Error(
+      'target color texture format uses a compressed texture format, which is not supported by @headless-three/renderer render targets. Use a regular 2D target texture and compress output after readback if needed.',
+    )
+  }
   if (
     format != null &&
     format !== AlphaFormat &&
@@ -2112,6 +2117,11 @@ function assertSupportedDepthTextureType(depthTexture: RenderTargetTextureLike |
 function assertSupportedDepthTextureFormat(depthTexture: RenderTargetTextureLike | undefined): void {
   const format = depthTexture?.format
   if (format == null) return
+  if (isCompressedTextureFormat(format)) {
+    throw new Error(
+      'target.depthTexture.format uses a compressed texture format, which is not supported by @headless-three/renderer render targets. Use DepthFormat or DepthStencilFormat for depth readback and compress output after readback if needed.',
+    )
+  }
   if (format === DepthFormat) {
     if (depthTexture?.type === UnsignedInt248Type) {
       throw new Error(

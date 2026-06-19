@@ -156,6 +156,10 @@ const CompressedTextureFormats = new Set([
   37821, // RGBA_ASTC_12x12_Format
 ])
 
+export function isCompressedTextureFormat(format: unknown): boolean {
+  return typeof format === 'number' && CompressedTextureFormats.has(format)
+}
+
 const DefaultOnBeforeCompileSource = 'onBeforeCompile( /* shaderobject, renderer */ ) {}'
 
 export interface EnvironmentMapInfo {
@@ -2348,7 +2352,7 @@ function assertSupportedTextureInput(
       `${label} uses a compressed texture. KTX2, Basis, and THREE.CompressedTexture inputs are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
     )
   }
-  if (CompressedTextureFormats.has(map.format ?? Number.NaN)) {
+  if (isCompressedTextureFormat(map.format)) {
     throw new Error(
       `${label} uses a compressed texture format. KTX2, Basis, and compressed texture formats are not decoded by @headless-three/renderer yet; pre-decode the texture to RGBA data or an encoded PNG/JPEG/WebP image before rendering.`,
     )
