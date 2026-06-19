@@ -20783,6 +20783,91 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleAttachmentMrtTarget.textures[0].needsUpdate, true)
 })
 
+test('Renderer readRenderTargetPixels reads stored target color data', async () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  renderer.renderToTarget(scene, camera, target, {
+    width: 16,
+    height: 8,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  const full = Buffer.alloc(16 * 8 * 4)
+  renderer.readRenderTargetPixels(target, 0, 0, 16, 8, full)
+  assert.deepEqual(full, target.data)
+
+  const rect = Buffer.alloc(4 * 3 * 4)
+  renderer.readRenderTargetPixels(target, 2, 1, 4, 3, rect)
+  const expectedRect = Buffer.alloc(rect.length)
+  for (let row = 0; row < 3; row += 1) {
+    const sourceStart = (((1 + row) * 16) + 2) * 4
+    target.data.copy(expectedRect, row * 4 * 4, sourceStart, sourceStart + 4 * 4)
+  }
+  assert.deepEqual(rect, expectedRect)
+
+  const asyncBuffer = new Uint8Array(16 * 8 * 4)
+  const returned = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 16, 8, asyncBuffer)
+  assert.strictEqual(returned, asyncBuffer)
+  assert.deepEqual(Buffer.from(asyncBuffer), target.data)
+
+  const mrtTarget = {
+    isWebGLMultipleRenderTargets: true,
+    textures: [
+      {},
+      { format: THREE.RGFormat, type: THREE.FloatType, userData: { headlessThreeRenderer: { renderMode: 'color' } } },
+    ],
+  }
+  renderer.renderToTarget(scene, camera, mrtTarget, {
+    width: 16,
+    height: 8,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  const typedAttachment = mrtTarget.textures[1].image.data
+  const typedBuffer = new Float32Array(16 * 8 * 2)
+  renderer.readRenderTargetPixels(mrtTarget, 0, 0, 16, 8, typedBuffer, undefined, 1)
+  assert.deepEqual([...typedBuffer], [...typedAttachment])
+
+  assert.throws(
+    () => renderer.readRenderTargetPixels('target', 0, 0, 1, 1, Buffer.alloc(4)),
+    /Renderer\.readRenderTargetPixels target must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.readRenderTargetPixels({ texture: {} }, 0, 0, 1, 1, Buffer.alloc(4)),
+    /target has no readable color data/i,
+  )
+  assert.throws(
+    () => renderer.readRenderTargetPixels(target, 15, 0, 2, 1, Buffer.alloc(8)),
+    /requested read bounds are out of range/i,
+  )
+  assert.throws(
+    () => renderer.readRenderTargetPixels(target, 0, 0, 1.5, 1, Buffer.alloc(8)),
+    /x, y, width, and height must be integers/i,
+  )
+  assert.throws(
+    () => renderer.readRenderTargetPixels(target, 0, 0, 2, 2, Buffer.alloc(4)),
+    /buffer length is too small/i,
+  )
+  assert.throws(
+    () => renderer.readRenderTargetPixels(target, 0, 0, 1, 1, {}, undefined, -1),
+    /textureIndex must be a non-negative integer/i,
+  )
+  await assert.rejects(
+    () => renderer.readRenderTargetPixelsAsync(target, 0, 0, 1, 1, {}),
+    /buffer must be a mutable typed array or Buffer/i,
+  )
+})
+
 test('Renderer.setRenderTarget state writes regular targets', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

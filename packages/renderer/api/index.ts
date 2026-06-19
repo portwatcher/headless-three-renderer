@@ -722,6 +722,39 @@ export class Renderer {
     )
   }
 
+  readRenderTargetPixels(
+    target: RenderTargetLike,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    buffer: NonNullable<RenderTargetImageLike['data']>,
+    activeCubeFaceIndex?: number,
+    textureIndex = 0,
+  ): void {
+    const readback = renderTargetReadbackSource(
+      target,
+      activeCubeFaceIndex,
+      textureIndex,
+      'Renderer.readRenderTargetPixels',
+    )
+    copyRenderTargetReadbackPixels(readback, x, y, width, height, buffer, 'Renderer.readRenderTargetPixels')
+  }
+
+  async readRenderTargetPixelsAsync(
+    target: RenderTargetLike,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    buffer: NonNullable<RenderTargetImageLike['data']>,
+    activeCubeFaceIndex?: number,
+    textureIndex = 0,
+  ): Promise<NonNullable<RenderTargetImageLike['data']>> {
+    this.readRenderTargetPixels(target, x, y, width, height, buffer, activeCubeFaceIndex, textureIndex)
+    return buffer
+  }
+
   private renderCurrentRenderTarget(
     scene: ThreeSceneRootLike,
     camera: ThreeCameraLike,
@@ -3376,6 +3409,155 @@ function renderTargetColorTextures(target: RenderTargetLike): RenderTargetTextur
   if (Array.isArray(target.texture)) return target.texture
   if (target.textures) return target.textures
   return target.texture ? [target.texture] : []
+}
+
+function renderTargetReadbackSource(
+  target: RenderTargetLike,
+  activeCubeFaceIndex: number | undefined,
+  textureIndex: number,
+  label: string,
+): { data: NonNullable<RenderTargetImageLike['data']>; width: number; height: number; channels: number } {
+  assertRenderTargetLike(target, `${label} target`)
+  if (!Number.isInteger(textureIndex) || textureIndex < 0) {
+    throw new TypeError(`${label} textureIndex must be a non-negative integer.`)
+  }
+  if (activeCubeFaceIndex !== undefined) {
+    assertActiveCubeFace(activeCubeFaceIndex, `${label} activeCubeFaceIndex`)
+  }
+
+  const texture = renderTargetColorTextures(target)[textureIndex]
+  const image = renderTargetReadbackImage(target, texture, activeCubeFaceIndex, textureIndex)
+  if (!image?.data) {
+    throw new Error(
+      `${label} target has no readable color data. Render into the target before reading pixels.`,
+    )
+  }
+
+  const rawWidth = image.width ?? target.width
+  const rawHeight = image.height ?? target.height
+  if (
+    typeof rawWidth !== 'number' ||
+    !Number.isInteger(rawWidth) ||
+    rawWidth <= 0 ||
+    typeof rawHeight !== 'number' ||
+    !Number.isInteger(rawHeight) ||
+    rawHeight <= 0
+  ) {
+    throw new Error(`${label} target readable color data is missing valid width and height.`)
+  }
+  const width = rawWidth
+  const height = rawHeight
+  const channels = renderTargetReadbackChannelCount(image.data, width, height, label)
+  return { data: image.data, width, height, channels }
+}
+
+function renderTargetReadbackImage(
+  target: RenderTargetLike,
+  texture: RenderTargetTextureLike | undefined,
+  activeCubeFaceIndex: number | undefined,
+  textureIndex: number,
+): RenderTargetImageLike | undefined {
+  if (activeCubeFaceIndex !== undefined) {
+    const face = renderTargetTextureFaceImage(texture, activeCubeFaceIndex)
+    if (face) return face
+  }
+  if (texture) {
+    const image = Array.isArray(texture.image) ? texture.image[0] : texture.image
+    if (image?.data) return image
+    const sourceData = texture.source?.data
+    const sourceImage = Array.isArray(sourceData) ? sourceData[0] : sourceData
+    if (sourceImage?.data) return sourceImage
+  }
+  if (textureIndex === 0) {
+    if (target.image?.data) return target.image
+    if (target.data) return {
+      data: target.data,
+      width: target.width,
+      height: target.height,
+    }
+  }
+  return undefined
+}
+
+function renderTargetTextureFaceImage(
+  texture: RenderTargetTextureLike | undefined,
+  activeCubeFaceIndex: number,
+): RenderTargetImageLike | undefined {
+  if (!texture) return undefined
+  if (Array.isArray(texture.image) && texture.image[activeCubeFaceIndex]?.data) {
+    return texture.image[activeCubeFaceIndex]
+  }
+  const sourceData = texture.source?.data
+  if (Array.isArray(sourceData) && sourceData[activeCubeFaceIndex]?.data) {
+    return sourceData[activeCubeFaceIndex]
+  }
+  return undefined
+}
+
+function renderTargetReadbackChannelCount(
+  data: NonNullable<RenderTargetImageLike['data']>,
+  width: number,
+  height: number,
+  label: string,
+): number {
+  const pixelCount = width * height
+  if (data.length === 0 || data.length % pixelCount !== 0) {
+    throw new Error(`${label} target readable color data length does not match its width and height.`)
+  }
+  return data.length / pixelCount
+}
+
+function copyRenderTargetReadbackPixels(
+  readback: { data: NonNullable<RenderTargetImageLike['data']>; width: number; height: number; channels: number },
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  buffer: NonNullable<RenderTargetImageLike['data']>,
+  label: string,
+): void {
+  const rect = readbackRect(x, y, width, height, label)
+  if (rect.x + rect.width > readback.width || rect.y + rect.height > readback.height) {
+    throw new Error(`${label} requested read bounds are out of range.`)
+  }
+  assertRenderTargetReadbackBuffer(buffer, rect.width * rect.height * readback.channels, label)
+  for (let row = 0; row < rect.height; row += 1) {
+    const sourceStart = ((rect.y + row) * readback.width + rect.x) * readback.channels
+    const sourceEnd = sourceStart + rect.width * readback.channels
+    const targetStart = row * rect.width * readback.channels
+    buffer.set(readback.data.subarray(sourceStart, sourceEnd) as any, targetStart)
+  }
+}
+
+function readbackRect(x: unknown, y: unknown, width: unknown, height: unknown, label: string): PixelRect {
+  const values = [x, y, width, height]
+  if (!values.every((value) => typeof value === 'number' && Number.isFinite(value))) {
+    throw new TypeError(`${label} x, y, width, and height must be finite numbers.`)
+  }
+  if (!values.every((value) => Number.isInteger(value))) {
+    throw new TypeError(`${label} x, y, width, and height must be integers.`)
+  }
+  if ((x as number) < 0 || (y as number) < 0) {
+    throw new TypeError(`${label} x and y must be greater than or equal to 0.`)
+  }
+  if ((width as number) <= 0 || (height as number) <= 0) {
+    throw new TypeError(`${label} width and height must be greater than 0.`)
+  }
+  return { x: x as number, y: y as number, width: width as number, height: height as number }
+}
+
+function assertRenderTargetReadbackBuffer(
+  buffer: unknown,
+  minimumLength: number,
+  label: string,
+): asserts buffer is NonNullable<RenderTargetImageLike['data']> {
+  const candidate = buffer as Partial<NonNullable<RenderTargetImageLike['data']>>
+  if (!candidate || typeof candidate.length !== 'number' || typeof candidate.set !== 'function') {
+    throw new TypeError(`${label} buffer must be a mutable typed array or Buffer.`)
+  }
+  if (candidate.length < minimumLength) {
+    throw new Error(`${label} buffer length is too small for the requested read.`)
+  }
 }
 
 function writeRenderTargetTexture(
