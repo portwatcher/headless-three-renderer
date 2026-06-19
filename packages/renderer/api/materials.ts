@@ -1010,6 +1010,7 @@ export function extractPbrProperties(
     props.specularMapMinFilter = minFilterModeToString(material.specularMap)
     props.specularMapAnisotropy = textureAnisotropy(material.specularMap, 'material.specularMap')
     props.specularMapTransform = textureTransform(material.specularMap, 'material.specularMap')
+    props.specularMapColorSpace = textureColorSpace(material.specularMap)
     props.specularMapUsesUv2 = textureUvChannel(material.specularMap) > 0
   }
 

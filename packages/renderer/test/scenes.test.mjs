@@ -3770,6 +3770,43 @@ test('MeshPhongMaterial renders Blinn-Phong specular and honors specularMap', ()
   assert.ok(fullSpecular > maskedSpecular + 80, `specularMap should suppress Phong highlight (${fullSpecular} vs ${maskedSpecular})`)
 })
 
+test('MeshPhongMaterial specularMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const specularMap = solidTexture(64, 64, 64)
+    specularMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 48, 24),
+      new THREE.MeshPhongMaterial({
+        color: 0x000000,
+        specular: 0xffffff,
+        shininess: 120,
+        specularMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 1)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return maxLuminance(renderRgba(scene, camera, {
+      width: 96,
+      height: 96,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear > srgb + 60, `linear specularMap should produce a stronger Phong highlight than decoded sRGB (${linear} vs ${srgb})`)
+})
+
 test('MeshPhongMaterial specularMap samples selected uv1-uv3 texture channels', () => {
   function renderSpecularChannel(channel) {
     const specularMap = rgbaTexture([

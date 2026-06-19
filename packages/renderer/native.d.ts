@@ -271,6 +271,8 @@ export interface SceneMesh {
   specularMapAnisotropy?: number
   /** Specular map UV transform `[a, c, tx, b, d, ty]`. */
   specularMapTransform?: Array<number>
+  /** Specular map color space. `"srgb"` is decoded to linear before shading. */
+  specularMapColorSpace?: string
   /** Whether specular map sampling uses the secondary UV stream. */
   specularMapUsesUv2?: boolean
   /** Metallic factor (0..1). Defaults to 0. */

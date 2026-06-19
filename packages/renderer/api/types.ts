@@ -982,6 +982,7 @@ export interface NativeSceneMesh {
   specularMapMinFilter?: string
   specularMapAnisotropy?: number
   specularMapTransform?: number[]
+  specularMapColorSpace?: string
   specularMapUsesUv2?: boolean
   alphaMap?: Buffer
   alphaMapWidth?: number
@@ -1378,6 +1379,7 @@ export interface PbrProperties {
   specularMapMinFilter?: string
   specularMapAnisotropy?: number
   specularMapTransform?: number[]
+  specularMapColorSpace?: string
   specularMapUsesUv2?: boolean
   alphaMap?: Buffer
   alphaMapWidth?: number

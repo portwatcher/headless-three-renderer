@@ -237,6 +237,8 @@ pub struct SceneMesh {
     pub specular_map_anisotropy: Option<f64>,
     /// Specular map UV transform `[a, c, tx, b, d, ty]`.
     pub specular_map_transform: Option<Vec<f64>>,
+    /// Specular map color space. `"srgb"` is decoded to linear before shading.
+    pub specular_map_color_space: Option<String>,
     /// Whether specular map sampling uses the secondary UV stream.
     pub specular_map_uses_uv2: Option<bool>,
     /// Metallic factor (0..1). Defaults to 0.

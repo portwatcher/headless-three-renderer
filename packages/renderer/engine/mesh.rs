@@ -149,6 +149,7 @@ pub struct PreparedMesh {
     pub light_map_transform: [f32; 6],
     pub light_map_uses_uv2: bool,
     pub specular_map_transform: [f32; 6],
+    pub specular_map_is_srgb: bool,
     pub specular_map_uses_uv2: bool,
     pub specular_color_map_transform: [f32; 6],
     pub specular_color_map_uses_uv2: bool,
@@ -860,6 +861,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         gradient_map_is_srgb,
         emissive_map_is_srgb,
         light_map_is_srgb,
+        specular_map_is_srgb,
         common,
     } = surface_texture_inputs;
 
@@ -1236,6 +1238,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         light_map_transform,
         light_map_uses_uv2: mesh.light_map_uses_uv2.unwrap_or(false),
         specular_map_transform,
+        specular_map_is_srgb,
         specular_map_uses_uv2: mesh.specular_map_uses_uv2.unwrap_or(false),
         specular_color_map_transform,
         specular_color_map_uses_uv2: mesh.specular_color_map_uses_uv2.unwrap_or(false),
@@ -1669,6 +1672,7 @@ struct SurfaceTextureInputs {
     gradient_map_is_srgb: bool,
     emissive_map_is_srgb: bool,
     light_map_is_srgb: bool,
+    specular_map_is_srgb: bool,
     common: CommonTextureInputs,
 }
 
@@ -1770,6 +1774,7 @@ fn prepare_surface_texture_inputs(
         let gradient_map_is_srgb = matches!(mesh.gradient_map_color_space.as_deref(), Some("srgb"));
         let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
         let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
+        let specular_map_is_srgb = matches!(mesh.specular_map_color_space.as_deref(), Some("srgb"));
 
         let mut common = prepare_common_texture_inputs(mesh, mesh_index)?;
         common.alpha_map = match alpha_map {
@@ -1807,6 +1812,7 @@ fn prepare_surface_texture_inputs(
             gradient_map_is_srgb,
             emissive_map_is_srgb,
             light_map_is_srgb,
+            specular_map_is_srgb,
             common,
         })
     })

@@ -64,6 +64,8 @@ struct Uniforms {
   // map_transform_rows[7].w = AO map uses secondary UV stream.
   // map_transform_rows[8].w = light map is sRGB.
   // map_transform_rows[9].w = light map uses secondary UV stream.
+  // map_transform_rows[10].w = Phong specular map is sRGB.
+  // map_transform_rows[11].w = Phong specular map uses secondary UV stream.
   map_transform_rows: array<vec4<f32>, 12>,
   // Row pairs for current physical-extension map transforms.
   // physical_map_transform_rows[1].w = clearcoat map uses secondary UV stream.
@@ -811,6 +813,13 @@ fn decode_light_map_sample(sample: vec4<f32>) -> vec4<f32> {
   return sample;
 }
 
+fn decode_specular_map_sample(sample: f32) -> f32 {
+  if uniforms.map_transform_rows[10u].w > 0.5 {
+    return srgb_to_linear_channel(sample);
+  }
+  return sample;
+}
+
 fn decode_toon_gradient_map_sample(sample: vec4<f32>) -> vec4<f32> {
   if uniforms.physical_params4.w > 0.5 {
     return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
@@ -1223,7 +1232,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let phong_shininess = max(uniforms.physical_params2.w, 0.0001);
   var phong_specular_strength = 1.0;
   if use_phong && uniforms.physical_params4.w > 0.5 {
-    phong_specular_strength = textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv, uv2), 0).r;
+    phong_specular_strength = decode_specular_map_sample(textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv, uv2), 0).r);
   }
 
   var lo = vec3<f32>(0.0);
