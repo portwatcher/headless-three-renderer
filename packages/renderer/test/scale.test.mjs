@@ -342,15 +342,15 @@ test('encoded texture budget renders many unique PNG buffer maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 8
-  const rows = 8
-  const geometry = new THREE.PlaneGeometry(0.16, 0.16)
+  const columns = 9
+  const rows = 9
+  const geometry = new THREE.PlaneGeometry(0.14, 0.14)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const index = row * columns + col
       const material = new THREE.MeshBasicMaterial({ map: makeEncodedTexture(index) })
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set((col - (columns - 1) / 2) * 0.2, (row - (rows - 1) / 2) * 0.2, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.17, (row - (rows - 1) / 2) * 0.17, 0)
       scene.add(mesh)
     }
   }
