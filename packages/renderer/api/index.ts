@@ -166,8 +166,12 @@ export class Renderer {
     this.currentViewport = rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.setViewport')
   }
 
-  getViewport(): RenderPixelRectLike | null {
-    return clonePixelRect(this.currentViewport)
+  getViewport(): RenderPixelRectLike | null
+  getViewport<T extends RenderPixelRectLike>(target: T): T | null
+  getViewport(target?: RenderPixelRectLike): RenderPixelRectLike | null {
+    return target === undefined
+      ? clonePixelRect(this.currentViewport)
+      : clonePixelRect(this.currentViewport, target)
   }
 
   setScissor(rect: RenderPixelRectLike | null): void
@@ -176,8 +180,12 @@ export class Renderer {
     this.currentScissor = rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.setScissor')
   }
 
-  getScissor(): RenderPixelRectLike | null {
-    return clonePixelRect(this.currentScissor)
+  getScissor(): RenderPixelRectLike | null
+  getScissor<T extends RenderPixelRectLike>(target: T): T | null
+  getScissor(target?: RenderPixelRectLike): RenderPixelRectLike | null {
+    return target === undefined
+      ? clonePixelRect(this.currentScissor)
+      : clonePixelRect(this.currentScissor, target)
   }
 
   setScissorTest(enabled: boolean): void {
@@ -1919,8 +1927,32 @@ function rendererStatePixelRectFromComponents(values: unknown[], label: string):
   return { x, y, width, height }
 }
 
-function clonePixelRect(rect: PixelRect | null | undefined): PixelRect | null {
-  return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null
+function clonePixelRect(rect: PixelRect | null | undefined): PixelRect | null
+function clonePixelRect<T extends RenderPixelRectLike>(rect: PixelRect | null | undefined, target: T): T | null
+function clonePixelRect<T extends RenderPixelRectLike>(
+  rect: PixelRect | null | undefined,
+  target?: T,
+): PixelRect | T | null {
+  if (!rect) return null
+  if (target) {
+    const mutable = target as any
+    if (typeof mutable.length === 'number') {
+      mutable[0] = rect.x
+      mutable[1] = rect.y
+      mutable[2] = rect.width
+      mutable[3] = rect.height
+    } else {
+      if (typeof mutable.set === 'function') mutable.set(rect.x, rect.y, rect.width, rect.height)
+      mutable.x = rect.x
+      mutable.y = rect.y
+      mutable.width = rect.width
+      mutable.height = rect.height
+      mutable.z = rect.width
+      mutable.w = rect.height
+    }
+    return target
+  }
+  return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
 }
 
 function finiteOrUndefined(value: unknown): number | undefined {

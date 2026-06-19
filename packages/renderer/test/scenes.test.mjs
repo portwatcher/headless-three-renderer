@@ -27812,6 +27812,15 @@ test('Renderer viewport and scissor state apply as render fallbacks', () => {
   assert.deepEqual(renderer.getViewport(), { x: 16, y: 16, width: 40, height: 32 })
   assert.deepEqual(renderer.getScissor(), { x: 24, y: 20, width: 24, height: 24 })
   assert.equal(renderer.getScissorTest(), true)
+  const viewportTarget = new THREE.Vector4()
+  const scissorTarget = { x: 0, y: 0, width: 0, height: 0 }
+  const viewportArray = [0, 0, 0, 0]
+  assert.strictEqual(renderer.getViewport(viewportTarget), viewportTarget)
+  assert.deepEqual(viewportTarget.toArray(), [16, 16, 40, 32])
+  assert.strictEqual(renderer.getScissor(scissorTarget), scissorTarget)
+  assert.deepEqual(scissorTarget, { x: 24, y: 20, width: 24, height: 24, z: 24, w: 24 })
+  assert.strictEqual(renderer.getViewport(viewportArray), viewportArray)
+  assert.deepEqual(viewportArray, [16, 16, 40, 32])
 
   const rgba = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
   const inside = meanRegion(rgba, 64, 64, 30, 26, 42, 38)
@@ -27842,6 +27851,8 @@ test('Renderer viewport and scissor state apply as render fallbacks', () => {
   renderer.setScissor(null)
   assert.equal(renderer.getViewport(), null)
   assert.equal(renderer.getScissor(), null)
+  assert.equal(renderer.getViewport(new THREE.Vector4()), null)
+  assert.equal(renderer.getScissor({}), null)
 })
 
 test('invalid viewport and scissor rectangles fail clearly', () => {
