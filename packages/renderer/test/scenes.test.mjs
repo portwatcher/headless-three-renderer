@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from 'three'
+import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
+import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
@@ -22102,6 +22104,59 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(halfRed > 0.5, `HalfFloatType red channel should be normalized (${halfRed})`)
   assert.ok(halfGreen < 0.05, `HalfFloatType green channel should stay near zero (${halfGreen})`)
   assert.ok(halfAlpha > 0.99, `HalfFloatType alpha channel should stay opaque (${halfAlpha})`)
+})
+
+test('Three.js exporters read targets through the WebGLRenderer marker path', async () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const renderOptions = { outputColorSpace: THREE.LinearSRGBColorSpace }
+
+  const exrTarget = new THREE.WebGLRenderTarget(16, 16, {
+    format: THREE.RGBAFormat,
+    type: THREE.HalfFloatType,
+  })
+  exrTarget.texture.colorSpace = THREE.LinearSRGBColorSpace
+  renderToTarget(scene, camera, exrTarget, renderOptions)
+  assert.ok(exrTarget.texture.image.data instanceof Uint16Array, 'EXR target should receive half-float render data')
+
+  const exr = await new EXRExporter().parse(renderer, exrTarget, {
+    compression: NO_COMPRESSION,
+    type: THREE.HalfFloatType,
+  })
+  assert.ok(exr instanceof Uint8Array, 'EXRExporter should return Uint8Array data')
+  assert.ok(exr.length > 16 * 16 * 8, `EXR output should include header and pixel data (${exr.length})`)
+  assert.deepEqual(
+    Array.from(exr.subarray(0, 4)),
+    [0x76, 0x2f, 0x31, 0x01],
+    'EXRExporter output should start with the OpenEXR magic number',
+  )
+
+  const ktxTarget = new THREE.WebGLRenderTarget(16, 16, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  ktxTarget.texture.colorSpace = THREE.SRGBColorSpace
+  renderToTarget(scene, camera, ktxTarget, renderOptions)
+  assert.ok(ktxTarget.texture.image.data instanceof Uint8Array, 'KTX2 target should receive byte render data')
+
+  const ktx = await new KTX2Exporter().parse(renderer, ktxTarget)
+  assert.ok(ktx instanceof Uint8Array, 'KTX2Exporter should return Uint8Array data')
+  assert.ok(ktx.length > 16 * 16 * 4, `KTX2 output should include header and pixel data (${ktx.length})`)
+  assert.deepEqual(
+    Array.from(ktx.subarray(0, 12)),
+    [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a],
+    'KTX2Exporter output should start with the KTX2 identifier',
+  )
 })
 
 test('single-attachment target array paths honor typed color readback requests', () => {
