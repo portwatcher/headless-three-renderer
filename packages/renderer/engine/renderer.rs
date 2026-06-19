@@ -165,6 +165,7 @@ pub struct GpuRenderer {
     physical_layers_texture_cache: Mutex<HashMap<PhysicalLayersTextureCacheKey, wgpu::Texture>>,
     texture_bind_group_cache: Mutex<HashMap<TextureBindGroupKey, wgpu::BindGroup>>,
     ao_physical_bind_group_cache: Mutex<HashMap<AoPhysicalBindGroupKey, wgpu::BindGroup>>,
+    uniform_bind_group_cache: Mutex<HashMap<UniformBindGroupKey, CachedUniformBindGroup>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -219,6 +220,12 @@ struct GpuBackground {
     _uniform_buffer: wgpu::Buffer,
 }
 
+#[derive(Clone)]
+struct CachedUniformBindGroup {
+    buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+}
+
 struct AoPhysicalBindGroupResources {
     bind_group: wgpu::BindGroup,
     ao_texture: Option<wgpu::Texture>,
@@ -244,6 +251,12 @@ struct MeshBufferCacheKey {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct BufferCacheKey {
+    len: usize,
+    hash: u64,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct UniformBindGroupKey {
     len: usize,
     hash: u64,
 }
@@ -381,6 +394,16 @@ impl MeshBufferCacheKey {
 
 impl BufferCacheKey {
     fn from_bytes(bytes: &[u8]) -> Self {
+        Self {
+            len: bytes.len(),
+            hash: hash_bytes(bytes),
+        }
+    }
+}
+
+impl UniformBindGroupKey {
+    fn from_uniforms(uniforms: &Uniforms) -> Self {
+        let bytes = bytemuck::bytes_of(uniforms);
         Self {
             len: bytes.len(),
             hash: hash_bytes(bytes),
@@ -1928,6 +1951,7 @@ impl GpuRenderer {
             physical_layers_texture_cache: Mutex::new(HashMap::new()),
             texture_bind_group_cache: Mutex::new(HashMap::new()),
             ao_physical_bind_group_cache: Mutex::new(HashMap::new()),
+            uniform_bind_group_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -3496,6 +3520,43 @@ impl GpuRenderer {
             .clone()
     }
 
+    fn uniform_bind_group_for(&self, uniforms: &Uniforms) -> CachedUniformBindGroup {
+        let key = UniformBindGroupKey::from_uniforms(uniforms);
+        if let Some(cached) = self
+            .uniform_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return cached;
+        }
+
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("headless-three-renderer uniform buffer"),
+                contents: bytemuck::bytes_of(uniforms),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer bind group"),
+            layout: &self.uniform_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+        let cached = CachedUniformBindGroup { buffer, bind_group };
+
+        self.uniform_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| cached.clone())
+            .clone()
+    }
+
     fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
         let CachedMeshBuffers {
             vertex_buffer,
@@ -3778,22 +3839,10 @@ impl GpuRenderer {
             ],
             lights,
         };
-        let uniform_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("headless-three-renderer uniform buffer"),
-                contents: bytemuck::bytes_of(&uniforms),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("headless-three-renderer bind group"),
-            layout: &self.uniform_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-        });
+        let CachedUniformBindGroup {
+            buffer: uniform_buffer,
+            bind_group,
+        } = self.uniform_bind_group_for(&uniforms);
 
         let (texture_bind_group, _mesh_texture) = match &mesh.texture {
             Some(tex) => {
@@ -5011,12 +5060,14 @@ mod tests {
     use super::{
         AoPhysicalBindGroupKey, CustomBlendPipelineKey, MeshBufferCacheKey,
         PhysicalLayersTextureCacheKey, SamplerKey, TextureBindGroupKey, TextureBindGroupKind,
-        TextureCacheKey, downsample_rgba_mip, f32_key, texture_mip_level_count,
+        TextureCacheKey, UniformBindGroupKey, Uniforms, downsample_rgba_mip, f32_key,
+        texture_mip_level_count,
     };
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
         PreparedTextureMipLevel, TextureFilter, WrapMode,
     };
+    use bytemuck::Zeroable;
 
     fn single_pixel_texture(rgba: [u8; 4]) -> PreparedTexture {
         solid_texture(1, 1, rgba)
@@ -5324,6 +5375,23 @@ mod tests {
             ao_physical_key(Some(&ao)),
             ao_physical_key(Some(&repeated_ao)),
             "AO sampler state is part of the combined bind group",
+        );
+    }
+
+    #[test]
+    fn uniform_bind_group_keys_track_uniform_bytes() {
+        let first = Uniforms::zeroed();
+        let second = Uniforms::zeroed();
+        assert_eq!(
+            UniformBindGroupKey::from_uniforms(&first),
+            UniformBindGroupKey::from_uniforms(&second),
+        );
+
+        let mut changed = first;
+        changed.base_color[0] = 1.0;
+        assert_ne!(
+            UniformBindGroupKey::from_uniforms(&first),
+            UniformBindGroupKey::from_uniforms(&changed),
         );
     }
 
