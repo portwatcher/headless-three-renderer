@@ -18038,6 +18038,54 @@ test('post-processing enabled false bypasses configured effects', () => {
   assert.deepEqual(disabled, base, 'postProcessing.enabled=false should ignore configured effects')
 })
 
+test('reusable renderer updates cached background and post-processing uniforms', () => {
+  const renderer = new Renderer()
+  const camera = makeCamera()
+
+  const backgroundScene = new THREE.Scene()
+  backgroundScene.background = solidTexture(0, 255, 0)
+  const backgroundOptions = { width: 64, height: 64, format: 'rgba' }
+  const dimmed = meanRgba(renderer.render(backgroundScene, camera, {
+    ...backgroundOptions,
+    backgroundIntensity: 0.25,
+  }))
+  const full = meanRgba(renderer.render(backgroundScene, camera, {
+    ...backgroundOptions,
+    backgroundIntensity: 1,
+  }))
+  const dimmedAgain = meanRgba(renderer.render(backgroundScene, camera, {
+    ...backgroundOptions,
+    backgroundIntensity: 0.25,
+  }))
+  assert.ok(full.g > dimmed.g + 60, `updated background uniform should brighten cached texture background (${full.g} vs ${dimmed.g})`)
+  assert.ok(Math.abs(dimmedAgain.g - dimmed.g) < 4, `cached background uniform should update back to dimmed intensity (${dimmedAgain.g} vs ${dimmed.g})`)
+
+  const postScene = new THREE.Scene()
+  postScene.background = new THREE.Color(1, 0, 0)
+  const postOptions = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }
+  const inverted = meanRgba(renderer.render(postScene, camera, {
+    ...postOptions,
+    postProcessing: { invert: 1 },
+  }))
+  const grayscale = meanRgba(renderer.render(postScene, camera, {
+    ...postOptions,
+    postProcessing: { grayscale: true },
+  }))
+  const invertedAgain = meanRgba(renderer.render(postScene, camera, {
+    ...postOptions,
+    postProcessing: { invert: 1 },
+  }))
+
+  assert.ok(inverted.g > inverted.r + 80 && inverted.b > inverted.r + 80, `invert uniform should turn red toward cyan (${inverted.r}, ${inverted.g}, ${inverted.b})`)
+  assert.ok(Math.max(grayscale.r, grayscale.g, grayscale.b) - Math.min(grayscale.r, grayscale.g, grayscale.b) < 3, `grayscale uniform should replace prior invert settings (${grayscale.r}, ${grayscale.g}, ${grayscale.b})`)
+  assert.ok(Math.abs(invertedAgain.g - inverted.g) < 4 && Math.abs(invertedAgain.b - inverted.b) < 4, `post uniform buffer should update back to invert settings (${invertedAgain.r}, ${invertedAgain.g}, ${invertedAgain.b})`)
+})
+
 test('invalid post-processing option values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
