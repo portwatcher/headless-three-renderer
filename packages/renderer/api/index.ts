@@ -3447,7 +3447,7 @@ function rawTextureCopyImage(
 
 function textureCopyReadableImageError(label: string, allowCanvasRead: boolean): string {
   if (allowCanvasRead) {
-    return `${label} must provide a readable image object with raw data, width, and height, or canvas-like pixel access.`
+    return `${label} must provide a readable image object with raw data, width, and height, or canvas-like pixel access, including OffscreenCanvas-backed image reads.`
   }
   return `${label} must provide a readable raw image object with data, width, and height.`
 }

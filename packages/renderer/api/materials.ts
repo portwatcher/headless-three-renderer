@@ -2501,7 +2501,7 @@ function unsupportedRawTextureDataError(label: string, usage: string): Error {
 
 function unsupportedTextureImageError(label: string, usage: string): Error {
   return new Error(
-    `${label} uses a texture image object that is not readable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, a canvas-like object with getContext("2d").getImageData(), or raw one-channel, two-channel, RGB, or RGBA numeric pixel data as { data, width, height } before rendering.`,
+    `${label} uses a texture image object that is not readable or drawable by @headless-three/renderer for ${usage}. Provide encoded PNG/JPEG/WebP bytes directly as texture.image or texture.source.data, a canvas-like object with getContext("2d").getImageData(), an image-like object drawable through an available OffscreenCanvas/2D canvas polyfill, or raw one-channel, two-channel, RGB, or RGBA numeric pixel data as { data, width, height } before rendering.`,
   )
 }
 
