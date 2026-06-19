@@ -8,6 +8,7 @@ import type {
   NativeSceneMesh,
   GeometryGroup,
   Color4,
+  PbrProperties,
   RenderSortFunction,
   RenderSortItem,
 } from './types'
@@ -101,6 +102,15 @@ interface TextureUvStreams {
   uvs2: UvChannel | null
   textureUsesUv2?: boolean
   alphaMapUsesUv2?: boolean
+  pbrUsesUv2?: Partial<Record<PbrUvFlag, boolean>>
+}
+
+type PbrUvFlag = Extract<keyof PbrProperties, `${string}UsesUv2`>
+
+interface MaterialUvSlot {
+  texture?: { channel?: number } | null
+  textureFlag?: 'textureUsesUv2' | 'alphaMapUsesUv2'
+  pbrFlag?: PbrUvFlag
 }
 
 interface UvChannel {
@@ -318,6 +328,7 @@ function appendMesh(
     if (uvStreams.alphaMapUsesUv2 !== undefined) {
       pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
     }
+    applyPbrUvStreamFlags(pbrProps, uvStreams)
     const textureInfo = extractTextureData(material)
     const castShadow = objectCastsShadow && !usesCustomShadowMaterial ? true : undefined
     const receiveShadow = objectReceivesShadow ? true : undefined
@@ -504,6 +515,7 @@ function appendShadowOnlyMeshGroup(
   if (uvStreams.alphaMapUsesUv2 !== undefined) {
     pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
   }
+  applyPbrUvStreamFlags(pbrProps, uvStreams)
   const textureInfo = extractTextureData(shadowMaterial)
   const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
   const wireframe = isDepthDistanceWireframeMaterial(shadowMaterial)
@@ -2470,49 +2482,104 @@ function textureUvStreamsForMeshMaterial(
   channels: Array<UvChannel | null>,
   material: ThreeMaterialLike | undefined,
 ): TextureUvStreams {
-  if (canUseDistinctMeshMapAlphaUvStreams(material)) {
-    return textureUvStreamsForMapAlphaMaterial(channels, material)
-  }
-
-  return {
-    uvs: channels[0],
-    uvs2: secondaryUvsForMaterial(channels, material),
-  }
+  return textureUvStreamsForMaterialSlots(channels, meshTextureUvSlots(material))
 }
 
-function canUseDistinctMeshMapAlphaUvStreams(material: ThreeMaterialLike | undefined): boolean {
-  if (!material) return false
-  const mapChannel = material.map ? textureUvChannel(material.map) : undefined
-  const alphaChannel = material.alphaMap ? textureUvChannel(material.alphaMap) : undefined
-  if (mapChannel === undefined || alphaChannel === undefined) return false
-  if (mapChannel === alphaChannel || mapChannel === 0 || alphaChannel === 0) return false
-  return !meshUvTextureSlotsBeyondMapAlpha(material).some((texture) => texture != null)
+function meshTextureUvSlots(material: ThreeMaterialLike | undefined): MaterialUvSlot[] {
+  if (!material) return []
+
+  const slots: MaterialUvSlot[] = material.isMeshMatcapMaterial === true
+    ? [{ texture: material.map, pbrFlag: 'matcapMapUsesUv2' }]
+    : [{ texture: material.map, textureFlag: 'textureUsesUv2' }]
+
+  slots.push(
+    { texture: material.clearcoatMap, pbrFlag: 'clearcoatMapUsesUv2' },
+    { texture: material.clearcoatRoughnessMap, pbrFlag: 'clearcoatRoughnessMapUsesUv2' },
+    { texture: material.clearcoatNormalMap, pbrFlag: 'clearcoatNormalMapUsesUv2' },
+    { texture: material.sheenColorMap, pbrFlag: 'sheenColorMapUsesUv2' },
+    { texture: material.sheenRoughnessMap, pbrFlag: 'sheenRoughnessMapUsesUv2' },
+    { texture: material.anisotropyMap, pbrFlag: 'anisotropyMapUsesUv2' },
+    { texture: material.iridescenceMap, pbrFlag: 'iridescenceMapUsesUv2' },
+    { texture: material.iridescenceThicknessMap, pbrFlag: 'iridescenceThicknessMapUsesUv2' },
+    { texture: material.normalMap, pbrFlag: 'normalMapUsesUv2' },
+    { texture: material.bumpMap, pbrFlag: 'bumpMapUsesUv2' },
+    { texture: material.transmissionMap, pbrFlag: 'transmissionMapUsesUv2' },
+    { texture: material.thicknessMap, pbrFlag: 'thicknessMapUsesUv2' },
+    { texture: material.specularColorMap, pbrFlag: 'specularColorMapUsesUv2' },
+    { texture: material.specularIntensityMap, pbrFlag: 'specularIntensityMapUsesUv2' },
+    { texture: material.displacementMap, pbrFlag: 'displacementMapUsesUv2' },
+    { texture: material.metalnessMap ?? material.roughnessMap, pbrFlag: 'metallicRoughnessTextureUsesUv2' },
+    { texture: material.emissiveMap, pbrFlag: 'emissiveMapUsesUv2' },
+    { texture: material.lightMap, pbrFlag: 'lightMapUsesUv2' },
+    { texture: material.aoMap, pbrFlag: 'aoMapUsesUv2' },
+    { texture: material.specularMap, pbrFlag: 'specularMapUsesUv2' },
+    { texture: material.alphaMap, textureFlag: 'alphaMapUsesUv2' },
+  )
+
+  return slots
 }
 
-function meshUvTextureSlotsBeyondMapAlpha(material: ThreeMaterialLike): Array<{ channel?: number } | null | undefined> {
-  return [
-    material.clearcoatMap,
-    material.clearcoatRoughnessMap,
-    material.clearcoatNormalMap,
-    material.sheenColorMap,
-    material.sheenRoughnessMap,
-    material.anisotropyMap,
-    material.iridescenceMap,
-    material.iridescenceThicknessMap,
-    material.normalMap,
-    material.bumpMap,
-    material.transmissionMap,
-    material.thicknessMap,
-    material.specularColorMap,
-    material.specularIntensityMap,
-    material.displacementMap,
-    material.metalnessMap,
-    material.roughnessMap,
-    material.emissiveMap,
-    material.lightMap,
-    material.aoMap,
-    material.specularMap,
-  ]
+function textureUvStreamsForMaterialSlots(
+  channels: Array<UvChannel | null>,
+  slots: MaterialUvSlot[],
+): TextureUvStreams {
+  const activeSlots = slots.filter((slot) => slot.texture != null)
+  const requestedChannels: number[] = []
+  for (const slot of activeSlots) {
+    const channel = textureUvChannel(slot.texture)
+    if (!requestedChannels.includes(channel)) requestedChannels.push(channel)
+  }
+
+  if (requestedChannels.length > 2) {
+    const channelList = [...requestedChannels].sort((a, b) => a - b).join(', ')
+    throw new Error(
+      `Material uses texture.channel values ${channelList}, but @headless-three/renderer can bind only two UV attributes per draw. Use at most two texture channels or render separate passes.`,
+    )
+  }
+
+  const preferredPrimary = preferredPrimaryTextureChannel(activeSlots)
+  const primaryChannel = requestedChannels.includes(0)
+    ? 0
+    : preferredPrimary !== undefined && requestedChannels.includes(preferredPrimary)
+      ? preferredPrimary
+      : requestedChannels[0] ?? 0
+  const secondaryChannel = requestedChannels.find((channel) => channel !== primaryChannel)
+  const out: TextureUvStreams = {
+    uvs: channels[primaryChannel] ?? channels[0],
+    uvs2: secondaryChannel !== undefined
+      ? channels[secondaryChannel] ?? channels[0]
+      : null,
+  }
+
+  for (const slot of activeSlots) {
+    const usesUv2 = secondaryChannel !== undefined
+      && textureUvChannel(slot.texture) === secondaryChannel
+    if (slot.textureFlag === 'textureUsesUv2') {
+      out.textureUsesUv2 = usesUv2
+    } else if (slot.textureFlag === 'alphaMapUsesUv2') {
+      out.alphaMapUsesUv2 = usesUv2
+    } else if (slot.pbrFlag) {
+      out.pbrUsesUv2 ??= {}
+      out.pbrUsesUv2[slot.pbrFlag] = usesUv2
+    }
+  }
+
+  return out
+}
+
+function preferredPrimaryTextureChannel(slots: MaterialUvSlot[]): number | undefined {
+  for (const flag of ['textureUsesUv2', 'alphaMapUsesUv2'] as const) {
+    const slot = slots.find((candidate) => candidate.textureFlag === flag)
+    if (slot?.texture != null) return textureUvChannel(slot.texture)
+  }
+  return slots[0]?.texture ? textureUvChannel(slots[0].texture) : undefined
+}
+
+function applyPbrUvStreamFlags(props: PbrProperties, uvStreams: TextureUvStreams): void {
+  if (!uvStreams.pbrUsesUv2) return
+  for (const [flag, usesUv2] of Object.entries(uvStreams.pbrUsesUv2)) {
+    props[flag as PbrUvFlag] = usesUv2
+  }
 }
 
 function secondaryUvsForMaterial(
