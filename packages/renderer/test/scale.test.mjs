@@ -232,13 +232,13 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
-test('mesh render budget handles 1,296 separate mesh objects', () => {
+test('mesh render budget handles 1,600 separate mesh objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 36
-  const rows = 36
-  const geometry = new THREE.PlaneGeometry(0.04, 0.04)
+  const columns = 40
+  const rows = 40
+  const geometry = new THREE.PlaneGeometry(0.036, 0.036)
   const materials = [
     new THREE.MeshBasicMaterial({ color: 0xf25f5c }),
     new THREE.MeshBasicMaterial({ color: 0x247ba0 }),
@@ -250,7 +250,7 @@ test('mesh render budget handles 1,296 separate mesh objects', () => {
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const mesh = new THREE.Mesh(geometry, materials[(row + col) % materials.length])
-      mesh.position.set((col - (columns - 1) / 2) * 0.055, (row - (rows - 1) / 2) * 0.055, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.051, (row - (rows - 1) / 2) * 0.051, 0)
       mesh.rotation.z = ((row * columns + col) % 7) * 0.04
       scene.add(mesh)
     }
@@ -274,11 +274,11 @@ test('instanced mesh budget renders thousands of transformed colored instances',
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 70
-  const rows = 70
+  const columns = 75
+  const rows = 75
   const count = columns * rows
   const mesh = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(0.024, 0.024),
+    new THREE.PlaneGeometry(0.022, 0.022),
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
     count,
   )
@@ -288,7 +288,7 @@ test('instanced mesh budget renders thousands of transformed colored instances',
   for (let i = 0; i < count; i += 1) {
     const col = i % columns
     const row = Math.floor(i / columns)
-    matrix.makeTranslation((col - (columns - 1) / 2) * 0.029, (row - (rows - 1) / 2) * 0.029, 0)
+    matrix.makeTranslation((col - (columns - 1) / 2) * 0.027, (row - (rows - 1) / 2) * 0.027, 0)
     mesh.setMatrixAt(i, matrix)
     color.setRGB(
       0.25 + 0.75 * (col / (columns - 1)),
