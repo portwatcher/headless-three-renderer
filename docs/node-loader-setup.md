@@ -96,9 +96,11 @@ node examples/render-vrm.mjs ./avatar.vrm ./dance.vrma render.png
 `EncodedImageTextureLoader` Three.js loader handler used by `loadGltfFromFile()`.
 It supports both callback-style `load()` and promise-style `loadAsync()`. Its
 textures expose encoded PNG/JPEG/WebP bytes through `texture.image` and
-`texture.source.data`. The renderer decodes those bytes natively, so no DOM
-`Image`, canvas, or WebGL context is needed for external image files or
-PNG/JPEG/WebP data URI or Blob URL image references.
+`texture.source.data`, and it reports optional `LoadingManager`
+`itemStart`/`itemEnd`/`itemError` hooks when a manager is supplied. The renderer
+decodes those bytes natively, so no DOM `Image`, canvas, or WebGL context is
+needed for external image files or PNG/JPEG/WebP data URI or Blob URL image
+references.
 
 ## FileLoader And Fetch
 

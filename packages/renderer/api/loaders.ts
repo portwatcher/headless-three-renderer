@@ -43,6 +43,9 @@ type TextureLike = {
 }
 export type ThreeLoadingManagerLike = {
   addHandler(regex: RegExp, loader: unknown): unknown
+  itemEnd?(url: string): unknown
+  itemError?(url: string): unknown
+  itemStart?(url: string): unknown
 }
 export type ThreeGltfLoaderLike = {
   parse(data: ArrayBuffer | string, path: string, onLoad: (gltf: unknown) => void, onError?: (error: unknown) => void): void
@@ -146,10 +149,12 @@ export type NodeGltfLoaderBundle = {
 
 export class EncodedImageTextureLoader {
   private readonly rootDir: string
+  private readonly manager?: ThreeLoadingManagerLike
   private loaderPath = ''
 
-  constructor(rootDir: string = process.cwd()) {
+  constructor(rootDir: string = process.cwd(), manager?: ThreeLoadingManagerLike) {
     this.rootDir = requiredString(rootDir, 'rootDir')
+    this.manager = optionalLoadingManager(manager, 'manager')
   }
 
   setCrossOrigin(): this {
@@ -187,12 +192,19 @@ export class EncodedImageTextureLoader {
         ? readBlobUrlBuffer(source)
         : readFile(resolveLocalAssetPath(source, this.rootDir))
 
+    this.manager?.itemStart?.(assetUrl)
     data.then((buffer) => {
       texture.image = buffer
       texture.source.data = buffer
       texture.needsUpdate = true
-      loadCallback?.(texture)
+      try {
+        loadCallback?.(texture)
+      } finally {
+        this.manager?.itemEnd?.(assetUrl)
+      }
     }, (error) => {
+      this.manager?.itemError?.(assetUrl)
+      this.manager?.itemEnd?.(assetUrl)
       errorCallback?.(error)
     })
 
@@ -210,8 +222,8 @@ export class EncodedImageTextureLoader {
   }
 }
 
-export function createEncodedImageTextureLoader(rootDir?: string): EncodedImageTextureLoader {
-  return new EncodedImageTextureLoader(rootDir)
+export function createEncodedImageTextureLoader(rootDir?: string, manager?: ThreeLoadingManagerLike): EncodedImageTextureLoader {
+  return new EncodedImageTextureLoader(rootDir, manager)
 }
 
 export async function createNodeGltfLoader(
@@ -232,7 +244,7 @@ export async function createNodeGltfLoader(
     installLocalFileFetch()
   }
 
-  const encodedImages = createEncodedImageTextureLoader(root)
+  const encodedImages = createEncodedImageTextureLoader(root, loadingManager)
   if (registerTextureHandlers !== false) {
     registerEncodedImageHandlers(loadingManager, encodedImages)
   }

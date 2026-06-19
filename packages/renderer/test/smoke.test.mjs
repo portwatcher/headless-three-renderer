@@ -80,6 +80,38 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     assert.deepEqual(Buffer.from(asyncTexture.image), imageBytes)
     assert.equal(asyncTexture.source.data, asyncTexture.image)
 
+    const managerEvents = []
+    const manager = {
+      addHandler() {},
+      itemStart(url) {
+        managerEvents.push(['start', url])
+      },
+      itemEnd(url) {
+        managerEvents.push(['end', url])
+      },
+      itemError(url) {
+        managerEvents.push(['error', url])
+      },
+    }
+    const managedLoader = createEncodedImageTextureLoader(dir, manager)
+    const managedTexture = await managedLoader.loadAsync('tex.png')
+    assert.deepEqual(Buffer.from(managedTexture.image), imageBytes)
+    assert.deepEqual(managerEvents, [
+      ['start', 'tex.png'],
+      ['end', 'tex.png'],
+    ])
+
+    managerEvents.length = 0
+    await assert.rejects(
+      () => managedLoader.loadAsync('missing-manager.png'),
+      /ENOENT|no such file/i,
+    )
+    assert.deepEqual(managerEvents, [
+      ['start', 'missing-manager.png'],
+      ['error', 'missing-manager.png'],
+      ['end', 'missing-manager.png'],
+    ])
+
     assert.equal(resolveLocalAssetPath('tex.png', dir), imagePath)
     assert.equal(resolveLocalAssetPath(imagePath, dir), imagePath)
     assert.equal(resolveLocalAssetPath(pathToFileURL(imagePath).href, dir), imagePath)
@@ -272,6 +304,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
   assert.throws(
     () => createEncodedImageTextureLoader(123),
     /rootDir must be a string/i,
+  )
+  assert.throws(
+    () => createEncodedImageTextureLoader(process.cwd(), {}),
+    /manager must provide an addHandler\(\) function/i,
   )
 
   const imageLoader = createEncodedImageTextureLoader(process.cwd())
