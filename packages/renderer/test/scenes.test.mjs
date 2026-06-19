@@ -1114,6 +1114,38 @@ test('renderable object frustum culling honors geometry bounds and frustumCulled
   }
 })
 
+test('Points frustum culling accounts for rendered billboard size', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderPoint(frustumCulled = true) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([1.25, 0, 0]), 3))
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(1.25, 0, 0), 0)
+
+    const points = new THREE.Points(
+      geometry,
+      new THREE.PointsMaterial({ color: 0xffffff, size: 48, sizeAttenuation: false }),
+    )
+    points.frustumCulled = frustumCulled
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(points)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  function visiblePixels(rgba) {
+    return countRegionPixels(rgba, 64, 64, 0, 0, 64, 64, (r, g, b) => r > 180 || g > 180 || b > 180)
+  }
+
+  const culledPixels = visiblePixels(renderPoint(true))
+  const uncullablePixels = visiblePixels(renderPoint(false))
+  assert.ok(culledPixels > 20, `point billboard should remain visible when its expanded quad intersects the frustum (${culledPixels})`)
+  assert.ok(uncullablePixels > 20, `frustumCulled=false control point should remain visible (${uncullablePixels})`)
+})
+
 test('invalid renderable object frustumCulled values fail clearly', () => {
   const scene = new THREE.Scene()
   const mesh = new THREE.Mesh(

@@ -1358,6 +1358,7 @@ function billboardCustomShadowCutoutCorpus() {
       const cases = [
         ['sprite', 'directional'],
         ['sprite', 'point'],
+        ['points', 'directional'],
         ['points', 'point'],
       ]
       for (const [kind, shadowKind] of cases) {
@@ -1377,6 +1378,7 @@ function billboardCustomShadowCutoutCorpus() {
       const cases = [
         ['sprite', 'directional'],
         ['sprite', 'point'],
+        ['points', 'directional'],
         ['points', 'point'],
       ]
       for (const [kind, shadowKind] of cases) {

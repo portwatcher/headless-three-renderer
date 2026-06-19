@@ -190,7 +190,7 @@ function visitObject(
         appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext, overrideMaterial)
       }
     } else if (object.isPoints === true && object.geometry) {
-      if (!renderableObjectOutsideFrustum(object, camera)) {
+      if (!renderableObjectOutsideFrustum(object, camera, viewportHeight, overrideMaterial)) {
         appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
       }
     } else if (object.isSprite === true) {
@@ -1861,6 +1861,8 @@ function objectSortCenter(object: ThreeObject3DLike): [number, number, number] {
 function renderableObjectOutsideFrustum(
   object: ThreeObject3DLike,
   camera: ThreeCameraLike | undefined,
+  viewportHeight = 512,
+  overrideMaterial?: ThreeMaterialLike,
 ): boolean {
   if (!camera) return false
   const frustumCulled = optionalObjectBoolean(object.frustumCulled, 'object.frustumCulled')
@@ -1869,7 +1871,10 @@ function renderableObjectOutsideFrustum(
   const sphere = objectBoundingSphere(object)
   if (!sphere) return false
   const transform = matrixElements(object.matrixWorld!, renderableMatrixWorldLabel(object))
-  return transformedSphereOutsideFrustum(camera, transform, sphere)
+  const extraRadius = object.isPoints === true
+    ? pointBillboardCullRadius(object, camera, transform, sphere, viewportHeight, overrideMaterial)
+    : 0
+  return transformedSphereOutsideFrustum(camera, transform, sphere, extraRadius)
 }
 
 function renderableMatrixWorldLabel(object: ThreeObject3DLike): string {
@@ -1899,6 +1904,40 @@ function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, num
     : sphereLike(geometry.boundingSphere, 'geometry.boundingSphere')
 }
 
+function pointBillboardCullRadius(
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike,
+  transform: ArrayLike<number>,
+  sphere: { center: [number, number, number]; radius: number },
+  viewportHeight: number,
+  overrideMaterial: ThreeMaterialLike | undefined,
+): number {
+  const center = transformPoint(transform, sphere.center)
+  let radius = 0
+  for (const material of pointCullMaterials(object, overrideMaterial)) {
+    const pointSize = safePositiveNumber(material?.size, 1)
+    const sizeAttenuation = typeof material?.sizeAttenuation === 'boolean'
+      ? material.sizeAttenuation
+      : undefined
+    const worldSize = pointWorldSize(pointSize, center, { sizeAttenuation }, camera, viewportHeight)
+    radius = Math.max(radius, worldSize * Math.SQRT1_2)
+  }
+  return radius
+}
+
+function pointCullMaterials(
+  object: ThreeObject3DLike,
+  overrideMaterial: ThreeMaterialLike | undefined,
+): Array<ThreeMaterialLike | undefined> {
+  if (overrideMaterial !== undefined) return [overrideMaterial]
+  if (Array.isArray(object.material)) {
+    return object.material.filter((material): material is ThreeMaterialLike => material != null && typeof material === 'object' && !Array.isArray(material))
+  }
+  return object.material != null && typeof object.material === 'object' && !Array.isArray(object.material)
+    ? [object.material]
+    : [undefined]
+}
+
 function spriteOutsideFrustum(
   object: ThreeObject3DLike,
   camera: ThreeCameraLike | undefined,
@@ -1920,10 +1959,11 @@ function transformedSphereOutsideFrustum(
   camera: ThreeCameraLike,
   transform: ArrayLike<number>,
   sphere: { center: [number, number, number]; radius: number },
+  extraRadius = 0,
 ): boolean {
   const center = transformPoint(transform, sphere.center)
   const scale = Math.max(columnLength3(transform, 0), columnLength3(transform, 4), columnLength3(transform, 8))
-  const radius = sphere.radius * scale
+  const radius = sphere.radius * scale + extraRadius
   if (!Number.isFinite(radius) || radius < 0) return false
   return !cameraFrustumIntersectsSphere(camera, center, radius)
 }
@@ -2022,6 +2062,10 @@ function clampPointSpriteSize(pixelSize: number): number {
 
 function finiteOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function safePositiveNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback
 }
 
 function finiteMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {
