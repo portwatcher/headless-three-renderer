@@ -9565,6 +9565,84 @@ test('LineBasicMaterial and LineDashedMaterial alphaHash approximate shadow cast
   }
 })
 
+test('LineBasicMaterial alphaHash and alphaToCoverage affect spot and point shadows', () => {
+  function makeLineSegments(cutoutKind, enabled) {
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      linewidth: 6,
+      opacity: cutoutKind === 'alphaHash' && enabled ? 0.35 : 1,
+      alphaHash: cutoutKind === 'alphaHash' ? enabled : false,
+    })
+    if (cutoutKind === 'alphaToCoverage') {
+      material.alphaMap = solidTexture(255, 0, 255)
+      material.alphaToCoverage = enabled
+    }
+    material.colorWrite = false
+    material.depthWrite = false
+
+    const positions = []
+    for (let offset = -3; offset <= 3; offset += 0.35) {
+      positions.push(-3, 2, offset, 3, 2, offset)
+      positions.push(offset, 2, -3, offset, 2, 3)
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    const line = new THREE.LineSegments(geometry, material)
+    line.castShadow = true
+    return line
+  }
+
+  function renderLineOpacityShadow(lightKind, cutoutKind, enabled) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+    scene.add(makeLineSegments(cutoutKind, enabled))
+
+    if (lightKind === 'spot') {
+      const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
+      light.position.set(0, 7, 8)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(512, 512)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 20
+      scene.add(light)
+      scene.add(light.target)
+    } else {
+      const light = new THREE.PointLight(0xffffff, 2)
+      light.position.set(0, 5, 4)
+      light.distance = 12
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 12
+      scene.add(light)
+    }
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const lightKind of ['spot', 'point']) {
+    for (const cutoutKind of ['alphaHash', 'alphaToCoverage']) {
+      const fullShadow = renderLineOpacityShadow(lightKind, cutoutKind, false)
+      const cutoutShadow = renderLineOpacityShadow(lightKind, cutoutKind, true)
+      const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+      const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
+      assert.ok(cutoutLum > fullLum + 4, `${lightKind} ${cutoutKind} should lighten the line caster shadow (${cutoutLum} vs ${fullLum})`)
+    }
+  }
+})
+
 test('Line shadow casters honor material and group clipShadows', () => {
   function makeLineSegments() {
     const material = new THREE.LineBasicMaterial({ color: 0xffffff })
