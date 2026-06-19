@@ -75,6 +75,7 @@ export function createSceneCorpus() {
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
+    dashedLineMaterialUvChannelCorpus(),
     dashedLineMaterialWideLineCorpus(),
     pointsMaterialTextureCorpus(),
     pointsMaterialUvChannelCorpus(),
@@ -3464,6 +3465,94 @@ function dashedLineMaterialTextureCorpus() {
       )
       if (greenPixels < 3 || redPixels > 1) {
         throw new Error(`textured dashed-line corpus should render green alpha-tested dashes, got green=${greenPixels} red=${redPixels}`)
+      }
+    },
+  }
+}
+
+function dashedLineMaterialUvChannelCorpus() {
+  const map = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  map.channel = 1
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.needsUpdate = true
+
+  const alphaMap = new THREE.DataTexture(new Uint8Array([
+    255, 255, 255, 255,
+    255, 0, 255, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  alphaMap.channel = 2
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.needsUpdate = true
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.45, 0, 0),
+    new THREE.Vector3(1.45, 0, 0),
+  ])
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, 2.9]), 1))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.LineDashedMaterial({
+    alphaTest: 0.5,
+    color: 0xffffff,
+    dashSize: 0.38,
+    gapSize: 0.2,
+    linewidth: 8,
+    map,
+    scale: 1,
+  })
+  material.alphaMap = alphaMap
+  scene.add(new THREE.Line(
+    geometry,
+    material,
+  ))
+
+  return {
+    name: 'line-dashed-material-uv-channel-selection',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.001,
+    browserReference: false,
+    validate(rgba, { width, height }) {
+      const greenPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => g > 100 && g > r + 40 && g > b + 40,
+      )
+      const redPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => r > 100 && r > g + 40 && r > b + 40,
+      )
+      if (!(greenPixels > 80 && redPixels < 5)) {
+        throw new Error(`dashed-line UV-channel corpus should render green uv1-selected dashes with uv2 alpha kept opaque, green=${greenPixels} red=${redPixels}`)
       }
     },
   }
