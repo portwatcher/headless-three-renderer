@@ -23263,7 +23263,7 @@ test('LineBasicMaterial map alpha samples line UVs', () => {
   assert.ok(discarded < visible * 0.3, `transparent map alpha texel should discard most line pixels (${discarded} vs ${visible})`)
 })
 
-test('LineBasicMaterial alphaMap samples the selected secondary UV channel', () => {
+test('LineBasicMaterial alphaMap samples selected uv1-uv3 texture channels', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,
     255, 255, 255, 255,
@@ -23279,10 +23279,13 @@ test('LineBasicMaterial alphaMap samples the selected secondary UV channel', () 
       0.25, 0.5,
       0.25, 0.5,
     ]), 2))
-    geom.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
-      0.75, 0.5,
-      0.75, 0.5,
-    ]), 2))
+    for (const index of [1, 2, 3]) {
+      const u = index === channel ? 0.75 : 0.25
+      geom.setAttribute(`uv${index}`, new THREE.BufferAttribute(new Float32Array([
+        u, 0.5,
+        u, 0.5,
+      ]), 2))
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0.1, 0.1, 0.1)
@@ -23296,9 +23299,11 @@ test('LineBasicMaterial alphaMap samples the selected secondary UV channel', () 
   }
 
   const primary = renderLine(0)
-  const secondary = renderLine(1)
-  assert.ok(secondary > 0.001, `line alphaMap channel=1 should sample the opaque uv1 texel (${secondary})`)
-  assert.ok(primary < secondary * 0.3, `line alphaMap channel=0 should sample the transparent primary UV texel (${primary} vs ${secondary})`)
+  for (const channel of [1, 2, 3]) {
+    const selected = renderLine(channel)
+    assert.ok(selected > 0.001, `line alphaMap channel=${channel} should sample the opaque uv${channel} texel (${selected})`)
+    assert.ok(primary < selected * 0.3, `line alphaMap channel=0 should sample the transparent primary UV texel (${primary} vs ${selected})`)
+  }
 })
 
 test('LineBasicMaterial map and alphaMap can sample distinct non-primary UV channels', () => {
@@ -24189,7 +24194,7 @@ test('LineDashedMaterial map alpha samples reconstructed dash UVs', () => {
   assert.ok(ratio > 0.0005, `dashed line UVs should sample the opaque map region (${ratio})`)
 })
 
-test('LineDashedMaterial alphaMap samples reconstructed secondary UVs', () => {
+test('LineDashedMaterial alphaMap samples reconstructed uv1-uv3 texture channels', () => {
   const alphaMap = rgbaTexture([
     255, 0, 255, 255,
     255, 255, 255, 255,
@@ -24205,10 +24210,13 @@ test('LineDashedMaterial alphaMap samples reconstructed secondary UVs', () => {
       0.25, 0.5,
       0.25, 0.5,
     ]), 2))
-    geom.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
-      0.75, 0.5,
-      0.75, 0.5,
-    ]), 2))
+    for (const index of [1, 2, 3]) {
+      const u = index === channel ? 0.75 : 0.25
+      geom.setAttribute(`uv${index}`, new THREE.BufferAttribute(new Float32Array([
+        u, 0.5,
+        u, 0.5,
+      ]), 2))
+    }
 
     const material = new THREE.LineDashedMaterial({
       color: 0xffffff,
@@ -24228,9 +24236,11 @@ test('LineDashedMaterial alphaMap samples reconstructed secondary UVs', () => {
   }
 
   const primary = renderLine(0)
-  const secondary = renderLine(1)
-  assert.ok(secondary > 0.0005, `dashed line alphaMap channel=1 should sample reconstructed uv1 (${secondary})`)
-  assert.ok(primary < secondary * 0.35, `dashed line alphaMap channel=0 should sample the transparent primary UV (${primary} vs ${secondary})`)
+  for (const channel of [1, 2, 3]) {
+    const selected = renderLine(channel)
+    assert.ok(selected > 0.0005, `dashed line alphaMap channel=${channel} should sample reconstructed uv${channel} (${selected})`)
+    assert.ok(primary < selected * 0.35, `dashed line alphaMap channel=0 should sample the transparent primary UV (${primary} vs ${selected})`)
+  }
 })
 
 test('LineDashedMaterial map and alphaMap can sample distinct non-primary UV channels', () => {
