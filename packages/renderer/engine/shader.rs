@@ -45,7 +45,7 @@ struct Uniforms {
   ao_params: vec4<f32>,
   // x = 1/width, y = 1/height, z = width, w = height
   render_params: vec4<f32>,
-  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped; z = alpha-to-coverage active; w = toneMappingExposure.
+  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = tone-mapping mode (0 when material toneMapped=false); z = alpha-to-coverage active; w = toneMappingExposure.
   output_params: vec4<f32>,
   // texture_transform1.xyz / texture_transform2.xyz = base-color texture transform rows.
   // texture_transform1.w = base texture uses secondary UV stream.
@@ -1509,6 +1509,25 @@ fn rrt_and_odt_fit(v: vec3<f32>) -> vec3<f32> {
   return a / b;
 }
 
+fn linear_tone_mapping(color: vec3<f32>) -> vec3<f32> {
+  return clamp(uniforms.output_params.w * color, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn reinhard_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
+  let color = color_in * uniforms.output_params.w;
+  return clamp(color / (vec3<f32>(1.0) + color), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn cineon_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
+  var color = color_in * uniforms.output_params.w;
+  color = max(vec3<f32>(0.0), color - vec3<f32>(0.004));
+  return pow(
+    (color * (6.2 * color + vec3<f32>(0.5))) /
+      (color * (6.2 * color + vec3<f32>(1.7)) + vec3<f32>(0.06)),
+    vec3<f32>(2.2)
+  );
+}
+
 fn aces_filmic_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
   // WGSL mat3x3 constructor takes columns.
   let aces_input = mat3x3<f32>(
@@ -1529,10 +1548,20 @@ fn aces_filmic_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
 }
 
 fn apply_material_tone_mapping(color: vec3<f32>) -> vec3<f32> {
-  if uniforms.output_params.y > 0.5 {
-    return aces_filmic_tone_mapping(color);
+  let mode = uniforms.output_params.y;
+  if mode < 0.5 {
+    return color;
   }
-  return color;
+  if abs(mode - 1.0) < 0.5 {
+    return linear_tone_mapping(color);
+  }
+  if abs(mode - 2.0) < 0.5 {
+    return reinhard_tone_mapping(color);
+  }
+  if abs(mode - 3.0) < 0.5 {
+    return cineon_tone_mapping(color);
+  }
+  return aces_filmic_tone_mapping(color);
 }
 
 fn apply_output_color_space(color: vec3<f32>) -> vec3<f32> {

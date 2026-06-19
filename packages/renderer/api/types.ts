@@ -1041,6 +1041,7 @@ export interface NativeRenderScene {
   backgroundTextureBlurriness?: number
   format?: string
   outputColorSpace?: string
+  toneMapping?: number
   toneMappingExposure?: number
   sampleCount?: number
   meshes?: NativeSceneMesh[]

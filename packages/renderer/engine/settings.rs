@@ -65,6 +65,7 @@ pub struct RenderSettings {
     pub background_texture: Option<BackgroundTexture>,
     pub output_format: OutputFormat,
     pub output_color_space: OutputColorSpace,
+    pub tone_mapping: f32,
     pub tone_mapping_exposure: f32,
     pub sample_count: u32,
     pub view: Mat4,
@@ -223,6 +224,7 @@ impl RenderSettings {
 
             let output_format = OutputFormat::from_scene(scene)?;
             let output_color_space = OutputColorSpace::from_scene(scene)?;
+            let tone_mapping = resolve_tone_mapping(scene.tone_mapping)?;
             let tone_mapping_exposure = finite_f32(
                 scene.tone_mapping_exposure.unwrap_or(1.0),
                 "scene.toneMappingExposure",
@@ -256,6 +258,7 @@ impl RenderSettings {
                 background_texture,
                 output_format,
                 output_color_space,
+                tone_mapping,
                 tone_mapping_exposure,
                 sample_count,
                 view,
@@ -539,6 +542,19 @@ fn resolve_sample_count(value: Option<u32>) -> Result<u32> {
         4 => Ok(4),
         other => bail!(
             "unsupported scene.sampleCount `{other}`; expected 1 for single-sample rendering or 4 for 4x MSAA"
+        ),
+    }
+}
+
+fn resolve_tone_mapping(value: Option<u32>) -> Result<f32> {
+    match value.unwrap_or(4) {
+        0 => Ok(0.0), // THREE.NoToneMapping
+        1 => Ok(1.0), // THREE.LinearToneMapping
+        2 => Ok(2.0), // THREE.ReinhardToneMapping
+        3 => Ok(3.0), // THREE.CineonToneMapping
+        4 => Ok(4.0), // THREE.ACESFilmicToneMapping
+        other => bail!(
+            "unsupported scene.toneMapping `{other}`; expected NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, or ACESFilmicToneMapping"
         ),
     }
 }

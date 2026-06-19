@@ -42,7 +42,17 @@ const PCFSoftShadowMap = 2
 const VSMShadowMap = 3
 const SupportedRendererShadowMapTypes = new Set([BasicShadowMap, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap])
 const NoToneMapping = 0
+const LinearToneMapping = 1
+const ReinhardToneMapping = 2
+const CineonToneMapping = 3
 const ACESFilmicToneMapping = 4
+const SupportedRendererToneMappings = new Set([
+  NoToneMapping,
+  LinearToneMapping,
+  ReinhardToneMapping,
+  CineonToneMapping,
+  ACESFilmicToneMapping,
+])
 
 export {
   applyVrmAnimation,
@@ -1056,6 +1066,7 @@ function toNativeInput(
     backgroundTextureBlurriness,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
+    toneMapping: rendererToneMapping,
     toneMappingExposure,
     sampleCount: resolveSampleCount(options),
     meshes,
@@ -2084,6 +2095,7 @@ function depthReadbackScene(scene: NativeRenderScene): NativeRenderScene {
     backgroundTextureBlurriness: undefined,
     format: 'rgba',
     outputColorSpace: 'srgb-linear',
+    toneMapping: undefined,
     toneMappingExposure: undefined,
     sampleCount: 1,
     meshes: scene.meshes?.map(depthReadbackMesh),
@@ -2369,9 +2381,9 @@ function rendererStateToneMapping(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new TypeError(`Renderer.toneMapping must be a Three.js tone mapping constant; received ${String(value)}.`)
   }
-  if (!Number.isInteger(value) || (value !== ACESFilmicToneMapping && value !== NoToneMapping)) {
+  if (!Number.isInteger(value) || !SupportedRendererToneMappings.has(value)) {
     throw new TypeError(
-      `Renderer.toneMapping ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.ACESFilmicToneMapping or THREE.NoToneMapping.`,
+      `Renderer.toneMapping ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.NoToneMapping, THREE.LinearToneMapping, THREE.ReinhardToneMapping, THREE.CineonToneMapping, or THREE.ACESFilmicToneMapping.`,
     )
   }
   return value

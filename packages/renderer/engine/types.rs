@@ -46,6 +46,8 @@ pub struct RenderScene {
     pub format: Option<String>,
     /// Output color space. Supported values are `"srgb"` (default), `"srgb-linear"`, `"linear-srgb"`, `"linearsrgb"`, and `"linear"`.
     pub output_color_space: Option<String>,
+    /// Three.js tone-mapping mode. Supports No, Linear, Reinhard, Cineon, and ACES Filmic. Defaults to ACES Filmic.
+    pub tone_mapping: Option<u32>,
     /// Material tone-mapping exposure multiplier. Defaults to 1.
     pub tone_mapping_exposure: Option<f64>,
     /// MSAA sample count. Supports `4`; omitted, `0`, or `1` use the single-sample path.
