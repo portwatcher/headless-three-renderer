@@ -2120,7 +2120,10 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32, { generateMipmaps: true })
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
   const renderer = new Renderer()
-  const listener = () => {}
+  const eventCalls = []
+  function listener(event) {
+    eventCalls.push([event.type, this === renderer.xr])
+  }
   assert.equal(renderer.xr.enabled, false)
   assert.equal(renderer.xr.isPresenting, false)
   assert.equal(renderer.xr.cameraAutoUpdate, true)
@@ -2142,8 +2145,12 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
   assert.equal(renderer.xr.setAnimationLoop(() => {}), undefined)
   assert.equal(renderer.xr.setAnimationLoop(null), undefined)
   assert.equal(renderer.xr.addEventListener('sessionstart', listener), undefined)
-  assert.equal(renderer.xr.hasEventListener('sessionstart', listener), false)
+  assert.equal(renderer.xr.hasEventListener('sessionstart', listener), true)
+  assert.equal(renderer.xr.dispatchEvent({ type: 'sessionstart' }), undefined)
   assert.equal(renderer.xr.removeEventListener('sessionstart', listener), undefined)
+  assert.equal(renderer.xr.hasEventListener('sessionstart', listener), false)
+  assert.equal(renderer.xr.dispatchEvent({ type: 'sessionstart' }), undefined)
+  assert.deepEqual(eventCalls, [['sessionstart', true]])
   assert.equal(renderer.xr.dispose(), undefined)
   assert.throws(
     () => { renderer.xr.enabled = 'yes' },
@@ -2180,6 +2187,14 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
   assert.throws(
     () => renderer.xr.removeEventListener('sessionstart', null),
     /Renderer\.xr\.removeEventListener listener must be a function/i,
+  )
+  assert.throws(
+    () => renderer.xr.dispatchEvent({ type: '' }),
+    /Renderer\.xr\.dispatchEvent event\.type must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.xr.dispatchEvent(null),
+    /Renderer\.xr\.dispatchEvent event must be an event-like object/i,
   )
   assert.throws(
     () => renderer.xr.setAnimationLoop('loop'),

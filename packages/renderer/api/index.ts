@@ -230,6 +230,7 @@ class RendererXrState {
   private referenceSpaceTypeValue = 'local-floor'
   private framebufferScaleFactorValue = 1
   private foveationValue: number | undefined
+  private readonly listeners = new Map<string, Set<(event: unknown) => void>>()
 
   readonly isPresenting = false
 
@@ -321,15 +322,37 @@ class RendererXrState {
 
   addEventListener(type: unknown, listener: unknown): void {
     assertEventListener(type, listener, 'Renderer.xr.addEventListener')
+    const eventType = type as string
+    const eventListener = listener as (event: unknown) => void
+    let typeListeners = this.listeners.get(eventType)
+    if (!typeListeners) {
+      typeListeners = new Set()
+      this.listeners.set(eventType, typeListeners)
+    }
+    typeListeners.add(eventListener)
   }
 
   removeEventListener(type: unknown, listener: unknown): void {
     assertEventListener(type, listener, 'Renderer.xr.removeEventListener')
+    this.listeners.get(type as string)?.delete(listener as (event: unknown) => void)
   }
 
   hasEventListener(type: unknown, listener: unknown): boolean {
     assertEventListener(type, listener, 'Renderer.xr.hasEventListener')
-    return false
+    return this.listeners.get(type as string)?.has(listener as (event: unknown) => void) ?? false
+  }
+
+  dispatchEvent(event: unknown): void {
+    if (event == null || typeof event !== 'object' || Array.isArray(event)) {
+      throw new TypeError('Renderer.xr.dispatchEvent event must be an event-like object.')
+    }
+    const type = (event as { type?: unknown }).type
+    if (typeof type !== 'string' || type.length === 0) {
+      throw new TypeError('Renderer.xr.dispatchEvent event.type must be a non-empty string.')
+    }
+    for (const listener of [...(this.listeners.get(type) ?? [])]) {
+      listener.call(this, event)
+    }
   }
 
   async setSession(session: unknown): Promise<never> {
