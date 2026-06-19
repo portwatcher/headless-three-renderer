@@ -565,6 +565,7 @@ export class Renderer {
   private localClippingEnabledValue = true
   private toneMappingValue = ACESFilmicToneMapping
   private toneMappingExposureValue = 1
+  private transmissionResolutionScaleValue = 1
   private animationLoop: RenderAnimationLoopCallback | null = null
   private readonly contextAttributes: RendererContextAttributesLike
 
@@ -652,6 +653,14 @@ export class Renderer {
 
   set toneMappingExposure(value: number) {
     this.toneMappingExposureValue = finiteNonNegativeNumber(value, 'Renderer.toneMappingExposure')
+  }
+
+  get transmissionResolutionScale(): number {
+    return this.transmissionResolutionScaleValue
+  }
+
+  set transmissionResolutionScale(value: number) {
+    this.transmissionResolutionScaleValue = rendererStatePositiveFiniteNumber(value, 'Renderer.transmissionResolutionScale')
   }
 
   get localClippingEnabled(): boolean {
@@ -2928,11 +2937,15 @@ function rendererStateSizeDimension(value: unknown, label: string): number {
 }
 
 function rendererStatePixelRatio(value: unknown, label: string): number {
+  return rendererStatePositiveFiniteNumber(value, `${label} value`)
+}
+
+function rendererStatePositiveFiniteNumber(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new TypeError(`${label} value must be a finite number.`)
+    throw new TypeError(`${label} must be a finite number.`)
   }
   if (value <= 0) {
-    throw new TypeError(`${label} value must be greater than 0.`)
+    throw new TypeError(`${label} must be greater than 0.`)
   }
   return value
 }

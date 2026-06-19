@@ -29352,6 +29352,40 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   )
 })
 
+test('Renderer transmissionResolutionScale is validated compatibility state', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.transmissionResolutionScale, 1)
+  renderer.transmissionResolutionScale = 0.5
+  assert.equal(renderer.transmissionResolutionScale, 0.5)
+  renderer.transmissionResolutionScale = 2
+  assert.equal(renderer.transmissionResolutionScale, 2)
+
+  const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `transmissionResolutionScale state should not alter normal rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => { renderer.transmissionResolutionScale = 0 },
+    /Renderer\.transmissionResolutionScale must be greater than 0/i,
+  )
+  assert.throws(
+    () => { renderer.transmissionResolutionScale = Number.NaN },
+    /Renderer\.transmissionResolutionScale must be a finite number/i,
+  )
+  assert.throws(
+    () => { renderer.transmissionResolutionScale = 'half' },
+    /Renderer\.transmissionResolutionScale must be a finite number/i,
+  )
+})
+
 test('Renderer domElement is an inert output-size mirror', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
