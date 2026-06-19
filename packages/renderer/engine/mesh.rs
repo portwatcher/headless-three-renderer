@@ -816,6 +816,20 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         compute_flat_normals(&mut vertices, indices.as_deref());
     }
 
+    let (surface_texture_inputs, physical_texture_inputs) = thread::scope(|scope| -> Result<_> {
+        let surface_handle = scope.spawn(|| prepare_surface_texture_inputs(mesh, mesh_index));
+        let physical_handle = scope.spawn(|| prepare_physical_texture_inputs(mesh, mesh_index));
+
+        let surface_texture_inputs = surface_handle
+            .join()
+            .expect("surface texture preparation worker panicked")?;
+        let physical_texture_inputs = physical_handle
+            .join()
+            .expect("physical texture preparation worker panicked")?;
+
+        Ok((surface_texture_inputs, physical_texture_inputs))
+    })?;
+
     let SurfaceTextureInputs {
         texture,
         texture_transform,
@@ -847,7 +861,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         emissive_map_is_srgb,
         light_map_is_srgb,
         common,
-    } = prepare_surface_texture_inputs(mesh, mesh_index)?;
+    } = surface_texture_inputs;
 
     let CommonTextureInputs {
         normal_map,
@@ -883,7 +897,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         thickness_map,
         specular_color_map,
         specular_intensity_map,
-    } = prepare_physical_texture_inputs(mesh, mesh_index)?;
+    } = physical_texture_inputs;
     let physical_maps = pack_physical_maps(PhysicalMapInputs {
         clearcoat: clearcoat_map.as_ref(),
         clearcoat_roughness: clearcoat_roughness_map.as_ref(),
