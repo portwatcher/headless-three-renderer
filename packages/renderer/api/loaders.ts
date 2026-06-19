@@ -60,6 +60,10 @@ type GltfRootLike = {
   scene?: unknown
   scenes?: unknown[]
 }
+type VrmLike = {
+  scene?: unknown
+  update?: unknown
+}
 type GltfNodeVisibilityParser = {
   associations?: Map<unknown, Record<string, number>>
   json?: {
@@ -335,11 +339,8 @@ export async function applyVrmAnimation(
   options: ApplyVrmAnimationOptions = {},
 ): Promise<AppliedVrmAnimation> {
   const helperOptions = objectOptions(options, 'options') as ApplyVrmAnimationOptions
-  const model = objectOptions(vrm, 'vrm') as { scene?: unknown; update?: unknown }
-  objectOptions(vrmAnimation, 'vrmAnimation')
-  if (model.scene == null || typeof model.scene !== 'object' || Array.isArray(model.scene)) {
-    throw new TypeError('vrm.scene must be an object.')
-  }
+  const model = resolveVrmModelInput(vrm)
+  const animation = resolveVrmAnimationInput(vrmAnimation)
 
   const time = optionalNonNegativeNumber(helperOptions.time, 'options.time') ?? 0
   const updateDelta = optionalNonNegativeNumber(helperOptions.updateDelta, 'options.updateDelta') ?? 0
@@ -347,7 +348,7 @@ export async function applyVrmAnimation(
   const createClip = optionalFunction(helperOptions.createVRMAnimationClip, 'options.createVRMAnimationClip')
     ?? await importVrmAnimationClipFactory()
   const Mixer = optionalFunction(helperOptions.AnimationMixer, 'options.AnimationMixer') ?? AnimationMixer
-  const clip = createClip(vrmAnimation, vrm)
+  const clip = createClip(animation, model)
   const mixer = new Mixer(model.scene)
   if (typeof mixer.clipAction !== 'function') {
     throw new TypeError('AnimationMixer must provide a clipAction() function.')
@@ -372,6 +373,36 @@ export async function applyVrmAnimation(
     model.update(updateDelta)
   }
   return { action, clip, mixer }
+}
+
+function resolveVrmModelInput(vrm: unknown): VrmLike {
+  const input = objectOptions(vrm, 'vrm') as Record<string, unknown>
+  const userData = input.userData
+  const wrapped = userData != null
+    && typeof userData === 'object'
+    && !Array.isArray(userData)
+    && 'vrm' in userData
+  const label = wrapped ? 'vrm.userData.vrm' : 'vrm'
+  const model = objectOptions(wrapped ? (userData as Record<string, unknown>).vrm : vrm, label) as VrmLike
+  if (model.scene == null || typeof model.scene !== 'object' || Array.isArray(model.scene)) {
+    throw new TypeError(`${label}.scene must be an object.`)
+  }
+  return model
+}
+
+function resolveVrmAnimationInput(vrmAnimation: unknown): unknown {
+  const input = objectOptions(vrmAnimation, 'vrmAnimation') as Record<string, unknown>
+  const userData = input.userData
+  if (userData == null || typeof userData !== 'object' || Array.isArray(userData) || !('vrmAnimations' in userData)) {
+    return vrmAnimation
+  }
+
+  const animations = (userData as Record<string, unknown>).vrmAnimations
+  if (!Array.isArray(animations)) {
+    throw new TypeError('vrmAnimation.userData.vrmAnimations must be an array.')
+  }
+  objectOptions(animations[0], 'vrmAnimation.userData.vrmAnimations[0]')
+  return animations[0]
 }
 
 function encodedImageDataUriBuffer(url: string): Buffer | null {
