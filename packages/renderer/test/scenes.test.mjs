@@ -13337,39 +13337,56 @@ test('unsupported cube texture material slots fail clearly', () => {
     ['CubeTexture', makeCubeMap],
     ['CubeUV texture', makeCubeUvMap],
   ]
+  const unsupported2DSlotPattern = (slot) => new RegExp(`material\\.${slot} uses a cube or PMREM\\/CubeUV texture mapping.*2D material texture slots`, 'i')
+  const physicalMapSlot = (slot, extra = {}) => (texture) => new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      ...extra,
+      [slot]: texture,
+    }),
+  )
   const slots = [
     ['MeshBasicMaterial.map', (texture) => new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshBasicMaterial({ map: texture }),
-    ), /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ), unsupported2DSlotPattern('map')],
     ['MeshBasicMaterial.alphaMap', (texture) => new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshBasicMaterial({ alphaMap: texture, alphaTest: 0.5 }),
-    ), /material\.alphaMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ), unsupported2DSlotPattern('alphaMap')],
     ['MeshStandardMaterial.normalMap', (texture) => new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshStandardMaterial({ normalMap: texture }),
-    ), /material\.normalMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ), unsupported2DSlotPattern('normalMap')],
     ['MeshPhongMaterial.specularMap', (texture) => new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshPhongMaterial({ specularMap: texture }),
-    ), /material\.specularMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
-    ['MeshPhysicalMaterial.clearcoatMap', (texture) => new THREE.Mesh(
-      new THREE.PlaneGeometry(2, 2),
-      new THREE.MeshPhysicalMaterial({ clearcoat: 1, clearcoatMap: texture }),
-    ), /material\.clearcoatMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    ), unsupported2DSlotPattern('specularMap')],
+    ['MeshPhysicalMaterial.clearcoatMap', physicalMapSlot('clearcoatMap', { clearcoat: 1 }), unsupported2DSlotPattern('clearcoatMap')],
+    ['MeshPhysicalMaterial.clearcoatRoughnessMap', physicalMapSlot('clearcoatRoughnessMap', { clearcoat: 1 }), unsupported2DSlotPattern('clearcoatRoughnessMap')],
+    ['MeshPhysicalMaterial.clearcoatNormalMap', physicalMapSlot('clearcoatNormalMap', { clearcoat: 1 }), unsupported2DSlotPattern('clearcoatNormalMap')],
+    ['MeshPhysicalMaterial.sheenColorMap', physicalMapSlot('sheenColorMap', { sheen: 1 }), unsupported2DSlotPattern('sheenColorMap')],
+    ['MeshPhysicalMaterial.sheenRoughnessMap', physicalMapSlot('sheenRoughnessMap', { sheen: 1 }), unsupported2DSlotPattern('sheenRoughnessMap')],
+    ['MeshPhysicalMaterial.anisotropyMap', physicalMapSlot('anisotropyMap', { anisotropy: 1 }), unsupported2DSlotPattern('anisotropyMap')],
+    ['MeshPhysicalMaterial.iridescenceMap', physicalMapSlot('iridescenceMap', { iridescence: 1 }), unsupported2DSlotPattern('iridescenceMap')],
+    ['MeshPhysicalMaterial.iridescenceThicknessMap', physicalMapSlot('iridescenceThicknessMap', { iridescence: 1 }), unsupported2DSlotPattern('iridescenceThicknessMap')],
+    ['MeshPhysicalMaterial.transmissionMap', physicalMapSlot('transmissionMap', { transmission: 1 }), unsupported2DSlotPattern('transmissionMap')],
+    ['MeshPhysicalMaterial.thicknessMap', physicalMapSlot('thicknessMap', { transmission: 1, thickness: 1 }), unsupported2DSlotPattern('thicknessMap')],
+    ['MeshPhysicalMaterial.specularColorMap', physicalMapSlot('specularColorMap', { specularIntensity: 1 }), unsupported2DSlotPattern('specularColorMap')],
+    ['MeshPhysicalMaterial.specularIntensityMap', physicalMapSlot('specularIntensityMap', { specularIntensity: 1 }), unsupported2DSlotPattern('specularIntensityMap')],
     ['SpriteMaterial.map', (texture) => new THREE.Sprite(new THREE.SpriteMaterial({ map: texture })),
-      /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+      unsupported2DSlotPattern('map')],
     ['PointsMaterial.alphaMap', (texture) => {
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
       return new THREE.Points(geometry, new THREE.PointsMaterial({ alphaMap: texture, alphaTest: 0.5 }))
-    }, /material\.alphaMap uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    }, unsupported2DSlotPattern('alphaMap')],
     ['LineBasicMaterial.map', (texture) => {
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0]), 3))
       return new THREE.Line(geometry, new THREE.LineBasicMaterial({ map: texture }))
-    }, /material\.map uses a cube or PMREM\/CubeUV texture mapping.*2D material texture slots/i],
+    }, unsupported2DSlotPattern('map')],
   ]
 
   for (const [textureName, makeTexture] of textureFactories) {
