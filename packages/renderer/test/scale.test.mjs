@@ -230,6 +230,44 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
+test('mesh render budget handles hundreds of separate mesh objects', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 20
+  const rows = 20
+  const geometry = new THREE.PlaneGeometry(0.075, 0.075)
+  const materials = [
+    new THREE.MeshBasicMaterial({ color: 0xf25f5c }),
+    new THREE.MeshBasicMaterial({ color: 0x247ba0 }),
+    new THREE.MeshBasicMaterial({ color: 0x70c1b3 }),
+    new THREE.MeshBasicMaterial({ color: 0xffe066 }),
+    new THREE.MeshBasicMaterial({ color: 0xc77dff }),
+  ]
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const mesh = new THREE.Mesh(geometry, materials[(row + col) % materials.length])
+      mesh.position.set((col - (columns - 1) / 2) * 0.095, (row - (rows - 1) / 2) * 0.095, 0)
+      mesh.rotation.z = ((row * columns + col) % 7) * 0.04
+      scene.add(mesh)
+    }
+  }
+
+  assert.equal(scene.children.length, rows * columns)
+
+  const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.25, `separate mesh budget scene should render broad coverage (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 25 && mean.g > 25 && mean.b > 25, `separate mesh colors should survive rendering (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('instanced mesh budget renders thousands of transformed colored instances', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
