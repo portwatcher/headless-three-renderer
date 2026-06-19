@@ -938,6 +938,7 @@ export interface NativeSceneMesh {
   metallicRoughnessTextureMinFilter?: string
   metallicRoughnessTextureAnisotropy?: number
   metallicRoughnessTextureTransform?: number[]
+  metallicRoughnessTextureColorSpace?: string
   metallicRoughnessTextureUsesUv2?: boolean
   emissiveMap?: Buffer
   emissiveMapWidth?: number
@@ -1337,6 +1338,7 @@ export interface PbrProperties {
   metallicRoughnessTextureMinFilter?: string
   metallicRoughnessTextureAnisotropy?: number
   metallicRoughnessTextureTransform?: number[]
+  metallicRoughnessTextureColorSpace?: string
   metallicRoughnessTextureUsesUv2?: boolean
   emissiveMap?: Buffer
   emissiveMapWidth?: number

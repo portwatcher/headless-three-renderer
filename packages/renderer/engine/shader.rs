@@ -59,6 +59,7 @@ struct Uniforms {
   alpha_map_transform2: vec4<f32>,
   // Row pairs for normal, metallic-roughness, emissive, AO, light, and specular map transforms.
   // map_transform_rows[1].w = active normal/bump map uses secondary UV stream.
+  // map_transform_rows[2].w = metallic-roughness map is sRGB.
   // map_transform_rows[3].w = metallic-roughness map uses secondary UV stream.
   // map_transform_rows[4].w = emissive map is sRGB.
   // map_transform_rows[5].w = emissive map uses secondary UV stream.
@@ -794,6 +795,13 @@ fn decode_color_map_sample(sample: vec4<f32>) -> vec4<f32> {
   return sample;
 }
 
+fn decode_metallic_roughness_map_sample(sample: vec4<f32>) -> vec4<f32> {
+  if uniforms.map_transform_rows[2u].w > 0.5 {
+    return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
+  }
+  return sample;
+}
+
 fn decode_alpha_map_sample(sample: f32) -> f32 {
   if uniforms.alpha_map_transform1.w > 0.5 {
     return srgb_to_linear_channel(sample);
@@ -1169,7 +1177,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let legacy_material_env = uniforms.env_map_params.z > 0.5 && (use_phong || use_lambert);
   let legacy_env_reflectivity = select(1.0, uniforms.env_map_params.y, legacy_material_env);
 
-  let mr_sample = textureSample(t_metallic_roughness, s_metallic_roughness, transform_metallic_roughness_map_uv(uv, uv2));
+  let mr_sample = decode_metallic_roughness_map_sample(textureSample(t_metallic_roughness, s_metallic_roughness, transform_metallic_roughness_map_uv(uv, uv2)));
   let metallic = uniforms.metallic * mr_sample.b;
   let roughness = max(uniforms.roughness * mr_sample.g, 0.04);
   let clearcoat_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_clearcoat_map_uv(uv, uv2), 0).r;

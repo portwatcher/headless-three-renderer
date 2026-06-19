@@ -217,6 +217,8 @@ pub struct SceneMesh {
     pub metallic_roughness_texture_anisotropy: Option<f64>,
     /// Metallic-roughness map UV transform `[a, c, tx, b, d, ty]`.
     pub metallic_roughness_texture_transform: Option<Vec<f64>>,
+    /// Metallic-roughness texture color space. `"srgb"` is decoded to linear before shading.
+    pub metallic_roughness_texture_color_space: Option<String>,
     /// Whether metallic-roughness map sampling uses the secondary UV stream.
     pub metallic_roughness_texture_uses_uv2: Option<bool>,
     /// Optional specular strength map. Red channel multiplies MeshPhongMaterial specular.

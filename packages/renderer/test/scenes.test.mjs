@@ -14511,6 +14511,45 @@ test('metallicRoughness maps sample selected uv1-uv3 texture channels', () => {
   }
 })
 
+test('metallicRoughness maps decode sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const roughnessMap = solidTexture(0, 128, 0, 255)
+    roughnessMap.colorSpace = colorSpace
+    roughnessMap.magFilter = THREE.NearestFilter
+    roughnessMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        roughnessMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 12)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return maxLuminance(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(srgb > linear + 10, `sRGB roughnessMap samples should decode before shading (${srgb} vs ${linear})`)
+})
+
 test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () => {
   const renderer = new Renderer()
 

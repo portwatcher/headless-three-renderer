@@ -251,6 +251,8 @@ export interface SceneMesh {
   metallicRoughnessTextureAnisotropy?: number
   /** Metallic-roughness map UV transform `[a, c, tx, b, d, ty]`. */
   metallicRoughnessTextureTransform?: Array<number>
+  /** Metallic-roughness texture color space. `"srgb"` is decoded to linear before shading. */
+  metallicRoughnessTextureColorSpace?: string
   /** Whether metallic-roughness map sampling uses the secondary UV stream. */
   metallicRoughnessTextureUsesUv2?: boolean
   /** Optional specular strength map. Red channel multiplies MeshPhongMaterial specular. */

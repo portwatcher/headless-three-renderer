@@ -64,7 +64,7 @@ pub struct Uniforms {
     /// x/y/z = alpha-map texture transform row 1 (`v' = x*u + y*v + z`), w = reserved
     pub alpha_map_transform2: [f32; 4],
     /// Row pairs for normal, metallic-roughness, emissive, AO, light, and specular map transforms.
-    /// Emissive/AO/light/specular-map row 0 w lanes flag sRGB decode; row 1 w lanes retain UV selection.
+    /// Metallic-roughness/emissive/AO/light/specular-map row 0 w lanes flag sRGB decode; row 1 w lanes retain UV selection.
     pub map_transform_rows: [[f32; 4]; 12],
     /// Row pairs for current physical-extension map transforms.
     pub physical_map_transform_rows: [[f32; 4]; 24],
@@ -4849,6 +4849,11 @@ fn map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 12] {
         if mesh.normal_map_uses_uv2 { 1.0 } else { 0.0 }
     } else if mesh.bump_map.is_some() {
         if mesh.bump_map_uses_uv2 { 1.0 } else { 0.0 }
+    } else {
+        0.0
+    };
+    rows[2][3] = if mesh.metallic_roughness_texture_is_srgb {
+        1.0
     } else {
         0.0
     };

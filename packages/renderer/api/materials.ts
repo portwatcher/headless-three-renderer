@@ -996,6 +996,7 @@ export function extractPbrProperties(
       mrMap,
       mrMapLabel,
     )
+    props.metallicRoughnessTextureColorSpace = textureColorSpace(mrMap)
     props.metallicRoughnessTextureUsesUv2 = textureUvChannel(mrMap) > 0
   }
 
