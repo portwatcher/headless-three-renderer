@@ -2328,6 +2328,26 @@ test('renderMode object-id target includes reverse lookup metadata', () => {
   assert.equal(optionsTarget.objectIdMap[String(leftEncoded)].id, left.id)
   assert.equal(optionsTarget.objectIdMap[String(rightEncoded)].id, right.id)
 
+  const rendererTarget = { texture: {} }
+  const renderer = new Renderer()
+  renderer.setRenderTarget(rendererTarget)
+  const rendererReturned = renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    renderMode: 'object-id',
+  })
+  assert.equal(rendererTarget.data, rendererReturned)
+  assert.equal(rendererTarget.objectIdEntries.length, 2)
+  assert.equal(rendererTarget.objectIdMap[String(leftEncoded)].id, left.id)
+  assert.equal(rendererTarget.objectIdMap[String(rightEncoded)].id, right.id)
+  const rendererLeft = meanRegion(rendererTarget.data, 64, 64, 12, 24, 24, 40)
+  assertRgbClose(rendererLeft, objectIdBytes(leftEncoded), 'Renderer.setRenderTarget object-id left mesh')
+
+  renderer.render(scene, camera, { width: 64, height: 64 })
+  assert.equal(rendererTarget.objectIdEntries, undefined)
+  assert.equal(rendererTarget.objectIdMap, undefined)
+  renderer.setRenderTarget(null)
+
   renderToTarget(scene, camera, target, { width: 64, height: 64 })
   assert.equal(target.objectIdEntries, undefined)
   assert.equal(target.objectIdMap, undefined)
