@@ -17732,6 +17732,51 @@ test('renderToTarget and options.target populate depthTexture with normalized RG
   )
 })
 
+test('Renderer.setRenderTarget state populates FloatType depthTexture', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const near = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  near.position.set(-0.7, 0, 1)
+
+  const far = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  far.position.set(0.7, 0, -3)
+  scene.add(near, far)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const depthTexture = { type: THREE.FloatType, source: { data: {} } }
+  const target = { texture: {}, depthTexture }
+  renderer.setRenderTarget(target)
+  const returned = renderer.render(scene, camera, { width: 64, height: 64 })
+
+  assert.equal(returned, target.data)
+  assert.strictEqual(renderer.getRenderTarget(), target)
+  assert.equal(target.texture.image.data, target.data)
+  assert.ok(depthTexture.image.data instanceof Float32Array, 'FloatType depthTexture should receive Float32Array data')
+  assert.equal(depthTexture.image.data.length, 64 * 64)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.source.data.width, 64)
+  assert.equal(depthTexture.source.data.height, 64)
+
+  const leftDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
+  const rightDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
+  assert.ok(leftDepth > rightDepth + 0.3, `active target near float depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+  assert.ok(leftDepth <= 1 && rightDepth >= 0, `active target float depth values should be normalized (${leftDepth}, ${rightDepth})`)
+
+  renderer.setRenderTarget(null)
+  assert.equal(renderer.getRenderTarget(), null)
+})
+
 test('renderToTarget populates FloatType depthTexture with normalized scalar depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
