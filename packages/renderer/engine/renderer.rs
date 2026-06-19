@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -159,6 +161,7 @@ pub struct GpuRenderer {
     line_shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
     sampler: wgpu::Sampler,
     sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
+    texture_cache: Mutex<HashMap<TextureCacheKey, wgpu::Texture>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
     shadow_sampler: wgpu::Sampler,
@@ -223,6 +226,24 @@ struct SamplerKey {
     anisotropy_clamp: u16,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct TextureCacheKey {
+    width: u32,
+    height: u32,
+    mipmap_filter: MipmapFilter,
+    rgba_len: usize,
+    rgba_hash: u64,
+    mipmaps: Vec<TextureMipCacheKey>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct TextureMipCacheKey {
+    width: u32,
+    height: u32,
+    rgba_len: usize,
+    rgba_hash: u64,
+}
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 struct StatePipelineKey {
     topology: Topology,
@@ -264,6 +285,34 @@ struct CustomBlendPipelineKey {
 struct CustomPipelineKey {
     state: StatePipelineKey,
     fragment_body: String,
+}
+
+impl TextureCacheKey {
+    fn from_texture(texture: &PreparedTexture) -> Self {
+        Self {
+            width: texture.width,
+            height: texture.height,
+            mipmap_filter: texture.mipmap_filter,
+            rgba_len: texture.rgba.len(),
+            rgba_hash: hash_bytes(&texture.rgba),
+            mipmaps: texture
+                .mipmaps
+                .iter()
+                .map(|mip| TextureMipCacheKey {
+                    width: mip.width,
+                    height: mip.height,
+                    rgba_len: mip.rgba.len(),
+                    rgba_hash: hash_bytes(&mip.rgba),
+                })
+                .collect(),
+        }
+    }
+}
+
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl StatePipelineKey {
@@ -1626,6 +1675,7 @@ impl GpuRenderer {
             line_shadow_pipelines,
             sampler,
             sampler_cache: Mutex::new(HashMap::new()),
+            texture_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
             shadow_sampler,
@@ -2380,6 +2430,27 @@ impl GpuRenderer {
     }
 
     fn upload_texture(&self, label: &'static str, tex: &PreparedTexture) -> wgpu::Texture {
+        let key = TextureCacheKey::from_texture(tex);
+        if let Some(texture) = self
+            .texture_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return texture;
+        }
+
+        let texture = self.upload_texture_uncached(label, tex);
+        self.texture_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| texture.clone())
+            .clone()
+    }
+
+    fn upload_texture_uncached(&self, label: &'static str, tex: &PreparedTexture) -> wgpu::Texture {
         let tex_size = wgpu::Extent3d {
             width: tex.width,
             height: tex.height,
@@ -4605,11 +4676,28 @@ fn create_cubemap_with_mips(
 #[cfg(test)]
 mod tests {
     use super::{
-        CustomBlendPipelineKey, SamplerKey, downsample_rgba_mip, f32_key, texture_mip_level_count,
+        CustomBlendPipelineKey, SamplerKey, TextureCacheKey, downsample_rgba_mip, f32_key,
+        texture_mip_level_count,
     };
     use crate::mesh::{
-        BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, TextureFilter, WrapMode,
+        BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
+        PreparedTextureMipLevel, TextureFilter, WrapMode,
     };
+
+    fn single_pixel_texture(rgba: [u8; 4]) -> PreparedTexture {
+        PreparedTexture {
+            rgba: rgba.to_vec(),
+            width: 1,
+            height: 1,
+            mipmaps: Vec::new(),
+            wrap_s: WrapMode::ClampToEdge,
+            wrap_t: WrapMode::ClampToEdge,
+            mag_filter: TextureFilter::Linear,
+            min_filter: TextureFilter::Linear,
+            mipmap_filter: MipmapFilter::None,
+            anisotropy: 1,
+        }
+    }
 
     #[test]
     fn mip_level_count_tracks_min_filter_mode() {
@@ -4683,6 +4771,85 @@ mod tests {
         assert_eq!(nearest.anisotropy_clamp, 1);
         assert_eq!(nearest.mipmap_filter, MipmapFilter::Linear);
         assert_eq!(nearest.lod_max_clamp(), 32.0);
+    }
+
+    #[test]
+    fn texture_cache_keys_track_pixels_and_mip_generation() {
+        let base = single_pixel_texture([255, 0, 0, 255]);
+        let mut sampler_variant = single_pixel_texture([255, 0, 0, 255]);
+        sampler_variant.wrap_s = WrapMode::Repeat;
+        sampler_variant.mag_filter = TextureFilter::Nearest;
+
+        assert_eq!(
+            TextureCacheKey::from_texture(&base),
+            TextureCacheKey::from_texture(&sampler_variant),
+            "sampler-only changes reuse the same uploaded texture",
+        );
+
+        let mut mipmapped = single_pixel_texture([255, 0, 0, 255]);
+        mipmapped.mipmap_filter = MipmapFilter::Linear;
+        assert_ne!(
+            TextureCacheKey::from_texture(&base),
+            TextureCacheKey::from_texture(&mipmapped),
+            "generated mip-chain textures need their own cache entry",
+        );
+
+        let different_pixels = single_pixel_texture([0, 255, 0, 255]);
+        assert_ne!(
+            TextureCacheKey::from_texture(&base),
+            TextureCacheKey::from_texture(&different_pixels),
+        );
+    }
+
+    #[test]
+    fn texture_cache_keys_include_explicit_mipmaps() {
+        let mut first = PreparedTexture {
+            rgba: vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+            width: 2,
+            height: 2,
+            mipmaps: vec![PreparedTextureMipLevel {
+                rgba: vec![128, 128, 128, 255],
+                width: 1,
+                height: 1,
+            }],
+            wrap_s: WrapMode::ClampToEdge,
+            wrap_t: WrapMode::ClampToEdge,
+            mag_filter: TextureFilter::Linear,
+            min_filter: TextureFilter::Linear,
+            mipmap_filter: MipmapFilter::Linear,
+            anisotropy: 1,
+        };
+        let second = PreparedTexture {
+            rgba: vec![
+                255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+            ],
+            width: 2,
+            height: 2,
+            mipmaps: vec![PreparedTextureMipLevel {
+                rgba: vec![64, 64, 64, 255],
+                width: 1,
+                height: 1,
+            }],
+            wrap_s: WrapMode::ClampToEdge,
+            wrap_t: WrapMode::ClampToEdge,
+            mag_filter: TextureFilter::Linear,
+            min_filter: TextureFilter::Linear,
+            mipmap_filter: MipmapFilter::Linear,
+            anisotropy: 1,
+        };
+        assert_ne!(
+            TextureCacheKey::from_texture(&first),
+            TextureCacheKey::from_texture(&second),
+        );
+
+        first.mipmaps.clear();
+        assert_ne!(
+            TextureCacheKey::from_texture(&first),
+            TextureCacheKey::from_texture(&second),
+            "explicit mipmaps are distinct from generated mip-chain uploads",
+        );
     }
 
     #[test]
