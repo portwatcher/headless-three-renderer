@@ -629,6 +629,8 @@ export interface SceneMesh {
   bumpMapAnisotropy?: number
   /** Bump map UV transform `[a, c, tx, b, d, ty]`. */
   bumpMapTransform?: Array<number>
+  /** Bump map color space. `"srgb"` decodes RGB channels before bump sampling. */
+  bumpMapColorSpace?: string
   /** Whether bump map sampling uses the secondary UV stream. */
   bumpMapUsesUv2?: boolean
   /** Bump map scale. Defaults to 1. */

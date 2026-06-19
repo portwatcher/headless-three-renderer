@@ -595,6 +595,8 @@ pub struct SceneMesh {
     pub bump_map_anisotropy: Option<f64>,
     /// Bump map UV transform `[a, c, tx, b, d, ty]`.
     pub bump_map_transform: Option<Vec<f64>>,
+    /// Bump map color space. `"srgb"` decodes RGB channels before bump sampling.
+    pub bump_map_color_space: Option<String>,
     /// Whether bump map sampling uses the secondary UV stream.
     pub bump_map_uses_uv2: Option<bool>,
     /// Bump map scale. Defaults to 1.

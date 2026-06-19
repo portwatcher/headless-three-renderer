@@ -903,6 +903,7 @@ export function extractPbrProperties(
     props.bumpMapMinFilter = minFilterModeToString(material.bumpMap)
     props.bumpMapAnisotropy = textureAnisotropy(material.bumpMap, 'material.bumpMap')
     props.bumpMapTransform = textureTransform(material.bumpMap, 'material.bumpMap')
+    props.bumpMapColorSpace = textureColorSpace(material.bumpMap)
     props.bumpMapUsesUv2 = textureUvChannel(material.bumpMap) > 0
     props.bumpScale = finiteNumberOrDefault(material.bumpScale, 'material.bumpScale', 1)
   }

@@ -2055,7 +2055,12 @@ fn prepare_common_texture_inputs(
             Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
             _ => [1.0, 1.0],
         };
-        let bump_map = join_texture_worker(bump_map, "bump map worker")?;
+        let mut bump_map = join_texture_worker(bump_map, "bump map worker")?;
+        if matches!(mesh.bump_map_color_space.as_deref(), Some("srgb")) {
+            if let Some(texture) = bump_map.as_mut() {
+                decode_texture_rgb_srgb_to_linear(texture);
+            }
+        }
         let bump_scale = finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?;
         let displacement_map = join_texture_worker(displacement_map, "displacement map worker")?;
         let displacement_scale = finite_f32(
@@ -2689,6 +2694,21 @@ fn srgb_u8_to_linear_f32(value: u8) -> f32 {
         channel / 12.92
     } else {
         ((channel + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn decode_texture_rgb_srgb_to_linear(texture: &mut PreparedTexture) {
+    for pixel in texture.rgba.chunks_exact_mut(4) {
+        pixel[0] = srgb_u8_to_linear_u8(pixel[0]);
+        pixel[1] = srgb_u8_to_linear_u8(pixel[1]);
+        pixel[2] = srgb_u8_to_linear_u8(pixel[2]);
+    }
+    for mipmap in &mut texture.mipmaps {
+        for pixel in mipmap.rgba.chunks_exact_mut(4) {
+            pixel[0] = srgb_u8_to_linear_u8(pixel[0]);
+            pixel[1] = srgb_u8_to_linear_u8(pixel[1]);
+            pixel[2] = srgb_u8_to_linear_u8(pixel[2]);
+        }
     }
 }
 

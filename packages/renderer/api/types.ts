@@ -898,6 +898,7 @@ export interface NativeSceneMesh {
   bumpMapMinFilter?: string
   bumpMapAnisotropy?: number
   bumpMapTransform?: number[]
+  bumpMapColorSpace?: string
   bumpMapUsesUv2?: boolean
   bumpScale?: number
   matcapMap?: Buffer
@@ -1307,6 +1308,7 @@ export interface PbrProperties {
   bumpMapMinFilter?: string
   bumpMapAnisotropy?: number
   bumpMapTransform?: number[]
+  bumpMapColorSpace?: string
   bumpMapUsesUv2?: boolean
   bumpScale?: number
   matcapMap?: Buffer

@@ -3013,6 +3013,43 @@ test('MeshNormalMaterial bumpMap perturbs output normals', () => {
   assert.ok(diff > 2, `bumpMap should perturb MeshNormalMaterial output normals (diff=${diff.toFixed(2)})`)
 })
 
+test('MeshNormalMaterial bumpMap decodes sRGB colorSpace before perturbing normals', () => {
+  function renderColorSpace(colorSpace) {
+    const bumpMap = rgbaTexture([
+      0, 0, 0, 255,
+      128, 128, 128, 255,
+    ], 2, 1)
+    bumpMap.colorSpace = colorSpace
+    bumpMap.magFilter = THREE.LinearFilter
+    bumpMap.minFilter = THREE.LinearFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({ bumpMap, bumpScale: 8 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const diff = meanAbsDiff(linear, srgb)
+  assert.ok(
+    diff > 1,
+    `sRGB-decoded bumpMap should perturb normals differently from linear height sampling (diff=${diff.toFixed(2)})`,
+  )
+})
+
 test('MeshNormalMaterial bumpMap honors explicit texture matrices', () => {
   function renderBumpMaterial(matrixOffsetX) {
     const bumpMap = rgbaTexture([
