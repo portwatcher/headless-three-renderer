@@ -167,6 +167,7 @@ pub struct GpuRenderer {
     ao_physical_bind_group_cache: Mutex<HashMap<AoPhysicalBindGroupKey, wgpu::BindGroup>>,
     background_bind_group_cache: Mutex<HashMap<BackgroundBindGroupKey, CachedBackgroundBindGroup>>,
     uniform_bind_group_cache: Mutex<HashMap<UniformBindGroupKey, CachedUniformBindGroup>>,
+    post_uniform_buffer_cache: Mutex<HashMap<PostUniformBufferKey, wgpu::Buffer>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -323,6 +324,11 @@ struct TextureBindGroupKey {
 struct BackgroundBindGroupKey {
     texture: TextureCacheKey,
     sampler: SamplerKey,
+    uniforms: BufferCacheKey,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct PostUniformBufferKey {
     uniforms: BufferCacheKey,
 }
 
@@ -485,6 +491,14 @@ impl BackgroundBindGroupKey {
         Self {
             texture: TextureCacheKey::from_texture(texture),
             sampler: SamplerKey::from_texture(texture),
+            uniforms: BufferCacheKey::from_bytes(bytemuck::bytes_of(uniforms)),
+        }
+    }
+}
+
+impl PostUniformBufferKey {
+    fn from_uniforms(uniforms: &PostUniforms) -> Self {
+        Self {
             uniforms: BufferCacheKey::from_bytes(bytemuck::bytes_of(uniforms)),
         }
     }
@@ -1977,6 +1991,7 @@ impl GpuRenderer {
             ao_physical_bind_group_cache: Mutex::new(HashMap::new()),
             background_bind_group_cache: Mutex::new(HashMap::new()),
             uniform_bind_group_cache: Mutex::new(HashMap::new()),
+            post_uniform_buffer_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -2330,13 +2345,7 @@ impl GpuRenderer {
             });
             let post_view = post_texture.create_view(&wgpu::TextureViewDescriptor::default());
             let post_uniforms = post_uniforms(settings.post_processing);
-            let post_uniform_buffer =
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("headless-three-renderer post uniform buffer"),
-                        contents: bytemuck::bytes_of(&post_uniforms),
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
+            let post_uniform_buffer = self.post_uniform_buffer_for(&post_uniforms);
             let post_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("headless-three-renderer post bind group"),
                 layout: &self.post_layout,
@@ -3605,6 +3614,33 @@ impl GpuRenderer {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .entry(key)
             .or_insert_with(|| cached.clone())
+            .clone()
+    }
+
+    fn post_uniform_buffer_for(&self, uniforms: &PostUniforms) -> wgpu::Buffer {
+        let key = PostUniformBufferKey::from_uniforms(uniforms);
+        if let Some(buffer) = self
+            .post_uniform_buffer_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return buffer;
+        }
+
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("headless-three-renderer post uniform buffer"),
+                contents: bytemuck::bytes_of(uniforms),
+                usage: wgpu::BufferUsages::UNIFORM,
+            });
+        self.post_uniform_buffer_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| buffer.clone())
             .clone()
     }
 
@@ -5110,9 +5146,9 @@ fn create_cubemap_with_mips(
 mod tests {
     use super::{
         AoPhysicalBindGroupKey, BackgroundBindGroupKey, BackgroundUniforms, CustomBlendPipelineKey,
-        MeshBufferCacheKey, PhysicalLayersTextureCacheKey, SamplerKey, TextureBindGroupKey,
-        TextureBindGroupKind, TextureCacheKey, UniformBindGroupKey, Uniforms, downsample_rgba_mip,
-        f32_key, texture_mip_level_count,
+        MeshBufferCacheKey, PhysicalLayersTextureCacheKey, PostUniformBufferKey, PostUniforms,
+        SamplerKey, TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey,
+        UniformBindGroupKey, Uniforms, downsample_rgba_mip, f32_key, texture_mip_level_count,
     };
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
@@ -5476,6 +5512,23 @@ mod tests {
         assert_ne!(
             UniformBindGroupKey::from_uniforms(&first),
             UniformBindGroupKey::from_uniforms(&changed),
+        );
+    }
+
+    #[test]
+    fn post_uniform_buffer_keys_track_uniform_bytes() {
+        let first = PostUniforms::zeroed();
+        let second = PostUniforms::zeroed();
+        assert_eq!(
+            PostUniformBufferKey::from_uniforms(&first),
+            PostUniformBufferKey::from_uniforms(&second),
+        );
+
+        let mut changed = first;
+        changed.params1[1] = 0.5;
+        assert_ne!(
+            PostUniformBufferKey::from_uniforms(&first),
+            PostUniformBufferKey::from_uniforms(&changed),
         );
     }
 
