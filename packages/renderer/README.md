@@ -118,7 +118,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.LOD` camera-distance/zoom level selection, with invalid auto-update flags, camera zoom, or level distance/hysteresis values failing clearly
 - vertex colors, with invalid `material.vertexColors` values failing clearly
 - scene background color plus 2D, equirectangular, and raw or encoded six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `scene.backgroundRotation`/`options.backgroundRotation`, `options.environmentIntensity`, and equirectangular/cube `scene.environmentRotation`/`options.environmentRotation`; invalid background color/control/rotation values, PMREM/CubeUV backgrounds, and unsupported background rotations fail clearly
-- render-option viewport/scissor rectangles and render-target viewport/scissor fields in output pixel coordinates, with malformed target scissor flags failing clearly
+- render-option viewport/scissor rectangles, render-target viewport/scissor fields, and reusable `Renderer.setViewport()`/`setScissor()`/`setScissorTest()` state in output pixel coordinates, with malformed target scissor flags failing clearly
 - perspective, orthographic, and custom projection matrices
 
 ### Materials & Textures

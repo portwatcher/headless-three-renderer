@@ -102,6 +102,9 @@ export class Renderer {
   private currentRenderTarget: RenderTargetLike | null = null
   private currentActiveCubeFace = 0
   private currentActiveMipmapLevel = 0
+  private currentViewport: PixelRect | null = null
+  private currentScissor: PixelRect | null = null
+  private currentScissorTest = false
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly reversedDepthBuffer = false
@@ -155,6 +158,37 @@ export class Renderer {
     this.currentRenderTarget = target
     this.currentActiveCubeFace = activeCubeFace
     this.currentActiveMipmapLevel = activeMipmapLevel
+  }
+
+  setViewport(rect: RenderPixelRectLike | null): void
+  setViewport(x: number, y: number, width: number, height: number): void
+  setViewport(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
+    this.currentViewport = rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.setViewport')
+  }
+
+  getViewport(): RenderPixelRectLike | null {
+    return clonePixelRect(this.currentViewport)
+  }
+
+  setScissor(rect: RenderPixelRectLike | null): void
+  setScissor(x: number, y: number, width: number, height: number): void
+  setScissor(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
+    this.currentScissor = rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.setScissor')
+  }
+
+  getScissor(): RenderPixelRectLike | null {
+    return clonePixelRect(this.currentScissor)
+  }
+
+  setScissorTest(enabled: boolean): void {
+    if (typeof enabled !== 'boolean') {
+      throw new TypeError(`Renderer.setScissorTest enabled must be a boolean; received ${String(enabled)}.`)
+    }
+    this.currentScissorTest = enabled
+  }
+
+  getScissorTest(): boolean {
+    return this.currentScissorTest
   }
 
   clearDepth(): void {
@@ -347,12 +381,15 @@ export class Renderer {
     return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, nativeCamera, objectIdEntries }
   }
 
-  private resolveRenderOptions(options: RenderOptions): RenderOptions {
+  private resolveRenderOptions(options: RenderOptions): InternalRenderOptions {
     return {
       ...options,
       sortObjects: options.sortObjects ?? this.sortObjects,
       opaqueSort: options.opaqueSort === undefined ? this.opaqueSort : options.opaqueSort,
       transparentSort: options.transparentSort === undefined ? this.transparentSort : options.transparentSort,
+      __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
+      __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
+      __headlessThreeRendererScissorTest: this.currentScissorTest,
     }
   }
 }
@@ -735,6 +772,9 @@ type PixelRect = {
 type InternalRenderOptions = RenderOptions & {
   __headlessThreeViewportLabel?: string
   __headlessThreeScissorLabel?: string
+  __headlessThreeRendererViewport?: PixelRect | null
+  __headlessThreeRendererScissor?: PixelRect | null
+  __headlessThreeRendererScissorTest?: boolean
 }
 
 const CUBE_FACE_COUNT = 6
@@ -1387,24 +1427,36 @@ function pixelRectToArray(rect: RenderPixelRectLike | null | undefined): number[
 }
 
 function effectiveViewport(options: RenderOptions): RenderPixelRectLike | null | undefined {
-  return options.viewport !== undefined ? options.viewport : options.target?.viewport
+  if (options.viewport !== undefined) return options.viewport
+  if (options.target?.viewport !== undefined) return options.target.viewport
+  return (options as InternalRenderOptions).__headlessThreeRendererViewport
 }
 
 function effectiveScissor(options: RenderOptions): RenderPixelRectLike | null | undefined {
   if (options.scissor !== undefined) return options.scissor
-  return options.target?.scissorTest === true ? options.target.scissor : undefined
+  if (options.target?.scissorTest === true) return options.target.scissor
+  const internal = options as InternalRenderOptions
+  return internal.__headlessThreeRendererScissorTest === true ? internal.__headlessThreeRendererScissor : undefined
 }
 
 function effectiveViewportLabel(options: RenderOptions): string {
   const internalLabel = (options as InternalRenderOptions).__headlessThreeViewportLabel
   if (internalLabel) return internalLabel
-  return options.viewport !== undefined ? 'options.viewport' : 'target.viewport'
+  if (options.viewport !== undefined) return 'options.viewport'
+  if (options.target?.viewport !== undefined) return 'target.viewport'
+  return (options as InternalRenderOptions).__headlessThreeRendererViewport !== undefined
+    ? 'Renderer.viewport'
+    : 'target.viewport'
 }
 
 function effectiveScissorLabel(options: RenderOptions): string {
   const internalLabel = (options as InternalRenderOptions).__headlessThreeScissorLabel
   if (internalLabel) return internalLabel
-  return options.scissor !== undefined ? 'options.scissor' : 'target.scissor'
+  if (options.scissor !== undefined) return 'options.scissor'
+  if (options.target?.scissorTest === true) return 'target.scissor'
+  return (options as InternalRenderOptions).__headlessThreeRendererScissorTest === true
+    ? 'Renderer.scissor'
+    : 'target.scissor'
 }
 
 function pixelRectComponents(rect: RenderPixelRectLike): number[] {
@@ -1414,6 +1466,45 @@ function pixelRectComponents(rect: RenderPixelRectLike): number[] {
   }
   const values = rect as { x?: number; y?: number; width?: number; height?: number; z?: number; w?: number }
   return [values.x!, values.y!, values.width ?? values.z!, values.height ?? values.w!]
+}
+
+function rendererStatePixelRect(
+  rectOrX: RenderPixelRectLike | null | number,
+  y: number | undefined,
+  width: number | undefined,
+  height: number | undefined,
+  label: string,
+): PixelRect | null {
+  if (rectOrX == null) return null
+  if (typeof rectOrX === 'number') {
+    return rendererStatePixelRectFromComponents([rectOrX, y, width, height], label)
+  }
+  if (typeof rectOrX !== 'object') {
+    throw new TypeError(`${label} expects a rectangle object, array, or x/y/width/height numbers.`)
+  }
+  return rendererStatePixelRectFromComponents(pixelRectComponents(rectOrX), label)
+}
+
+function rendererStatePixelRectFromComponents(values: unknown[], label: string): PixelRect {
+  const [rawX, rawY, rawWidth, rawHeight] = values
+  if (![rawX, rawY, rawWidth, rawHeight].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+    throw new TypeError(`${label} must contain finite x, y, width, and height values.`)
+  }
+  const x = Math.round(rawX as number)
+  const y = Math.round(rawY as number)
+  const width = Math.round(rawWidth as number)
+  const height = Math.round(rawHeight as number)
+  if (x < 0 || y < 0) {
+    throw new TypeError(`${label} x and y must be greater than or equal to 0.`)
+  }
+  if (width <= 0 || height <= 0) {
+    throw new TypeError(`${label} width and height must be greater than 0.`)
+  }
+  return { x, y, width, height }
+}
+
+function clonePixelRect(rect: PixelRect | null | undefined): PixelRect | null {
+  return rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null
 }
 
 function finiteOrUndefined(value: unknown): number | undefined {

@@ -23726,10 +23726,63 @@ test('render options accept Vector4 viewport and scissor rectangles', () => {
   assert.ok(scissorOutside.b > scissorOutside.r + 80, `outside Vector4 scissor should retain blue background (${scissorOutside.b} vs ${scissorOutside.r})`)
 })
 
+test('Renderer viewport and scissor state apply as render fallbacks', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  renderer.setViewport(16, 16, 40, 32)
+  renderer.setScissor(new THREE.Vector4(24, 20, 24, 24))
+  renderer.setScissorTest(true)
+
+  assert.deepEqual(renderer.getViewport(), { x: 16, y: 16, width: 40, height: 32 })
+  assert.deepEqual(renderer.getScissor(), { x: 24, y: 20, width: 24, height: 24 })
+  assert.equal(renderer.getScissorTest(), true)
+
+  const rgba = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  const inside = meanRegion(rgba, 64, 64, 30, 26, 42, 38)
+  const viewportOutside = meanRegion(rgba, 64, 64, 4, 26, 12, 38)
+  const scissorOutside = meanRegion(rgba, 64, 64, 18, 26, 22, 38)
+  assert.ok(inside.r > inside.b + 80, `Renderer viewport/scissor state should contain the red mesh (${inside.r} vs ${inside.b})`)
+  assert.ok(viewportOutside.b > viewportOutside.r + 80, `outside Renderer viewport should retain blue background (${viewportOutside.b} vs ${viewportOutside.r})`)
+  assert.ok(scissorOutside.b > scissorOutside.r + 80, `outside Renderer scissor should retain blue background (${scissorOutside.b} vs ${scissorOutside.r})`)
+
+  const override = renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    viewport: { x: 0, y: 0, width: 24, height: 24 },
+    scissor: { x: 0, y: 0, width: 24, height: 24 },
+  })
+  const optionInside = meanRegion(override, 64, 64, 4, 4, 16, 16)
+  const stateInside = meanRegion(override, 64, 64, 30, 26, 42, 38)
+  assert.ok(optionInside.r > optionInside.b + 80, `options.viewport should override Renderer viewport state (${optionInside.r} vs ${optionInside.b})`)
+  assert.ok(stateInside.b > stateInside.r + 80, `Renderer viewport state should not leak when options override it (${stateInside.b} vs ${stateInside.r})`)
+
+  renderer.setScissorTest(false)
+  const unclipped = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  const previouslyClipped = meanRegion(unclipped, 64, 64, 18, 26, 22, 38)
+  assert.ok(previouslyClipped.r > previouslyClipped.b + 80, `disabled Renderer scissor should stop clipping inside the viewport (${previouslyClipped.r} vs ${previouslyClipped.b})`)
+
+  renderer.setViewport(null)
+  renderer.setScissor(null)
+  assert.equal(renderer.getViewport(), null)
+  assert.equal(renderer.getScissor(), null)
+})
+
 test('invalid viewport and scissor rectangles fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
   const camera = makeCamera()
+  const renderer = new Renderer()
 
   assert.throws(
     () => getRenderer().render(scene, camera, { width: 32, height: 32, viewport: [0, 0, 0, 16] }),
@@ -23754,6 +23807,23 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   assert.throws(
     () => renderToTarget(scene, camera, { scissorTest: 'yes', scissor: [0, 0, 16, 16] }, { width: 32, height: 32 }),
     /target\.scissorTest must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.setViewport(0, 0, 0, 16),
+    /Renderer\.setViewport width and height must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.setScissor({ x: '0', y: 0, width: 16, height: 16 }),
+    /Renderer\.setScissor must contain finite x, y, width, and height values/i,
+  )
+  assert.throws(
+    () => renderer.setScissorTest('yes'),
+    /Renderer\.setScissorTest enabled must be a boolean/i,
+  )
+  renderer.setViewport(0, 0, 64, 16)
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    /Renderer\.viewport must fit inside the render target/i,
   )
 
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
