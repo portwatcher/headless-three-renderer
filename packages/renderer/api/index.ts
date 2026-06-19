@@ -36,6 +36,11 @@ import { validateObjectChildrenTree } from './objects'
 import { clamp01, matrixElements } from './math'
 
 const WEBGL_COORDINATE_SYSTEM = 2000
+const BasicShadowMap = 0
+const PCFShadowMap = 1
+const PCFSoftShadowMap = 2
+const VSMShadowMap = 3
+const SupportedRendererShadowMapTypes = new Set([BasicShadowMap, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap])
 
 export {
   applyVrmAnimation,
@@ -104,8 +109,7 @@ class RendererShadowMapState {
   private enabledValue = true
   private autoUpdateValue = true
   private needsUpdateValue = false
-
-  type: unknown = undefined
+  private typeValue = PCFShadowMap
 
   get enabled(): boolean {
     return this.enabledValue
@@ -129,6 +133,14 @@ class RendererShadowMapState {
 
   set needsUpdate(value: boolean) {
     this.needsUpdateValue = rendererStateBoolean(value, 'Renderer.shadowMap.needsUpdate')
+  }
+
+  get type(): number {
+    return this.typeValue
+  }
+
+  set type(value: number) {
+    this.typeValue = rendererStateShadowMapType(value)
   }
 }
 
@@ -2304,6 +2316,18 @@ function rendererStatePixelRatio(value: unknown, label: string): number {
 function rendererStateBoolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') {
     throw new TypeError(`${label} must be a boolean.`)
+  }
+  return value
+}
+
+function rendererStateShadowMapType(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`Renderer.shadowMap.type must be a Three.js shadow map type constant; received ${String(value)}.`)
+  }
+  if (!Number.isInteger(value) || !SupportedRendererShadowMapTypes.has(value)) {
+    throw new TypeError(
+      `Renderer.shadowMap.type ${String(value)} is not supported by @headless-three/renderer. Use THREE.BasicShadowMap, THREE.PCFShadowMap, THREE.PCFSoftShadowMap, or THREE.VSMShadowMap.`,
+    )
   }
   return value
 }
