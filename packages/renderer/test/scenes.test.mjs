@@ -18368,7 +18368,7 @@ test('specularIntensityMap samples the selected secondary UV channel', () => {
   assert.ok(maxLuminance(secondary) > maxLuminance(primary) + 40, 'specularIntensityMap channel=1 should enable the uv1 specular texel')
 })
 
-test('transmissionMap samples the selected secondary UV channel', () => {
+test('transmissionMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const transmissionMap = rgbaTexture([
       0, 0, 0, 255,
@@ -18386,7 +18386,9 @@ test('transmissionMap samples the selected secondary UV channel', () => {
     scene.add(back)
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
     scene.add(new THREE.Mesh(
       geometry,
       new THREE.MeshPhysicalMaterial({
@@ -18408,9 +18410,11 @@ test('transmissionMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   assert.ok(primary.r > primary.b + 30, `transmissionMap channel=0 should sample the opaque primary UV texel (${primary.r} vs ${primary.b})`)
-  assert.ok(secondary.b > secondary.r + 40, `transmissionMap channel=1 should sample the transmitting uv1 texel (${secondary.b} vs ${secondary.r})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.b > secondary.r + 40, `transmissionMap channel=${channel} should sample the transmitting uv${channel} texel (${secondary.b} vs ${secondary.r})`)
+  }
 })
 
 test('clearcoatMap samples the selected secondary UV channel', () => {
