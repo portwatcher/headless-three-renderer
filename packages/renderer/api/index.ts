@@ -295,6 +295,10 @@ export class Renderer {
     // Stencil state is scoped to each native render pass.
   }
 
+  dispose(): void {
+    // Native resources are owned by the renderer instance and released with normal object lifetime.
+  }
+
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
     validateThreeSceneRoot(scene)
     validateTopLevelRenderCamera(camera)
