@@ -2078,29 +2078,79 @@ function canvasLikeImageToRgba(
   image: unknown,
   label: string,
 ): { rgba: Uint8Array; width: number; height: number } | null {
-  if (!image || typeof image !== 'object' || typeof (image as { getContext?: unknown }).getContext !== 'function') {
+  if (!image || typeof image !== 'object') {
     return null
   }
+
+  if (typeof (image as { getContext?: unknown }).getContext === 'function') {
+    const candidate = image as {
+      width?: unknown
+      height?: unknown
+      getContext: (contextId: string, options?: unknown) => unknown
+    }
+    const width = canvasLikeImageDimension(candidate.width, `${label}.width`)
+    const height = canvasLikeImageDimension(candidate.height, `${label}.height`)
+    const context = canvasLike2dContext(candidate, label)
+    return canvasLikeContextToRgba(context, width, height, label)
+  }
+
+  return drawImageLikeToRgba(image, label)
+}
+
+function drawImageLikeToRgba(
+  image: object,
+  label: string,
+): { rgba: Uint8Array; width: number; height: number } | null {
+  const offscreenCanvas = (globalThis as unknown as {
+    OffscreenCanvas?: new (width: number, height: number) => { getContext?: (contextId: string, options?: unknown) => unknown }
+  }).OffscreenCanvas
+  if (typeof offscreenCanvas !== 'function') return null
 
   const candidate = image as {
     width?: unknown
     height?: unknown
-    getContext: (contextId: string, options?: unknown) => unknown
+    naturalWidth?: unknown
+    naturalHeight?: unknown
   }
-  const width = canvasLikeImageDimension(candidate.width, `${label}.width`)
-  const height = canvasLikeImageDimension(candidate.height, `${label}.height`)
+  const width = canvasLikeImageDimension(candidate.width ?? candidate.naturalWidth, `${label}.width`)
+  const height = canvasLikeImageDimension(candidate.height ?? candidate.naturalHeight, `${label}.height`)
+  const canvas = new offscreenCanvas(width, height)
+  const context = canvasLike2dContext(canvas, label)
+  if (typeof (context as { drawImage?: unknown }).drawImage !== 'function') {
+    throw new Error(`${label} OffscreenCanvas 2D context must provide drawImage() to read image-like texture pixels.`)
+  }
+  try {
+    (context as { drawImage: (source: object, x: number, y: number, width: number, height: number) => unknown })
+      .drawImage(image, 0, 0, width, height)
+  } catch {
+    throw new Error(`${label} OffscreenCanvas 2D context drawImage() failed while reading image-like texture pixels.`)
+  }
+  return canvasLikeContextToRgba(context, width, height, label)
+}
 
+function canvasLike2dContext(
+  canvas: { getContext?: (contextId: string, options?: unknown) => unknown },
+  label: string,
+): unknown {
   let context: unknown
   try {
-    context = candidate.getContext('2d', { willReadFrequently: true })
-      ?? candidate.getContext('2d')
+    context = canvas.getContext?.('2d', { willReadFrequently: true })
+      ?? canvas.getContext?.('2d')
   } catch {
     throw new Error(`${label}.getContext("2d") failed while reading canvas texture pixels.`)
   }
   if (!context || typeof context !== 'object' || typeof (context as { getImageData?: unknown }).getImageData !== 'function') {
     throw new Error(`${label} canvas-like texture images must provide getContext("2d").getImageData().`)
   }
+  return context
+}
 
+function canvasLikeContextToRgba(
+  context: unknown,
+  width: number,
+  height: number,
+  label: string,
+): { rgba: Uint8Array; width: number; height: number } {
   let imageData: unknown
   try {
     imageData = (context as { getImageData: (x: number, y: number, width: number, height: number) => unknown })

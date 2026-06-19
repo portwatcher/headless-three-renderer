@@ -16088,6 +16088,68 @@ test('canvas-like texture images render across material, background, and IBL slo
   assert.ok(probeDiff > 0.5, `canvas-like reflection probe should affect IBL, diff=${probeDiff.toFixed(3)}`)
 })
 
+test('image-like texture objects render through an OffscreenCanvas polyfill', () => {
+  const previousOffscreenCanvas = globalThis.OffscreenCanvas
+  class FakeOffscreenCanvas {
+    constructor(width, height) {
+      this.width = width
+      this.height = height
+      this.pixels = new Uint8ClampedArray(width * height * 4)
+    }
+
+    getContext(type) {
+      if (type !== '2d') return null
+      return {
+        drawImage: (image, x, y, width, height) => {
+          assert.equal(x, 0)
+          assert.equal(y, 0)
+          assert.equal(width, this.width)
+          assert.equal(height, this.height)
+          this.pixels.set(image.pixels)
+        },
+        getImageData: (x, y, width, height) => {
+          assert.equal(x, 0)
+          assert.equal(y, 0)
+          assert.equal(width, this.width)
+          assert.equal(height, this.height)
+          return { data: this.pixels, width: this.width, height: this.height }
+        },
+      }
+    }
+  }
+
+  try {
+    globalThis.OffscreenCanvas = FakeOffscreenCanvas
+    const texture = new THREE.Texture({
+      width: 1,
+      height: 1,
+      complete: true,
+      pixels: new Uint8ClampedArray([255, 0, 255, 255]),
+    })
+    texture.needsUpdate = true
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map: texture }),
+    ))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 2)
+    camera.lookAt(0, 0, 0)
+
+    const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+    assert.ok(mean.r > 160 && mean.b > 160 && mean.g < 80, `OffscreenCanvas image-like texture should render magenta (${mean.r}, ${mean.g}, ${mean.b})`)
+  } finally {
+    if (previousOffscreenCanvas === undefined) {
+      delete globalThis.OffscreenCanvas
+    } else {
+      globalThis.OffscreenCanvas = previousOffscreenCanvas
+    }
+  }
+})
+
 test('unsupported array and 3D texture inputs fail clearly', () => {
   function dataArrayTexture() {
     const texture = new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1)
@@ -16404,6 +16466,7 @@ test('unsupported packed-depth raw DataTexture type constants fail clearly', () 
 })
 
 test('opaque browser-like texture image objects fail clearly in Node slots', () => {
+  const previousOffscreenCanvas = globalThis.OffscreenCanvas
   function browserLikeTexture() {
     const texture = new THREE.Texture({ width: 1, height: 1, complete: true })
     texture.needsUpdate = true
@@ -16469,14 +16532,23 @@ test('opaque browser-like texture image objects fail clearly in Node slots', () 
     }, /reflectionProbe\.texture\.source\.data must be an image-like object/i],
   ]
 
-  for (const [name, setup, pattern] of cases) {
-    const scene = new THREE.Scene()
-    setup(scene)
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      pattern,
-      name,
-    )
+  try {
+    globalThis.OffscreenCanvas = undefined
+    for (const [name, setup, pattern] of cases) {
+      const scene = new THREE.Scene()
+      setup(scene)
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+        pattern,
+        name,
+      )
+    }
+  } finally {
+    if (previousOffscreenCanvas === undefined) {
+      delete globalThis.OffscreenCanvas
+    } else {
+      globalThis.OffscreenCanvas = previousOffscreenCanvas
+    }
   }
 })
 

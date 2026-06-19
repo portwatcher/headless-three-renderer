@@ -170,7 +170,7 @@ Texture image data can be:
 - Raw one-channel, two-channel, RGB, or RGBA numeric pixels via `THREE.DataTexture` (or any image with `.data`, `.width`, `.height`), including `UnsignedByteType`, normalized `ByteType`/`ShortType`/`UnsignedShortType`/`IntType`/`UnsignedIntType`, packed `UnsignedShort4444Type`/`UnsignedShort5551Type`, normalized float arrays, and `HalfFloatType` `Uint16Array` binary16 data
 - Encoded PNG, JPEG, or WebP image buffers (auto-decoded on the native side)
 
-Compressed KTX2/Basis/`THREE.CompressedTexture` inputs and compressed texture format constants are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Canvas-like texture images that expose `getContext("2d").getImageData()` are read directly in Node; opaque browser `Image`/`ImageBitmap` objects still fail clearly until normalized to encoded bytes, raw pixel data, or a readable canvas. Mismatched-length raw texture payloads fail clearly.
+Compressed KTX2/Basis/`THREE.CompressedTexture` inputs and compressed texture format constants are not decoded in-process; pre-decode them to RGB/RGBA data or an encoded PNG/JPEG/WebP image before rendering. Canvas-like texture images that expose `getContext("2d").getImageData()` are read directly in Node, and image-like objects can be read through an available `OffscreenCanvas`/2D canvas polyfill that supports `drawImage()` plus `getImageData()`; opaque browser `Image`/`ImageBitmap` objects still fail clearly when no readable or drawable pixel path is available. Mismatched-length raw texture payloads fail clearly.
 
 ### Lights
 
