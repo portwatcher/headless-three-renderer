@@ -2115,18 +2115,62 @@ test('LightProbeGenerator reads cube targets through the WebGLRenderer marker pa
   assert.ok(energy > 0.01, `generated LightProbe should contain captured cube radiance (${energy})`)
 })
 
-test('CubeCamera.update works with Renderer render-target state', () => {
+test('CubeCamera.update works with Renderer render-target state', async () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32, { generateMipmaps: true })
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
   const renderer = new Renderer()
+  const listener = () => {}
   assert.equal(renderer.xr.enabled, false)
   assert.equal(renderer.xr.isPresenting, false)
+  assert.equal(renderer.xr.cameraAutoUpdate, true)
   assert.equal(renderer.xr.getSession(), null)
   assert.equal(renderer.xr.getReferenceSpace(), null)
+  assert.equal(renderer.xr.getReferenceSpaceType(), 'local-floor')
+  assert.equal(renderer.xr.setReferenceSpaceType('local'), undefined)
+  assert.equal(renderer.xr.getReferenceSpaceType(), 'local')
+  assert.equal(renderer.xr.getEnvironmentBlendMode(), 'opaque')
+  assert.equal(renderer.xr.hasDepthSensing(), false)
+  assert.equal(renderer.xr.getDepthSensingMesh(), null)
+  assert.equal(renderer.xr.getCamera(), null)
+  assert.equal(renderer.xr.updateCamera(makeCamera()), undefined)
+  assert.equal(renderer.xr.setAnimationLoop(() => {}), undefined)
+  assert.equal(renderer.xr.setAnimationLoop(null), undefined)
+  assert.equal(renderer.xr.addEventListener('sessionstart', listener), undefined)
+  assert.equal(renderer.xr.hasEventListener('sessionstart', listener), false)
+  assert.equal(renderer.xr.removeEventListener('sessionstart', listener), undefined)
+  assert.equal(renderer.xr.dispose(), undefined)
   assert.throws(
     () => { renderer.xr.enabled = 'yes' },
     /Renderer\.xr\.enabled must be a boolean/i,
+  )
+  assert.throws(
+    () => { renderer.xr.cameraAutoUpdate = 'yes' },
+    /Renderer\.xr\.cameraAutoUpdate must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.xr.setReferenceSpaceType(''),
+    /Renderer\.xr\.setReferenceSpaceType type must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.xr.addEventListener('', listener),
+    /Renderer\.xr\.addEventListener type must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.xr.removeEventListener('sessionstart', null),
+    /Renderer\.xr\.removeEventListener listener must be a function/i,
+  )
+  assert.throws(
+    () => renderer.xr.setAnimationLoop('loop'),
+    /Renderer\.xr\.setAnimationLoop callback must be a function or null/i,
+  )
+  await assert.rejects(
+    () => renderer.xr.setSession(null),
+    /Renderer\.xr\.setSession session must be a WebXR session-like object/i,
+  )
+  await assert.rejects(
+    () => renderer.xr.setSession({}),
+    /Renderer\.xr\.setSession\(\) is not supported.*WebXR runtime/i,
   )
   renderer.xr.enabled = true
 

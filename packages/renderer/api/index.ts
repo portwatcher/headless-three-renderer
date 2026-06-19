@@ -226,6 +226,8 @@ class RendererInfoState {
 
 class RendererXrState {
   private enabledValue = false
+  private cameraAutoUpdateValue = true
+  private referenceSpaceTypeValue = 'local-floor'
 
   readonly isPresenting = false
 
@@ -237,12 +239,83 @@ class RendererXrState {
     this.enabledValue = rendererStateBoolean(value, 'Renderer.xr.enabled')
   }
 
+  get cameraAutoUpdate(): boolean {
+    return this.cameraAutoUpdateValue
+  }
+
+  set cameraAutoUpdate(value: boolean) {
+    this.cameraAutoUpdateValue = rendererStateBoolean(value, 'Renderer.xr.cameraAutoUpdate')
+  }
+
   getSession(): null {
     return null
   }
 
   getReferenceSpace(): null {
     return null
+  }
+
+  getReferenceSpaceType(): string {
+    return this.referenceSpaceTypeValue
+  }
+
+  setReferenceSpaceType(type: unknown): void {
+    if (typeof type !== 'string' || type.length === 0) {
+      throw new TypeError('Renderer.xr.setReferenceSpaceType type must be a non-empty string.')
+    }
+    this.referenceSpaceTypeValue = type
+  }
+
+  getEnvironmentBlendMode(): 'opaque' {
+    return 'opaque'
+  }
+
+  hasDepthSensing(): boolean {
+    return false
+  }
+
+  getDepthSensingMesh(): null {
+    return null
+  }
+
+  getCamera(): null {
+    return null
+  }
+
+  updateCamera(camera: ThreeRenderCameraLike): void {
+    validateTopLevelRenderCamera(camera)
+  }
+
+  setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
+    if (callback !== null && typeof callback !== 'function') {
+      throw new TypeError('Renderer.xr.setAnimationLoop callback must be a function or null.')
+    }
+  }
+
+  addEventListener(type: unknown, listener: unknown): void {
+    assertEventListener(type, listener, 'Renderer.xr.addEventListener')
+  }
+
+  removeEventListener(type: unknown, listener: unknown): void {
+    assertEventListener(type, listener, 'Renderer.xr.removeEventListener')
+  }
+
+  hasEventListener(type: unknown, listener: unknown): boolean {
+    assertEventListener(type, listener, 'Renderer.xr.hasEventListener')
+    return false
+  }
+
+  async setSession(session: unknown): Promise<never> {
+    if (session === null || typeof session !== 'object') {
+      throw new TypeError('Renderer.xr.setSession session must be a WebXR session-like object.')
+    }
+    throw new Error(
+      'Renderer.xr.setSession() is not supported by @headless-three/renderer because it does not provide a browser WebXR runtime.',
+    )
+  }
+
+  dispose(): void {
+    // XR resources are not allocated by the headless renderer.
   }
 }
 
@@ -3920,6 +3993,15 @@ function assertRenderTargetImageLike(value: unknown, label: string): asserts val
 function assertWebGlExtensionName(value: unknown, label: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(`${label} must be a non-empty string.`)
+  }
+}
+
+function assertEventListener(type: unknown, listener: unknown, label: string): void {
+  if (typeof type !== 'string' || type.length === 0) {
+    throw new TypeError(`${label} type must be a non-empty string.`)
+  }
+  if (typeof listener !== 'function') {
+    throw new TypeError(`${label} listener must be a function.`)
   }
 }
 
