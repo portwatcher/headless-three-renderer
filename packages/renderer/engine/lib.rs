@@ -283,6 +283,48 @@ mod tests {
     }
 
     #[test]
+    fn accepts_line_and_point_meshes_with_base_and_alpha_maps() {
+        let scene = RenderScene {
+            meshes: Some(vec![
+                SceneMesh {
+                    positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                    uvs: Some(vec![0.0, 0.0, 1.0, 0.0]),
+                    topology: Some("lines".into()),
+                    texture: Some(vec![255u8, 128, 64, 255].into()),
+                    texture_width: Some(1),
+                    texture_height: Some(1),
+                    alpha_map: Some(vec![0u8, 0, 0, 200].into()),
+                    alpha_map_width: Some(1),
+                    alpha_map_height: Some(1),
+                    ..SceneMesh::default()
+                },
+                SceneMesh {
+                    positions: vec![0.0, 0.0, 0.0],
+                    uvs: Some(vec![0.5, 0.5]),
+                    topology: Some("points".into()),
+                    texture: Some(vec![64u8, 128, 255, 255].into()),
+                    texture_width: Some(1),
+                    texture_height: Some(1),
+                    alpha_map: Some(vec![0u8, 0, 0, 180].into()),
+                    alpha_map_width: Some(1),
+                    alpha_map_height: Some(1),
+                    ..SceneMesh::default()
+                },
+            ]),
+            ..RenderScene::default()
+        };
+
+        let meshes = prepare_meshes(&scene).unwrap();
+        assert_eq!(meshes.len(), 2);
+        for mesh in meshes {
+            assert!(mesh.texture.is_some());
+            assert!(mesh.alpha_map.is_some());
+            assert!(mesh.normal_map.is_none());
+            assert!(mesh.physical_maps.is_none());
+        }
+    }
+
+    #[test]
     fn accepts_mesh_with_physical_extension_maps() {
         let scene = RenderScene {
             meshes: Some(vec![SceneMesh {

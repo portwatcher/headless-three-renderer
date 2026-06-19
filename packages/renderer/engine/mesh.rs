@@ -816,81 +816,38 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         compute_flat_normals(&mut vertices, indices.as_deref());
     }
 
-    let texture = match &mesh.texture {
-        Some(tex_data) if !tex_data.is_empty() => {
-            let mut tex = decode_texture(
-                tex_data,
-                mesh.texture_width,
-                mesh.texture_height,
-                mesh_index,
-            )?;
-            apply_texture_sampling(
-                &mut tex,
-                mesh.texture_wrap_s.as_deref(),
-                mesh.texture_wrap_t.as_deref(),
-                mesh.texture_mag_filter.as_deref(),
-                mesh.texture_min_filter.as_deref(),
-                mesh.texture_anisotropy,
-            );
-            Some(tex)
-        }
-        _ => None,
-    };
-    let texture_transform = parse_texture_transform(mesh.texture_transform.as_deref(), mesh_index)?;
-    let alpha_map_transform =
-        parse_texture_transform(mesh.alpha_map_transform.as_deref(), mesh_index)?;
-    let normal_map_transform =
-        parse_texture_transform(mesh.normal_map_transform.as_deref(), mesh_index)?;
-    let bump_map_transform =
-        parse_texture_transform(mesh.bump_map_transform.as_deref(), mesh_index)?;
-    let matcap_map_transform =
-        parse_texture_transform(mesh.matcap_map_transform.as_deref(), mesh_index)?;
-    let displacement_map_transform =
-        parse_texture_transform(mesh.displacement_map_transform.as_deref(), mesh_index)?;
-    let metallic_roughness_texture_transform = parse_texture_transform(
-        mesh.metallic_roughness_texture_transform.as_deref(),
-        mesh_index,
-    )?;
-    let emissive_map_transform =
-        parse_texture_transform(mesh.emissive_map_transform.as_deref(), mesh_index)?;
-    let ao_map_transform = parse_texture_transform(mesh.ao_map_transform.as_deref(), mesh_index)?;
-    let light_map_transform =
-        parse_texture_transform(mesh.light_map_transform.as_deref(), mesh_index)?;
-    let specular_map_transform =
-        parse_texture_transform(mesh.specular_map_transform.as_deref(), mesh_index)?;
-    let specular_color_map_transform =
-        parse_texture_transform(mesh.specular_color_map_transform.as_deref(), mesh_index)?;
-    let specular_intensity_map_transform =
-        parse_texture_transform(mesh.specular_intensity_map_transform.as_deref(), mesh_index)?;
-    let clearcoat_map_transform =
-        parse_texture_transform(mesh.clearcoat_map_transform.as_deref(), mesh_index)?;
-    let clearcoat_roughness_map_transform = parse_texture_transform(
-        mesh.clearcoat_roughness_map_transform.as_deref(),
-        mesh_index,
-    )?;
-    let clearcoat_normal_map_transform =
-        parse_texture_transform(mesh.clearcoat_normal_map_transform.as_deref(), mesh_index)?;
-    let sheen_color_map_transform =
-        parse_texture_transform(mesh.sheen_color_map_transform.as_deref(), mesh_index)?;
-    let sheen_roughness_map_transform =
-        parse_texture_transform(mesh.sheen_roughness_map_transform.as_deref(), mesh_index)?;
-    let anisotropy_map_transform =
-        parse_texture_transform(mesh.anisotropy_map_transform.as_deref(), mesh_index)?;
-    let iridescence_map_transform =
-        parse_texture_transform(mesh.iridescence_map_transform.as_deref(), mesh_index)?;
-    let iridescence_thickness_map_transform = parse_texture_transform(
-        mesh.iridescence_thickness_map_transform.as_deref(),
-        mesh_index,
-    )?;
-    let transmission_map_transform =
-        parse_texture_transform(mesh.transmission_map_transform.as_deref(), mesh_index)?;
-    let thickness_map_transform =
-        parse_texture_transform(mesh.thickness_map_transform.as_deref(), mesh_index)?;
-    let texture_is_srgb = matches!(mesh.texture_color_space.as_deref(), Some("srgb"));
-    let matcap_map_is_srgb = matches!(mesh.matcap_map_color_space.as_deref(), Some("srgb"));
-    let gradient_map_is_srgb = matches!(mesh.gradient_map_color_space.as_deref(), Some("srgb"));
-    let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
-    let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
+    let SurfaceTextureInputs {
+        texture,
+        texture_transform,
+        alpha_map_transform,
+        normal_map_transform,
+        bump_map_transform,
+        matcap_map_transform,
+        displacement_map_transform,
+        metallic_roughness_texture_transform,
+        emissive_map_transform,
+        ao_map_transform,
+        light_map_transform,
+        specular_map_transform,
+        specular_color_map_transform,
+        specular_intensity_map_transform,
+        clearcoat_map_transform,
+        clearcoat_roughness_map_transform,
+        clearcoat_normal_map_transform,
+        sheen_color_map_transform,
+        sheen_roughness_map_transform,
+        anisotropy_map_transform,
+        iridescence_map_transform,
+        iridescence_thickness_map_transform,
+        transmission_map_transform,
+        thickness_map_transform,
+        texture_is_srgb,
+        matcap_map_is_srgb,
+        gradient_map_is_srgb,
+        emissive_map_is_srgb,
+        light_map_is_srgb,
+        common,
+    } = prepare_surface_texture_inputs(mesh, mesh_index)?;
 
     let CommonTextureInputs {
         normal_map,
@@ -911,7 +868,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         light_map,
         light_map_intensity,
         alpha_map,
-    } = prepare_common_texture_inputs(mesh, mesh_index)?;
+    } = common;
 
     let PhysicalTextureInputs {
         clearcoat_map,
@@ -1668,6 +1625,183 @@ fn apply_texture_sampling(
     texture.anisotropy = texture_anisotropy(anisotropy);
 }
 
+struct SurfaceTextureInputs {
+    texture: Option<PreparedTexture>,
+    texture_transform: [f32; 6],
+    alpha_map_transform: [f32; 6],
+    normal_map_transform: [f32; 6],
+    bump_map_transform: [f32; 6],
+    matcap_map_transform: [f32; 6],
+    displacement_map_transform: [f32; 6],
+    metallic_roughness_texture_transform: [f32; 6],
+    emissive_map_transform: [f32; 6],
+    ao_map_transform: [f32; 6],
+    light_map_transform: [f32; 6],
+    specular_map_transform: [f32; 6],
+    specular_color_map_transform: [f32; 6],
+    specular_intensity_map_transform: [f32; 6],
+    clearcoat_map_transform: [f32; 6],
+    clearcoat_roughness_map_transform: [f32; 6],
+    clearcoat_normal_map_transform: [f32; 6],
+    sheen_color_map_transform: [f32; 6],
+    sheen_roughness_map_transform: [f32; 6],
+    anisotropy_map_transform: [f32; 6],
+    iridescence_map_transform: [f32; 6],
+    iridescence_thickness_map_transform: [f32; 6],
+    transmission_map_transform: [f32; 6],
+    thickness_map_transform: [f32; 6],
+    texture_is_srgb: bool,
+    matcap_map_is_srgb: bool,
+    gradient_map_is_srgb: bool,
+    emissive_map_is_srgb: bool,
+    light_map_is_srgb: bool,
+    common: CommonTextureInputs,
+}
+
+fn prepare_surface_texture_inputs(
+    mesh: &SceneMesh,
+    mesh_index: usize,
+) -> Result<SurfaceTextureInputs> {
+    thread::scope(|scope| {
+        let texture = has_texture_data(mesh.texture.as_deref()).then(|| {
+            scope.spawn(|| {
+                decode_optional_texture_with_sampling(
+                    mesh.texture.as_deref(),
+                    mesh.texture_width,
+                    mesh.texture_height,
+                    mesh_index,
+                    mesh.texture_wrap_s.as_deref(),
+                    mesh.texture_wrap_t.as_deref(),
+                    mesh.texture_mag_filter.as_deref(),
+                    mesh.texture_min_filter.as_deref(),
+                    mesh.texture_anisotropy,
+                )
+            })
+        });
+        let alpha_map = has_texture_data(mesh.alpha_map.as_deref()).then(|| {
+            scope.spawn(|| {
+                decode_optional_texture_with_sampling(
+                    mesh.alpha_map.as_deref(),
+                    mesh.alpha_map_width,
+                    mesh.alpha_map_height,
+                    mesh_index,
+                    mesh.alpha_map_wrap_s.as_deref(),
+                    mesh.alpha_map_wrap_t.as_deref(),
+                    mesh.alpha_map_mag_filter.as_deref(),
+                    mesh.alpha_map_min_filter.as_deref(),
+                    mesh.alpha_map_anisotropy,
+                )
+            })
+        });
+
+        let texture = match texture {
+            Some(texture) => join_texture_worker(texture, "base texture worker")?,
+            None => None,
+        };
+
+        let texture_transform =
+            parse_texture_transform(mesh.texture_transform.as_deref(), mesh_index)?;
+        let alpha_map_transform =
+            parse_texture_transform(mesh.alpha_map_transform.as_deref(), mesh_index)?;
+        let normal_map_transform =
+            parse_texture_transform(mesh.normal_map_transform.as_deref(), mesh_index)?;
+        let bump_map_transform =
+            parse_texture_transform(mesh.bump_map_transform.as_deref(), mesh_index)?;
+        let matcap_map_transform =
+            parse_texture_transform(mesh.matcap_map_transform.as_deref(), mesh_index)?;
+        let displacement_map_transform =
+            parse_texture_transform(mesh.displacement_map_transform.as_deref(), mesh_index)?;
+        let metallic_roughness_texture_transform = parse_texture_transform(
+            mesh.metallic_roughness_texture_transform.as_deref(),
+            mesh_index,
+        )?;
+        let emissive_map_transform =
+            parse_texture_transform(mesh.emissive_map_transform.as_deref(), mesh_index)?;
+        let ao_map_transform =
+            parse_texture_transform(mesh.ao_map_transform.as_deref(), mesh_index)?;
+        let light_map_transform =
+            parse_texture_transform(mesh.light_map_transform.as_deref(), mesh_index)?;
+        let specular_map_transform =
+            parse_texture_transform(mesh.specular_map_transform.as_deref(), mesh_index)?;
+        let specular_color_map_transform =
+            parse_texture_transform(mesh.specular_color_map_transform.as_deref(), mesh_index)?;
+        let specular_intensity_map_transform =
+            parse_texture_transform(mesh.specular_intensity_map_transform.as_deref(), mesh_index)?;
+        let clearcoat_map_transform =
+            parse_texture_transform(mesh.clearcoat_map_transform.as_deref(), mesh_index)?;
+        let clearcoat_roughness_map_transform = parse_texture_transform(
+            mesh.clearcoat_roughness_map_transform.as_deref(),
+            mesh_index,
+        )?;
+        let clearcoat_normal_map_transform =
+            parse_texture_transform(mesh.clearcoat_normal_map_transform.as_deref(), mesh_index)?;
+        let sheen_color_map_transform =
+            parse_texture_transform(mesh.sheen_color_map_transform.as_deref(), mesh_index)?;
+        let sheen_roughness_map_transform =
+            parse_texture_transform(mesh.sheen_roughness_map_transform.as_deref(), mesh_index)?;
+        let anisotropy_map_transform =
+            parse_texture_transform(mesh.anisotropy_map_transform.as_deref(), mesh_index)?;
+        let iridescence_map_transform =
+            parse_texture_transform(mesh.iridescence_map_transform.as_deref(), mesh_index)?;
+        let iridescence_thickness_map_transform = parse_texture_transform(
+            mesh.iridescence_thickness_map_transform.as_deref(),
+            mesh_index,
+        )?;
+        let transmission_map_transform =
+            parse_texture_transform(mesh.transmission_map_transform.as_deref(), mesh_index)?;
+        let thickness_map_transform =
+            parse_texture_transform(mesh.thickness_map_transform.as_deref(), mesh_index)?;
+        let texture_is_srgb = matches!(mesh.texture_color_space.as_deref(), Some("srgb"));
+        let matcap_map_is_srgb = matches!(mesh.matcap_map_color_space.as_deref(), Some("srgb"));
+        let gradient_map_is_srgb = matches!(mesh.gradient_map_color_space.as_deref(), Some("srgb"));
+        let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
+        let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
+
+        let mut common = prepare_common_texture_inputs(mesh, mesh_index)?;
+        common.alpha_map = match alpha_map {
+            Some(alpha_map) => join_texture_worker(alpha_map, "alpha map worker")?,
+            None => None,
+        };
+
+        Ok(SurfaceTextureInputs {
+            texture,
+            texture_transform,
+            alpha_map_transform,
+            normal_map_transform,
+            bump_map_transform,
+            matcap_map_transform,
+            displacement_map_transform,
+            metallic_roughness_texture_transform,
+            emissive_map_transform,
+            ao_map_transform,
+            light_map_transform,
+            specular_map_transform,
+            specular_color_map_transform,
+            specular_intensity_map_transform,
+            clearcoat_map_transform,
+            clearcoat_roughness_map_transform,
+            clearcoat_normal_map_transform,
+            sheen_color_map_transform,
+            sheen_roughness_map_transform,
+            anisotropy_map_transform,
+            iridescence_map_transform,
+            iridescence_thickness_map_transform,
+            transmission_map_transform,
+            thickness_map_transform,
+            texture_is_srgb,
+            matcap_map_is_srgb,
+            gradient_map_is_srgb,
+            emissive_map_is_srgb,
+            light_map_is_srgb,
+            common,
+        })
+    })
+}
+
+fn has_texture_data(data: Option<&[u8]>) -> bool {
+    data.is_some_and(|data| !data.is_empty())
+}
+
 #[derive(Default)]
 struct CommonTextureInputs {
     normal_map: Option<PreparedTexture>,
@@ -1854,20 +1988,6 @@ fn prepare_common_texture_inputs(
                 mesh.light_map_anisotropy,
             )
         });
-        let alpha_map = scope.spawn(|| {
-            decode_optional_texture_with_sampling(
-                mesh.alpha_map.as_deref(),
-                mesh.alpha_map_width,
-                mesh.alpha_map_height,
-                mesh_index,
-                mesh.alpha_map_wrap_s.as_deref(),
-                mesh.alpha_map_wrap_t.as_deref(),
-                mesh.alpha_map_mag_filter.as_deref(),
-                mesh.alpha_map_min_filter.as_deref(),
-                mesh.alpha_map_anisotropy,
-            )
-        });
-
         let normal_map = join_texture_worker(normal_map, "normal map worker")?;
         let normal_map_type =
             NormalMapType::from_str_opt(mesh.normal_map_type.as_deref(), mesh_index)?;
@@ -1902,7 +2022,6 @@ fn prepare_common_texture_inputs(
             "mesh lightMapIntensity",
         )?
         .max(0.0);
-        let alpha_map = join_texture_worker(alpha_map, "alpha map worker")?;
 
         Ok(CommonTextureInputs {
             normal_map,
@@ -1922,7 +2041,7 @@ fn prepare_common_texture_inputs(
             ao_map_intensity,
             light_map,
             light_map_intensity,
-            alpha_map,
+            alpha_map: None,
         })
     })
 }
@@ -1939,10 +2058,9 @@ fn has_common_texture_input(mesh: &SceneMesh) -> bool {
         mesh.emissive_map.as_deref(),
         mesh.ao_map.as_deref(),
         mesh.light_map.as_deref(),
-        mesh.alpha_map.as_deref(),
     ]
     .into_iter()
-    .any(|data| data.is_some_and(|data| !data.is_empty()))
+    .any(has_texture_data)
 }
 
 #[derive(Default)]
