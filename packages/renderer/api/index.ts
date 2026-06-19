@@ -795,7 +795,11 @@ const RGBAFormat = 1023
 const DepthFormat = 1026
 const DepthStencilFormat = 1027
 const RedFormat = 1028
+const RedIntegerFormat = 1029
 const RGFormat = 1030
+const RGIntegerFormat = 1031
+const RGBIntegerFormat = 1032
+const RGBAIntegerFormat = 1033
 const UnsignedInt101111Type = 35899
 const UnsignedInt5999Type = 35902
 
@@ -2016,12 +2020,16 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     format != null &&
     format !== AlphaFormat &&
     format !== RedFormat &&
+    format !== RedIntegerFormat &&
     format !== RGFormat &&
+    format !== RGIntegerFormat &&
     format !== RGBFormat &&
-    format !== RGBAFormat
+    format !== RGBIntegerFormat &&
+    format !== RGBAFormat &&
+    format !== RGBAIntegerFormat
   ) {
     throw new Error(
-      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, RedFormat, RGFormat, RGBFormat, RGBAFormat, or omit format for RGBA8 readback.`,
+      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBFormat, RGBIntegerFormat, RGBAFormat, RGBAIntegerFormat, or omit format for RGBA8 readback.`,
     )
   }
   const type = texture.type
@@ -2371,10 +2379,13 @@ function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
   switch (format) {
     case AlphaFormat:
     case RedFormat:
+    case RedIntegerFormat:
       return 1
     case RGFormat:
+    case RGIntegerFormat:
       return 2
     case RGBFormat:
+    case RGBIntegerFormat:
       return 3
     default:
       return 4

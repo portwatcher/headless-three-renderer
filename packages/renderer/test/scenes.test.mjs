@@ -17766,6 +17766,24 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(rgFloatData[rgCenter] > 0.5, `RGFormat FloatType red channel should be normalized (${rgFloatData[rgCenter]})`)
   assert.ok(rgFloatData[rgCenter + 1] < 0.05, `RGFormat FloatType green channel should stay near zero (${rgFloatData[rgCenter + 1]})`)
 
+  for (const [label, format, channels] of [
+    ['RedIntegerFormat', THREE.RedIntegerFormat, 1],
+    ['RGIntegerFormat', THREE.RGIntegerFormat, 2],
+    ['RGBIntegerFormat', THREE.RGBIntegerFormat, 3],
+    ['RGBAIntegerFormat', THREE.RGBAIntegerFormat, 4],
+  ]) {
+    const target = { texture: { format, type: THREE.UnsignedShortType } }
+    renderToTarget(scene, camera, target, options)
+    const data = target.texture.image.data
+    const pixel = redCenter * channels
+    assert.ok(data instanceof Uint16Array, `${label} color target should receive Uint16Array data`)
+    assert.equal(data.length, 64 * 64 * channels, `${label} color target should receive ${channels} channel(s) per pixel`)
+    assert.ok(data[pixel] > 0x8000, `${label} red channel should be normalized (${data[pixel]})`)
+    if (channels > 1) assert.ok(data[pixel + 1] < 0x1000, `${label} green channel should stay near zero (${data[pixel + 1]})`)
+    if (channels > 2) assert.ok(data[pixel + 2] < 0x1000, `${label} blue channel should stay near zero (${data[pixel + 2]})`)
+    if (channels > 3) assert.ok(data[pixel + 3] > 0xff00, `${label} alpha channel should stay opaque (${data[pixel + 3]})`)
+  }
+
   const ushortTarget = { texture: { type: THREE.UnsignedShortType } }
   renderToTarget(scene, camera, ushortTarget, options)
   const ushortData = ushortTarget.texture.image.data
@@ -18034,7 +18052,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ depthTexture: { isCubeTexture: true } }, /target\.depthTexture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube depth texture'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
-    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'color texture format'],
+    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'color texture format'],
     [{ texture: { type: THREE.UnsignedInt248Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type.*UnsignedInt101111Type.*UnsignedInt5999Type/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
@@ -18054,7 +18072,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'options.target texture array'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'options.target sampleCount'],
-    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'options.target color texture format'],
+    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'options.target color texture format'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'options.target depth texture type'],
   ]
 
