@@ -166,6 +166,7 @@ pub struct GpuRenderer {
     texture_bind_group_cache: Mutex<HashMap<TextureBindGroupKey, wgpu::BindGroup>>,
     ao_physical_bind_group_cache: Mutex<HashMap<AoPhysicalBindGroupKey, wgpu::BindGroup>>,
     background_bind_group_cache: Mutex<HashMap<BackgroundBindGroupKey, CachedBackgroundBindGroup>>,
+    ibl_bind_group_cache: Mutex<HashMap<IblBindGroupKey, wgpu::BindGroup>>,
     uniform_bind_group_cache: Mutex<HashMap<UniformBindGroupKey, CachedUniformBindGroup>>,
     post_uniform_buffer_cache: Mutex<HashMap<PostUniformBufferKey, wgpu::Buffer>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
@@ -330,6 +331,17 @@ struct BackgroundBindGroupKey {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct PostUniformBufferKey {
     uniforms: BufferCacheKey,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct IblBindGroupKey {
+    irradiance_size: u32,
+    irradiance_faces: Vec<BufferCacheKey>,
+    prefilter_base_size: u32,
+    prefilter_mip_levels: u32,
+    prefilter_faces: Vec<BufferCacheKey>,
+    brdf_lut_size: u32,
+    brdf_lut: BufferCacheKey,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -500,6 +512,28 @@ impl PostUniformBufferKey {
     fn from_uniforms(uniforms: &PostUniforms) -> Self {
         Self {
             uniforms: BufferCacheKey::from_bytes(bytemuck::bytes_of(uniforms)),
+        }
+    }
+}
+
+impl IblBindGroupKey {
+    fn from_maps(ibl: &IblMaps) -> Self {
+        Self {
+            irradiance_size: ibl.irradiance_size,
+            irradiance_faces: ibl
+                .irradiance_faces
+                .iter()
+                .map(|face| BufferCacheKey::from_bytes(face))
+                .collect(),
+            prefilter_base_size: ibl.prefilter_base_size,
+            prefilter_mip_levels: ibl.prefilter_mip_levels,
+            prefilter_faces: ibl
+                .prefilter_faces
+                .iter()
+                .map(|face| BufferCacheKey::from_bytes(face))
+                .collect(),
+            brdf_lut_size: ibl.brdf_lut_size,
+            brdf_lut: BufferCacheKey::from_bytes(&ibl.brdf_lut),
         }
     }
 }
@@ -1990,6 +2024,7 @@ impl GpuRenderer {
             texture_bind_group_cache: Mutex::new(HashMap::new()),
             ao_physical_bind_group_cache: Mutex::new(HashMap::new()),
             background_bind_group_cache: Mutex::new(HashMap::new()),
+            ibl_bind_group_cache: Mutex::new(HashMap::new()),
             uniform_bind_group_cache: Mutex::new(HashMap::new()),
             post_uniform_buffer_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
@@ -2078,13 +2113,7 @@ impl GpuRenderer {
             .collect::<Result<Vec<_>>>()?;
 
         let ibl_bind_group = match &settings.ibl {
-            Some(ibl) => create_ibl_bind_group(
-                &self.device,
-                &self.queue,
-                &self.ibl_layout,
-                &self.sampler,
-                ibl,
-            ),
+            Some(ibl) => self.ibl_bind_group_for(ibl),
             None => self.default_ibl_bind_group.clone(),
         };
 
@@ -3644,6 +3673,33 @@ impl GpuRenderer {
             .clone()
     }
 
+    fn ibl_bind_group_for(&self, ibl: &IblMaps) -> wgpu::BindGroup {
+        let key = IblBindGroupKey::from_maps(ibl);
+        if let Some(bind_group) = self
+            .ibl_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return bind_group;
+        }
+
+        let bind_group = create_ibl_bind_group(
+            &self.device,
+            &self.queue,
+            &self.ibl_layout,
+            &self.sampler,
+            ibl,
+        );
+        self.ibl_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| bind_group.clone())
+            .clone()
+    }
+
     fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
         let CachedMeshBuffers {
             vertex_buffer,
@@ -5146,10 +5202,11 @@ fn create_cubemap_with_mips(
 mod tests {
     use super::{
         AoPhysicalBindGroupKey, BackgroundBindGroupKey, BackgroundUniforms, CustomBlendPipelineKey,
-        MeshBufferCacheKey, PhysicalLayersTextureCacheKey, PostUniformBufferKey, PostUniforms,
-        SamplerKey, TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey,
+        IblBindGroupKey, MeshBufferCacheKey, PhysicalLayersTextureCacheKey, PostUniformBufferKey,
+        PostUniforms, SamplerKey, TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey,
         UniformBindGroupKey, Uniforms, downsample_rgba_mip, f32_key, texture_mip_level_count,
     };
+    use crate::ibl::IblMaps;
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
         PreparedTextureMipLevel, TextureFilter, WrapMode,
@@ -5176,6 +5233,19 @@ mod tests {
             min_filter: TextureFilter::Linear,
             mipmap_filter: MipmapFilter::None,
             anisotropy: 1,
+        }
+    }
+
+    fn single_pixel_ibl_maps(red: u8) -> IblMaps {
+        let face = vec![red, 0, 0, 255];
+        IblMaps {
+            irradiance_faces: vec![face.clone(); 6],
+            irradiance_size: 1,
+            prefilter_faces: vec![face; 6],
+            prefilter_base_size: 1,
+            prefilter_mip_levels: 1,
+            brdf_lut: vec![0, red, 0, 255],
+            brdf_lut_size: 1,
         }
     }
 
@@ -5529,6 +5599,39 @@ mod tests {
         assert_ne!(
             PostUniformBufferKey::from_uniforms(&first),
             PostUniformBufferKey::from_uniforms(&changed),
+        );
+    }
+
+    #[test]
+    fn ibl_bind_group_keys_track_uploaded_map_bytes() {
+        let base = single_pixel_ibl_maps(32);
+        let same = single_pixel_ibl_maps(32);
+        assert_eq!(
+            IblBindGroupKey::from_maps(&base),
+            IblBindGroupKey::from_maps(&same),
+        );
+
+        let different_face = single_pixel_ibl_maps(64);
+        assert_ne!(
+            IblBindGroupKey::from_maps(&base),
+            IblBindGroupKey::from_maps(&different_face),
+            "IBL face bytes are part of the uploaded resource cache key",
+        );
+
+        let mut different_brdf = single_pixel_ibl_maps(32);
+        different_brdf.brdf_lut[1] = 96;
+        assert_ne!(
+            IblBindGroupKey::from_maps(&base),
+            IblBindGroupKey::from_maps(&different_brdf),
+            "BRDF LUT bytes are part of the uploaded resource cache key",
+        );
+
+        let mut different_mips = single_pixel_ibl_maps(32);
+        different_mips.prefilter_mip_levels = 2;
+        assert_ne!(
+            IblBindGroupKey::from_maps(&base),
+            IblBindGroupKey::from_maps(&different_mips),
+            "prefilter dimensions are part of the uploaded resource cache key",
         );
     }
 
