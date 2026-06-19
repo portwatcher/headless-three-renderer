@@ -1993,6 +1993,51 @@ test('CubeCamera object-id target includes reverse lookup metadata', () => {
   assert.equal(cubeTarget.objectIdMap, undefined)
 })
 
+test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  cubeTarget.textures = [
+    cubeTarget.texture,
+    { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
+    { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
+    { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+  ]
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  const [positiveX, negativeX] = scene.children
+
+  renderToTarget(scene, cubeCamera, cubeTarget, {
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.equal(cubeTarget.textures[0].image.length, 6)
+  assert.equal(cubeTarget.textures[1].image.length, 6)
+  assert.equal(cubeTarget.textures[2].image.length, 6)
+  assert.equal(cubeTarget.textures[3].image.length, 6)
+
+  const colorPx = meanRegion(cubeTarget.textures[0].image[0].data, 32, 32, 12, 12, 20, 20)
+  const colorNx = meanRegion(cubeTarget.textures[0].image[1].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(colorPx.r > colorPx.g + 80 && colorPx.r > colorPx.b + 80, `primary +X cube attachment should capture red (${colorPx.r}, ${colorPx.g}, ${colorPx.b})`)
+  assert.ok(colorNx.g > colorNx.r + 60 && colorNx.g > colorNx.b + 60, `primary -X cube attachment should capture green (${colorNx.r}, ${colorNx.g}, ${colorNx.b})`)
+
+  const maskPx = meanRegion(cubeTarget.textures[1].image[0].data, 32, 32, 12, 12, 20, 20)
+  const maskNx = meanRegion(cubeTarget.textures[1].image[1].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(maskPx.r > 250 && maskNx.r > 250, `cube mask attachment should capture visible faces (${maskPx.r}, ${maskNx.r})`)
+
+  const objectIdPx = meanRegion(cubeTarget.textures[2].image[0].data, 32, 32, 12, 12, 20, 20)
+  const objectIdNx = meanRegion(cubeTarget.textures[2].image[1].data, 32, 32, 12, 12, 20, 20)
+  const positiveXEncoded = positiveX.id + 1
+  const negativeXEncoded = negativeX.id + 1
+  assertRgbClose(objectIdPx, objectIdBytes(positiveXEncoded), '+X auxiliary CubeCamera object id')
+  assertRgbClose(objectIdNx, objectIdBytes(negativeXEncoded), '-X auxiliary CubeCamera object id')
+  assert.ok(cubeTarget.objectIdEntries.length >= 2, 'cube auxiliary object-id target should expose rendered object metadata')
+  assert.equal(cubeTarget.objectIdMap[String(positiveXEncoded)].id, positiveX.id)
+  assert.equal(cubeTarget.objectIdMap[String(negativeXEncoded)].id, negativeX.id)
+
+  const normalPx = meanRegion(cubeTarget.textures[3].image[0].data, 32, 32, 12, 12, 20, 20)
+  const normalNx = meanRegion(cubeTarget.textures[3].image[1].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(normalPx.b > 250 && normalNx.b > 250, `cube normal attachment should capture face normals (${normalPx.b}, ${normalNx.b})`)
+})
+
 test('CubeCamera renders active mip target faces', () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
@@ -18138,6 +18183,15 @@ test('MRT-shaped targets can request auxiliary render-mode attachments', () => {
 
   const normalCenter = meanRegion(target.textures[3].image.data, 64, 64, 28, 28, 36, 36)
   assert.ok(normalCenter.r > 120 && normalCenter.b > 200, `normal attachment should encode the tilted view normal (${normalCenter.r}, ${normalCenter.g}, ${normalCenter.b})`)
+
+  const countedTarget = new THREE.WebGLRenderTarget(64, 64, { count: 2 })
+  countedTarget.textures[1].userData.headlessThreeRenderer = { renderMode: 'mask' }
+  renderToTarget(scene, camera, countedTarget, {
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.strictEqual(countedTarget.texture, countedTarget.textures[0])
+  const countedMaskCenter = meanRegion(countedTarget.textures[1].image.data, 64, 64, 28, 28, 36, 36)
+  assert.ok(countedMaskCenter.r > 250, `WebGLRenderTarget count auxiliary mask should render (${countedMaskCenter.r})`)
 
   const optionsTarget = {
     textures: [

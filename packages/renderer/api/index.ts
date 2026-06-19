@@ -362,7 +362,6 @@ export class Renderer {
     const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
 
     if (isCubeRenderTarget(target)) {
-      assertNoAuxiliaryTargetAttachments(target, 'THREE.CubeCamera')
       if (isArrayCamera(camera)) {
         throw new Error(
           'THREE.ArrayCamera cannot render into an active cube render target. Render each cube face with a regular THREE.Camera or pass a THREE.CubeCamera as the top-level camera.',
@@ -460,6 +459,15 @@ export class Renderer {
       nativeCamera,
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
+    const auxiliary = renderRegularCameraAuxiliaryTargetAttachments(
+      scene,
+      camera,
+      target,
+      faceOptions,
+      buffer,
+      objectIdEntries,
+      (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+    )
     writeCubeRenderTargetFace(
       target,
       buffer,
@@ -470,7 +478,8 @@ export class Renderer {
       this.currentActiveCubeFace,
       activeMipmapLevel,
       depthData ? cloneTargetData(depthTextureData(target.depthTexture!, depthData)) : undefined,
-      objectIdEntries,
+      auxiliary.objectIdEntries,
+      auxiliary.attachments,
     )
     return buffer
   }
@@ -1024,10 +1033,112 @@ function renderArrayCameraAuxiliaryTargetAttachments(
   )
 }
 
-function assertNoAuxiliaryTargetAttachments(target: RenderTargetLike | undefined, cameraLabel: string): void {
-  if (!target || renderTargetColorTextures(target).length <= 1) return
-  throw new Error(
-    `Auxiliary render-mode target attachments are not supported with ${cameraLabel} yet. Render regular-camera or ArrayCamera auxiliary targets, or run separate passes for CubeCamera output.`,
+function renderCubeCameraAuxiliaryTargetAttachments(
+  target: RenderTargetLike,
+  options: RenderOptions,
+  primaryFaces: Buffer[],
+  primaryObjectIdEntries: RenderObjectIdEntry[] | undefined,
+  renderAttachment: (mode: RenderMode) => { faces: Buffer[]; objectIdEntries?: RenderObjectIdEntry[] },
+): { attachments?: RenderCubeTargetAttachmentData[]; objectIdEntries?: RenderObjectIdEntry[] } {
+  const colorTextures = renderTargetColorTextures(target)
+  if (colorTextures.length <= 1) return { objectIdEntries: primaryObjectIdEntries }
+
+  const primaryMode = normalizedRenderMode(options.renderMode)
+  let targetObjectIdEntries = primaryObjectIdEntries
+  const attachments: RenderCubeTargetAttachmentData[] = []
+
+  for (let i = 1; i < colorTextures.length; i += 1) {
+    const texture = colorTextures[i]
+    const mode = renderTargetTextureRenderMode(texture, targetColorTextureLabel(i))!
+    if (mode === primaryMode) {
+      attachments.push({ texture, faces: primaryFaces })
+      if (mode === 'object-id') targetObjectIdEntries = primaryObjectIdEntries
+      continue
+    }
+
+    const rendered = renderAttachment(mode)
+    attachments.push({ texture, faces: rendered.faces })
+    if (mode === 'object-id') targetObjectIdEntries = rendered.objectIdEntries
+  }
+
+  return { attachments, objectIdEntries: targetObjectIdEntries }
+}
+
+function sortedObjectIdEntries(objectIdEntryMap: Map<number, RenderObjectIdEntry>): RenderObjectIdEntry[] | undefined {
+  return objectIdEntryMap.size > 0
+    ? [...objectIdEntryMap.values()].sort((a, b) => a.encodedId - b.encodedId)
+    : undefined
+}
+
+function renderCubeCameraFaces(
+  scene: ThreeSceneRootLike,
+  subCameras: ThreeCameraLike[],
+  target: RenderTargetLike,
+  faceOptions: InternalRenderOptions,
+  renderNativeScene: RenderNativeScene,
+  includeDepth: boolean,
+): {
+  faces: Buffer[]
+  depthFaces?: NonNullable<RenderTargetImageLike['data']>[]
+  objectIdEntries?: RenderObjectIdEntry[]
+} {
+  const objectIdEntryMap = new Map<number, RenderObjectIdEntry>()
+  const faces: Buffer[] = []
+  const depthFaces: NonNullable<RenderTargetImageLike['data']>[] = []
+
+  for (const subCamera of subCameras) {
+    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, subCamera, faceOptions)
+    faces.push(Buffer.from(renderNativeScene(nativeScene, nativeCamera)))
+    if (objectIdEntries) {
+      for (const entry of objectIdEntries) {
+        objectIdEntryMap.set(entry.encodedId, entry)
+      }
+    }
+    if (includeDepth) {
+      const depthFace = renderTargetDepthBuffer(target, nativeScene, nativeCamera, renderNativeScene)
+      if (depthFace) {
+        depthFaces.push(cloneTargetData(depthTextureData(target.depthTexture!, depthFace)))
+      }
+    }
+  }
+
+  return {
+    faces,
+    depthFaces: depthFaces.length > 0 ? depthFaces : undefined,
+    objectIdEntries: sortedObjectIdEntries(objectIdEntryMap),
+  }
+}
+
+function assertCubeFaceCount(faces: unknown[], label: string): void {
+  if (faces.length !== CUBE_FACE_COUNT) {
+    throw new Error(
+      `THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered ${label} faces, received ${faces.length}.`,
+    )
+  }
+}
+
+function ensureCubeTargetAttachmentTexture(texture: RenderTargetTextureLike): void {
+  texture.isCubeTexture = true
+  texture.needsPMREMUpdate = true
+  texture.pmremVersion = (texture.pmremVersion ?? 0) + 1
+}
+
+function writeCubeTargetAttachmentFaces(
+  attachment: RenderCubeTargetAttachmentData,
+  faceWidth: number,
+  faceHeight: number,
+  activeMipmapLevel: number,
+  label: string,
+): void {
+  assertCubeFaceCount(attachment.faces, label)
+  ensureCubeTargetAttachmentTexture(attachment.texture)
+  writeCubeTextureFaces(
+    attachment.texture,
+    attachment.faces.map((face) => colorTextureData(attachment.texture, face)),
+    faceWidth,
+    faceHeight,
+    activeMipmapLevel,
+    label,
   )
 }
 
@@ -1042,6 +1153,10 @@ type PixelRect = {
 type RenderTargetAttachmentData = {
   texture: RenderTargetTextureLike
   data: Buffer
+}
+type RenderCubeTargetAttachmentData = {
+  texture: RenderTargetTextureLike
+  faces: Buffer[]
 }
 type InternalRenderOptions = RenderOptions & {
   __headlessThreeViewportLabel?: string
@@ -1091,14 +1206,12 @@ function renderCubeCamera(
   }
   assertRenderTargetLike(target, options.target !== undefined ? 'options.target' : 'THREE.CubeCamera renderTarget')
   validateUnsupportedRenderTargetOptions(target)
-  assertNoAuxiliaryTargetAttachments(target, 'THREE.CubeCamera')
 
   const { width: targetWidth, height: targetHeight } = resolveCubeTargetSize(target, options)
   const activeMipmapLevel = resolveCubeMipmapLevel(camera, targetWidth)
   const { width, height } = cubeMipmapSize(targetWidth, targetHeight, activeMipmapLevel)
   const outputFormat = options.format ?? (options.target ? 'rgba' : 'png')
   const subCameras = cubeSubCameras(camera)
-  const objectIdEntryMap = new Map<number, RenderObjectIdEntry>()
   const faceOptions: InternalRenderOptions = {
     ...options,
     target,
@@ -1110,38 +1223,41 @@ function renderCubeCamera(
     __headlessThreeViewportLabel: cubeMipmapViewportLabel(options),
     __headlessThreeScissorLabel: cubeMipmapScissorLabel(options, target),
   }
-  const faces: Buffer[] = []
-  const depthFaces: NonNullable<RenderTargetImageLike['data']>[] = []
-  for (const subCamera of subCameras) {
-    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, subCamera, faceOptions)
-    faces.push(Buffer.from(renderNativeScene(nativeScene, nativeCamera)))
-    if (objectIdEntries) {
-      for (const entry of objectIdEntries) {
-        objectIdEntryMap.set(entry.encodedId, entry)
-      }
-    }
-    const depthFace = renderTargetDepthBuffer(target, nativeScene, nativeCamera, renderNativeScene)
-    if (depthFace) {
-      depthFaces.push(cloneTargetData(depthTextureData(target.depthTexture!, depthFace)))
-    }
-  }
+  const primary = renderCubeCameraFaces(scene, subCameras, target, faceOptions, renderNativeScene, true)
+  const auxiliary = renderCubeCameraAuxiliaryTargetAttachments(
+    target,
+    options,
+    primary.faces,
+    primary.objectIdEntries,
+    (mode) => renderCubeCameraFaces(
+      scene,
+      subCameras,
+      target,
+      {
+        ...faceOptions,
+        renderMode: mode,
+        format: 'rgba',
+      },
+      renderNativeScene,
+      false,
+    ),
+  )
 
   writeCubeRenderTarget(
     target,
-    faces,
+    primary.faces,
     targetWidth,
     targetHeight,
     width,
     height,
     activeMipmapLevel,
-    depthFaces.length > 0 ? depthFaces : undefined,
-    objectIdEntryMap.size > 0
-      ? [...objectIdEntryMap.values()].sort((a, b) => a.encodedId - b.encodedId)
-      : undefined,
+    primary.depthFaces,
+    auxiliary.objectIdEntries,
+    auxiliary.attachments,
   )
 
-  const buffer = outputFormat === 'png' ? native.encodePng(faces[0], width, height) : faces[0]
-  return { buffer, target, width, height, faces }
+  const buffer = outputFormat === 'png' ? native.encodePng(primary.faces[0], width, height) : primary.faces[0]
+  return { buffer, target, width, height, faces: primary.faces }
 }
 
 function validateCubeCamera(camera: ThreeCubeCameraLike, options: RenderOptions): void {
@@ -1285,23 +1401,29 @@ function writeCubeRenderTarget(
   activeMipmapLevel: number,
   depthFaces?: NonNullable<RenderTargetImageLike['data']>[],
   objectIdEntries?: RenderObjectIdEntry[],
+  colorAttachments?: RenderCubeTargetAttachmentData[],
 ): RenderTargetLike {
-  if (faces.length !== CUBE_FACE_COUNT) {
-    throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered faces, received ${faces.length}.`)
-  }
+  assertCubeFaceCount(faces, 'color')
   target.width = targetWidth
   target.height = targetHeight
   target.data = faces[0]
 
   const texture = ensureCubeTargetTexture(target)
-  texture.isCubeTexture = true
+  ensureCubeTargetAttachmentTexture(texture)
   writeCubeTextureFaces(texture, faces.map((face) => colorTextureData(texture, face)), faceWidth, faceHeight, activeMipmapLevel, 'target.texture')
-  texture.needsPMREMUpdate = true
   if (target.depthTexture && depthFaces) {
-    if (depthFaces.length !== CUBE_FACE_COUNT) {
-      throw new Error(`THREE.CubeCamera expected ${CUBE_FACE_COUNT} rendered depth faces, received ${depthFaces.length}.`)
-    }
+    assertCubeFaceCount(depthFaces, 'depth')
     writeCubeTextureFaces(target.depthTexture, depthFaces, faceWidth, faceHeight, activeMipmapLevel, 'target.depthTexture')
+  }
+  const attachments = colorAttachments ?? []
+  for (let i = 0; i < attachments.length; i += 1) {
+    writeCubeTargetAttachmentFaces(
+      attachments[i],
+      faceWidth,
+      faceHeight,
+      activeMipmapLevel,
+      targetColorTextureLabel(i + 1),
+    )
   }
   writeObjectIdMetadata(target, objectIdEntries)
   return target
@@ -1318,6 +1440,7 @@ function writeCubeRenderTargetFace(
   activeMipmapLevel: number,
   depthFace?: NonNullable<RenderTargetImageLike['data']>,
   objectIdEntries?: RenderObjectIdEntry[],
+  colorAttachments?: RenderTargetAttachmentData[],
 ): RenderTargetLike {
   assertActiveCubeFace(activeCubeFace, 'Renderer activeCubeFace')
   target.width = targetWidth
@@ -1325,7 +1448,7 @@ function writeCubeRenderTargetFace(
   target.data = face
 
   const texture = ensureCubeTargetTexture(target)
-  texture.isCubeTexture = true
+  ensureCubeTargetAttachmentTexture(texture)
   writeCubeTextureFace(
     texture,
     colorTextureData(texture, face),
@@ -1335,9 +1458,22 @@ function writeCubeRenderTargetFace(
     activeMipmapLevel,
     'target.texture',
   )
-  texture.needsPMREMUpdate = true
   if (target.depthTexture && depthFace) {
     writeCubeTextureFace(target.depthTexture, depthFace, faceWidth, faceHeight, activeCubeFace, activeMipmapLevel, 'target.depthTexture')
+  }
+  const attachments = colorAttachments ?? []
+  for (let i = 0; i < attachments.length; i += 1) {
+    const attachment = attachments[i]
+    ensureCubeTargetAttachmentTexture(attachment.texture)
+    writeCubeTextureFace(
+      attachment.texture,
+      colorTextureData(attachment.texture, attachment.data),
+      faceWidth,
+      faceHeight,
+      activeCubeFace,
+      activeMipmapLevel,
+      targetColorTextureLabel(i + 1),
+    )
   }
   writeObjectIdMetadata(target, objectIdEntries)
   return target
@@ -1419,7 +1555,7 @@ function cubeTextureImages(value: RenderTargetImageLike | RenderTargetImageLike[
 function cubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {
   return Array.isArray(target.texture)
     ? target.texture[0]
-    : target.texture ?? target.textures?.[0]
+    : target.textures?.[0] ?? target.texture
 }
 
 function ensureCubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike {
@@ -2531,8 +2667,8 @@ function renderTargetColorTexture(target: RenderTargetLike): RenderTargetTexture
 
 function renderTargetColorTextures(target: RenderTargetLike): RenderTargetTextureLike[] {
   if (Array.isArray(target.texture)) return target.texture
-  if (target.texture) return [target.texture]
-  return target.textures ?? []
+  if (target.textures) return target.textures
+  return target.texture ? [target.texture] : []
 }
 
 function writeRenderTargetTexture(
