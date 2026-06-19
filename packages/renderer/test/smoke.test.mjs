@@ -80,6 +80,10 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     assert.deepEqual(Buffer.from(asyncTexture.image), imageBytes)
     assert.equal(asyncTexture.source.data, asyncTexture.image)
 
+    const fileUrlRootLoader = createEncodedImageTextureLoader(pathToFileURL(dir).href)
+    const fileUrlRootTexture = await fileUrlRootLoader.loadAsync('tex.png')
+    assert.deepEqual(Buffer.from(fileUrlRootTexture.image), imageBytes)
+
     const managerEvents = []
     const manager = {
       addHandler() {},
@@ -176,6 +180,12 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     installLocalFileFetch()
     const response = await fetch(pathToFileURL(imagePath).href)
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), imageBytes)
+
+    const fileUrlRootBundle = await createNodeGltfLoader(pathToFileURL(dir).href, {
+      installFetch: false,
+      registerTextureHandlers: false,
+    })
+    assert.equal(fileUrlRootBundle.rootDir, dir)
 
     const fileUrlGltf = await loadGltfFromFile(
       new URL('./fixtures/simple-triangle.gltf', import.meta.url).href,
@@ -315,6 +325,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
     () => createEncodedImageTextureLoader(process.cwd(), {}),
     /manager must provide an addHandler\(\) function/i,
   )
+  assert.throws(
+    () => createEncodedImageTextureLoader('https://example.com/assets'),
+    /rootDir is not a local directory path/i,
+  )
 
   const imageLoader = createEncodedImageTextureLoader(process.cwd())
   assert.throws(
@@ -361,6 +375,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
     /rootDir must be a string/i,
   )
   await assert.rejects(
+    () => createNodeGltfLoader('https://example.com/assets'),
+    /rootDir is not a local directory path/i,
+  )
+  await assert.rejects(
     () => createNodeGltfLoader(process.cwd(), null),
     /options must be an object/i,
   )
@@ -383,6 +401,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
   await assert.rejects(
     () => loadGltfFromFile('scene.gltf', { rootDir: 123 }),
     /options\.rootDir must be a string/i,
+  )
+  await assert.rejects(
+    () => loadGltfFromFile('scene.gltf', { rootDir: 'https://example.com/assets' }),
+    /options\.rootDir is not a local directory path/i,
   )
   await assert.rejects(
     () => loadGltfFromFile('scene.gltf', { baseUrl: 123, installFetch: false }),

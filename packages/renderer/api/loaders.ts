@@ -153,7 +153,7 @@ export class EncodedImageTextureLoader {
   private loaderPath = ''
 
   constructor(rootDir: string = process.cwd(), manager?: ThreeLoadingManagerLike) {
-    this.rootDir = requiredString(rootDir, 'rootDir')
+    this.rootDir = resolveLocalRootDir(rootDir, 'rootDir')
     this.manager = optionalLoadingManager(manager, 'manager')
   }
 
@@ -231,7 +231,7 @@ export async function createNodeGltfLoader(
   options: NodeGltfLoaderOptions = {},
 ): Promise<NodeGltfLoaderBundle> {
   const loaderOptions = objectOptions(options, 'options') as NodeGltfLoaderOptions
-  const root = path.resolve(requiredString(rootDir, 'rootDir'))
+  const root = resolveLocalRootDir(rootDir, 'rootDir')
   const {
     configureLoader,
     installFetch,
@@ -265,7 +265,8 @@ export async function loadGltfFromFile<T = unknown>(
   const loaderOptions = objectOptions(options, 'options') as LoadGltfFromFileOptions
   validateLoadGltfFromFileOptions(loaderOptions)
   const absolute = resolveLocalAssetPath(requiredString(filePath, 'filePath'))
-  const root = path.resolve(optionalString(loaderOptions.rootDir, 'options.rootDir') ?? path.dirname(absolute))
+  const rootDirOption = optionalString(loaderOptions.rootDir, 'options.rootDir')
+  const root = rootDirOption == null ? path.dirname(absolute) : resolveLocalRootDir(rootDirOption, 'options.rootDir')
   const baseUrl = optionalString(loaderOptions.baseUrl, 'options.baseUrl') ?? pathToFileURL(`${root}${path.sep}`).href
   const { loader } = await createNodeGltfLoader(root, loaderOptions)
   const bytes = await readFile(absolute)
@@ -418,6 +419,23 @@ export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd
     throw new Error(`Remote texture URL is not a local file: ${assetUrl}`)
   }
   return path.resolve(root, assetUrl)
+}
+
+function resolveLocalRootDir(rootDir: string, label: string): string {
+  const value = requiredString(rootDir, label)
+  if (/^data:/i.test(value)) {
+    throw new Error(`${label} must be a local directory path, not a data URI.`)
+  }
+  if (path.isAbsolute(value) || path.win32.isAbsolute(value)) {
+    return path.normalize(value)
+  }
+  if (/^file:/i.test(value)) {
+    return fileURLToPath(value)
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    throw new Error(`${label} is not a local directory path: ${value}`)
+  }
+  return path.resolve(value)
 }
 
 export function installLocalFileFetch(): void {
