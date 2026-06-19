@@ -130,6 +130,41 @@ class RendererShadowMapState {
   }
 }
 
+class RendererInfoState {
+  private autoResetValue = true
+
+  readonly memory = {
+    geometries: 0,
+    textures: 0,
+  }
+
+  readonly render = {
+    calls: 0,
+    triangles: 0,
+    points: 0,
+    lines: 0,
+    frame: 0,
+  }
+
+  programs: unknown[] | null = null
+
+  get autoReset(): boolean {
+    return this.autoResetValue
+  }
+
+  set autoReset(value: boolean) {
+    this.autoResetValue = rendererStateBoolean(value, 'Renderer.info.autoReset')
+  }
+
+  reset(): void {
+    this.render.calls = 0
+    this.render.triangles = 0
+    this.render.points = 0
+    this.render.lines = 0
+    this.render.frame = 0
+  }
+}
+
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private opaqueSort: RenderSortFunction | null = null
@@ -152,6 +187,7 @@ export class Renderer {
   private localClippingEnabledValue = true
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
+  readonly info = new RendererInfoState()
   readonly reversedDepthBuffer = false
   readonly shadowMap = new RendererShadowMapState()
   readonly xr = { enabled: false }

@@ -28170,6 +28170,41 @@ test('Renderer resetState is a no-op compatibility hook', () => {
   assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer resetState should preserve renderer clear alpha (${clear.a})`)
 })
 
+test('Renderer info exposes inert compatibility counters', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.info.autoReset, true)
+  assert.deepEqual(renderer.info.memory, { geometries: 0, textures: 0 })
+  assert.deepEqual(renderer.info.render, {
+    calls: 0,
+    triangles: 0,
+    points: 0,
+    lines: 0,
+    frame: 0,
+  })
+  assert.equal(renderer.info.programs, null)
+
+  renderer.info.autoReset = false
+  assert.equal(renderer.info.autoReset, false)
+  renderer.info.render.calls = 3
+  renderer.info.render.triangles = 12
+  renderer.info.reset()
+  assert.equal(renderer.info.render.calls, 0)
+  assert.equal(renderer.info.render.triangles, 0)
+
+  assert.throws(
+    () => { renderer.info.autoReset = 'yes' },
+    /Renderer\.info\.autoReset must be a boolean/i,
+  )
+
+  renderer.setClearColor(0x204080, 0.5)
+  const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer info compatibility state should not affect rendering')
+  assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer info compatibility state should preserve clear alpha (${clear.a})`)
+})
+
 test('Renderer size state applies as render fallback', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
