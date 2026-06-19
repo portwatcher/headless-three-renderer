@@ -123,7 +123,7 @@ The public API accepts only Three.js-like objects:
 
 ### Materials & Textures
 
-- material base color, opacity, and visibility, with malformed color containers and invalid color/opacity/visible values failing clearly
+- material base color, opacity, and visibility, including CSS string material color inputs, with malformed color containers and invalid color/opacity/visible values failing clearly
 - `material.map` (base color texture) — PNG, JPEG, WebP, and raw one-channel, two-channel, RGB, or RGBA numeric DataTexture inputs, including byte, signed/unsigned normalized integer, packed 16-bit color, float, and half-float typed data, with `texture.channel` UV selection and sRGB color-space decode
 - base, sprite, point, line/dashed-line, matcap, emissive, light, sheen color, and physical specular color maps honor `THREE.SRGBColorSpace`/`THREE.LinearSRGBColorSpace`, including the documented linear string aliases; unsupported texture color-space/encoding values fail clearly
 - base, 2D background, sprite/point color and alpha, line/dashed-line, matcap, normal/bump, displacement, emissive, metallic/roughness, AO/light, Phong specular, alpha, and current physical-extension maps honor texture UV transforms, including explicit texture matrices for those covered slots and color-space decode after explicit matrices for current color-producing transform slots; malformed transform vector containers and invalid transform or transform-boolean values fail clearly
@@ -154,7 +154,7 @@ The public API accepts only Three.js-like objects:
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
 - `ShadowMaterial` transparent receiver output with color, opacity, scene fog, Fog/FogExp2 fog opt-out, and output color-space conversion
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`, with clear failures for unsupported side constants
-- `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths; malformed fog color containers and invalid fog color/parameter values fail clearly
+- `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths; CSS string fog colors are accepted, while malformed fog color containers and invalid fog color/parameter values fail clearly
 - alpha test (`material.alphaTest`) with fragment discard and alpha-to-coverage threshold smoothing on multisampled main-pass renders; invalid values fail clearly
 - native draw ordering honors group order, `renderOrder`, material id, WebGL material variant, transmissive/transparent buckets, projected geometry bounding-sphere z, object/insertion ties, `sortObjects`, and custom opaque/transparent sort callbacks with object/material/geometry/group render-item metadata, including source-object metadata for BatchedMesh-expanded draws; transparency sorting is back-to-front with `material.depthWrite` overrides, including Three.js' default transparent depth writes; invalid `renderOrder` and sort-control values fail clearly
 - material render state: `depthTest`, `depthFunc`, `depthWrite`, `colorWrite`, `polygonOffset`, `alphaHash`, `alphaToCoverage` on 4x MSAA renders including output-alpha and alpha-test threshold coverage, `premultipliedAlpha`, `toneMapped=false` output opt-out, stencil state, built-in blending modes, `CustomBlending` equations/factors, and clear failures for unsupported render-state constants or invalid boolean/numeric values
@@ -182,7 +182,7 @@ Compressed KTX2/Basis/`THREE.CompressedTexture` inputs and compressed texture fo
 - `THREE.RectAreaLight` — one-sided finite-area direct-light approximation
 - `THREE.LightProbe` — diffuse spherical-harmonics indirect lighting, with invalid coefficient values failing clearly
 
-Lights are automatically extracted from the scene, with malformed light color/target containers, invalid light color, numeric controls, transform matrix values, shadow flags, and shadow option containers failing clearly. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 64 direct lights per scene are supported. Visible directional, spot, and point lights may cast shadows while their packed native shadow-map usage stays within twelve array layers. When no lights are present, meshes render with a hemispherical ambient fallback.
+Lights are automatically extracted from the scene, with CSS string light colors accepted and malformed light color/target containers, invalid light color, numeric controls, transform matrix values, shadow flags, and shadow option containers failing clearly. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 64 direct lights per scene are supported. Visible directional, spot, and point lights may cast shadows while their packed native shadow-map usage stays within twelve array layers. When no lights are present, meshes render with a hemispherical ambient fallback.
 
 ### Image-Based Lighting (IBL)
 

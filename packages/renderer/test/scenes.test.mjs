@@ -2683,9 +2683,14 @@ test('invalid material color values fail clearly', () => {
     }, /material\.color\.g must be a finite number/i],
     ['base color container', () => {
       const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
-      material.color = 'red'
+      material.color = 123
       return material
-    }, /material\.color must be a color-like object or \[r, g, b\]/i],
+    }, /material\.color must be a color-like object, CSS color string, or \[r, g, b\]/i],
+    ['base color CSS', () => {
+      const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      material.color = 'not-a-color'
+      return material
+    }, /material\.color "not-a-color" is not a supported CSS color string/i],
     ['emissive', () => {
       const material = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xff0000 })
       material.emissive = { isColor: true, r: 1, g: 0, b: Number.NaN }
@@ -2713,6 +2718,27 @@ test('invalid material color values fail clearly', () => {
       `${name} should fail clearly`,
     )
   }
+})
+
+test('CSS material color strings render with linear color semantics', () => {
+  function renderMaterialColor(color) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    material.color = color
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const cssMean = renderMaterialColor('rgb(32, 64, 128)')
+  const colorMean = renderMaterialColor(new THREE.Color(0x204080))
+  assertRgbClose(cssMean, [colorMean.r, colorMean.g, colorMean.b], 'CSS material color')
 })
 
 test('different materials produce visibly different outputs', async () => {
@@ -16866,6 +16892,15 @@ test('AmbientLight honors camera layer filtering', () => {
   assert.ok(mean.g > mean.r + 15, `camera layer should select green AmbientLight and ignore red (${mean.g} vs ${mean.r})`)
 })
 
+test('CSS light color strings are accepted with linear color semantics', () => {
+  const scene = new THREE.Scene()
+  const ambient = new THREE.AmbientLight(0xffffff, 1)
+  ambient.color = 'rgb(0, 255, 0)'
+  scene.add(ambient)
+
+  assert.deepEqual(extractAmbientLight(scene), [0, 1, 0])
+})
+
 test('HemisphereLight honors camera layer filtering', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -17346,11 +17381,20 @@ test('invalid light color values fail clearly', () => {
 
   const primitiveColorScene = new THREE.Scene()
   const primitiveColor = new THREE.PointLight(0xffffff, 1)
-  primitiveColor.color = 'white'
+  primitiveColor.color = 123
   primitiveColorScene.add(primitiveColor)
   assert.throws(
     () => extractLights(primitiveColorScene),
-    /light\.color must be a color-like object or \[r, g, b\]/i,
+    /light\.color must be a color-like object, CSS color string, or \[r, g, b\]/i,
+  )
+
+  const invalidCssScene = new THREE.Scene()
+  const invalidCss = new THREE.PointLight(0xffffff, 1)
+  invalidCss.color = 'not-a-color'
+  invalidCssScene.add(invalidCss)
+  assert.throws(
+    () => extractLights(invalidCssScene),
+    /light\.color "not-a-color" is not a supported CSS color string/i,
   )
 
   const ambientScene = new THREE.Scene()
@@ -17603,6 +17647,24 @@ test('Fog and FogExp2 affect material output', () => {
   )
 })
 
+test('CSS fog color strings render with linear color semantics', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.fog = new THREE.Fog(0x000000, 0, 1)
+  scene.fog.color = 'rgb(0, 255, 0)'
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.g > mean.r + 40, `CSS fog color should mix the red plane toward green (${mean.g} vs ${mean.r})`)
+})
+
 test('Fog uses view-space depth rather than Euclidean camera distance', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -17687,10 +17749,17 @@ test('invalid fog parameter values fail clearly', () => {
   )
 
   scene.fog = new THREE.Fog(0x00ff00, 0, 1)
-  scene.fog.color = 'green'
+  scene.fog.color = 123
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32 }),
-    /scene\.fog\.color must be a color-like object or \[r, g, b\]/i,
+    /scene\.fog\.color must be a color-like object, CSS color string, or \[r, g, b\]/i,
+  )
+
+  scene.fog = new THREE.Fog(0x00ff00, 0, 1)
+  scene.fog.color = 'not-a-color'
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32 }),
+    /scene\.fog\.color "not-a-color" is not a supported CSS color string/i,
   )
 })
 

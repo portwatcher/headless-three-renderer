@@ -51,13 +51,14 @@ export function strictColorLikeToArray(value: unknown, label: string): Color4 | 
 export function validatedColorLikeToArray(value: unknown, label: string): Color4 | null {
   if (value == null) return null
   if (Array.isArray(value)) return normalizeColorArray(value, label)
+  if (typeof value === 'string') return cssColorStringToLinearArray(value, label)
   if (typeof value !== 'object') {
-    throw new TypeError(`${label} must be a color-like object or [r, g, b].`)
+    throw new TypeError(`${label} must be a color-like object, CSS color string, or [r, g, b].`)
   }
 
   const color = value as ColorLikeWithAlpha
   if (!isColorShaped(color)) {
-    throw new TypeError(`${label} must be a color-like object or [r, g, b].`)
+    throw new TypeError(`${label} must be a color-like object, CSS color string, or [r, g, b].`)
   }
 
   return [
@@ -69,6 +70,17 @@ export function validatedColorLikeToArray(value: unknown, label: string): Color4
 }
 
 export function cssColorStringToArray(value: string, label: string): Color4 {
+  const color = parseCssColorString(value, label)
+  color.convertLinearToSRGB()
+  return [clamp01(color.r), clamp01(color.g), clamp01(color.b), 1]
+}
+
+export function cssColorStringToLinearArray(value: string, label: string): Color4 {
+  const color = parseCssColorString(value, label)
+  return [clamp01(color.r), clamp01(color.g), clamp01(color.b), 1]
+}
+
+function parseCssColorString(value: string, label: string): ThreeColorStyleParser {
   if (value.trim() === '') {
     throw new TypeError(`${label} must be a non-empty CSS color string.`)
   }
@@ -84,8 +96,7 @@ export function cssColorStringToArray(value: string, label: string): Color4 {
     if (invalidWarning) {
       throw new TypeError(`${label} ${JSON.stringify(value)} is not a supported CSS color string.`)
     }
-    color.convertLinearToSRGB()
-    return [clamp01(color.r), clamp01(color.g), clamp01(color.b), 1]
+    return color
   } finally {
     console.warn = originalWarn
     ThreeColorManagement.enabled = originalColorManagementEnabled

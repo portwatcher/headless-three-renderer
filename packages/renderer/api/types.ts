@@ -13,6 +13,8 @@ export interface ThreeColorLike {
   isColor?: boolean
 }
 
+export type ThreeColorInput = ThreeColorLike | string | number[]
+
 export interface ThreeMatrix4Like {
   elements: ArrayLike<number>
 }
@@ -149,7 +151,7 @@ export interface ThreeLayersLike {
 
 export interface ThreeMaterialLike {
   type?: string
-  color?: ThreeColorLike
+  color?: ThreeColorInput
   opacity?: number
   visible?: boolean
   vertexColors?: boolean
@@ -162,7 +164,7 @@ export interface ThreeMaterialLike {
   blendEquationAlpha?: number | null
   blendSrcAlpha?: number | null
   blendDstAlpha?: number | null
-  blendColor?: ThreeColorLike
+  blendColor?: ThreeColorInput
   blendAlpha?: number
   premultipliedAlpha?: boolean
   toneMapped?: boolean
@@ -182,7 +184,7 @@ export interface ThreeMaterialLike {
   clearcoatNormalMap?: ThreeTextureLike | null
   clearcoatNormalScale?: { x: number; y: number }
   sheen?: number
-  sheenColor?: ThreeColorLike
+  sheenColor?: ThreeColorInput
   sheenColorMap?: ThreeTextureLike | null
   sheenRoughness?: number
   sheenRoughnessMap?: ThreeTextureLike | null
@@ -201,14 +203,14 @@ export interface ThreeMaterialLike {
   thickness?: number
   thicknessMap?: ThreeTextureLike | null
   attenuationDistance?: number
-  attenuationColor?: ThreeColorLike
-  specularColor?: ThreeColorLike
+  attenuationColor?: ThreeColorInput
+  specularColor?: ThreeColorInput
   specularColorMap?: ThreeTextureLike | null
   specularIntensity?: number
   specularIntensityMap?: ThreeTextureLike | null
-  specular?: ThreeColorLike
+  specular?: ThreeColorInput
   shininess?: number
-  emissive?: ThreeColorLike
+  emissive?: ThreeColorInput
   emissiveIntensity?: number
   emissiveMap?: ThreeTextureLike | null
   normalMap?: ThreeTextureLike | null
@@ -389,8 +391,8 @@ export interface ThreeObject3DLike {
   bindMatrixInverse?: ThreeMatrix4Like
   morphTargetInfluences?: number[]
   morphTargetDictionary?: Record<string, number>
-  color?: ThreeColorLike
-  groundColor?: ThreeColorLike
+  color?: ThreeColorInput
+  groundColor?: ThreeColorInput
   sh?: {
     coefficients?: Array<ThreeColorLike | { x?: number; y?: number; z?: number } | ArrayLike<number>>
   }
@@ -427,14 +429,14 @@ export interface ThreeObject3DLike {
 export interface ThreeSceneRootLike extends ThreeObject3DLike {
   isScene?: boolean
   overrideMaterial?: ThreeMaterialLike | null
-  background?: string | ThreeColorLike | ThreeTextureLike | null
+  background?: ThreeColorInput | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
   backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null
   fog?: {
     isFog?: boolean
     isFogExp2?: boolean
-    color?: ThreeColorLike
+    color?: ThreeColorInput
     near?: number
     far?: number
     density?: number
@@ -502,7 +504,7 @@ export type RenderSortFunction = (a: RenderSortItem, b: RenderSortItem) => numbe
 export interface RenderOptions {
   width?: number
   height?: number
-  background?: number[] | string | ThreeColorLike | ThreeTextureLike | null
+  background?: ThreeColorInput | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number
   backgroundRotation?: ThreeEulerLike | ArrayLike<number> | null
