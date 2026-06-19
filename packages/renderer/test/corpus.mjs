@@ -65,6 +65,7 @@ export function createSceneCorpus() {
     normalRenderModeCorpus(),
     spriteMaterialCorpus(),
     spriteAlphaMapCorpus(),
+    billboardAlphaCutoutCorpus(),
     spriteShadowCorpus(),
     pointSpotLightCorpus(),
     rectAreaLightCorpus(),
@@ -1067,6 +1068,110 @@ function spriteAlphaMapCorpus() {
       const visible = meanRegion(rgba, width, 56, 34, 76, 62)
       if (!(cutout.b > cutout.g + 25 && visible.g > visible.b + 80 && visible.g > visible.r + 80)) {
         throw new Error(`sprite alpha-map corpus should cut out the left side and keep the right side green, got cutout=${JSON.stringify(cutout)} visible=${JSON.stringify(visible)}`)
+      }
+    },
+  }
+}
+
+function billboardAlphaCutoutCorpus() {
+  function makeBillboardScene(kind, materialProps) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial(materialProps))
+      sprite.scale.set(1.2, 1.2, 1)
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+        ...materialProps,
+        size: 48,
+        sizeAttenuation: false,
+      })))
+    }
+    return scene
+  }
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const a2cOptions = { ...options, sampleCount: 4, outputColorSpace: THREE.LinearSRGBColorSpace }
+  const opaqueProps = { color: 0xffffff, opacity: 1 }
+  const hashedProps = { alphaHash: true, color: 0xffffff, opacity: 0.35 }
+  const a2cProps = { alphaToCoverage: true, color: 0xffffff, opacity: 0.5, transparent: false }
+  const opaqueScenes = {
+    points: makeBillboardScene('points', opaqueProps),
+    sprite: makeBillboardScene('sprite', opaqueProps),
+  }
+  const hashedScenes = {
+    points: makeBillboardScene('points', hashedProps),
+    sprite: makeBillboardScene('sprite', hashedProps),
+  }
+  const a2cScenes = {
+    points: makeBillboardScene('points', a2cProps),
+    sprite: makeBillboardScene('sprite', a2cProps),
+  }
+  const stats = new Map()
+
+  function visiblePixels(rgba) {
+    return countRegionPixels(
+      rgba,
+      options.width,
+      24,
+      24,
+      72,
+      72,
+      (r, g, b) => r > 20 || g > 20 || b > 20,
+    )
+  }
+
+  function centerMean(rgba) {
+    return meanRegion(rgba, options.width, 36, 36, 60, 60)
+  }
+
+  return {
+    name: 'billboard-alpha-cutouts',
+    scene: a2cScenes.points,
+    camera,
+    options: a2cOptions,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.04,
+    browserReference: false,
+    render(renderer) {
+      let output = null
+      for (const kind of ['sprite', 'points']) {
+        const opaque = renderer.render(opaqueScenes[kind], camera, options)
+        const hashed = renderer.render(hashedScenes[kind], camera, options)
+        const a2c = renderer.render(a2cScenes[kind], camera, a2cOptions)
+        stats.set(kind, {
+          a2c: centerMean(a2c),
+          hashedPixels: visiblePixels(hashed),
+          opaquePixels: visiblePixels(opaque),
+          opaque: centerMean(opaque),
+        })
+        if (kind === 'points') {
+          output = a2c
+        }
+      }
+      return output
+    },
+    validate() {
+      for (const kind of ['sprite', 'points']) {
+        const result = stats.get(kind)
+        if (!result) {
+          throw new Error(`billboard alpha corpus did not record ${kind} stats`)
+        }
+        if (!(result.opaquePixels > 1400)) {
+          throw new Error(`${kind} opaque billboard should fill sampled region, got ${result.opaquePixels}`)
+        }
+        if (!(result.hashedPixels > 100 && result.hashedPixels < result.opaquePixels - 260)) {
+          throw new Error(`${kind} alphaHash should keep sparse visible pixels, got hashed=${result.hashedPixels} opaque=${result.opaquePixels}`)
+        }
+        if (!(result.opaque.r > 170 && result.a2c.r > 30 && result.a2c.r < result.opaque.r - 80)) {
+          throw new Error(`${kind} alphaToCoverage should resolve partial billboard coverage, got opaque=${JSON.stringify(result.opaque)} a2c=${JSON.stringify(result.a2c)}`)
+        }
       }
     },
   }
