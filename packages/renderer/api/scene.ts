@@ -2668,11 +2668,11 @@ function dashedLineAttributes(
 ): DashedLineExpansion {
   const dashSize = positiveMaterialOrObjectNumber(material.dashSize, 'material.dashSize', 3)
   const gapSize = nonNegativeMaterialOrObjectNumber(material.gapSize, 'material.gapSize', 1)
-  const scale = positiveMaterialOrObjectNumber(material.scale, 'material.scale', 1)
+  const scale = nonNegativeMaterialOrObjectNumber(material.scale, 'material.scale', 1)
 
   const segments = lineSegmentsWithDistances(positions, source, start, end, object, lineDistance)
   const out = createDashedLineExpansion(uvs, uvs2, colors)
-  if (!lineDistance || gapSize <= 0) {
+  if (!lineDistance || gapSize <= 0 || scale === 0) {
     for (const segment of segments) {
       appendInterpolatedLine(out, positions, uvs, uvs2, colors, segment.a, segment.b, 0, 1)
     }

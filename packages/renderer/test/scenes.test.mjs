@@ -5973,11 +5973,11 @@ test('invalid billboard and line scalar values fail clearly', () => {
       material.scale = 'fast'
       return lineScene(material)
     }, /material\.scale must be a finite number/i],
-    ['dash scale zero', () => {
+    ['dash scale negative', () => {
       const material = new THREE.LineDashedMaterial({ color: 0xffffff })
-      material.scale = 0
+      material.scale = -0.1
       return lineScene(material)
-    }, /material\.scale must be positive/i],
+    }, /material\.scale must be non-negative/i],
     ['line distance finite', () => {
       const material = new THREE.LineDashedMaterial({ color: 0xffffff })
       return lineScene(material, (geometry) => {
@@ -23612,6 +23612,46 @@ test('LineDashedMaterial scale changes dash coverage', () => {
   const highScale = renderScale(2)
   assert.ok(lowScale > 0.001, `low scale should keep the line visible (${lowScale})`)
   assert.ok(highScale < lowScale * 0.35, `higher scale should advance into the gap sooner (${highScale} vs ${lowScale})`)
+})
+
+test('LineDashedMaterial scale zero renders solid like WebGL', () => {
+  function renderMaterial(material) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.8, 0, 0),
+      new THREE.Vector3(0.8, 0, 0),
+    ])
+    const line = new THREE.Line(geom, material)
+    if (material.isLineDashedMaterial === true) line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+
+    const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return countRegionPixels(
+      renderRgba(scene, camera, { width: 96, height: 96 }),
+      96,
+      96,
+      12,
+      42,
+      84,
+      54,
+      (r, g, b) => r > 180 && g > 180 && b > 180,
+    )
+  }
+
+  const solid = renderMaterial(new THREE.LineBasicMaterial({ color: 0xffffff }))
+  const zeroScale = renderMaterial(new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 0.2,
+    gapSize: 0.2,
+    scale: 0,
+  }))
+
+  assert.ok(solid > 20, `solid line should render visible pixels (${solid})`)
+  assert.ok(zeroScale > solid * 0.8, `scale=0 dashed line should render solid-like coverage (${zeroScale} vs ${solid})`)
 })
 
 test('LineDashedMaterial uses custom lineDistance attributes', () => {
