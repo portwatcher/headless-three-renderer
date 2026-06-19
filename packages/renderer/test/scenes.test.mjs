@@ -1871,6 +1871,7 @@ test('ArrayCamera supports auxiliary MRT-shaped target attachments', () => {
   const target = {
     textures: [
       {},
+      { userData: { headlessThreeRenderer: { renderMode: 'color' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
@@ -1888,12 +1889,17 @@ test('ArrayCamera supports auxiliary MRT-shaped target attachments', () => {
   assert.ok(colorLeft.r > colorLeft.g + 80, `primary ArrayCamera attachment left viewport should render red (${colorLeft.r}, ${colorLeft.g})`)
   assert.ok(colorRight.g > colorRight.r + 80, `primary ArrayCamera attachment right viewport should render green (${colorRight.g}, ${colorRight.r})`)
 
-  const maskLeft = meanRegion(target.textures[1].image.data, 64, 64, 8, 20, 24, 44)
-  const maskRight = meanRegion(target.textures[1].image.data, 64, 64, 40, 20, 56, 44)
+  const colorCopyLeft = meanRegion(target.textures[1].image.data, 64, 64, 8, 20, 24, 44)
+  const colorCopyRight = meanRegion(target.textures[1].image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(colorCopyLeft.r > colorCopyLeft.g + 80, `secondary color ArrayCamera attachment left viewport should render red (${colorCopyLeft.r}, ${colorCopyLeft.g})`)
+  assert.ok(colorCopyRight.g > colorCopyRight.r + 80, `secondary color ArrayCamera attachment right viewport should render green (${colorCopyRight.g}, ${colorCopyRight.r})`)
+
+  const maskLeft = meanRegion(target.textures[2].image.data, 64, 64, 8, 20, 24, 44)
+  const maskRight = meanRegion(target.textures[2].image.data, 64, 64, 40, 20, 56, 44)
   assert.ok(maskLeft.r > 250 && maskRight.r > 250, `mask attachment should compose both viewports (${maskLeft.r}, ${maskRight.r})`)
 
-  const objectIdLeft = meanRegion(target.textures[2].image.data, 64, 64, 8, 20, 24, 44)
-  const objectIdRight = meanRegion(target.textures[2].image.data, 64, 64, 40, 20, 56, 44)
+  const objectIdLeft = meanRegion(target.textures[3].image.data, 64, 64, 8, 20, 24, 44)
+  const objectIdRight = meanRegion(target.textures[3].image.data, 64, 64, 40, 20, 56, 44)
   const redEncoded = red.id + 1
   const greenEncoded = green.id + 1
   assertRgbClose(objectIdLeft, objectIdBytes(redEncoded), 'left auxiliary ArrayCamera object id')
@@ -1902,8 +1908,8 @@ test('ArrayCamera supports auxiliary MRT-shaped target attachments', () => {
   assert.equal(target.objectIdMap[String(redEncoded)].id, red.id)
   assert.equal(target.objectIdMap[String(greenEncoded)].id, green.id)
 
-  const normalLeft = meanRegion(target.textures[3].image.data, 64, 64, 8, 20, 24, 44)
-  const normalRight = meanRegion(target.textures[3].image.data, 64, 64, 40, 20, 56, 44)
+  const normalLeft = meanRegion(target.textures[4].image.data, 64, 64, 8, 20, 24, 44)
+  const normalRight = meanRegion(target.textures[4].image.data, 64, 64, 40, 20, 56, 44)
   assert.ok(normalLeft.b > 250 && normalRight.b > 250, `normal attachment should compose both viewports (${normalLeft.b}, ${normalRight.b})`)
 })
 
@@ -2044,6 +2050,7 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
   cubeTarget.textures = [
     cubeTarget.texture,
+    { userData: { headlessThreeRenderer: { renderMode: 'color' } } },
     { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
     { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
     { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
@@ -2059,18 +2066,24 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
   assert.equal(cubeTarget.textures[1].image.length, 6)
   assert.equal(cubeTarget.textures[2].image.length, 6)
   assert.equal(cubeTarget.textures[3].image.length, 6)
+  assert.equal(cubeTarget.textures[4].image.length, 6)
 
   const colorPx = meanRegion(cubeTarget.textures[0].image[0].data, 32, 32, 12, 12, 20, 20)
   const colorNx = meanRegion(cubeTarget.textures[0].image[1].data, 32, 32, 12, 12, 20, 20)
   assert.ok(colorPx.r > colorPx.g + 80 && colorPx.r > colorPx.b + 80, `primary +X cube attachment should capture red (${colorPx.r}, ${colorPx.g}, ${colorPx.b})`)
   assert.ok(colorNx.g > colorNx.r + 60 && colorNx.g > colorNx.b + 60, `primary -X cube attachment should capture green (${colorNx.r}, ${colorNx.g}, ${colorNx.b})`)
 
-  const maskPx = meanRegion(cubeTarget.textures[1].image[0].data, 32, 32, 12, 12, 20, 20)
-  const maskNx = meanRegion(cubeTarget.textures[1].image[1].data, 32, 32, 12, 12, 20, 20)
+  const colorCopyPx = meanRegion(cubeTarget.textures[1].image[0].data, 32, 32, 12, 12, 20, 20)
+  const colorCopyNx = meanRegion(cubeTarget.textures[1].image[1].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(colorCopyPx.r > colorCopyPx.g + 80 && colorCopyPx.r > colorCopyPx.b + 80, `secondary +X cube color attachment should capture red (${colorCopyPx.r}, ${colorCopyPx.g}, ${colorCopyPx.b})`)
+  assert.ok(colorCopyNx.g > colorCopyNx.r + 60 && colorCopyNx.g > colorCopyNx.b + 60, `secondary -X cube color attachment should capture green (${colorCopyNx.r}, ${colorCopyNx.g}, ${colorCopyNx.b})`)
+
+  const maskPx = meanRegion(cubeTarget.textures[2].image[0].data, 32, 32, 12, 12, 20, 20)
+  const maskNx = meanRegion(cubeTarget.textures[2].image[1].data, 32, 32, 12, 12, 20, 20)
   assert.ok(maskPx.r > 250 && maskNx.r > 250, `cube mask attachment should capture visible faces (${maskPx.r}, ${maskNx.r})`)
 
-  const objectIdPx = meanRegion(cubeTarget.textures[2].image[0].data, 32, 32, 12, 12, 20, 20)
-  const objectIdNx = meanRegion(cubeTarget.textures[2].image[1].data, 32, 32, 12, 12, 20, 20)
+  const objectIdPx = meanRegion(cubeTarget.textures[3].image[0].data, 32, 32, 12, 12, 20, 20)
+  const objectIdNx = meanRegion(cubeTarget.textures[3].image[1].data, 32, 32, 12, 12, 20, 20)
   const positiveXEncoded = positiveX.id + 1
   const negativeXEncoded = negativeX.id + 1
   assertRgbClose(objectIdPx, objectIdBytes(positiveXEncoded), '+X auxiliary CubeCamera object id')
@@ -2079,8 +2092,8 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
   assert.equal(cubeTarget.objectIdMap[String(positiveXEncoded)].id, positiveX.id)
   assert.equal(cubeTarget.objectIdMap[String(negativeXEncoded)].id, negativeX.id)
 
-  const normalPx = meanRegion(cubeTarget.textures[3].image[0].data, 32, 32, 12, 12, 20, 20)
-  const normalNx = meanRegion(cubeTarget.textures[3].image[1].data, 32, 32, 12, 12, 20, 20)
+  const normalPx = meanRegion(cubeTarget.textures[4].image[0].data, 32, 32, 12, 12, 20, 20)
+  const normalNx = meanRegion(cubeTarget.textures[4].image[1].data, 32, 32, 12, 12, 20, 20)
   assert.ok(normalPx.b > 250 && normalNx.b > 250, `cube normal attachment should capture face normals (${normalPx.b}, ${normalNx.b})`)
 })
 
@@ -19928,6 +19941,7 @@ test('MRT-shaped targets can request auxiliary render-mode attachments', () => {
     isWebGLMultipleRenderTargets: true,
     textures: [
       {},
+      { format: THREE.RGFormat, type: THREE.FloatType, userData: { headlessThreeRenderer: { renderMode: 'color' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
@@ -19943,17 +19957,25 @@ test('MRT-shaped targets can request auxiliary render-mode attachments', () => {
   const colorCenter = meanRegion(target.data, 64, 64, 28, 28, 36, 36)
   assert.ok(colorCenter.r > 180 && colorCenter.g < 20 && colorCenter.b < 20, `primary color attachment should stay red (${colorCenter.r}, ${colorCenter.g}, ${colorCenter.b})`)
 
-  const maskCenter = meanRegion(target.textures[1].image.data, 64, 64, 28, 28, 36, 36)
-  const maskCorner = meanRegion(target.textures[1].image.data, 64, 64, 0, 0, 8, 8)
+  const colorCopyData = target.textures[1].image.data
+  const colorCopyCenter = ((32 * 64) + 32) * 2
+  assert.ok(colorCopyData instanceof Float32Array, 'secondary color attachment should honor FloatType RG readback')
+  assert.equal(colorCopyData.length, 64 * 64 * 2)
+  assert.equal(target.textures[1].source.data.data, colorCopyData)
+  assert.ok(colorCopyData[colorCopyCenter] > 0.7, `secondary color attachment red channel should be normalized (${colorCopyData[colorCopyCenter]})`)
+  assert.ok(colorCopyData[colorCopyCenter + 1] < 0.05, `secondary color attachment green channel should stay near zero (${colorCopyData[colorCopyCenter + 1]})`)
+
+  const maskCenter = meanRegion(target.textures[2].image.data, 64, 64, 28, 28, 36, 36)
+  const maskCorner = meanRegion(target.textures[2].image.data, 64, 64, 0, 0, 8, 8)
   assert.ok(maskCenter.r > 250 && maskCenter.g > 250 && maskCenter.b > 250, `mask attachment center should be white (${maskCenter.r}, ${maskCenter.g}, ${maskCenter.b})`)
   assert.ok(maskCorner.r < 2 && maskCorner.g < 2 && maskCorner.b < 2, `mask attachment background should be black (${maskCorner.r}, ${maskCorner.g}, ${maskCorner.b})`)
 
-  const objectIdCenter = meanRegion(target.textures[2].image.data, 64, 64, 28, 28, 36, 36)
+  const objectIdCenter = meanRegion(target.textures[3].image.data, 64, 64, 28, 28, 36, 36)
   const encoded = mesh.id + 1
   assertRgbClose(objectIdCenter, objectIdBytes(encoded), 'auxiliary object-id attachment')
   assert.equal(target.objectIdMap[String(encoded)].id, mesh.id)
 
-  const normalCenter = meanRegion(target.textures[3].image.data, 64, 64, 28, 28, 36, 36)
+  const normalCenter = meanRegion(target.textures[4].image.data, 64, 64, 28, 28, 36, 36)
   assert.ok(normalCenter.r > 120 && normalCenter.b > 200, `normal attachment should encode the tilted view normal (${normalCenter.r}, ${normalCenter.g}, ${normalCenter.b})`)
 
   const countedTarget = new THREE.WebGLRenderTarget(64, 64, { count: 2 })
