@@ -979,6 +979,7 @@ export function extractPbrProperties(
     props.displacementMapMinFilter = minFilterModeToString(material.displacementMap)
     props.displacementMapAnisotropy = textureAnisotropy(material.displacementMap, 'material.displacementMap')
     props.displacementMapTransform = textureTransform(material.displacementMap, 'material.displacementMap')
+    props.displacementMapColorSpace = textureColorSpace(material.displacementMap)
     props.displacementMapUsesUv2 = textureUvChannel(material.displacementMap) > 0
     props.displacementScale = finiteNumberOrDefault(material.displacementScale, 'material.displacementScale', 1)
     props.displacementBias = finiteNumberOrDefault(material.displacementBias, 'material.displacementBias', 0)

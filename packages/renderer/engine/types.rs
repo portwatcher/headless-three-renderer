@@ -666,6 +666,8 @@ pub struct SceneMesh {
     pub displacement_map_anisotropy: Option<f64>,
     /// Displacement map UV transform `[a, c, tx, b, d, ty]`.
     pub displacement_map_transform: Option<Vec<f64>>,
+    /// Displacement map color space. `"srgb"` decodes the red channel before displacement.
+    pub displacement_map_color_space: Option<String>,
     /// Whether displacement map sampling uses the secondary UV stream.
     pub displacement_map_uses_uv2: Option<bool>,
     /// Displacement scale multiplier. Defaults to 1.

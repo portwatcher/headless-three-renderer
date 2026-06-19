@@ -702,6 +702,8 @@ export interface SceneMesh {
   displacementMapAnisotropy?: number
   /** Displacement map UV transform `[a, c, tx, b, d, ty]`. */
   displacementMapTransform?: Array<number>
+  /** Displacement map color space. `"srgb"` decodes the red channel before displacement. */
+  displacementMapColorSpace?: string
   /** Whether displacement map sampling uses the secondary UV stream. */
   displacementMapUsesUv2?: boolean
   /** Displacement scale multiplier. Defaults to 1. */

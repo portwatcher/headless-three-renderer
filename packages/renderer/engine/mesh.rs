@@ -842,6 +842,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         bump_map_transform,
         matcap_map_transform,
         displacement_map_transform,
+        displacement_map_is_srgb,
         metallic_roughness_texture_transform,
         metallic_roughness_texture_is_srgb,
         emissive_map_transform,
@@ -1030,6 +1031,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
                 &mut vertices,
                 displacement_map,
                 displacement_map_transform,
+                displacement_map_is_srgb,
                 mesh.displacement_map_uses_uv2.unwrap_or(false),
                 displacement_scale,
                 displacement_bias,
@@ -1672,6 +1674,7 @@ struct SurfaceTextureInputs {
     bump_map_transform: [f32; 6],
     matcap_map_transform: [f32; 6],
     displacement_map_transform: [f32; 6],
+    displacement_map_is_srgb: bool,
     metallic_roughness_texture_transform: [f32; 6],
     emissive_map_transform: [f32; 6],
     ao_map_transform: [f32; 6],
@@ -1806,6 +1809,8 @@ fn prepare_surface_texture_inputs(
         let ao_map_is_srgb = matches!(mesh.ao_map_color_space.as_deref(), Some("srgb"));
         let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
         let specular_map_is_srgb = matches!(mesh.specular_map_color_space.as_deref(), Some("srgb"));
+        let displacement_map_is_srgb =
+            matches!(mesh.displacement_map_color_space.as_deref(), Some("srgb"));
 
         let mut common = prepare_common_texture_inputs(mesh, mesh_index)?;
         common.alpha_map = match alpha_map {
@@ -1821,6 +1826,7 @@ fn prepare_surface_texture_inputs(
             bump_map_transform,
             matcap_map_transform,
             displacement_map_transform,
+            displacement_map_is_srgb,
             metallic_roughness_texture_transform,
             emissive_map_transform,
             ao_map_transform,
@@ -2674,19 +2680,23 @@ fn sample_texture_color_channel(
 }
 
 fn srgb_u8_to_linear_u8(value: u8) -> u8 {
+    (srgb_u8_to_linear_f32(value).clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+fn srgb_u8_to_linear_f32(value: u8) -> f32 {
     let channel = value as f32 / 255.0;
-    let linear = if channel <= 0.04045 {
+    if channel <= 0.04045 {
         channel / 12.92
     } else {
         ((channel + 0.055) / 1.055).powf(2.4)
-    };
-    (linear.clamp(0.0, 1.0) * 255.0).round() as u8
+    }
 }
 
 fn apply_displacement_map(
     vertices: &mut [Vertex],
     texture: &PreparedTexture,
     transform: [f32; 6],
+    is_srgb: bool,
     uses_uv2: bool,
     scale: f32,
     bias: f32,
@@ -2702,7 +2712,7 @@ fn apply_displacement_map(
         }
         let source_uv = if uses_uv2 { vertex.uv2 } else { vertex.uv };
         let uv = transform_uv(source_uv, transform);
-        let sample = sample_texture_channel_uv(texture, uv[0], uv[1], 0);
+        let sample = sample_texture_color_channel_uv(texture, uv[0], uv[1], 0, is_srgb);
         let displacement = sample * scale + bias;
         let position = Vec3::from_array(vertex.position) + normal * displacement;
         vertex.position = position.to_array();
@@ -2720,6 +2730,23 @@ fn sample_texture_channel_uv(texture: &PreparedTexture, u: f32, v: f32, channel:
     match texture.mag_filter {
         TextureFilter::Nearest => sample_texture_channel_nearest(texture, u, v, channel),
         TextureFilter::Linear => sample_texture_channel_linear(texture, u, v, channel),
+    }
+}
+
+fn sample_texture_color_channel_uv(
+    texture: &PreparedTexture,
+    u: f32,
+    v: f32,
+    channel: usize,
+    is_srgb: bool,
+) -> f32 {
+    if !is_srgb || channel >= 3 {
+        return sample_texture_channel_uv(texture, u, v, channel);
+    }
+
+    match texture.mag_filter {
+        TextureFilter::Nearest => sample_texture_color_channel_nearest(texture, u, v, channel),
+        TextureFilter::Linear => sample_texture_color_channel_linear(texture, u, v, channel),
     }
 }
 
@@ -2742,6 +2769,26 @@ fn sample_texture_channel_nearest(
     texture.rgba[((y * texture.width + x) * 4) as usize + channel] as f32 / 255.0
 }
 
+fn sample_texture_color_channel_nearest(
+    texture: &PreparedTexture,
+    u: f32,
+    v: f32,
+    channel: usize,
+) -> f32 {
+    let x = wrapped_texel_index(
+        (u * texture.width as f32).floor() as i32,
+        texture.width,
+        texture.wrap_s,
+    );
+    let y = wrapped_texel_index(
+        (v * texture.height as f32).floor() as i32,
+        texture.height,
+        texture.wrap_t,
+    );
+    let value = texture.rgba[((y * texture.width + x) * 4) as usize + channel];
+    srgb_u8_to_linear_f32(value)
+}
+
 fn sample_texture_channel_linear(texture: &PreparedTexture, u: f32, v: f32, channel: usize) -> f32 {
     let x = u * texture.width as f32 - 0.5;
     let y = v * texture.height as f32 - 0.5;
@@ -2759,10 +2806,39 @@ fn sample_texture_channel_linear(texture: &PreparedTexture, u: f32, v: f32, chan
     sx0 * (1.0 - ty) + sx1 * ty
 }
 
+fn sample_texture_color_channel_linear(
+    texture: &PreparedTexture,
+    u: f32,
+    v: f32,
+    channel: usize,
+) -> f32 {
+    let x = u * texture.width as f32 - 0.5;
+    let y = v * texture.height as f32 - 0.5;
+    let x0 = x.floor() as i32;
+    let y0 = y.floor() as i32;
+    let tx = x - x0 as f32;
+    let ty = y - y0 as f32;
+
+    let s00 = texel_color_channel(texture, x0, y0, channel);
+    let s10 = texel_color_channel(texture, x0 + 1, y0, channel);
+    let s01 = texel_color_channel(texture, x0, y0 + 1, channel);
+    let s11 = texel_color_channel(texture, x0 + 1, y0 + 1, channel);
+    let sx0 = s00 * (1.0 - tx) + s10 * tx;
+    let sx1 = s01 * (1.0 - tx) + s11 * tx;
+    sx0 * (1.0 - ty) + sx1 * ty
+}
+
 fn texel_channel(texture: &PreparedTexture, x: i32, y: i32, channel: usize) -> f32 {
     let tx = wrapped_texel_index(x, texture.width, texture.wrap_s);
     let ty = wrapped_texel_index(y, texture.height, texture.wrap_t);
     texture.rgba[((ty * texture.width + tx) * 4) as usize + channel] as f32 / 255.0
+}
+
+fn texel_color_channel(texture: &PreparedTexture, x: i32, y: i32, channel: usize) -> f32 {
+    let tx = wrapped_texel_index(x, texture.width, texture.wrap_s);
+    let ty = wrapped_texel_index(y, texture.height, texture.wrap_t);
+    let value = texture.rgba[((ty * texture.width + tx) * 4) as usize + channel];
+    srgb_u8_to_linear_f32(value)
 }
 
 fn wrapped_texel_index(index: i32, size: u32, wrap: WrapMode) -> u32 {

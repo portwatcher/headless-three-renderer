@@ -144,7 +144,7 @@ The public API accepts only Three.js-like objects:
 - `MeshNormalMaterial` and `MeshMatcapMaterial` normal-map output
 - `material.flatShading` per-face normals for triangle meshes without normal maps
 - `MeshMatcapMaterial.map` color maps with primary/secondary `texture.channel` UV selection, transforms, horizontal/vertical repeat/mirrored wrapping, and nearest/linear filtering
-- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, texture transforms, horizontal/vertical repeat/mirrored wrapping, and nearest/linear sampler filtering; invalid scale/bias values fail clearly
+- displacement map CPU-baked into triangle vertices with `displacementScale`, `displacementBias`, primary/secondary `texture.channel` UV selection, texture color-space decode, texture transforms, horizontal/vertical repeat/mirrored wrapping, and nearest/linear sampler filtering; invalid scale/bias values fail clearly
 - `MeshToonMaterial.gradientMap` red-channel diffuse ramps with sRGB color-space decode, horizontal repeat/mirrored wrapping, and nearest/linear filtering; direct conformance also covers toon normal/bump-map lighting perturbation, base-map UV channels, emissive-map UV channels, light-map secondary UVs, and alpha-map cutouts
 - `MeshDepthMaterial.depthPacking`: basic, RGBA, RGB, and RG packing, with clear failures for unsupported depth-packing constants
 - `MeshDistanceMaterial` `referencePosition`, `nearDistance`, and `farDistance` overrides, with invalid range/reference values and malformed material userData/renderer hint containers failing clearly, plus alpha-map cutouts and CPU-baked displacement

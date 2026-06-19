@@ -5367,6 +5367,42 @@ test('displacementMap honors texture filters before depth output', () => {
   assert.ok(nearest.r > linear.r + 8, `nearest displacement should sample the high texel more strongly than linear filtering (${nearest.r} vs ${linear.r})`)
 })
 
+test('displacementMap decodes sRGB colorSpace before depth output', () => {
+  function renderColorSpace(colorSpace) {
+    const displacementMap = solidTexture(128, 0, 0, 255)
+    displacementMap.colorSpace = colorSpace
+    displacementMap.magFilter = THREE.NearestFilter
+    displacementMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.5, 0.5),
+      new THREE.MeshDepthMaterial({
+        displacementMap,
+        displacementScale: 4,
+        displacementBias: 0,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  assert.ok(
+    linear.r > srgb.r + 8,
+    `linear displacementMap should move the depth plane nearer before sRGB decode (${linear.r} vs ${srgb.r})`,
+  )
+})
+
 test('displacementMap honors horizontal and vertical repeat wrapping before depth output', () => {
   function renderDisplaced({ wrapS, wrapT, vertical = false }) {
     const displacementMap = vertical
