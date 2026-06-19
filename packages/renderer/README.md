@@ -269,7 +269,7 @@ Directional cascades can be provided with `light.userData.headlessThreeRenderer.
 
 ### Tone Mapping
 
-Output uses the Narkowicz ACES Filmic tone mapping fit by default with a three.js-compatible `toneMappingExposure / 0.6` exposure pre-scale, matching `THREE.ACESFilmicToneMapping`. Reusable `Renderer.toneMapping` supports `THREE.NoToneMapping`, `THREE.LinearToneMapping`, `THREE.ReinhardToneMapping`, `THREE.CineonToneMapping`, `THREE.ACESFilmicToneMapping`, `THREE.AgXToneMapping`, and `THREE.NeutralToneMapping`; `Renderer.toneMappingExposure` defaults to `1`; custom tone mapping, other unsupported tone-mapping constants, and invalid exposure values fail clearly.
+Output uses the Narkowicz ACES Filmic tone mapping fit by default with a three.js-compatible `toneMappingExposure / 0.6` exposure pre-scale, matching `THREE.ACESFilmicToneMapping`. Reusable `Renderer.toneMapping` supports `THREE.NoToneMapping`, `THREE.LinearToneMapping`, `THREE.ReinhardToneMapping`, `THREE.CineonToneMapping`, `THREE.ACESFilmicToneMapping`, `THREE.CustomToneMapping`, `THREE.AgXToneMapping`, and `THREE.NeutralToneMapping`; `THREE.CustomToneMapping` uses Three.js' default identity custom function because GLSL shader-chunk customizations are not translated; `Renderer.toneMappingExposure` defaults to `1`; unsupported tone-mapping constants and invalid exposure values fail clearly.
 
 ### Render Targets & Post-Processing
 

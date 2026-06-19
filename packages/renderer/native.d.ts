@@ -84,7 +84,7 @@ export interface RenderScene {
   format?: string
   /** Output color space. Supported values are `"srgb"` (default), `"srgb-linear"`, `"linear-srgb"`, `"linearsrgb"`, and `"linear"`. */
   outputColorSpace?: string
-  /** Three.js tone-mapping mode. Supports No, Linear, Reinhard, Cineon, ACES Filmic, AgX, and Neutral. Defaults to ACES Filmic. */
+  /** Three.js tone-mapping mode. Supports No, Linear, Reinhard, Cineon, ACES Filmic, Custom, AgX, and Neutral. Defaults to ACES Filmic. */
   toneMapping?: number
   /** Material tone-mapping exposure multiplier. Defaults to 1. */
   toneMappingExposure?: number

@@ -553,10 +553,11 @@ fn resolve_tone_mapping(value: Option<u32>) -> Result<f32> {
         2 => Ok(2.0), // THREE.ReinhardToneMapping
         3 => Ok(3.0), // THREE.CineonToneMapping
         4 => Ok(4.0), // THREE.ACESFilmicToneMapping
+        5 => Ok(5.0), // THREE.CustomToneMapping
         6 => Ok(6.0), // THREE.AgXToneMapping
         7 => Ok(7.0), // THREE.NeutralToneMapping
         other => bail!(
-            "unsupported scene.toneMapping `{other}`; expected NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, AgXToneMapping, or NeutralToneMapping"
+            "unsupported scene.toneMapping `{other}`; expected NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, CustomToneMapping, AgXToneMapping, or NeutralToneMapping"
         ),
     }
 }

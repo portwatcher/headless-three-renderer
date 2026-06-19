@@ -16653,6 +16653,8 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
   const reinhard = renderToneMappingState()
   renderer.toneMapping = THREE.CineonToneMapping
   const cineon = renderToneMappingState()
+  renderer.toneMapping = THREE.CustomToneMapping
+  const custom = renderToneMappingState()
   renderer.toneMapping = THREE.AgXToneMapping
   const agx = renderToneMappingState()
   renderer.toneMapping = THREE.NeutralToneMapping
@@ -16665,6 +16667,10 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
   assert.ok(
     cineon.r > reinhard.r + 20 && cineon.r < linear.r - 20,
     `CineonToneMapping should land between Reinhard and linear white (${cineon.r}, ${reinhard.r}, ${linear.r})`,
+  )
+  assert.ok(
+    Math.abs(custom.r - linear.r) < 2,
+    `CustomToneMapping should use Three.js' default identity custom function (${custom.r} vs ${linear.r})`,
   )
   assert.ok(
     agx.r > 0 && agx.r < linear.r - 20,
@@ -16680,8 +16686,8 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
     /Renderer\.toneMapping must be a Three\.js tone mapping constant/i,
   )
   assert.throws(
-    () => { renderer.toneMapping = THREE.CustomToneMapping },
-    /Renderer\.toneMapping 5 is not supported.*NoToneMapping.*LinearToneMapping.*ReinhardToneMapping.*CineonToneMapping.*ACESFilmicToneMapping.*AgXToneMapping.*NeutralToneMapping/i,
+    () => { renderer.toneMapping = 99 },
+    /Renderer\.toneMapping 99 is not supported.*NoToneMapping.*LinearToneMapping.*ReinhardToneMapping.*CineonToneMapping.*ACESFilmicToneMapping.*CustomToneMapping.*AgXToneMapping.*NeutralToneMapping/i,
   )
   assert.throws(
     () => { renderer.toneMappingExposure = Number.NaN },

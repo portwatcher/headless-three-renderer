@@ -1635,6 +1635,9 @@ fn apply_material_tone_mapping(color: vec3<f32>) -> vec3<f32> {
   if abs(mode - 3.0) < 0.5 {
     return cineon_tone_mapping(color);
   }
+  if abs(mode - 5.0) < 0.5 {
+    return color;
+  }
   if abs(mode - 6.0) < 0.5 {
     return agx_tone_mapping(color);
   }
