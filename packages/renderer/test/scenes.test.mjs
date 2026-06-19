@@ -4216,7 +4216,7 @@ test('material envMapRotation rotates shared IBL', () => {
   assert.ok(rotated.g > rotated.r + 15, `rotated material reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
 })
 
-test('material envMapRotation rotates Basic and Lambert legacy env maps', () => {
+test('material envMapRotation rotates Basic, Lambert, and Phong legacy env maps', () => {
   function renderWithRotation(makeMaterial, yRotation) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -4251,6 +4251,14 @@ test('material envMapRotation rotates Basic and Lambert legacy env maps', () => 
     })],
     ['Lambert', (envMap) => new THREE.MeshLambertMaterial({
       color: 0xffffff,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+    })],
+    ['Phong', (envMap) => new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 120,
       envMap,
       combine: THREE.MixOperation,
       reflectivity: 1,
