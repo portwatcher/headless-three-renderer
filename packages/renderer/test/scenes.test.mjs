@@ -9219,25 +9219,44 @@ test('Line, LineSegments, and LineLoop objects cast directional shadows', () => 
   }
 })
 
-test('LineSegments objects cast spot and point shadows', () => {
-  function makeLineSegments(castShadow) {
+test('Line, LineSegments, and LineLoop objects cast spot and point shadows', () => {
+  function makeLineObject(kind, castShadow) {
     const material = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 6 })
     material.colorWrite = false
     material.depthWrite = false
 
+    if (kind === 'segments') {
+      const positions = []
+      for (let offset = -3; offset <= 3; offset += 0.35) {
+        positions.push(-3, 2, offset, 3, 2, offset)
+        positions.push(offset, 2, -3, offset, 2, 3)
+      }
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+      const line = new THREE.LineSegments(geometry, material)
+      line.castShadow = castShadow
+      return line
+    }
+
     const positions = []
-    for (let offset = -3; offset <= 3; offset += 0.35) {
-      positions.push(-3, 2, offset, 3, 2, offset)
-      positions.push(offset, 2, -3, offset, 2, 3)
+    for (let row = 0; row < 18; row += 1) {
+      const z = -3 + row * (6 / 17)
+      if (row % 2 === 0) {
+        positions.push(-3, 2, z, 3, 2, z)
+      } else {
+        positions.push(3, 2, z, -3, 2, z)
+      }
     }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    const line = new THREE.LineSegments(geometry, material)
+    const line = kind === 'loop'
+      ? new THREE.LineLoop(geometry, material)
+      : new THREE.Line(geometry, material)
     line.castShadow = castShadow
     return line
   }
 
-  function renderLineSegmentsShadow(lightKind, castShadow) {
+  function renderLineShadow(lightKind, kind, castShadow) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -9248,7 +9267,7 @@ test('LineSegments objects cast spot and point shadows', () => {
     receiver.rotation.x = -Math.PI / 2
     receiver.receiveShadow = true
     scene.add(receiver)
-    scene.add(makeLineSegments(castShadow))
+    scene.add(makeLineObject(kind, castShadow))
 
     if (lightKind === 'spot') {
       const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
@@ -9278,11 +9297,13 @@ test('LineSegments objects cast spot and point shadows', () => {
   }
 
   for (const lightKind of ['spot', 'point']) {
-    const unshadowed = renderLineSegmentsShadow(lightKind, false)
-    const shadowed = renderLineSegmentsShadow(lightKind, true)
-    const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
-    const shadowedLum = shadowed.r + shadowed.g + shadowed.b
-    assert.ok(shadowedLum < unshadowedLum - 4, `${lightKind} line shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
+    for (const kind of ['line', 'segments', 'loop']) {
+      const unshadowed = renderLineShadow(lightKind, kind, false)
+      const shadowed = renderLineShadow(lightKind, kind, true)
+      const unshadowedLum = unshadowed.r + unshadowed.g + unshadowed.b
+      const shadowedLum = shadowed.r + shadowed.g + shadowed.b
+      assert.ok(shadowedLum < unshadowedLum - 4, `${lightKind} ${kind} shadow should darken the receiver (${shadowedLum} vs ${unshadowedLum})`)
+    }
   }
 })
 
