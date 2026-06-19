@@ -29195,11 +29195,23 @@ test('Renderer resource init hooks are validated no-op compatibility hooks', () 
   )
 })
 
-test('Renderer framebuffer and texture copy APIs fail clearly', () => {
+test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   const renderer = new Renderer()
+  const target = { texture: {}, depthTexture: {} }
+  const externalColorTexture = {}
+  const externalDepthTexture = {}
+  const externalFramebuffer = {}
   const source = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
   const destination = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
 
+  assert.throws(
+    () => renderer.setRenderTargetTextures(target, externalColorTexture, externalDepthTexture),
+    /Renderer\.setRenderTargetTextures\(\).*not supported.*WebGLTexture handles/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTargetFramebuffer(target, externalFramebuffer),
+    /Renderer\.setRenderTargetFramebuffer\(\).*not supported.*WebGL framebuffer/i,
+  )
   assert.throws(
     () => renderer.copyFramebufferToTexture(source),
     /Renderer\.copyFramebufferToTexture\(\).*not supported.*readRenderTargetPixels/i,
@@ -29207,6 +29219,26 @@ test('Renderer framebuffer and texture copy APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination),
     /Renderer\.copyTextureToTexture\(\).*not supported.*Copy readable texture data on the CPU/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTargetTextures(null, externalColorTexture),
+    /Renderer\.setRenderTargetTextures renderTarget must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTargetTextures(target, null),
+    /Renderer\.setRenderTargetTextures colorTexture must be an external WebGL object-like handle/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTargetTextures(target, externalColorTexture, []),
+    /Renderer\.setRenderTargetTextures depthTexture must be an external WebGL object-like handle/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTargetFramebuffer(null, externalFramebuffer),
+    /Renderer\.setRenderTargetFramebuffer renderTarget must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTargetFramebuffer(target, []),
+    /Renderer\.setRenderTargetFramebuffer defaultFramebuffer must be an external WebGL object-like handle/i,
   )
   assert.throws(
     () => renderer.copyFramebufferToTexture(null),

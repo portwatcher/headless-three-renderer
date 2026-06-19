@@ -626,6 +626,25 @@ export class Renderer {
     assertThreeTextureLike(texture, 'Renderer.initTexture texture')
   }
 
+  setRenderTargetTextures(renderTarget: RenderTargetLike, colorTexture: unknown, depthTexture: unknown = null): never {
+    assertRenderTargetLike(renderTarget, 'Renderer.setRenderTargetTextures renderTarget')
+    validateUnsupportedRenderTargetOptions(renderTarget)
+    assertExternalWebGlObjectLike(colorTexture, 'Renderer.setRenderTargetTextures colorTexture')
+    assertOptionalExternalWebGlObjectLike(depthTexture, 'Renderer.setRenderTargetTextures depthTexture')
+    throw new Error(
+      'Renderer.setRenderTargetTextures() is not supported by @headless-three/renderer because WebGLTexture handles cannot be attached to wgpu-backed render targets. Render into a target-like object and use Renderer.readRenderTargetPixels() for CPU readback.',
+    )
+  }
+
+  setRenderTargetFramebuffer(renderTarget: RenderTargetLike, defaultFramebuffer?: unknown): never {
+    assertRenderTargetLike(renderTarget, 'Renderer.setRenderTargetFramebuffer renderTarget')
+    validateUnsupportedRenderTargetOptions(renderTarget)
+    assertOptionalExternalWebGlObjectLike(defaultFramebuffer, 'Renderer.setRenderTargetFramebuffer defaultFramebuffer')
+    throw new Error(
+      'Renderer.setRenderTargetFramebuffer() is not supported by @headless-three/renderer because it does not expose a browser WebGL framebuffer. Use Renderer.setRenderTarget() with a target-like object for offscreen output.',
+    )
+  }
+
   copyFramebufferToTexture(texture: ThreeTextureLike, _position: unknown = null, _level = 0): never {
     assertThreeTextureLike(texture, 'Renderer.copyFramebufferToTexture texture')
     throw new Error(
@@ -3220,6 +3239,17 @@ function assertThreeTextureLike(value: unknown, label: string): asserts value is
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a texture-like object.`)
   }
+}
+
+function assertExternalWebGlObjectLike(value: unknown, label: string): void {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an external WebGL object-like handle.`)
+  }
+}
+
+function assertOptionalExternalWebGlObjectLike(value: unknown, label: string): void {
+  if (value == null) return
+  assertExternalWebGlObjectLike(value, label)
 }
 
 function assertEulerOption(value: unknown, label: string): void {
