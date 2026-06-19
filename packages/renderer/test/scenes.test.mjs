@@ -29987,7 +29987,7 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
     powerPreference: 'high-performance',
     failIfMajorPerformanceCaveat: false,
     logarithmicDepthBuffer: false,
-    reverseDepthBuffer: false,
+    reversedDepthBuffer: false,
   })
   assert.equal(renderer.reversedDepthBuffer, false)
   assert.deepEqual(renderer.getContextAttributes(), {
@@ -30046,6 +30046,10 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   assert.throws(
     () => new Renderer({ logarithmicDepthBuffer: true }),
     /Renderer parameters\.logarithmicDepthBuffer true is not supported/i,
+  )
+  assert.throws(
+    () => new Renderer({ reversedDepthBuffer: true }),
+    /Renderer parameters\.reversedDepthBuffer true is not supported/i,
   )
   assert.throws(
     () => new Renderer({ reverseDepthBuffer: true }),

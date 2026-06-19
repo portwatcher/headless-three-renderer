@@ -3258,6 +3258,7 @@ function assertRendererParametersLike(value: RendererParametersLike | undefined,
   assertRendererContextParameterAbsent(parameters, 'canvas', label)
   assertRendererContextParameterAbsent(parameters, 'context', label)
   assertRendererUnsupportedDepthParameterFalse(parameters, 'logarithmicDepthBuffer', label)
+  assertRendererUnsupportedDepthParameterFalse(parameters, 'reversedDepthBuffer', label)
   assertRendererUnsupportedDepthParameterFalse(parameters, 'reverseDepthBuffer', label)
 }
 
@@ -3297,7 +3298,7 @@ function assertRendererContextParameterAbsent(
 
 function assertRendererUnsupportedDepthParameterFalse(
   parameters: Record<string, unknown>,
-  name: 'logarithmicDepthBuffer' | 'reverseDepthBuffer',
+  name: 'logarithmicDepthBuffer' | 'reversedDepthBuffer' | 'reverseDepthBuffer',
   label: string,
 ): void {
   if (parameters[name] === undefined) return
