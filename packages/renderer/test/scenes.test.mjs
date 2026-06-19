@@ -2866,7 +2866,7 @@ test('MeshNormalMaterial bumpMap honors explicit texture matrices', () => {
   assert.ok(diff > 2, `explicit bumpMap matrix should change the bump perturbation (diff=${diff.toFixed(2)})`)
 })
 
-test('MeshNormalMaterial normalMap samples the selected secondary UV channel', () => {
+test('MeshNormalMaterial normalMap samples selected uv1-uv3 texture channels', () => {
   function renderNormalMaterial(channel) {
     const normalMap = rgbaTexture([
       128, 128, 255, 255,
@@ -2875,7 +2875,9 @@ test('MeshNormalMaterial normalMap samples the selected secondary UV channel', (
     normalMap.channel = channel
 
     const geometry = new THREE.PlaneGeometry(2, 2)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -2892,12 +2894,14 @@ test('MeshNormalMaterial normalMap samples the selected secondary UV channel', (
   }
 
   const primary = renderNormalMaterial(0)
-  const secondary = renderNormalMaterial(1)
-  assert.ok(secondary.r > primary.r + 20, `normalMap channel=1 should sample uv1's tangent-right texel (${secondary.r} vs ${primary.r})`)
-  assert.ok(primary.b > secondary.b + 20, `normalMap channel=0 should retain more front-facing blue normal output (${primary.b} vs ${secondary.b})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderNormalMaterial(channel)
+    assert.ok(secondary.r > primary.r + 20, `normalMap channel=${channel} should sample uv${channel}'s tangent-right texel (${secondary.r} vs ${primary.r})`)
+    assert.ok(primary.b > secondary.b + 20, `normalMap channel=0 should retain more front-facing blue normal output than channel=${channel} (${primary.b} vs ${secondary.b})`)
+  }
 })
 
-test('MeshNormalMaterial bumpMap samples the selected secondary UV channel', () => {
+test('MeshNormalMaterial bumpMap samples selected uv1-uv3 texture channels', () => {
   function renderBumpMaterial(channel) {
     const bumpMap = rgbaTexture([
       0, 0, 0, 255,
@@ -2908,7 +2912,9 @@ test('MeshNormalMaterial bumpMap samples the selected secondary UV channel', () 
     bumpMap.minFilter = THREE.LinearFilter
 
     const geometry = new THREE.PlaneGeometry(2, 2)
-    setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.25, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -2925,9 +2931,10 @@ test('MeshNormalMaterial bumpMap samples the selected secondary UV channel', () 
   }
 
   const primary = renderBumpMaterial(0)
-  const secondary = renderBumpMaterial(1)
-  const diff = meanAbsDiff(primary, secondary)
-  assert.ok(diff > 2, `bumpMap channel=1 should use uv1 and change the bump perturbation (diff=${diff.toFixed(2)})`)
+  for (const channel of [1, 2, 3]) {
+    const diff = meanAbsDiff(primary, renderBumpMaterial(channel))
+    assert.ok(diff > 2, `bumpMap channel=${channel} should use uv${channel} and change the bump perturbation (diff=${diff.toFixed(2)})`)
+  }
 })
 
 test('MeshNormalMaterial bumpMap honors horizontal and vertical repeat wrapping', () => {
@@ -3259,7 +3266,7 @@ test('MeshMatcapMaterial map honors explicit texture matrices', () => {
   assert.ok(mean.g > mean.r + 40, `explicit matcap map matrix should sample the green texel (${mean.g} vs ${mean.r})`)
 })
 
-test('MeshMatcapMaterial map samples the selected secondary UV channel', () => {
+test('MeshMatcapMaterial map samples selected uv1-uv3 texture channels', () => {
   function renderMatcapMap(channel) {
     const map = rgbaTexture([
       0, 255, 0, 255,
@@ -3268,7 +3275,9 @@ test('MeshMatcapMaterial map samples the selected secondary UV channel', () => {
     map.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -3289,9 +3298,11 @@ test('MeshMatcapMaterial map samples the selected secondary UV channel', () => {
   }
 
   const primary = renderMatcapMap(0)
-  const secondary = renderMatcapMap(1)
   assert.ok(primary.g > primary.r + 40, `matcap map channel=0 should sample the primary UV green texel (${primary.g} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.g + 40, `matcap map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderMatcapMap(channel)
+    assert.ok(secondary.r > secondary.g + 40, `matcap map channel=${channel} should sample the uv${channel} red texel (${secondary.r} vs ${secondary.g})`)
+  }
 })
 
 test('MeshMatcapMaterial map honors nearest and linear filters', () => {
