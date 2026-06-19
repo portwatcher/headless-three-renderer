@@ -118,7 +118,7 @@ The public API accepts only Three.js-like objects:
 - `THREE.LOD` camera-distance/zoom level selection, with invalid auto-update flags, camera zoom, or level distance/hysteresis values failing clearly
 - vertex colors, with invalid `material.vertexColors` values failing clearly
 - scene background color plus reusable `Renderer.setClearColor()`/`setClearAlpha()` fallback state and 2D, equirectangular, and raw, encoded, or CubeUV-mapped readable six-face cube texture backgrounds with `backgroundIntensity`, approximate texture blur, equirectangular/cube `scene.backgroundRotation`/`options.backgroundRotation`, `options.environmentIntensity`, and equirectangular/cube `scene.environmentRotation`/`options.environmentRotation`; invalid background color/control/rotation values, invalid renderer clear-color values, packed PMREM/CubeUV backgrounds without readable cube faces, and unsupported background rotations fail clearly
-- render-option viewport/scissor rectangles, render-target dimensions and viewport/scissor fields, and reusable `Renderer.setSize()`/`getSize()` plus `setViewport()`/`setScissor()`/`setScissorTest()` state in output pixel coordinates, with invalid sizes and malformed target scissor flags failing clearly
+- render-option viewport/scissor rectangles, render-target dimensions and viewport/scissor fields, reusable `Renderer.setSize()`/`getSize()` plus `setViewport()`/`setScissor()`/`setScissorTest()` state in output pixel coordinates, and no-op `clear()`/`clearColor()`/`clearDepth()`/`clearStencil()` hooks for pass-owned buffers, with invalid sizes, clear booleans, and malformed target scissor flags failing clearly
 - perspective, orthographic, and custom projection matrices
 
 ### Materials & Textures

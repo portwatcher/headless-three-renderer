@@ -27785,6 +27785,36 @@ test('Renderer clear color state applies as background fallback', () => {
   assert.ok(Math.abs(optionBackground.a - 191) <= 1, `options.background alpha should override Renderer clear alpha (${optionBackground.a})`)
 })
 
+test('Renderer clear methods are no-op compatibility hooks', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  renderer.setClearColor(0x204080, 0.5)
+  renderer.clear()
+  renderer.clear(false, true, false)
+  renderer.clearColor()
+  renderer.clearDepth()
+  renderer.clearStencil()
+
+  const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer clear hooks should preserve clear color state')
+  assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer clear hooks should preserve clear alpha state (${clear.a})`)
+
+  assert.throws(
+    () => renderer.clear('yes'),
+    /Renderer\.clear color must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.clear(true, 'depth'),
+    /Renderer\.clear depth must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.clear(true, true, 'stencil'),
+    /Renderer\.clear stencil must be a boolean/i,
+  )
+})
+
 test('Renderer size state applies as render fallback', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

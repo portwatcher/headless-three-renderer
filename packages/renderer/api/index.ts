@@ -241,8 +241,23 @@ export class Renderer {
     return this.currentScissorTest
   }
 
+  clear(color = true, depth = true, stencil = true): void {
+    assertOptionalBoolean(color, 'Renderer.clear color')
+    assertOptionalBoolean(depth, 'Renderer.clear depth')
+    assertOptionalBoolean(stencil, 'Renderer.clear stencil')
+    // Each render call owns its native pass, so there is no persistent framebuffer to clear.
+  }
+
+  clearColor(): void {
+    // Color buffers are created and cleared inside each native render pass.
+  }
+
   clearDepth(): void {
     // Depth is owned by each native render pass, so there is no persistent buffer to clear.
+  }
+
+  clearStencil(): void {
+    // Stencil state is scoped to each native render pass.
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
@@ -2082,6 +2097,12 @@ function rendererStateSizeDimension(value: unknown, label: string): number {
     throw new TypeError(`${label} must be a positive integer.`)
   }
   return value
+}
+
+function assertOptionalBoolean(value: unknown, label: string): void {
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`${label} must be a boolean.`)
+  }
 }
 
 function clonePixelSize(size: PixelSize | null | undefined): PixelSize | null
