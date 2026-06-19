@@ -27382,6 +27382,35 @@ test('render options accept texture backgrounds', () => {
   assert.ok(mean.b > mean.r + 80, `options.background texture should override scene background (${mean.b} vs ${mean.r})`)
 })
 
+test('render option texture backgrounds honor their own UV transforms', () => {
+  function renderOptionBackground(offset) {
+    const scene = new THREE.Scene()
+    scene.background = solidTexture(255, 0, 0)
+    scene.backgroundIntensity = 0
+    scene.backgroundBlurriness = 1
+    scene.backgroundRotation = new THREE.Euler(0, Math.PI / 4, 0)
+
+    const background = rgbaTexture([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 1)
+    background.magFilter = THREE.NearestFilter
+    background.minFilter = THREE.NearestFilter
+    background.offset.set(offset, 0)
+
+    return meanRgba(renderRgba(scene, makeCamera(), {
+      width: 64,
+      height: 64,
+      background,
+    }))
+  }
+
+  const unshifted = renderOptionBackground(0)
+  const shifted = renderOptionBackground(0.5)
+  assert.ok(shifted.g > unshifted.g + 80, `options.background texture offset should increase green coverage (${shifted.g} vs ${unshifted.g})`)
+  assert.ok(shifted.r < unshifted.r - 80, `options.background texture offset should reduce red coverage (${shifted.r} vs ${unshifted.r})`)
+})
+
 test('render option color backgrounds override scene texture backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.EquirectangularReflectionMapping })
