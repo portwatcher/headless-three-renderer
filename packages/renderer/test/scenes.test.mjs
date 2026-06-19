@@ -15767,7 +15767,7 @@ test('MeshPhysicalMaterial iridescenceMap modulates scalar iridescence', () => {
   )
 })
 
-test('MeshPhysicalMaterial iridescenceMap samples the selected secondary UV channel', () => {
+test('MeshPhysicalMaterial iridescenceMap samples selected uv1-uv3 texture channels', () => {
   function renderIridescenceMap(channel) {
     const iridescenceMap = rgbaTexture([
       0, 0, 0, 255,
@@ -15776,7 +15776,9 @@ test('MeshPhysicalMaterial iridescenceMap samples the selected secondary UV chan
     iridescenceMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -15804,10 +15806,11 @@ test('MeshPhysicalMaterial iridescenceMap samples the selected secondary UV chan
     return renderRgba(scene, camera, { width: 64, height: 64 })
   }
 
-  assert.ok(
-    meanAbsDiff(renderIridescenceMap(0), renderIridescenceMap(1)) > 10,
-    'iridescenceMap channel=1 should sample the uv1 texel that enables iridescence',
-  )
+  const primary = renderIridescenceMap(0)
+  for (const channel of [1, 2, 3]) {
+    const diff = meanAbsDiff(primary, renderIridescenceMap(channel))
+    assert.ok(diff > 10, `iridescenceMap channel=${channel} should sample uv${channel}'s texel that enables iridescence (${diff.toFixed(2)})`)
+  }
 })
 
 test('MeshPhysicalMaterial iridescenceThicknessMap selects film thickness range', () => {
@@ -15850,7 +15853,7 @@ test('MeshPhysicalMaterial iridescenceThicknessMap selects film thickness range'
   )
 })
 
-test('MeshPhysicalMaterial iridescenceThicknessMap samples the selected secondary UV channel', () => {
+test('MeshPhysicalMaterial iridescenceThicknessMap samples selected uv1-uv3 texture channels', () => {
   function renderThicknessMap(channel) {
     const iridescenceThicknessMap = rgbaTexture([
       0, 0, 0, 255,
@@ -15859,7 +15862,9 @@ test('MeshPhysicalMaterial iridescenceThicknessMap samples the selected secondar
     iridescenceThicknessMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -15887,10 +15892,11 @@ test('MeshPhysicalMaterial iridescenceThicknessMap samples the selected secondar
     return renderRgba(scene, camera, { width: 64, height: 64 })
   }
 
-  assert.ok(
-    meanAbsDiff(renderThicknessMap(0), renderThicknessMap(1)) > 5,
-    'iridescenceThicknessMap channel=1 should sample the uv1 texel for the upper film thickness range',
-  )
+  const primary = renderThicknessMap(0)
+  for (const channel of [1, 2, 3]) {
+    const diff = meanAbsDiff(primary, renderThicknessMap(channel))
+    assert.ok(diff > 5, `iridescenceThicknessMap channel=${channel} should sample uv${channel}'s texel for the upper film thickness range (${diff.toFixed(2)})`)
+  }
 })
 
 test('MeshPhysicalMaterial iridescence maps honor horizontal and vertical wrap modes', () => {
