@@ -29023,6 +29023,102 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   )
 })
 
+test('Renderer exposes inert WebGLRenderer helper objects', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.capabilities.isWebGL2, false)
+  assert.equal(renderer.capabilities.precision, 'highp')
+  assert.equal(renderer.capabilities.logarithmicDepthBuffer, false)
+  assert.equal(renderer.capabilities.reversedDepthBuffer, false)
+  assert.equal(renderer.capabilities.maxSamples, 4)
+  assert.equal(renderer.capabilities.samples, 0)
+  assert.equal(renderer.capabilities.getMaxAnisotropy(), 0)
+  assert.equal(renderer.capabilities.getMaxPrecision('highp'), 'highp')
+  assert.equal(renderer.capabilities.getMaxPrecision('mediump'), 'mediump')
+  assert.equal(renderer.capabilities.textureFormatReadable(THREE.RGBAFormat), true)
+  assert.equal(renderer.capabilities.textureFormatReadable(THREE.DepthFormat), false)
+  assert.equal(renderer.capabilities.textureTypeReadable(THREE.UnsignedByteType), true)
+  assert.equal(renderer.capabilities.textureTypeReadable(THREE.UnsignedInt248Type), false)
+  assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
+  assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
+  assert.equal(renderer.extensions.init(), undefined)
+
+  const object = {}
+  assert.equal(renderer.properties.has(object), false)
+  const propertyBag = renderer.properties.get(object)
+  assert.equal(renderer.properties.has(object), true)
+  propertyBag.__webglTexture = 'ignored'
+  assert.equal(renderer.properties.get(object).__webglTexture, 'ignored')
+  renderer.properties.update(object, 'custom', 42)
+  assert.equal(renderer.properties.get(object).custom, 42)
+  renderer.properties.remove(object)
+  assert.equal(renderer.properties.has(object), false)
+
+  const renderList = renderer.renderLists.get(scene, 0)
+  assert.equal(renderer.renderLists.get(scene, 0), renderList)
+  assert.equal(renderer.renderLists.get(scene, 1) === renderList, false)
+  renderList.init()
+  renderList.push({ id: 2, renderOrder: 0 }, {}, { id: 5, transparent: true }, 0, 2, null)
+  renderList.unshift({ id: 1, renderOrder: 0, isSkinnedMesh: true }, {}, { id: 4, transmission: 0.5 }, 0, 1, null)
+  assert.equal(renderList.opaque.length, 0)
+  assert.equal(renderList.transparent.length, 1)
+  assert.equal(renderList.transmissive.length, 1)
+  assert.equal(renderList.transmissive[0].materialVariant, 1)
+  renderList.sort(null, (a, b) => b.z - a.z)
+  renderList.finish()
+  renderer.dispose()
+  assert.equal(renderer.properties.has(object), false)
+  assert.equal(renderer.renderLists.get(scene, 0) === renderList, false)
+
+  const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `helper object probes should not alter later rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => renderer.extensions.get(null),
+    /Renderer\.extensions\.get name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.capabilities.getMaxPrecision('ultrap'),
+    /Renderer\.capabilities\.getMaxPrecision precision ultrap is not supported/i,
+  )
+  assert.throws(
+    () => renderer.capabilities.textureFormatReadable('rgba'),
+    /Renderer\.capabilities\.textureFormatReadable format must be an integer/i,
+  )
+  assert.throws(
+    () => renderer.capabilities.textureTypeReadable(Number.POSITIVE_INFINITY),
+    /Renderer\.capabilities\.textureTypeReadable type must be an integer/i,
+  )
+  assert.throws(
+    () => renderer.properties.get(null),
+    /Renderer\.properties\.get object must be an object/i,
+  )
+  assert.throws(
+    () => renderer.properties.update({}, '', 1),
+    /Renderer\.properties\.update key must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.renderLists.get(null),
+    /Renderer\.renderLists\.get scene must be an object/i,
+  )
+  assert.throws(
+    () => renderer.renderLists.get(scene, -1),
+    /Renderer\.renderLists\.get renderCallDepth must be a non-negative integer/i,
+  )
+  assert.throws(
+    () => renderList.sort('front-to-back'),
+    /Renderer\.renderLists list opaque sort must be a function or null/i,
+  )
+})
+
 test('Renderer compile hooks are validated no-op compatibility hooks', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

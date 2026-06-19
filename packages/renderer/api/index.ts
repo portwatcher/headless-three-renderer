@@ -235,6 +235,246 @@ class RendererXrState {
   }
 }
 
+class RendererExtensionsState {
+  has(name: string): boolean {
+    assertWebGlExtensionName(name, 'Renderer.extensions.has name')
+    return false
+  }
+
+  init(): void {
+    // There are no browser WebGL extensions to preload in the wgpu-backed adapter.
+  }
+
+  get(name: string): null {
+    assertWebGlExtensionName(name, 'Renderer.extensions.get name')
+    return null
+  }
+}
+
+class RendererCapabilitiesState {
+  readonly isWebGL2 = false
+  readonly precision = 'highp'
+  readonly logarithmicDepthBuffer = false
+  readonly reversedDepthBuffer = false
+  readonly maxTextures = 0
+  readonly maxVertexTextures = 0
+  readonly maxTextureSize = 0
+  readonly maxCubemapSize = 0
+  readonly maxAttributes = 0
+  readonly maxVertexUniforms = 0
+  readonly maxVaryings = 0
+  readonly maxFragmentUniforms = 0
+  readonly maxSamples = 4
+  readonly samples = 0
+
+  getMaxAnisotropy(): number {
+    return 0
+  }
+
+  getMaxPrecision(precision: string): string {
+    if (precision === 'highp' || precision === 'mediump' || precision === 'lowp') {
+      return precision
+    }
+    throw new Error(
+      `Renderer.capabilities.getMaxPrecision precision ${String(precision)} is not supported. Use "highp", "mediump", or "lowp".`,
+    )
+  }
+
+  textureFormatReadable(textureFormat: number): boolean {
+    assertFiniteInteger(textureFormat, 'Renderer.capabilities.textureFormatReadable format')
+    return isReadableRenderTargetColorFormat(textureFormat)
+  }
+
+  textureTypeReadable(textureType: number): boolean {
+    assertFiniteInteger(textureType, 'Renderer.capabilities.textureTypeReadable type')
+    return isReadableRenderTargetColorType(textureType)
+  }
+}
+
+class RendererPropertiesState {
+  private properties = new WeakMap<object, Record<string, unknown>>()
+
+  has(object: object): boolean {
+    assertWeakMapKey(object, 'Renderer.properties.has object')
+    return this.properties.has(object)
+  }
+
+  get(object: object): Record<string, unknown> {
+    assertWeakMapKey(object, 'Renderer.properties.get object')
+    let map = this.properties.get(object)
+    if (map === undefined) {
+      map = {}
+      this.properties.set(object, map)
+    }
+    return map
+  }
+
+  remove(object: object): void {
+    assertWeakMapKey(object, 'Renderer.properties.remove object')
+    this.properties.delete(object)
+  }
+
+  update(object: object, key: string, value: unknown): void {
+    assertWeakMapKey(object, 'Renderer.properties.update object')
+    assertPropertyKey(key, 'Renderer.properties.update key')
+    this.get(object)[key] = value
+  }
+
+  dispose(): void {
+    this.properties = new WeakMap()
+  }
+}
+
+type RendererRenderListSort = (a: RendererRenderListItem, b: RendererRenderListItem) => number
+
+type RendererRenderListItem = {
+  id: unknown
+  object: unknown
+  geometry: unknown
+  material: unknown
+  materialVariant: number
+  groupOrder: number
+  renderOrder: unknown
+  z: number
+  group: unknown
+}
+
+class RendererRenderList {
+  private readonly renderItems: RendererRenderListItem[] = []
+  private renderItemsIndex = 0
+
+  readonly opaque: RendererRenderListItem[] = []
+  readonly transmissive: RendererRenderListItem[] = []
+  readonly transparent: RendererRenderListItem[] = []
+
+  init(): void {
+    this.renderItemsIndex = 0
+    this.opaque.length = 0
+    this.transmissive.length = 0
+    this.transparent.length = 0
+  }
+
+  push(
+    object: unknown,
+    geometry: unknown,
+    material: unknown,
+    groupOrder = 0,
+    z = 0,
+    group: unknown = null,
+  ): void {
+    const renderItem = this.getNextRenderItem(object, geometry, material, groupOrder, z, group)
+    this.bucketForMaterial(material).push(renderItem)
+  }
+
+  unshift(
+    object: unknown,
+    geometry: unknown,
+    material: unknown,
+    groupOrder = 0,
+    z = 0,
+    group: unknown = null,
+  ): void {
+    const renderItem = this.getNextRenderItem(object, geometry, material, groupOrder, z, group)
+    this.bucketForMaterial(material).unshift(renderItem)
+  }
+
+  sort(customOpaqueSort?: RendererRenderListSort | null, customTransparentSort?: RendererRenderListSort | null): void {
+    if (customOpaqueSort !== undefined && customOpaqueSort !== null && typeof customOpaqueSort !== 'function') {
+      throw new TypeError('Renderer.renderLists list opaque sort must be a function or null.')
+    }
+    if (customTransparentSort !== undefined && customTransparentSort !== null && typeof customTransparentSort !== 'function') {
+      throw new TypeError('Renderer.renderLists list transparent sort must be a function or null.')
+    }
+    if (customOpaqueSort) this.opaque.sort(customOpaqueSort)
+    if (customTransparentSort) {
+      this.transmissive.sort(customTransparentSort)
+      this.transparent.sort(customTransparentSort)
+    }
+  }
+
+  finish(): void {
+    for (let i = this.renderItemsIndex; i < this.renderItems.length; i += 1) {
+      this.renderItems[i].id = null
+      this.renderItems[i].object = null
+      this.renderItems[i].geometry = null
+      this.renderItems[i].material = null
+      this.renderItems[i].group = null
+    }
+  }
+
+  private getNextRenderItem(
+    object: unknown,
+    geometry: unknown,
+    material: unknown,
+    groupOrder: number,
+    z: number,
+    group: unknown,
+  ): RendererRenderListItem {
+    assertFiniteNumberOption(groupOrder, 'Renderer.renderLists list groupOrder')
+    assertFiniteNumberOption(z, 'Renderer.renderLists list z')
+    let renderItem = this.renderItems[this.renderItemsIndex]
+    if (renderItem === undefined) {
+      renderItem = {
+        id: rendererRenderListId(object),
+        object,
+        geometry,
+        material,
+        materialVariant: rendererRenderListMaterialVariant(object),
+        groupOrder,
+        renderOrder: rendererRenderListRenderOrder(object),
+        z,
+        group,
+      }
+      this.renderItems[this.renderItemsIndex] = renderItem
+    } else {
+      renderItem.id = rendererRenderListId(object)
+      renderItem.object = object
+      renderItem.geometry = geometry
+      renderItem.material = material
+      renderItem.materialVariant = rendererRenderListMaterialVariant(object)
+      renderItem.groupOrder = groupOrder
+      renderItem.renderOrder = rendererRenderListRenderOrder(object)
+      renderItem.z = z
+      renderItem.group = group
+    }
+    this.renderItemsIndex += 1
+    return renderItem
+  }
+
+  private bucketForMaterial(material: unknown): RendererRenderListItem[] {
+    const record = material && typeof material === 'object' ? material as Record<string, unknown> : undefined
+    if (typeof record?.transmission === 'number' && record.transmission > 0) return this.transmissive
+    if (record?.transparent === true) return this.transparent
+    return this.opaque
+  }
+}
+
+class RendererRenderListsState {
+  private lists = new WeakMap<object, RendererRenderList[]>()
+
+  get(scene: object, renderCallDepth = 0): RendererRenderList {
+    assertWeakMapKey(scene, 'Renderer.renderLists.get scene')
+    if (!Number.isInteger(renderCallDepth) || renderCallDepth < 0) {
+      throw new TypeError(`Renderer.renderLists.get renderCallDepth must be a non-negative integer; received ${String(renderCallDepth)}.`)
+    }
+    let listArray = this.lists.get(scene)
+    if (listArray === undefined) {
+      listArray = []
+      this.lists.set(scene, listArray)
+    }
+    let list = listArray[renderCallDepth]
+    if (list === undefined) {
+      list = new RendererRenderList()
+      listArray[renderCallDepth] = list
+    }
+    return list
+  }
+
+  dispose(): void {
+    this.lists = new WeakMap()
+  }
+}
+
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private opaqueSort: RenderSortFunction | null = null
@@ -263,7 +503,11 @@ export class Renderer {
   private readonly contextAttributes: RendererContextAttributesLike
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
+  readonly capabilities = new RendererCapabilitiesState()
+  readonly extensions = new RendererExtensionsState()
   readonly info = new RendererInfoState()
+  readonly properties = new RendererPropertiesState()
+  readonly renderLists = new RendererRenderListsState()
   readonly reversedDepthBuffer = false
   readonly shadowMap = new RendererShadowMapState()
   readonly xr = new RendererXrState()
@@ -586,6 +830,8 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.properties.dispose()
+    this.renderLists.dispose()
     // Native resources are owned by the renderer instance and released with normal object lifetime.
   }
 
@@ -3196,6 +3442,48 @@ function assertRenderTargetImageLike(value: unknown, label: string): asserts val
   }
 }
 
+function assertWebGlExtensionName(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
+  }
+}
+
+function assertWeakMapKey(value: unknown, label: string): asserts value is object {
+  if (value == null || (typeof value !== 'object' && typeof value !== 'function')) {
+    throw new TypeError(`${label} must be an object.`)
+  }
+}
+
+function assertPropertyKey(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
+  }
+}
+
+function assertFiniteInteger(value: unknown, label: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || Math.floor(value) !== value) {
+    throw new TypeError(`${label} must be an integer.`)
+  }
+}
+
+function rendererRenderListId(object: unknown): unknown {
+  return object && typeof object === 'object'
+    ? (object as Record<string, unknown>).id
+    : undefined
+}
+
+function rendererRenderListRenderOrder(object: unknown): unknown {
+  return object && typeof object === 'object'
+    ? (object as Record<string, unknown>).renderOrder
+    : undefined
+}
+
+function rendererRenderListMaterialVariant(object: unknown): number {
+  if (!object || typeof object !== 'object') return 0
+  const record = object as Record<string, unknown>
+  return (record.isInstancedMesh === true ? 2 : 0) + (record.isSkinnedMesh === true ? 1 : 0)
+}
+
 function validatePostProcessingOptions(value: unknown): void {
   if (value == null || value === false) return
   if (typeof value !== 'object' || Array.isArray(value)) {
@@ -3300,6 +3588,37 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
       `${label} type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt101111Type, UnsignedInt5999Type, or omit type for RGBA8 readback.`,
     )
   }
+}
+
+function isReadableRenderTargetColorFormat(format: number): boolean {
+  return (
+    format === AlphaFormat ||
+    format === RedFormat ||
+    format === RedIntegerFormat ||
+    format === RGFormat ||
+    format === RGIntegerFormat ||
+    format === RGBFormat ||
+    format === RGBIntegerFormat ||
+    format === RGBAFormat ||
+    format === RGBAIntegerFormat
+  )
+}
+
+function isReadableRenderTargetColorType(type: number): boolean {
+  return (
+    type === UnsignedByteType ||
+    type === ByteType ||
+    type === ShortType ||
+    type === UnsignedShortType ||
+    type === IntType ||
+    type === UnsignedIntType ||
+    type === FloatType ||
+    type === HalfFloatType ||
+    type === UnsignedShort4444Type ||
+    type === UnsignedShort5551Type ||
+    type === UnsignedInt101111Type ||
+    type === UnsignedInt5999Type
+  )
 }
 
 function assertSupportedRenderTargetTextureDimensionality(texture: RenderTargetTextureLike | undefined, label: string): void {
