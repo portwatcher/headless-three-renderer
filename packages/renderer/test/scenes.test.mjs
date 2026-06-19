@@ -7667,6 +7667,48 @@ test('material dithering is accepted as a compatibility no-op', () => {
   )
 })
 
+test('material precision values are accepted as compatibility no-ops', () => {
+  function renderPrecision(precision) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x40a0ff,
+        precision,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const defaultOutput = renderPrecision(null)
+  for (const precision of ['highp', 'mediump', 'lowp']) {
+    assert.deepEqual(
+      renderPrecision(precision),
+      defaultOutput,
+      `${precision} precision should be accepted without altering native output`,
+    )
+  }
+
+  for (const [precision, pattern] of [
+    [1, /material\.precision must be "highp", "mediump", "lowp", null, or undefined/i],
+    ['ultrap', /material\.precision "ultrap" is not supported.*highp.*mediump.*lowp/i],
+  ]) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    material.precision = precision
+    assertMaterialRenderStateFails(material, pattern)
+  }
+})
+
 test('NoBlending disables blending even for transparent materials', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

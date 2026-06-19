@@ -170,6 +170,7 @@ export interface ThreeMaterialLike {
   premultipliedAlpha?: boolean
   toneMapped?: boolean
   dithering?: boolean
+  precision?: 'highp' | 'mediump' | 'lowp' | null
   map?: ThreeTextureLike | null
   envMap?: ThreeTextureLike | null
   envMapIntensity?: number

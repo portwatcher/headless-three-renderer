@@ -1072,6 +1072,7 @@ export function extractPbrProperties(
     props.toneMapped = false
   }
   optionalBoolean(material.dithering, 'material.dithering')
+  optionalMaterialPrecision(material.precision)
   const transparent = optionalBoolean(material.transparent, 'material.transparent')
   if (transparent !== undefined) {
     props.transparent = transparent
@@ -1445,6 +1446,18 @@ function optionalBoolean(value: unknown, label: string): boolean | undefined {
   if (value == null) return undefined
   if (typeof value === 'boolean') return value
   throw new TypeError(`${label} must be a boolean.`)
+}
+
+function optionalMaterialPrecision(value: unknown): void {
+  if (value == null) return
+  if (typeof value !== 'string') {
+    throw new TypeError('material.precision must be "highp", "mediump", "lowp", null, or undefined.')
+  }
+  if (value !== 'highp' && value !== 'mediump' && value !== 'lowp') {
+    throw new Error(
+      `material.precision ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "highp", "mediump", "lowp", null, or undefined.`,
+    )
+  }
 }
 
 function optionalFiniteNumberOrInfinityDefault(value: unknown, label: string): number | undefined {
