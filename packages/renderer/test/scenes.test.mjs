@@ -24234,6 +24234,49 @@ test('Line material arrays honor geometry groups', () => {
   assert.ok(greenPixels > 2, `right line group should use the green dashed material (${greenPixels})`)
 })
 
+test('LineDashedMaterial material-array groups honor dash gaps', () => {
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1.5, 0, 0,
+    -0.3, 0, 0,
+    0.3, 0, 0,
+    1.5, 0, 0,
+  ]), 3))
+  geom.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    0, 1,
+    0, 1,
+  ]), 1))
+  geom.addGroup(0, 2, 0)
+  geom.addGroup(2, 2, 1)
+
+  const line = new THREE.LineSegments(geom, [
+    new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 8 }),
+    new THREE.LineDashedMaterial({
+      color: 0x00ff00,
+      dashSize: 0.45,
+      gapSize: 10,
+      linewidth: 8,
+      scale: 1,
+    }),
+  ])
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(line)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 8, 42, 42, 54, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenDashPixels = countRegionPixels(rgba, 96, 96, 58, 42, 70, 54, (r, g, b) => g > r + 40 && g > b + 40)
+  const greenGapPixels = countRegionPixels(rgba, 96, 96, 76, 42, 90, 54, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(redPixels > 20, `solid material-array line group should keep red coverage (${redPixels})`)
+  assert.ok(greenDashPixels > 20, `dashed material-array line group should render its first green dash (${greenDashPixels})`)
+  assert.ok(greenGapPixels < 2, `dashed material-array line group should preserve the custom-distance gap (${greenGapPixels})`)
+})
+
 test('LineDashedMaterial renders fewer visible line pixels than a solid line', () => {
   function makeScene(material) {
     const geom = new THREE.BufferGeometry().setFromPoints([
