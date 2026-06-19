@@ -358,6 +358,20 @@ export class Renderer {
     this.transparentSort = method
   }
 
+  compile(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, targetScene: ThreeSceneRootLike | null = null): void {
+    validateThreeSceneRoot(scene)
+    validateTopLevelRenderCamera(camera)
+    if (targetScene !== null) validateThreeSceneRoot(targetScene)
+  }
+
+  async compileAsync(
+    scene: ThreeSceneRootLike,
+    camera: ThreeRenderCameraLike,
+    targetScene: ThreeSceneRootLike | null = null,
+  ): Promise<void> {
+    this.compile(scene, camera, targetScene)
+  }
+
   setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
     if (callback !== null && typeof callback !== 'function') {
       throw new TypeError('Renderer.setAnimationLoop callback must be a function or null.')

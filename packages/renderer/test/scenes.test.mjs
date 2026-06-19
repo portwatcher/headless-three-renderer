@@ -28901,6 +28901,39 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   )
 })
 
+test('Renderer compile hooks are validated no-op compatibility hooks', async () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const targetScene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.compile(scene, camera), undefined)
+  assert.equal(await renderer.compileAsync(scene, camera), undefined)
+  assert.equal(await renderer.compileAsync(scene, camera, targetScene), undefined)
+
+  const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `compile hooks should not alter later rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => renderer.compile({}, camera),
+    /THREE\.Scene or THREE\.Object3D root/i,
+  )
+  await assert.rejects(
+    () => renderer.compileAsync(scene, {}),
+    /THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
+  )
+  await assert.rejects(
+    () => renderer.compileAsync(scene, camera, {}),
+    /THREE\.Scene or THREE\.Object3D root/i,
+  )
+})
+
 test('Renderer clear methods are no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
