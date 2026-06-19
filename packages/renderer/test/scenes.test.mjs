@@ -20239,6 +20239,58 @@ test('reusable renderer reflects mutated mesh material texture and transform sta
   assert.ok(secondRight.g > secondRight.r + 50 && secondRight.g > secondRight.b + 80, `updated material and texture state should produce a green-dominant right region (${secondRight.r}, ${secondRight.g}, ${secondRight.b})`)
 })
 
+test('reusable renderer reflects mutated scene environment texture bytes', () => {
+  const renderer = new Renderer()
+  const data = new Uint8Array(2 * 2 * 4)
+  const environment = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+  environment.mapping = THREE.EquirectangularReflectionMapping
+  environment.colorSpace = THREE.LinearSRGBColorSpace
+  environment.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.environment = environment
+  scene.environmentIntensity = 4
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.05 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function fillEnvironment(r, g, b) {
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = r
+      data[i + 1] = g
+      data[i + 2] = b
+      data[i + 3] = 255
+    }
+    environment.needsUpdate = true
+  }
+
+  function sampleCenter() {
+    return meanRegion(renderer.render(scene, camera, {
+      width: 64,
+      height: 64,
+      format: 'rgba',
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  fillEnvironment(255, 0, 0)
+  const red = sampleCenter()
+  fillEnvironment(0, 255, 0)
+  const green = sampleCenter()
+  fillEnvironment(255, 0, 0)
+  const redAgain = sampleCenter()
+
+  assert.ok(red.r > red.g + 20, `initial IBL should reflect red environment bytes (${red.r} vs ${red.g})`)
+  assert.ok(green.g > green.r + 20, `mutated IBL should reflect green environment bytes (${green.g} vs ${green.r})`)
+  assert.ok(redAgain.r > redAgain.g + 20, `mutated IBL should update back to red environment bytes (${redAgain.r} vs ${redAgain.g})`)
+})
+
 test('invalid post-processing option values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)
