@@ -13130,7 +13130,7 @@ test('emissiveMap honors explicit texture matrices', () => {
   assert.ok(mean.r > mean.g + 40, `explicit emissiveMap matrix should sample the red texel (${mean.r} vs ${mean.g})`)
 })
 
-test('emissiveMap samples the selected secondary UV channel', () => {
+test('emissiveMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const emissiveMap = rgbaTexture([
       0, 255, 0, 255,
@@ -13139,7 +13139,9 @@ test('emissiveMap samples the selected secondary UV channel', () => {
     emissiveMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -13160,10 +13162,11 @@ test('emissiveMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-
   assert.ok(primary.g > primary.r + 40, `emissiveMap channel=0 should sample the primary UV green texel (${primary.g} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.g + 40, `emissiveMap channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.r > secondary.g + 40, `emissiveMap channel=${channel} should sample the uv${channel} red texel (${secondary.r} vs ${secondary.g})`)
+  }
 })
 
 test('emissiveMap honors nearest texture filters', () => {
@@ -15854,7 +15857,7 @@ test('lightMap decodes sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 10, `linear lightMap should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
-test('lightMap samples the selected UV channel', () => {
+test('lightMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const lightMap = rgbaTexture([
       255, 0, 0, 255,
@@ -15863,7 +15866,9 @@ test('lightMap samples the selected UV channel', () => {
     lightMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -15881,9 +15886,11 @@ test('lightMap samples the selected UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   assert.ok(primary.r > primary.g + 40, `lightMap channel=0 should sample primary red texel, got ${primary.r} vs ${primary.g}`)
-  assert.ok(secondary.g > secondary.r + 40, `lightMap channel=1 should sample uv1 green texel, got ${secondary.g} vs ${secondary.r}`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.g > secondary.r + 40, `lightMap channel=${channel} should sample uv${channel} green texel, got ${secondary.g} vs ${secondary.r}`)
+  }
 })
 
 test('lightMap applies texture UV transforms on the selected channel', () => {
