@@ -796,6 +796,7 @@ const DepthFormat = 1026
 const DepthStencilFormat = 1027
 const RedFormat = 1028
 const RGFormat = 1030
+const UnsignedInt101111Type = 35899
 const UnsignedInt5999Type = 35902
 
 function renderCubeCamera(
@@ -2036,10 +2037,11 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     type !== HalfFloatType &&
     type !== UnsignedShort4444Type &&
     type !== UnsignedShort5551Type &&
+    type !== UnsignedInt101111Type &&
     type !== UnsignedInt5999Type
   ) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt5999Type, or omit type for RGBA8 readback.`,
+      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt101111Type, UnsignedInt5999Type, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -2251,6 +2253,9 @@ function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNu
   if (texture.type === UnsignedInt5999Type) {
     return packedUnsignedInt5999ColorTextureData(values, channels)
   }
+  if (texture.type === UnsignedInt101111Type) {
+    return packedUnsignedInt101111ColorTextureData(values, channels)
+  }
   return values
 }
 
@@ -2297,6 +2302,17 @@ function packedUnsignedInt5999ColorTextureData(values: Uint8Array, channels: 1 |
   return out
 }
 
+function packedUnsignedInt101111ColorTextureData(values: Uint8Array, channels: 1 | 2 | 3 | 4): Uint32Array {
+  const out = new Uint32Array(values.length / channels)
+  for (let src = 0, pixel = 0; src < values.length; src += channels, pixel += 1) {
+    const r = values[src] / 255
+    const g = channels > 1 ? values[src + 1] / 255 : 0
+    const b = channels > 2 ? values[src + 2] / 255 : 0
+    out[pixel] = packR11G11B10F(r, g, b)
+  }
+  return out
+}
+
 function packRgb9E5(r: number, g: number, b: number): number {
   const maxChannel = Math.max(r, g, b)
   if (maxChannel <= 0) return 0
@@ -2321,6 +2337,34 @@ function packRgb9E5(r: number, g: number, b: number): number {
     ((Math.min(0x1ff, gm) & 0x1ff) << 9) |
     (Math.min(0x1ff, rm) & 0x1ff)
   ) >>> 0
+}
+
+function packR11G11B10F(r: number, g: number, b: number): number {
+  return (
+    (packUnsignedFloat(b, 5) << 22) |
+    (packUnsignedFloat(g, 6) << 11) |
+    packUnsignedFloat(r, 6)
+  ) >>> 0
+}
+
+function packUnsignedFloat(value: number, mantissaBits: 5 | 6): number {
+  const clamped = Math.max(0, value)
+  if (clamped <= 0) return 0
+
+  const mantissaScale = 2 ** mantissaBits
+  const minNormal = 2 ** -14
+  if (clamped < minNormal) {
+    return Math.min((1 << mantissaBits) - 1, Math.round((clamped / minNormal) * mantissaScale))
+  }
+
+  let exponent = Math.max(0, Math.min(31, Math.floor(Math.log2(clamped)) + 15))
+  let mantissa = Math.round(((clamped / (2 ** (exponent - 15))) - 1) * mantissaScale)
+  if (mantissa >= mantissaScale) {
+    exponent = Math.min(31, exponent + 1)
+    mantissa = 0
+  }
+  if (exponent >= 31) return 0x1f << mantissaBits
+  return (exponent << mantissaBits) | (mantissa & ((1 << mantissaBits) - 1))
 }
 
 function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {

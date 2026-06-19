@@ -82,6 +82,14 @@ function halfFloatToNumber(bits) {
   return sign * (1 + mantissa / 0x400) * (2 ** (exponent - 15))
 }
 
+function unsignedFloatToNumber(bits, mantissaBits) {
+  const exponent = bits >>> mantissaBits
+  const mantissa = bits & ((1 << mantissaBits) - 1)
+  if (exponent === 0) return (mantissa / (2 ** mantissaBits)) * (2 ** -14)
+  if (exponent === 0x1f) return mantissa ? Number.NaN : Infinity
+  return (1 + mantissa / (2 ** mantissaBits)) * (2 ** (exponent - 15))
+}
+
 function splitEnvironmentTexture() {
   const data = []
   for (let y = 0; y < 2; y++) {
@@ -17817,6 +17825,18 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(rgb9e5Green < 0.05, `UnsignedInt5999Type green channel should stay near zero (${rgb9e5Green})`)
   assert.ok(rgb9e5Blue < 0.05, `UnsignedInt5999Type blue channel should stay near zero (${rgb9e5Blue})`)
 
+  const r11Target = { texture: { type: THREE.UnsignedInt101111Type } }
+  renderToTarget(scene, camera, r11Target, options)
+  const r11Data = r11Target.texture.image.data
+  const r11 = r11Data[redCenter]
+  const r11Red = unsignedFloatToNumber(r11 & 0x7ff, 6)
+  const r11Green = unsignedFloatToNumber((r11 >>> 11) & 0x7ff, 6)
+  const r11Blue = unsignedFloatToNumber((r11 >>> 22) & 0x3ff, 5)
+  assert.ok(r11Data instanceof Uint32Array, 'UnsignedInt101111Type color target should receive Uint32Array data')
+  assert.ok(r11Red > 0.5, `UnsignedInt101111Type red channel should be packed (${r11Red})`)
+  assert.ok(r11Green < 0.05, `UnsignedInt101111Type green channel should stay near zero (${r11Green})`)
+  assert.ok(r11Blue < 0.05, `UnsignedInt101111Type blue channel should stay near zero (${r11Blue})`)
+
   const uintTarget = { texture: { type: THREE.UnsignedIntType } }
   renderToTarget(scene, camera, uintTarget, options)
   const uintData = uintTarget.texture.image.data
@@ -18015,7 +18035,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
     [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RGFormat.*RGBFormat.*RGBAFormat/i, 'color texture format'],
-    [{ texture: { type: THREE.UnsignedInt248Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type.*UnsignedInt5999Type/i, 'color texture type'],
+    [{ texture: { type: THREE.UnsignedInt248Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type.*UnsignedInt101111Type.*UnsignedInt5999Type/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'depth-stencil format with scalar type'],
