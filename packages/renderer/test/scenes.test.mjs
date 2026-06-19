@@ -10711,6 +10711,122 @@ test('customDistanceMaterial alphaMap controls point-light shadow casters', () =
   assert.ok(cutoutLum > opaqueLum + 20, `customDistanceMaterial alphaMap should remove the point-shadow caster (${cutoutLum} vs ${opaqueLum})`)
 })
 
+test('custom shadow material alphaMaps sample selected UV channels', () => {
+  function alphaMapForChannel(channel) {
+    const alphaMap = rgbaTexture([
+      255, 0, 255, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    alphaMap.magFilter = THREE.NearestFilter
+    alphaMap.minFilter = THREE.NearestFilter
+    alphaMap.channel = channel
+    return alphaMap
+  }
+
+  function casterGeometry(size) {
+    const geometry = new THREE.BoxGeometry(size, size, size)
+    setConstantUvAttribute(geometry, 'uv', 0.75, 0.5)
+    setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+    return geometry
+  }
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function renderDirectionalCustomDepthChannel(channel) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const caster = new THREE.Mesh(
+      casterGeometry(3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    caster.customDepthMaterial = new THREE.MeshDepthMaterial({
+      alphaMap: alphaMapForChannel(channel),
+      alphaTest: 0.5,
+    })
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  function renderPointCustomDistanceChannel(channel) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const caster = new THREE.Mesh(
+      casterGeometry(2.5),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.25
+    caster.castShadow = true
+    caster.customDistanceMaterial = new THREE.MeshDistanceMaterial({
+      alphaMap: alphaMapForChannel(channel),
+      alphaTest: 0.5,
+    })
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  const primaryDepth = renderDirectionalCustomDepthChannel(0)
+  const secondaryDepth = renderDirectionalCustomDepthChannel(1)
+  const primaryDepthLum = primaryDepth.r + primaryDepth.g + primaryDepth.b
+  const secondaryDepthLum = secondaryDepth.r + secondaryDepth.g + secondaryDepth.b
+  assert.ok(
+    secondaryDepthLum > primaryDepthLum + 30,
+    `customDepthMaterial alphaMap channel=1 should sample transparent uv1 and remove the caster shadow (${secondaryDepthLum} vs ${primaryDepthLum})`,
+  )
+
+  const primaryDistance = renderPointCustomDistanceChannel(0)
+  const secondaryDistance = renderPointCustomDistanceChannel(1)
+  const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
+  const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
+  assert.ok(
+    secondaryDistanceLum > primaryDistanceLum + 20,
+    `customDistanceMaterial alphaMap channel=1 should sample transparent uv1 and remove the caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
+  )
+})
+
 test('custom shadow material base-map alpha controls mesh shadow casters', () => {
   function renderDirectionalCustomDepthMapShadow(mapAlpha) {
     const scene = new THREE.Scene()
