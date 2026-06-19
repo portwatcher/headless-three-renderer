@@ -309,6 +309,19 @@ export class Renderer {
       : clonePixelSize(this.currentSize, target)
   }
 
+  setDrawingBufferSize(width: number, height: number, pixelRatio: number): void {
+    this.currentSize = rendererStateSize(width, height, 'Renderer.setDrawingBufferSize')
+    this.pixelRatioValue = rendererStatePixelRatio(pixelRatio, 'Renderer.setDrawingBufferSize pixelRatio')
+  }
+
+  getDrawingBufferSize(): RenderSizeLike | null
+  getDrawingBufferSize<T extends RenderSizeLike>(target: T): T | null
+  getDrawingBufferSize(target?: RenderSizeLike): RenderSizeLike | null {
+    return target === undefined
+      ? clonePixelSize(this.currentSize)
+      : clonePixelSize(this.currentSize, target)
+  }
+
   setClearColor(color: number | ThreeColorLike | number[], alpha?: number): void {
     this.currentClearColor = rendererStateClearColor(color, alpha)
   }

@@ -28307,6 +28307,55 @@ test('Renderer pixel ratio is validated compatibility state', () => {
   )
 })
 
+test('Renderer drawing buffer size state applies as render fallback', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer.getDrawingBufferSize(), null)
+  assert.equal(renderer.getDrawingBufferSize(new THREE.Vector2()), null)
+
+  renderer.setDrawingBufferSize(36, 24, 2)
+  assert.equal(renderer.getPixelRatio(), 2)
+  assert.deepEqual(renderer.getSize(), { width: 36, height: 24 })
+  assert.deepEqual(renderer.getDrawingBufferSize(), { width: 36, height: 24 })
+
+  const vectorTarget = new THREE.Vector2()
+  const objectTarget = { width: 0, height: 0 }
+  const arrayTarget = [0, 0]
+  assert.strictEqual(renderer.getDrawingBufferSize(vectorTarget), vectorTarget)
+  assert.deepEqual(vectorTarget.toArray(), [36, 24])
+  assert.strictEqual(renderer.getDrawingBufferSize(objectTarget), objectTarget)
+  assert.deepEqual(objectTarget, { width: 36, height: 24 })
+  assert.strictEqual(renderer.getDrawingBufferSize(arrayTarget), arrayTarget)
+  assert.deepEqual(arrayTarget, [36, 24])
+
+  const rgba = renderer.render(scene, camera, { format: 'rgba' })
+  assert.equal(rgba.length, 36 * 24 * 4)
+  const mean = meanRegion(rgba, 36, 24, 10, 7, 26, 17)
+  assert.ok(mean.r > mean.b + 80, `Renderer drawing buffer fallback should render the red mesh (${mean.r} vs ${mean.b})`)
+
+  const override = renderer.render(scene, camera, { width: 20, height: 12, format: 'rgba' })
+  assert.equal(override.length, 20 * 12 * 4)
+
+  assert.throws(
+    () => renderer.setDrawingBufferSize(0, 24, 1),
+    /Renderer\.setDrawingBufferSize width must be a positive integer/i,
+  )
+  assert.throws(
+    () => renderer.setDrawingBufferSize(36, 24, '2'),
+    /Renderer\.setDrawingBufferSize pixelRatio value must be a finite number/i,
+  )
+})
+
 test('render options viewport confines draws to an output rectangle', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
