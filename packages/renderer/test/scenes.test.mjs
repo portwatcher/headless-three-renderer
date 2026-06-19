@@ -1791,6 +1791,20 @@ test('ArrayCamera renders sub-camera viewports', () => {
   assert.ok(targetLeft.r > targetLeft.g + 80, `target left ArrayCamera viewport should render red (${targetLeft.r}, ${targetLeft.g})`)
   assert.ok(targetRight.g > targetRight.r + 80, `target right ArrayCamera viewport should render green (${targetRight.g}, ${targetRight.r})`)
   assert.ok(depthLeft.r > 0 && depthRight.r > 0, `ArrayCamera depth target should include both viewports (${depthLeft.r}, ${depthRight.r})`)
+
+  const rendererTarget = { texture: {}, depthTexture: {} }
+  const renderer = new Renderer()
+  renderer.setRenderTarget(rendererTarget)
+  const rendererReturned = renderer.render(scene, arrayCamera, { width: 64, height: 64 })
+  assert.equal(rendererReturned, rendererTarget.data)
+  const rendererLeft = meanRegion(rendererTarget.data, 64, 64, 8, 20, 24, 44)
+  const rendererRight = meanRegion(rendererTarget.data, 64, 64, 40, 20, 56, 44)
+  const rendererDepthLeft = meanRegion(rendererTarget.depthTexture.image.data, 64, 64, 8, 20, 24, 44)
+  const rendererDepthRight = meanRegion(rendererTarget.depthTexture.image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(rendererLeft.r > rendererLeft.g + 80, `Renderer.setRenderTarget ArrayCamera left viewport should render red (${rendererLeft.r}, ${rendererLeft.g})`)
+  assert.ok(rendererRight.g > rendererRight.r + 80, `Renderer.setRenderTarget ArrayCamera right viewport should render green (${rendererRight.g}, ${rendererRight.r})`)
+  assert.ok(rendererDepthLeft.r > 0 && rendererDepthRight.r > 0, `Renderer.setRenderTarget ArrayCamera depth should include both viewports (${rendererDepthLeft.r}, ${rendererDepthRight.r})`)
+  renderer.setRenderTarget(null)
 })
 
 test('ArrayCamera supports PNG output', () => {
