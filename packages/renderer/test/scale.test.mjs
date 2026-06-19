@@ -313,13 +313,15 @@ test('texture-heavy scene budget renders many unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const geometry = new THREE.PlaneGeometry(0.18, 0.18)
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      const index = row * 8 + col
+  const columns = 10
+  const rows = 10
+  const geometry = new THREE.PlaneGeometry(0.15, 0.15)
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const index = row * columns + col
       const material = new THREE.MeshBasicMaterial({ map: makeTexture(index) })
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set((col - 3.5) * 0.22, (row - 3.5) * 0.22, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.18, (row - (rows - 1) / 2) * 0.18, 0)
       scene.add(mesh)
     }
   }
@@ -340,13 +342,15 @@ test('encoded texture budget renders many unique PNG buffer maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const geometry = new THREE.PlaneGeometry(0.2, 0.2)
-  for (let row = 0; row < 6; row += 1) {
-    for (let col = 0; col < 6; col += 1) {
-      const index = row * 6 + col
+  const columns = 8
+  const rows = 8
+  const geometry = new THREE.PlaneGeometry(0.16, 0.16)
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const index = row * columns + col
       const material = new THREE.MeshBasicMaterial({ map: makeEncodedTexture(index) })
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set((col - 2.5) * 0.25, (row - 2.5) * 0.25, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.2, (row - (rows - 1) / 2) * 0.2, 0)
       scene.add(mesh)
     }
   }
