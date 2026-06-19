@@ -204,10 +204,10 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 9
-  const rows = 9
-  const geometry = new THREE.BoxGeometry(0.125, 0.125, 0.125)
-  const textures = Array.from({ length: 9 }, (_, i) => makeTexture(i))
+  const columns = 10
+  const rows = 10
+  const geometry = new THREE.BoxGeometry(0.115, 0.115, 0.115)
+  const textures = Array.from({ length: 10 }, (_, i) => makeTexture(i))
   const materials = textures.map((map, i) => new THREE.MeshStandardMaterial({
     map,
     roughness: 0.48 + (i % 3) * 0.12,
@@ -311,12 +311,12 @@ test('instanced mesh budget renders thousands of transformed colored instances',
   assert.ok(mean.r > 40 && mean.g > 40 && mean.b > 40, `instanced colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
-test('texture-heavy scene budget renders many unique maps', () => {
+test('texture-heavy scene budget renders 169 unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 12
-  const rows = 12
+  const columns = 13
+  const rows = 13
   const geometry = new THREE.PlaneGeometry(0.13, 0.13)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
@@ -340,12 +340,12 @@ test('texture-heavy scene budget renders many unique maps', () => {
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `texture-heavy scene should retain textured color (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
-test('encoded texture budget renders many unique PNG buffer maps', () => {
+test('encoded texture budget renders 121 unique PNG buffer maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 10
-  const rows = 10
+  const columns = 11
+  const rows = 11
   const geometry = new THREE.PlaneGeometry(0.14, 0.14)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
