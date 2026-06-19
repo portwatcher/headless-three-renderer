@@ -73,6 +73,7 @@ export function createSceneCorpus() {
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
+    dashedLineMaterialWideLineCorpus(),
     pointsMaterialTextureCorpus(),
     pointsMaterialUvChannelCorpus(),
     instancedLinesPointsCorpus(),
@@ -3357,6 +3358,61 @@ function dashedLineMaterialTextureCorpus() {
       )
       if (greenPixels < 3 || redPixels > 1) {
         throw new Error(`textured dashed-line corpus should render green alpha-tested dashes, got green=${greenPixels} red=${redPixels}`)
+      }
+    },
+  }
+}
+
+function dashedLineMaterialWideLineCorpus() {
+  function makeScene(linewidth) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.45, 0, 0),
+      new THREE.Vector3(1.45, 0, 0),
+    ])
+    geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, 2.9]), 1))
+
+    scene.add(new THREE.Line(
+      geometry,
+      new THREE.LineDashedMaterial({
+        color: 0x55ccff,
+        dashSize: 0.4,
+        gapSize: 0.22,
+        linewidth,
+        scale: 1,
+      }),
+    ))
+    return scene
+  }
+
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const thinScene = makeScene(1)
+  const wideScene = makeScene(10)
+  let thinPixels = 0
+  let widePixels = 0
+
+  return {
+    name: 'line-dashed-material-wide-linewidth',
+    scene: wideScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.002,
+    browserReference: false,
+    render(renderer) {
+      const isCyan = (r, g, b) => b > 120 && g > 90 && r < 130
+      const thin = renderer.render(thinScene, camera, options)
+      thinPixels = countRegionPixels(thin, options.width, 0, 0, options.width, options.height, isCyan)
+      const wide = renderer.render(wideScene, camera, options)
+      widePixels = countRegionPixels(wide, options.width, 0, 0, options.width, options.height, isCyan)
+      return wide
+    },
+    validate() {
+      if (!(thinPixels > 0 && widePixels > thinPixels * 3)) {
+        throw new Error(`wide dashed-line corpus should expand linewidth coverage, thin=${thinPixels} wide=${widePixels}`)
       }
     },
   }
