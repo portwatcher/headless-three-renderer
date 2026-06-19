@@ -22206,14 +22206,14 @@ test('ShadowMaterial color tints received shadows', () => {
 })
 
 test('ShadowMaterial honors material.fog opt-out', () => {
-  function renderShadowMaterialFog(fog) {
+  function renderShadowMaterialFog(materialFog, sceneFog = new THREE.Fog(0x0000ff, 0, 1)) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
-    scene.fog = new THREE.Fog(0x0000ff, 0, 1)
+    scene.fog = sceneFog
 
     const receiver = new THREE.Mesh(
       new THREE.PlaneGeometry(12, 12),
-      new THREE.ShadowMaterial({ opacity: 1, fog }),
+      new THREE.ShadowMaterial({ opacity: 1, fog: materialFog }),
     )
     receiver.rotation.x = -Math.PI / 2
     receiver.receiveShadow = true
@@ -22251,6 +22251,11 @@ test('ShadowMaterial honors material.fog opt-out', () => {
   const unfogged = renderShadowMaterialFog(false)
   assert.ok(fogged.b > fogged.r + 15, `fogged ShadowMaterial should tint received shadows blue (${fogged.b} vs ${fogged.r})`)
   assert.ok(fogged.b > unfogged.b + 10, `fog=false should skip the fog color tint (${fogged.b} vs ${unfogged.b})`)
+
+  const exp2Fogged = renderShadowMaterialFog(true, new THREE.FogExp2(0x0000ff, 0.35))
+  const exp2Unfogged = renderShadowMaterialFog(false, new THREE.FogExp2(0x0000ff, 0.35))
+  assert.ok(exp2Fogged.b > exp2Fogged.r + 15, `FogExp2 ShadowMaterial should tint received shadows blue (${exp2Fogged.b} vs ${exp2Fogged.r})`)
+  assert.ok(exp2Fogged.b > exp2Unfogged.b + 10, `fog=false should skip the FogExp2 color tint (${exp2Fogged.b} vs ${exp2Unfogged.b})`)
 })
 
 test('ShadowMaterial shadow color honors outputColorSpace', () => {

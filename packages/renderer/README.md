@@ -152,7 +152,7 @@ The public API accepts only Three.js-like objects:
 - `MeshPhongMaterial.specularMap` red-channel specular strength, with finite `shininess`, primary/secondary `texture.channel` UV selection, texture transforms, horizontal/vertical repeat/mirrored wrapping, nearest/linear filtering, and masking for scene-level, reflection-probe, and supported material-level environment specular reflections
 - `MeshBasicMaterial.envMap` for one shared material-level reflection or refraction map, including legacy multiply/mix/add combine modes, `reflectivity`, and `refractionRatio`; invalid env-map scalar values fail clearly
 - `MeshStandardMaterial`, `MeshPhysicalMaterial` (PBR), `MeshLambertMaterial` (diffuse-only), and `MeshBasicMaterial` (unlit)
-- `ShadowMaterial` transparent receiver output with color, opacity, scene fog, fog opt-out, and output color-space conversion
+- `ShadowMaterial` transparent receiver output with color, opacity, scene fog, Fog/FogExp2 fog opt-out, and output color-space conversion
 - `material.side`: `FrontSide`, `BackSide`, `DoubleSide`, with clear failures for unsupported side constants
 - `material.fog = false` opt-out for scene fog on mesh, shadow, sprite, point, and line material paths; malformed fog color containers and invalid fog color/parameter values fail clearly
 - alpha test (`material.alphaTest`) with fragment discard and alpha-to-coverage threshold smoothing on multisampled main-pass renders; invalid values fail clearly
