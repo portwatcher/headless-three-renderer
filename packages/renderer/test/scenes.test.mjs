@@ -3593,43 +3593,48 @@ test('MeshPhongMaterial renders Blinn-Phong specular and honors specularMap', ()
   assert.ok(fullSpecular > maskedSpecular + 80, `specularMap should suppress Phong highlight (${fullSpecular} vs ${maskedSpecular})`)
 })
 
-test('MeshPhongMaterial specularMap samples the selected secondary UV channel', () => {
-  const specularMap = rgbaTexture([
-    0, 0, 0, 255,
-    255, 0, 0, 255,
-  ], 2, 1)
-  specularMap.channel = 1
+test('MeshPhongMaterial specularMap samples selected uv1-uv3 texture channels', () => {
+  function renderSpecularChannel(channel) {
+    const specularMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ], 2, 1)
+    specularMap.channel = channel
 
-  const geometry = constantUvPlane(0.25, 0.5)
-  const uv1 = new Float32Array(geometry.getAttribute('uv').count * 2)
-  for (let i = 0; i < geometry.getAttribute('uv').count; i++) {
-    uv1[i * 2] = 0.75
-    uv1[i * 2 + 1] = 0.5
+    const geometry = constantUvPlane(0.25, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshPhongMaterial({
+        color: 0x000000,
+        specular: 0xffffff,
+        shininess: 4,
+        specularMap,
+      }),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 8)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
   }
-  geometry.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2))
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(
-    geometry,
-    new THREE.MeshPhongMaterial({
-      color: 0x000000,
-      specular: 0xffffff,
-      shininess: 4,
-      specularMap,
-    }),
-  ))
-
-  const light = new THREE.DirectionalLight(0xffffff, 8)
-  light.position.set(0, 0, 3)
-  scene.add(light)
-
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
-
-  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
-  assert.ok(mean.r > 35, `specularMap.channel should sample uv1's enabled texel (${mean.r})`)
+  const primary = renderSpecularChannel(0)
+  for (const channel of [1, 2, 3]) {
+    const sample = renderSpecularChannel(channel)
+    assert.ok(sample.r > 35, `specularMap channel=${channel} should sample uv${channel}'s enabled texel (${sample.r})`)
+    assert.ok(sample.r > primary.r + 30, `specularMap channel=${channel} should enable stronger highlights than channel=0 (${sample.r} vs ${primary.r})`)
+  }
 })
 
 test('MeshPhongMaterial specularMap keeps primary UVs when another map uses a secondary channel', () => {
@@ -8128,7 +8133,7 @@ test('invalid skinning matrix values fail clearly', () => {
   }
 })
 
-test('aoMap samples the selected UV channel', () => {
+test('aoMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const aoMap = rgbaTexture([
       255, 255, 255, 255,
@@ -8138,17 +8143,10 @@ test('aoMap samples the selected UV channel', () => {
     ], 4, 1)
     aoMap.channel = channel
 
-    const geometry = new THREE.PlaneGeometry(2, 2)
-    const primaryUv = new Float32Array(geometry.getAttribute('uv').count * 2)
-    const secondaryUv = new Float32Array(geometry.getAttribute('uv').count * 2)
-    for (let i = 0; i < geometry.getAttribute('uv').count; i++) {
-      primaryUv[i * 2] = 0.125
-      primaryUv[i * 2 + 1] = 0.5
-      secondaryUv[i * 2] = 0.875
-      secondaryUv[i * 2 + 1] = 0.5
+    const geometry = constantUvPlane(0.125, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.875, 0.5)
     }
-    geometry.setAttribute('uv', new THREE.BufferAttribute(primaryUv, 2))
-    geometry.setAttribute('uv1', new THREE.BufferAttribute(secondaryUv, 2))
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -8165,9 +8163,11 @@ test('aoMap samples the selected UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
-  assert.ok(primary.r > secondary.r + 100, `aoMap channel=0 should sample bright primary UVs (${primary.r} vs ${secondary.r})`)
-  assert.ok(secondary.r < 20, `aoMap channel=1 should darken the plane through uv1 (${secondary.r})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(primary.r > secondary.r + 100, `aoMap channel=0 should sample bright primary UVs over channel=${channel} (${primary.r} vs ${secondary.r})`)
+    assert.ok(secondary.r < 20, `aoMap channel=${channel} should darken the plane through uv${channel} (${secondary.r})`)
+  }
 })
 
 test('aoMap applies texture UV transforms on the selected channel', () => {
@@ -8376,7 +8376,7 @@ test('alphaMap honors explicit texture matrices before alpha testing', () => {
   assert.ok(mean.r > mean.b + 40, `explicit alphaMap matrix should sample the visible texel before alpha testing (${mean.r} vs ${mean.b})`)
 })
 
-test('alphaMap samples the selected secondary UV channel', () => {
+test('alphaMap samples selected uv1-uv3 texture channels', () => {
   function renderAlphaChannel(channel) {
     const alphaMap = rgbaTexture([
       255, 0, 255, 255,
@@ -8385,7 +8385,9 @@ test('alphaMap samples the selected secondary UV channel', () => {
     alphaMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 1)
@@ -8405,9 +8407,11 @@ test('alphaMap samples the selected secondary UV channel', () => {
   }
 
   const primary = renderAlphaChannel(0)
-  const secondary = renderAlphaChannel(1)
   assert.ok(primary.b > primary.r + 80, `alphaMap channel=0 should sample the transparent primary UV texel (${primary.b} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.b + 40, `alphaMap channel=1 should sample the opaque uv1 texel (${secondary.r} vs ${secondary.b})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderAlphaChannel(channel)
+    assert.ok(secondary.r > secondary.b + 40, `alphaMap channel=${channel} should sample the opaque uv${channel} texel (${secondary.r} vs ${secondary.b})`)
+  }
 })
 
 test('alphaMap honors nearest texture filters before alpha testing', () => {
