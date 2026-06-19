@@ -919,6 +919,18 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         specular_color: specular_color_map.as_ref(),
         specular_intensity: specular_intensity_map.as_ref(),
         clearcoat_is_srgb: matches!(mesh.clearcoat_map_color_space.as_deref(), Some("srgb")),
+        clearcoat_roughness_is_srgb: matches!(
+            mesh.clearcoat_roughness_map_color_space.as_deref(),
+            Some("srgb")
+        ),
+        anisotropy_is_srgb: matches!(mesh.anisotropy_map_color_space.as_deref(), Some("srgb")),
+        iridescence_is_srgb: matches!(mesh.iridescence_map_color_space.as_deref(), Some("srgb")),
+        iridescence_thickness_is_srgb: matches!(
+            mesh.iridescence_thickness_map_color_space.as_deref(),
+            Some("srgb")
+        ),
+        transmission_is_srgb: matches!(mesh.transmission_map_color_space.as_deref(), Some("srgb")),
+        thickness_is_srgb: matches!(mesh.thickness_map_color_space.as_deref(), Some("srgb")),
         sheen_color_is_srgb: matches!(mesh.sheen_color_map_color_space.as_deref(), Some("srgb")),
         specular_color_is_srgb: matches!(
             mesh.specular_color_map_color_space.as_deref(),
@@ -2361,6 +2373,12 @@ struct PhysicalMapInputs<'a> {
     specular_color: Option<&'a PreparedTexture>,
     specular_intensity: Option<&'a PreparedTexture>,
     clearcoat_is_srgb: bool,
+    clearcoat_roughness_is_srgb: bool,
+    anisotropy_is_srgb: bool,
+    iridescence_is_srgb: bool,
+    iridescence_thickness_is_srgb: bool,
+    transmission_is_srgb: bool,
+    thickness_is_srgb: bool,
     sheen_color_is_srgb: bool,
     specular_color_is_srgb: bool,
 }
@@ -2424,13 +2442,37 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
                 );
             }
             if let Some(map) = inputs.clearcoat_roughness {
-                scalar[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
+                scalar[out + 1] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    1,
+                    inputs.clearcoat_roughness_is_srgb,
+                );
             }
             if let Some(map) = inputs.transmission {
-                scalar[out + 2] = sample_texture_channel(map, x, y, width, height, 0);
+                scalar[out + 2] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    0,
+                    inputs.transmission_is_srgb,
+                );
             }
             if let Some(map) = inputs.thickness {
-                scalar[out + 3] = sample_texture_channel(map, x, y, width, height, 1);
+                scalar[out + 3] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    1,
+                    inputs.thickness_is_srgb,
+                );
             }
             if let Some(map) = inputs.sheen_color {
                 sheen[out] = sample_texture_color_channel(
@@ -2465,15 +2507,55 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
                 sheen[out + 3] = sample_texture_channel(map, x, y, width, height, 3);
             }
             if let Some(map) = inputs.anisotropy {
-                anisotropy[out] = sample_texture_channel(map, x, y, width, height, 0);
-                anisotropy[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
-                anisotropy[out + 2] = sample_texture_channel(map, x, y, width, height, 2);
+                anisotropy[out] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    0,
+                    inputs.anisotropy_is_srgb,
+                );
+                anisotropy[out + 1] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    1,
+                    inputs.anisotropy_is_srgb,
+                );
+                anisotropy[out + 2] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    2,
+                    inputs.anisotropy_is_srgb,
+                );
             }
             if let Some(map) = inputs.iridescence {
-                iridescence[out] = sample_texture_channel(map, x, y, width, height, 0);
+                iridescence[out] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    0,
+                    inputs.iridescence_is_srgb,
+                );
             }
             if let Some(map) = inputs.iridescence_thickness {
-                iridescence[out + 1] = sample_texture_channel(map, x, y, width, height, 1);
+                iridescence[out + 1] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    1,
+                    inputs.iridescence_thickness_is_srgb,
+                );
             }
             if let Some(map) = inputs.specular_color {
                 specular[out] = sample_texture_color_channel(
@@ -2584,7 +2666,7 @@ fn sample_texture_color_channel(
     is_srgb: bool,
 ) -> u8 {
     let value = sample_texture_channel(texture, x, y, out_width, out_height, channel);
-    if is_srgb {
+    if is_srgb && channel < 3 {
         srgb_u8_to_linear_u8(value)
     } else {
         value

@@ -327,6 +327,8 @@ export interface SceneMesh {
   clearcoatRoughnessMapAnisotropy?: number
   /** Clearcoat roughness map UV transform `[a, c, tx, b, d, ty]`. */
   clearcoatRoughnessMapTransform?: Array<number>
+  /** Clearcoat roughness map color space. `"srgb"` is decoded to linear before shading. */
+  clearcoatRoughnessMapColorSpace?: string
   /** Whether clearcoat roughness map sampling uses the secondary UV stream. */
   clearcoatRoughnessMapUsesUv2?: boolean
   /** Optional clearcoat normal map. */
@@ -419,6 +421,8 @@ export interface SceneMesh {
   anisotropyMapAnisotropy?: number
   /** Anisotropy map UV transform `[a, c, tx, b, d, ty]`. */
   anisotropyMapTransform?: Array<number>
+  /** Anisotropy map color space. `"srgb"` is decoded to linear before shading. */
+  anisotropyMapColorSpace?: string
   /** Whether anisotropy map sampling uses the secondary UV stream. */
   anisotropyMapUsesUv2?: boolean
   /** MeshPhysicalMaterial iridescence factor (0..1). Defaults to 0. */
@@ -441,6 +445,8 @@ export interface SceneMesh {
   iridescenceMapAnisotropy?: number
   /** Iridescence factor map UV transform `[a, c, tx, b, d, ty]`. */
   iridescenceMapTransform?: Array<number>
+  /** Iridescence factor map color space. `"srgb"` is decoded to linear before shading. */
+  iridescenceMapColorSpace?: string
   /** Whether iridescence factor map sampling uses the secondary UV stream. */
   iridescenceMapUsesUv2?: boolean
   /** Iridescence film IOR. Defaults to 1.3. */
@@ -467,6 +473,8 @@ export interface SceneMesh {
   iridescenceThicknessMapAnisotropy?: number
   /** Iridescence thickness map UV transform `[a, c, tx, b, d, ty]`. */
   iridescenceThicknessMapTransform?: Array<number>
+  /** Iridescence thickness map color space. `"srgb"` is decoded to linear before shading. */
+  iridescenceThicknessMapColorSpace?: string
   /** Whether iridescence thickness map sampling uses the secondary UV stream. */
   iridescenceThicknessMapUsesUv2?: boolean
   /** Physical transmission factor (0..1). Defaults to 0. */
@@ -489,6 +497,8 @@ export interface SceneMesh {
   transmissionMapAnisotropy?: number
   /** Transmission map UV transform `[a, c, tx, b, d, ty]`. */
   transmissionMapTransform?: Array<number>
+  /** Transmission map color space. `"srgb"` is decoded to linear before shading. */
+  transmissionMapColorSpace?: string
   /** Whether transmission map sampling uses the secondary UV stream. */
   transmissionMapUsesUv2?: boolean
   /** MeshPhysicalMaterial dispersion factor. Defaults to 0. */
@@ -515,6 +525,8 @@ export interface SceneMesh {
   thicknessMapAnisotropy?: number
   /** Thickness map UV transform `[a, c, tx, b, d, ty]`. */
   thicknessMapTransform?: Array<number>
+  /** Thickness map color space. `"srgb"` is decoded to linear before shading. */
+  thicknessMapColorSpace?: string
   /** Whether thickness map sampling uses the secondary UV stream. */
   thicknessMapUsesUv2?: boolean
   /** Transmission attenuation distance. Defaults to a very large distance. */

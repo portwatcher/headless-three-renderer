@@ -620,6 +620,7 @@ export function extractPbrProperties(
     props.clearcoatRoughnessMapMinFilter = minFilterModeToString(material.clearcoatRoughnessMap)
     props.clearcoatRoughnessMapAnisotropy = textureAnisotropy(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
     props.clearcoatRoughnessMapTransform = textureTransform(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
+    props.clearcoatRoughnessMapColorSpace = textureColorSpace(material.clearcoatRoughnessMap)
     props.clearcoatRoughnessMapUsesUv2 = textureUvChannel(material.clearcoatRoughnessMap) > 0
   }
   const clearcoatNormalMapInfo = extractTextureFromSlot(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
@@ -705,6 +706,7 @@ export function extractPbrProperties(
     props.anisotropyMapMinFilter = minFilterModeToString(material.anisotropyMap)
     props.anisotropyMapAnisotropy = textureAnisotropy(material.anisotropyMap, 'material.anisotropyMap')
     props.anisotropyMapTransform = textureTransform(material.anisotropyMap, 'material.anisotropyMap')
+    props.anisotropyMapColorSpace = textureColorSpace(material.anisotropyMap)
     props.anisotropyMapUsesUv2 = textureUvChannel(material.anisotropyMap) > 0
   }
 
@@ -723,6 +725,7 @@ export function extractPbrProperties(
     props.iridescenceMapMinFilter = minFilterModeToString(material.iridescenceMap)
     props.iridescenceMapAnisotropy = textureAnisotropy(material.iridescenceMap, 'material.iridescenceMap')
     props.iridescenceMapTransform = textureTransform(material.iridescenceMap, 'material.iridescenceMap')
+    props.iridescenceMapColorSpace = textureColorSpace(material.iridescenceMap)
     props.iridescenceMapUsesUv2 = textureUvChannel(material.iridescenceMap) > 0
   }
   const iridescenceIor = optionalFiniteNumber(material.iridescenceIOR, 'material.iridescenceIOR')
@@ -749,6 +752,7 @@ export function extractPbrProperties(
     props.iridescenceThicknessMapMinFilter = minFilterModeToString(material.iridescenceThicknessMap)
     props.iridescenceThicknessMapAnisotropy = textureAnisotropy(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
     props.iridescenceThicknessMapTransform = textureTransform(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
+    props.iridescenceThicknessMapColorSpace = textureColorSpace(material.iridescenceThicknessMap)
     props.iridescenceThicknessMapUsesUv2 = textureUvChannel(material.iridescenceThicknessMap) > 0
   }
 
@@ -771,6 +775,7 @@ export function extractPbrProperties(
     props.transmissionMapMinFilter = minFilterModeToString(material.transmissionMap)
     props.transmissionMapAnisotropy = textureAnisotropy(material.transmissionMap, 'material.transmissionMap')
     props.transmissionMapTransform = textureTransform(material.transmissionMap, 'material.transmissionMap')
+    props.transmissionMapColorSpace = textureColorSpace(material.transmissionMap)
     props.transmissionMapUsesUv2 = textureUvChannel(material.transmissionMap) > 0
   }
   const ior = optionalFiniteNumber(material.ior, 'material.ior')
@@ -792,6 +797,7 @@ export function extractPbrProperties(
     props.thicknessMapMinFilter = minFilterModeToString(material.thicknessMap)
     props.thicknessMapAnisotropy = textureAnisotropy(material.thicknessMap, 'material.thicknessMap')
     props.thicknessMapTransform = textureTransform(material.thicknessMap, 'material.thicknessMap')
+    props.thicknessMapColorSpace = textureColorSpace(material.thicknessMap)
     props.thicknessMapUsesUv2 = textureUvChannel(material.thicknessMap) > 0
   }
   const attenuationDistance = optionalFiniteNumberOrInfinityDefault(

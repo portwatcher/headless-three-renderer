@@ -749,6 +749,7 @@ export interface NativeSceneMesh {
   clearcoatRoughnessMapMinFilter?: string
   clearcoatRoughnessMapAnisotropy?: number
   clearcoatRoughnessMapTransform?: number[]
+  clearcoatRoughnessMapColorSpace?: string
   clearcoatRoughnessMapUsesUv2?: boolean
   clearcoatNormalMap?: Buffer
   clearcoatNormalMapWidth?: number
@@ -795,6 +796,7 @@ export interface NativeSceneMesh {
   anisotropyMapMinFilter?: string
   anisotropyMapAnisotropy?: number
   anisotropyMapTransform?: number[]
+  anisotropyMapColorSpace?: string
   anisotropyMapUsesUv2?: boolean
   iridescence?: number
   iridescenceMap?: Buffer
@@ -806,6 +808,7 @@ export interface NativeSceneMesh {
   iridescenceMapMinFilter?: string
   iridescenceMapAnisotropy?: number
   iridescenceMapTransform?: number[]
+  iridescenceMapColorSpace?: string
   iridescenceMapUsesUv2?: boolean
   iridescenceIor?: number
   iridescenceThicknessMin?: number
@@ -819,6 +822,7 @@ export interface NativeSceneMesh {
   iridescenceThicknessMapMinFilter?: string
   iridescenceThicknessMapAnisotropy?: number
   iridescenceThicknessMapTransform?: number[]
+  iridescenceThicknessMapColorSpace?: string
   iridescenceThicknessMapUsesUv2?: boolean
   transmission?: number
   transmissionMap?: Buffer
@@ -830,6 +834,7 @@ export interface NativeSceneMesh {
   transmissionMapMinFilter?: string
   transmissionMapAnisotropy?: number
   transmissionMapTransform?: number[]
+  transmissionMapColorSpace?: string
   transmissionMapUsesUv2?: boolean
   dispersion?: number
   ior?: number
@@ -843,6 +848,7 @@ export interface NativeSceneMesh {
   thicknessMapMinFilter?: string
   thicknessMapAnisotropy?: number
   thicknessMapTransform?: number[]
+  thicknessMapColorSpace?: string
   thicknessMapUsesUv2?: boolean
   attenuationDistance?: number
   attenuationColor?: number[]
@@ -1143,6 +1149,7 @@ export interface PbrProperties {
   clearcoatRoughnessMapMinFilter?: string
   clearcoatRoughnessMapAnisotropy?: number
   clearcoatRoughnessMapTransform?: number[]
+  clearcoatRoughnessMapColorSpace?: string
   clearcoatRoughnessMapUsesUv2?: boolean
   clearcoatNormalMap?: Buffer
   clearcoatNormalMapWidth?: number
@@ -1189,6 +1196,7 @@ export interface PbrProperties {
   anisotropyMapMinFilter?: string
   anisotropyMapAnisotropy?: number
   anisotropyMapTransform?: number[]
+  anisotropyMapColorSpace?: string
   anisotropyMapUsesUv2?: boolean
   iridescence?: number
   iridescenceMap?: Buffer
@@ -1200,6 +1208,7 @@ export interface PbrProperties {
   iridescenceMapMinFilter?: string
   iridescenceMapAnisotropy?: number
   iridescenceMapTransform?: number[]
+  iridescenceMapColorSpace?: string
   iridescenceMapUsesUv2?: boolean
   iridescenceIor?: number
   iridescenceThicknessMin?: number
@@ -1213,6 +1222,7 @@ export interface PbrProperties {
   iridescenceThicknessMapMinFilter?: string
   iridescenceThicknessMapAnisotropy?: number
   iridescenceThicknessMapTransform?: number[]
+  iridescenceThicknessMapColorSpace?: string
   iridescenceThicknessMapUsesUv2?: boolean
   transmission?: number
   transmissionMap?: Buffer
@@ -1224,6 +1234,7 @@ export interface PbrProperties {
   transmissionMapMinFilter?: string
   transmissionMapAnisotropy?: number
   transmissionMapTransform?: number[]
+  transmissionMapColorSpace?: string
   transmissionMapUsesUv2?: boolean
   dispersion?: number
   ior?: number
@@ -1237,6 +1248,7 @@ export interface PbrProperties {
   thicknessMapMinFilter?: string
   thicknessMapAnisotropy?: number
   thicknessMapTransform?: number[]
+  thicknessMapColorSpace?: string
   thicknessMapUsesUv2?: boolean
   attenuationDistance?: number
   attenuationColor?: number[]

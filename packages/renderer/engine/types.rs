@@ -293,6 +293,8 @@ pub struct SceneMesh {
     pub clearcoat_roughness_map_anisotropy: Option<f64>,
     /// Clearcoat roughness map UV transform `[a, c, tx, b, d, ty]`.
     pub clearcoat_roughness_map_transform: Option<Vec<f64>>,
+    /// Clearcoat roughness map color space. `"srgb"` is decoded to linear before shading.
+    pub clearcoat_roughness_map_color_space: Option<String>,
     /// Whether clearcoat roughness map sampling uses the secondary UV stream.
     pub clearcoat_roughness_map_uses_uv2: Option<bool>,
     /// Optional clearcoat normal map.
@@ -385,6 +387,8 @@ pub struct SceneMesh {
     pub anisotropy_map_anisotropy: Option<f64>,
     /// Anisotropy map UV transform `[a, c, tx, b, d, ty]`.
     pub anisotropy_map_transform: Option<Vec<f64>>,
+    /// Anisotropy map color space. `"srgb"` is decoded to linear before shading.
+    pub anisotropy_map_color_space: Option<String>,
     /// Whether anisotropy map sampling uses the secondary UV stream.
     pub anisotropy_map_uses_uv2: Option<bool>,
     /// MeshPhysicalMaterial iridescence factor (0..1). Defaults to 0.
@@ -407,6 +411,8 @@ pub struct SceneMesh {
     pub iridescence_map_anisotropy: Option<f64>,
     /// Iridescence factor map UV transform `[a, c, tx, b, d, ty]`.
     pub iridescence_map_transform: Option<Vec<f64>>,
+    /// Iridescence factor map color space. `"srgb"` is decoded to linear before shading.
+    pub iridescence_map_color_space: Option<String>,
     /// Whether iridescence factor map sampling uses the secondary UV stream.
     pub iridescence_map_uses_uv2: Option<bool>,
     /// Iridescence film IOR. Defaults to 1.3.
@@ -433,6 +439,8 @@ pub struct SceneMesh {
     pub iridescence_thickness_map_anisotropy: Option<f64>,
     /// Iridescence thickness map UV transform `[a, c, tx, b, d, ty]`.
     pub iridescence_thickness_map_transform: Option<Vec<f64>>,
+    /// Iridescence thickness map color space. `"srgb"` is decoded to linear before shading.
+    pub iridescence_thickness_map_color_space: Option<String>,
     /// Whether iridescence thickness map sampling uses the secondary UV stream.
     pub iridescence_thickness_map_uses_uv2: Option<bool>,
     /// Physical transmission factor (0..1). Defaults to 0.
@@ -455,6 +463,8 @@ pub struct SceneMesh {
     pub transmission_map_anisotropy: Option<f64>,
     /// Transmission map UV transform `[a, c, tx, b, d, ty]`.
     pub transmission_map_transform: Option<Vec<f64>>,
+    /// Transmission map color space. `"srgb"` is decoded to linear before shading.
+    pub transmission_map_color_space: Option<String>,
     /// Whether transmission map sampling uses the secondary UV stream.
     pub transmission_map_uses_uv2: Option<bool>,
     /// MeshPhysicalMaterial dispersion factor. Defaults to 0.
@@ -481,6 +491,8 @@ pub struct SceneMesh {
     pub thickness_map_anisotropy: Option<f64>,
     /// Thickness map UV transform `[a, c, tx, b, d, ty]`.
     pub thickness_map_transform: Option<Vec<f64>>,
+    /// Thickness map color space. `"srgb"` is decoded to linear before shading.
+    pub thickness_map_color_space: Option<String>,
     /// Whether thickness map sampling uses the secondary UV stream.
     pub thickness_map_uses_uv2: Option<bool>,
     /// Transmission attenuation distance. Defaults to a very large distance.

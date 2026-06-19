@@ -20557,6 +20557,57 @@ test('transmissionMap samples selected uv1-uv3 texture channels', () => {
   }
 })
 
+test('transmissionMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const transmissionMap = solidTexture(128, 0, 0, 255)
+    transmissionMap.colorSpace = colorSpace
+    transmissionMap.magFilter = THREE.NearestFilter
+    transmissionMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xff0000,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        transmissionMap,
+        ior: 1.5,
+        thickness: 0,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  assert.ok(
+    linear.b > srgb.b + 20,
+    `linear transmissionMap should transmit more background blue before sRGB decode (${linear.b.toFixed(1)} vs ${srgb.b.toFixed(1)})`,
+  )
+  assert.ok(
+    srgb.r > linear.r + 5,
+    `sRGB-decoded transmissionMap should leave the surface more opaque red (${srgb.r.toFixed(1)} vs ${linear.r.toFixed(1)})`,
+  )
+})
+
 test('clearcoatMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const clearcoatMap = rgbaTexture([
@@ -20684,6 +20735,49 @@ test('clearcoatRoughnessMap samples selected uv1-uv3 texture channels', () => {
     const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
     assert.ok(primaryLum > secondaryLum + 20, `clearcoatRoughnessMap channel=${channel} should sample the rough uv${channel} texel (${primaryLum.toFixed(1)} vs ${secondaryLum.toFixed(1)})`)
   }
+})
+
+test('clearcoatRoughnessMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const clearcoatRoughnessMap = solidTexture(0, 128, 0, 255)
+    clearcoatRoughnessMap.colorSpace = colorSpace
+    clearcoatRoughnessMap.magFilter = THREE.NearestFilter
+    clearcoatRoughnessMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 1,
+        clearcoatRoughnessMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const mean = meanRgba(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+    return 0.2126 * mean.r + 0.7152 * mean.g + 0.0722 * mean.b
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  assert.ok(
+    srgb > linear + 8,
+    `sRGB-decoded clearcoatRoughnessMap should produce the smoother, brighter clearcoat response (${srgb.toFixed(1)} vs ${linear.toFixed(1)})`,
+  )
 })
 
 test('clearcoatNormalMap samples selected uv1-uv3 texture channels', () => {
