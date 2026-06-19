@@ -28412,12 +28412,20 @@ test('Renderer clear methods are no-op compatibility hooks', () => {
   const camera = makeCamera()
   const renderer = new Renderer()
 
+  assert.equal(renderer.getClearDepth(), 1)
+  assert.equal(renderer.getClearStencil(), 0)
   renderer.setClearColor(0x204080, 0.5)
+  renderer.setClearDepth(0.25)
+  renderer.setClearStencil(7)
+  assert.equal(renderer.getClearDepth(), 0.25)
+  assert.equal(renderer.getClearStencil(), 7)
   renderer.clear()
   renderer.clear(false, true, false)
   renderer.clearColor()
   renderer.clearDepth()
   renderer.clearStencil()
+  assert.equal(renderer.getClearDepth(), 0.25)
+  assert.equal(renderer.getClearStencil(), 7)
 
   const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
   assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer clear hooks should preserve clear color state')
@@ -28913,6 +28921,14 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   assert.throws(
     () => renderer.setClearAlpha(Number.NaN),
     /Renderer\.setClearAlpha alpha must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.setClearDepth('near'),
+    /Renderer\.setClearDepth depth must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.setClearStencil(1.5),
+    /Renderer\.setClearStencil stencil must be a finite integer/i,
   )
   renderer.setViewport(0, 0, 64, 16)
   assert.throws(

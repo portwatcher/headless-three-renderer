@@ -219,6 +219,8 @@ export class Renderer {
   private currentActiveMipmapLevel = 0
   private currentSize: PixelSize | null = null
   private currentClearColor: Color4 = [...DEFAULT_BACKGROUND_COLOR] as Color4
+  private currentClearDepth = 1
+  private currentClearStencil = 0
   private currentViewport: PixelRect | null = null
   private currentScissor: PixelRect | null = null
   private currentScissorTest = false
@@ -415,6 +417,22 @@ export class Renderer {
 
   getClearAlpha(): number {
     return this.currentClearColor[3]
+  }
+
+  setClearDepth(depth: number): void {
+    this.currentClearDepth = rendererStateClearDepth(depth, 'Renderer.setClearDepth depth')
+  }
+
+  getClearDepth(): number {
+    return this.currentClearDepth
+  }
+
+  setClearStencil(stencil: number): void {
+    this.currentClearStencil = rendererStateClearStencil(stencil, 'Renderer.setClearStencil stencil')
+  }
+
+  getClearStencil(): number {
+    return this.currentClearStencil
   }
 
   setViewport(rect: RenderPixelRectLike | null): void
@@ -2318,6 +2336,20 @@ function rendererStateClearAlpha(value: unknown, label: string): number {
     throw new TypeError(`${label} must be a finite number.`)
   }
   return clamp01(value)
+}
+
+function rendererStateClearDepth(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  return clamp01(value)
+}
+
+function rendererStateClearStencil(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value)) {
+    throw new TypeError(`${label} must be a finite integer.`)
+  }
+  return value
 }
 
 function cloneColor4(color: Color4): Color4 {
