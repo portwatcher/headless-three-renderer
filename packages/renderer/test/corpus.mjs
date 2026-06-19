@@ -63,6 +63,7 @@ export function createSceneCorpus() {
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
     spriteMaterialCorpus(),
+    spriteAlphaMapCorpus(),
     spriteShadowCorpus(),
     pointSpotLightCorpus(),
     rectAreaLightCorpus(),
@@ -1027,6 +1028,43 @@ function spriteMaterialCorpus() {
       }
       if (colors.red < 100 || colors.green < 100 || colors.blue < 100 || colors.yellow < 100) {
         throw new Error(`mapped sprite corpus should render all texture quadrants, got ${JSON.stringify(colors)}`)
+      }
+    },
+  }
+}
+
+function spriteAlphaMapCorpus() {
+  const alphaMap = new THREE.DataTexture(new Uint8Array([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.16)
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    alphaMap,
+    alphaTest: 0.5,
+    color: 0x22ff88,
+  }))
+  sprite.scale.set(1.6, 1.2, 1)
+  scene.add(sprite)
+
+  return {
+    name: 'sprite-material-alpha-map-cutout',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 41],
+    minNonBackgroundRatio: 0.04,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const cutout = meanRegion(rgba, width, 20, 34, 40, 62)
+      const visible = meanRegion(rgba, width, 56, 34, 76, 62)
+      if (!(cutout.b > cutout.g + 25 && visible.g > visible.b + 80 && visible.g > visible.r + 80)) {
+        throw new Error(`sprite alpha-map corpus should cut out the left side and keep the right side green, got cutout=${JSON.stringify(cutout)} visible=${JSON.stringify(visible)}`)
       }
     },
   }
