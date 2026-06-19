@@ -260,6 +260,31 @@ class RendererDebugState {
   }
 }
 
+class RendererDomElementState {
+  width = 0
+  height = 0
+
+  readonly style = {
+    width: '0px',
+    height: '0px',
+  }
+
+  setSize(width: number, height: number, updateStyle = true): void {
+    this.width = width
+    this.height = height
+    if (updateStyle) {
+      this.style.width = `${width}px`
+      this.style.height = `${height}px`
+    }
+  }
+
+  getContext(): never {
+    throw new Error(
+      'Renderer.domElement.getContext() is not supported by @headless-three/renderer because the domElement is an inert offscreen compatibility object, not a browser canvas.',
+    )
+  }
+}
+
 class RendererExtensionsState {
   has(name: string): boolean {
     assertWebGlExtensionName(name, 'Renderer.extensions.has name')
@@ -531,6 +556,7 @@ export class Renderer {
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
   readonly debug = new RendererDebugState()
+  readonly domElement = new RendererDomElementState()
   readonly extensions = new RendererExtensionsState()
   readonly info = new RendererInfoState()
   readonly properties = new RendererPropertiesState()
@@ -745,6 +771,7 @@ export class Renderer {
 
   setSize(width: number, height: number, _updateStyle = true): void {
     this.currentSize = rendererStateSize(width, height, 'Renderer.setSize')
+    this.domElement.setSize(this.currentSize.width, this.currentSize.height, _updateStyle)
   }
 
   setPixelRatio(value: number): void {
@@ -766,6 +793,7 @@ export class Renderer {
   setDrawingBufferSize(width: number, height: number, pixelRatio: number): void {
     this.currentSize = rendererStateSize(width, height, 'Renderer.setDrawingBufferSize')
     this.pixelRatioValue = rendererStatePixelRatio(pixelRatio, 'Renderer.setDrawingBufferSize pixelRatio')
+    this.domElement.setSize(this.currentSize.width, this.currentSize.height)
   }
 
   getDrawingBufferSize(): RenderSizeLike | null

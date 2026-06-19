@@ -29071,6 +29071,46 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   )
 })
 
+test('Renderer domElement is an inert output-size mirror', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.domElement.width, 0)
+  assert.equal(renderer.domElement.height, 0)
+  assert.deepEqual(renderer.domElement.style, { width: '0px', height: '0px' })
+  assert.throws(
+    () => renderer.domElement.getContext('webgl'),
+    /Renderer\.domElement\.getContext\(\) is not supported.*inert offscreen compatibility object/i,
+  )
+
+  renderer.setSize(64, 32)
+  assert.equal(renderer.domElement.width, 64)
+  assert.equal(renderer.domElement.height, 32)
+  assert.deepEqual(renderer.domElement.style, { width: '64px', height: '32px' })
+
+  renderer.setSize(48, 24, false)
+  assert.equal(renderer.domElement.width, 48)
+  assert.equal(renderer.domElement.height, 24)
+  assert.deepEqual(renderer.domElement.style, { width: '64px', height: '32px' })
+
+  renderer.setDrawingBufferSize(40, 20, 2)
+  assert.equal(renderer.domElement.width, 40)
+  assert.equal(renderer.domElement.height, 20)
+  assert.deepEqual(renderer.domElement.style, { width: '40px', height: '20px' })
+  assert.equal(renderer.getPixelRatio(), 2)
+
+  const rgba = renderer.render(scene, camera, { format: 'rgba' })
+  assert.equal(rgba.length, 40 * 20 * 4)
+  const mean = meanRegion(rgba, 40, 20, 12, 6, 28, 14)
+  assert.ok(mean.r > mean.b + 80, `domElement size mirroring should preserve normal rendering (${mean.r} vs ${mean.b})`)
+})
+
 test('Renderer exposes inert WebGLRenderer helper objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
