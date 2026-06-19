@@ -13177,40 +13177,46 @@ test('unsupported array and 3D texture inputs fail clearly', () => {
     return texture
   }
 
-  const cases = [
-    ['material DataArrayTexture', (scene) => {
+  const textureFactories = [
+    ['DataArrayTexture', dataArrayTexture],
+    ['Data3DTexture', data3dTexture],
+  ]
+  const slots = [
+    ['material map', (scene, texture) => {
       scene.add(new THREE.Mesh(
         new THREE.PlaneGeometry(2, 2),
-        new THREE.MeshBasicMaterial({ map: dataArrayTexture() }),
+        new THREE.MeshBasicMaterial({ map: texture }),
       ))
     }, /material\.map uses an array or 3D texture/i],
-    ['background DataArrayTexture', (scene) => {
-      scene.background = dataArrayTexture()
+    ['background', (scene, texture) => {
+      scene.background = texture
     }, /background uses an array or 3D texture/i],
-    ['environment Data3DTexture', (scene) => {
-      scene.environment = data3dTexture()
+    ['environment', (scene, texture) => {
+      scene.environment = texture
     }, /scene\.environment uses an array or 3D texture/i],
-    ['material envMap Data3DTexture', (scene) => {
-      const envMap = data3dTexture()
+    ['material envMap', (scene, texture) => {
+      const envMap = texture
       envMap.mapping = THREE.EquirectangularReflectionMapping
       scene.add(new THREE.Mesh(
         new THREE.PlaneGeometry(2, 2),
         new THREE.MeshBasicMaterial({ envMap }),
       ))
     }, /material\.envMap uses an array or 3D texture/i],
-    ['reflection probe Data3DTexture', (scene) => {
-      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: data3dTexture() } }
+    ['reflection probe', (scene, texture) => {
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture } }
     }, /reflectionProbe\.texture uses an array or 3D texture/i],
   ]
 
-  for (const [name, setup, pattern] of cases) {
-    const scene = new THREE.Scene()
-    setup(scene)
-    assert.throws(
-      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      pattern,
-      name,
-    )
+  for (const [textureName, makeTexture] of textureFactories) {
+    for (const [slotName, setup, pattern] of slots) {
+      const scene = new THREE.Scene()
+      setup(scene, makeTexture())
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+        pattern,
+        `${slotName} ${textureName} should fail clearly`,
+      )
+    }
   }
 })
 
