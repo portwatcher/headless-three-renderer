@@ -1448,6 +1448,40 @@ function optionalBoolean(value: unknown, label: string): boolean | undefined {
   throw new TypeError(`${label} must be a boolean.`)
 }
 
+function optionalPositiveFiniteNumber(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  if (value <= 0) {
+    throw new TypeError(`${label} must be positive.`)
+  }
+}
+
+function optionalWireframeLinecap(value: unknown): void {
+  if (value == null) return
+  if (typeof value !== 'string') {
+    throw new TypeError('material.wireframeLinecap must be a string.')
+  }
+  if (value !== 'butt' && value !== 'round' && value !== 'square') {
+    throw new Error(
+      `material.wireframeLinecap ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "butt", "round", "square", null, or undefined.`,
+    )
+  }
+}
+
+function optionalWireframeLinejoin(value: unknown): void {
+  if (value == null) return
+  if (typeof value !== 'string') {
+    throw new TypeError('material.wireframeLinejoin must be a string.')
+  }
+  if (value !== 'round' && value !== 'bevel' && value !== 'miter') {
+    throw new Error(
+      `material.wireframeLinejoin ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "round", "bevel", "miter", null, or undefined.`,
+    )
+  }
+}
+
 function optionalMaterialPrecision(value: unknown): void {
   if (value == null) return
   if (typeof value !== 'string') {
@@ -1694,6 +1728,9 @@ function assertSupportedMaterialState(
   context: MaterialExtractionContext,
 ): void {
   optionalBoolean(material.wireframe, 'material.wireframe')
+  optionalPositiveFiniteNumber(material.wireframeLinewidth, 'material.wireframeLinewidth')
+  optionalWireframeLinecap(material.wireframeLinecap)
+  optionalWireframeLinejoin(material.wireframeLinejoin)
   if (
     material.envMap != null &&
     supportsNativeMaterialEnvironmentMap(material) &&

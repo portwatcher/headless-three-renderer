@@ -261,6 +261,9 @@ export interface ThreeMaterialLike {
   shadowSide?: number | null
   flatShading?: boolean
   wireframe?: boolean
+  wireframeLinewidth?: number | null
+  wireframeLinecap?: 'butt' | 'round' | 'square' | null
+  wireframeLinejoin?: 'round' | 'bevel' | 'miter' | null
   fog?: boolean
   isLineDashedMaterial?: boolean
   isMeshBasicMaterial?: boolean

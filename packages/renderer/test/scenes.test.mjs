@@ -7709,6 +7709,71 @@ test('material precision values are accepted as compatibility no-ops', () => {
   }
 })
 
+test('mesh wireframe line hints are accepted as compatibility no-ops', () => {
+  function renderWireframeHints(hints) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        ...hints,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 4)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  assert.deepEqual(
+    renderWireframeHints({
+      wireframeLinewidth: 4,
+      wireframeLinecap: 'butt',
+      wireframeLinejoin: 'bevel',
+    }),
+    renderWireframeHints({}),
+    'wireframeLinewidth, wireframeLinecap, and wireframeLinejoin should not alter native output',
+  )
+})
+
+test('invalid mesh wireframe line hints fail clearly', () => {
+  for (const [mutate, pattern] of [
+    [(material) => {
+      material.wireframeLinewidth = 'wide'
+    }, /material\.wireframeLinewidth must be a finite number/i],
+    [(material) => {
+      material.wireframeLinewidth = 0
+    }, /material\.wireframeLinewidth must be positive/i],
+    [(material) => {
+      material.wireframeLinecap = 1
+    }, /material\.wireframeLinecap must be a string/i],
+    [(material) => {
+      material.wireframeLinecap = 'triangle'
+    }, /material\.wireframeLinecap "triangle" is not supported.*butt.*round.*square/i],
+    [(material) => {
+      material.wireframeLinejoin = 1
+    }, /material\.wireframeLinejoin must be a string/i],
+    [(material) => {
+      material.wireframeLinejoin = 'triangle'
+    }, /material\.wireframeLinejoin "triangle" is not supported.*round.*bevel.*miter/i],
+  ]) {
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      wireframe: true,
+    })
+    mutate(material)
+    assertMaterialRenderStateFails(material, pattern)
+  }
+})
+
 test('NoBlending disables blending even for transparent materials', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
