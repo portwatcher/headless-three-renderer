@@ -27933,6 +27933,43 @@ test('Renderer clear methods are no-op compatibility hooks', () => {
   )
 })
 
+test('Renderer autoClear flags are validated compatibility state', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.autoClear, true)
+  assert.equal(renderer.autoClearColor, true)
+  assert.equal(renderer.autoClearDepth, true)
+  assert.equal(renderer.autoClearStencil, true)
+
+  renderer.autoClear = false
+  renderer.autoClearColor = false
+  renderer.autoClearDepth = false
+  renderer.autoClearStencil = false
+  assert.equal(renderer.autoClear, false)
+  assert.equal(renderer.autoClearColor, false)
+  assert.equal(renderer.autoClearDepth, false)
+  assert.equal(renderer.autoClearStencil, false)
+
+  renderer.setClearColor(0x204080, 0.5)
+  const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer autoClear flags should not change pass-owned clear color')
+  assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer autoClear flags should not change pass-owned clear alpha (${clear.a})`)
+
+  for (const [property, value, pattern] of [
+    ['autoClear', 'yes', /Renderer\.autoClear must be a boolean/i],
+    ['autoClearColor', 'yes', /Renderer\.autoClearColor must be a boolean/i],
+    ['autoClearDepth', 'yes', /Renderer\.autoClearDepth must be a boolean/i],
+    ['autoClearStencil', 'yes', /Renderer\.autoClearStencil must be a boolean/i],
+  ]) {
+    assert.throws(
+      () => { renderer[property] = value },
+      pattern,
+    )
+  }
+})
+
 test('Renderer size state applies as render fallback', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

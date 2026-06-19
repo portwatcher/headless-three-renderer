@@ -110,14 +110,49 @@ export class Renderer {
   private currentViewport: PixelRect | null = null
   private currentScissor: PixelRect | null = null
   private currentScissorTest = false
+  private autoClearValue = true
+  private autoClearColorValue = true
+  private autoClearDepthValue = true
+  private autoClearStencilValue = true
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly reversedDepthBuffer = false
   readonly xr = { enabled: false }
-  autoClear = true
 
   constructor() {
     this.native = new native.NativeRenderer()
+  }
+
+  get autoClear(): boolean {
+    return this.autoClearValue
+  }
+
+  set autoClear(value: boolean) {
+    this.autoClearValue = rendererStateBoolean(value, 'Renderer.autoClear')
+  }
+
+  get autoClearColor(): boolean {
+    return this.autoClearColorValue
+  }
+
+  set autoClearColor(value: boolean) {
+    this.autoClearColorValue = rendererStateBoolean(value, 'Renderer.autoClearColor')
+  }
+
+  get autoClearDepth(): boolean {
+    return this.autoClearDepthValue
+  }
+
+  set autoClearDepth(value: boolean) {
+    this.autoClearDepthValue = rendererStateBoolean(value, 'Renderer.autoClearDepth')
+  }
+
+  get autoClearStencil(): boolean {
+    return this.autoClearStencilValue
+  }
+
+  set autoClearStencil(value: boolean) {
+    this.autoClearStencilValue = rendererStateBoolean(value, 'Renderer.autoClearStencil')
   }
 
   get sortObjects(): boolean {
@@ -2099,10 +2134,15 @@ function rendererStateSizeDimension(value: unknown, label: string): number {
   return value
 }
 
-function assertOptionalBoolean(value: unknown, label: string): void {
+function rendererStateBoolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') {
     throw new TypeError(`${label} must be a boolean.`)
   }
+  return value
+}
+
+function assertOptionalBoolean(value: unknown, label: string): void {
+  rendererStateBoolean(value, label)
 }
 
 function clonePixelSize(size: PixelSize | null | undefined): PixelSize | null
