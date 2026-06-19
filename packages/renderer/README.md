@@ -232,7 +232,7 @@ const animGltf = await loadVrmAnimationFromFile('./dance.vrma', {
 })
 
 // Animate to a specific time
-await applyVrmAnimation(vrm, animGltf, {
+await applyVrmAnimation(modelGltf, animGltf, {
   createVRMAnimationClip,
   time: 1.5,
 })

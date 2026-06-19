@@ -45,7 +45,7 @@ try {
     if (!vrmAnimation) {
       throw new Error(`No VRMA animation was found in ${animationPath}. Confirm that the file is a VRM Animation asset.`)
     }
-    await applyVrmAnimation(vrm, vrmAnimation, {
+    await applyVrmAnimation(modelGltf, animationGltf, {
       createVRMAnimationClip: packages.createVRMAnimationClip,
       time: animationTime,
     })
