@@ -4721,7 +4721,7 @@ test('MeshToonMaterial bumpMap perturbs toon lighting', () => {
   assert.ok(flat.r > bumped.r + 8, `bumpMap should perturb the toon ramp lookup (${flat.r} vs ${bumped.r})`)
 })
 
-test('MeshToonMaterial map samples the selected secondary UV channel', () => {
+test('MeshToonMaterial map samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const map = rgbaTexture([
       0, 255, 0, 255,
@@ -4730,7 +4730,9 @@ test('MeshToonMaterial map samples the selected secondary UV channel', () => {
     map.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -4750,12 +4752,14 @@ test('MeshToonMaterial map samples the selected secondary UV channel', () => {
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   assert.ok(primary.g > primary.r + 40, `toon map channel=0 should sample the primary UV green texel (${primary.g} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.g + 40, `toon map channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.r > secondary.g + 40, `toon map channel=${channel} should sample the uv${channel} red texel (${secondary.r} vs ${secondary.g})`)
+  }
 })
 
-test('MeshToonMaterial emissiveMap samples the selected secondary UV channel', () => {
+test('MeshToonMaterial emissiveMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const emissiveMap = rgbaTexture([
       0, 255, 0, 255,
@@ -4764,7 +4768,9 @@ test('MeshToonMaterial emissiveMap samples the selected secondary UV channel', (
     emissiveMap.channel = channel
 
     const geometry = constantUvPlane(0.25, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -4784,38 +4790,48 @@ test('MeshToonMaterial emissiveMap samples the selected secondary UV channel', (
   }
 
   const primary = renderWithChannel(0)
-  const secondary = renderWithChannel(1)
   assert.ok(primary.g > primary.r + 40, `toon emissiveMap channel=0 should sample the primary UV green texel (${primary.g} vs ${primary.r})`)
-  assert.ok(secondary.r > secondary.g + 40, `toon emissiveMap channel=1 should sample the uv1 red texel (${secondary.r} vs ${secondary.g})`)
+  for (const channel of [1, 2, 3]) {
+    const secondary = renderWithChannel(channel)
+    assert.ok(secondary.r > secondary.g + 40, `toon emissiveMap channel=${channel} should sample the uv${channel} red texel (${secondary.r} vs ${secondary.g})`)
+  }
 })
 
-test('MeshToonMaterial lightMap contributes through secondary UVs', () => {
-  const lightMap = rgbaTexture([
-    0, 0, 0, 255,
-    255, 255, 255, 255,
-  ], 2, 1)
-  lightMap.channel = 1
+test('MeshToonMaterial lightMap samples selected uv1-uv3 texture channels', () => {
+  function renderWithChannel(channel) {
+    const lightMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    lightMap.channel = channel
 
-  const geometry = constantUvPlane(0.25, 0.5)
-  setConstantUvAttribute(geometry, 'uv1', 0.75, 0.5)
+    const geometry = constantUvPlane(0.25, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(
-    geometry,
-    new THREE.MeshToonMaterial({
-      color: 0xffffff,
-      lightMap,
-      lightMapIntensity: 4,
-    }),
-  ))
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        lightMap,
+        lightMapIntensity: 4,
+      }),
+    ))
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
 
-  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
-  assert.ok(mean.r > 100 && mean.g > 100 && mean.b > 100, `toon lightMap should add the bright uv1 texel (${mean.r}, ${mean.g}, ${mean.b})`)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  for (const channel of [1, 2, 3]) {
+    const mean = renderWithChannel(channel)
+    assert.ok(mean.r > 100 && mean.g > 100 && mean.b > 100, `toon lightMap channel=${channel} should add the bright uv${channel} texel (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
 })
 
 test('MeshToonMaterial alphaMap cutouts participate in alpha testing', () => {
