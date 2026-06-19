@@ -39,6 +39,7 @@ export function createSceneCorpus() {
     meshNormalMaterialBumpMapCorpus(),
     meshMatcapMaterialCorpus(),
     meshMatcapMaterialNormalMapCorpus(),
+    meshMatcapMaterialBumpMapCorpus(),
     meshToonMaterialCorpus(),
     meshToonMaterialNormalMapCorpus(),
     meshToonMaterialBumpMapCorpus(),
@@ -1963,6 +1964,70 @@ function meshMatcapMaterialNormalMapCorpus() {
     validate() {
       if (!(flatCenter.r > flatCenter.g + 40 && mappedCenter.g > mappedCenter.r + 40)) {
         throw new Error(`matcap normal-map corpus should shift lookup from red to green, flat=${JSON.stringify(flatCenter)} mapped=${JSON.stringify(mappedCenter)}`)
+      }
+    },
+  }
+}
+
+function meshMatcapMaterialBumpMapCorpus() {
+  function makeMatcap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeBumpMap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.LinearFilter
+    texture.minFilter = THREE.LinearFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(bumpScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: makeMatcap(),
+        bumpMap: makeBumpMap(),
+        bumpScale,
+      }),
+    ))
+    return scene
+  }
+
+  const flatScene = makeScene(0)
+  const bumpedScene = makeScene(8)
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let bumpDiff = 0
+
+  return {
+    name: 'mesh-matcap-material-bump-map',
+    scene: bumpedScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(flatScene, camera, options).slice()
+      const bumped = renderer.render(bumpedScene, camera, options)
+      bumpDiff = meanAbsDiff(flat, bumped)
+      return bumped
+    },
+    validate() {
+      if (!(bumpDiff > 2)) {
+        throw new Error(`matcap bump-map corpus should perturb the matcap lookup, diff=${bumpDiff.toFixed(3)}`)
       }
     },
   }

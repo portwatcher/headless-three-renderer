@@ -3020,6 +3020,45 @@ test('MeshMatcapMaterial normalMap changes matcap lookup', () => {
   assert.ok(tangentRight.g > tangentRight.r + 40, `normalMap should shift matcap lookup toward the green texel (${tangentRight.g} vs ${tangentRight.r})`)
 })
 
+test('MeshMatcapMaterial bumpMap changes matcap lookup', () => {
+  function renderMatcap(bumpScale) {
+    const matcap = rgbaTexture([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 2, 1)
+
+    const bumpMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    bumpMap.magFilter = THREE.LinearFilter
+    bumpMap.minFilter = THREE.LinearFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap,
+        bumpMap,
+        bumpScale,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const flat = renderMatcap(0)
+  const bumped = renderMatcap(8)
+  const diff = meanAbsDiff(flat, bumped)
+  assert.ok(diff > 2, `bumpMap should perturb MeshMatcapMaterial matcap lookup (diff=${diff.toFixed(2)})`)
+})
+
 test('MeshMatcapMaterial flatShading changes face-normal matcap lookup', () => {
   const data = []
   for (let y = 0; y < 4; y += 1) {
