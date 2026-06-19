@@ -254,6 +254,27 @@ class RendererXrState {
     this.framebufferScaleFactorValue = rendererStatePositiveFiniteNumber(value, 'Renderer.xr.setFramebufferScaleFactor value')
   }
 
+  getController(index: unknown): never {
+    assertXrInputIndex(index, 'Renderer.xr.getController index')
+    throw new Error(
+      'Renderer.xr.getController() is not supported by @headless-three/renderer because it does not provide a browser WebXR runtime.',
+    )
+  }
+
+  getControllerGrip(index: unknown): never {
+    assertXrInputIndex(index, 'Renderer.xr.getControllerGrip index')
+    throw new Error(
+      'Renderer.xr.getControllerGrip() is not supported by @headless-three/renderer because it does not provide a browser WebXR runtime.',
+    )
+  }
+
+  getHand(index: unknown): never {
+    assertXrInputIndex(index, 'Renderer.xr.getHand index')
+    throw new Error(
+      'Renderer.xr.getHand() is not supported by @headless-three/renderer because it does not provide a browser WebXR runtime.',
+    )
+  }
+
   getSession(): null {
     return null
   }
@@ -273,8 +294,33 @@ class RendererXrState {
     this.referenceSpaceTypeValue = type
   }
 
+  setReferenceSpace(space: unknown): never {
+    if (space === null || typeof space !== 'object' || Array.isArray(space)) {
+      throw new TypeError('Renderer.xr.setReferenceSpace space must be a WebXR reference-space-like object.')
+    }
+    throw new Error(
+      'Renderer.xr.setReferenceSpace() is not supported by @headless-three/renderer because it does not provide a browser WebXR runtime.',
+    )
+  }
+
+  getBaseLayer(): null {
+    return null
+  }
+
+  getBinding(): null {
+    return null
+  }
+
+  getFrame(): null {
+    return null
+  }
+
   getEnvironmentBlendMode(): 'opaque' {
     return 'opaque'
+  }
+
+  getDepthTexture(): null {
+    return null
   }
 
   hasDepthSensing(): boolean {
@@ -4248,6 +4294,12 @@ function domElementStyleWritablePropertyKey(value: unknown, label: string): stri
     throw new TypeError(`${label} must not name a reserved style method.`)
   }
   return key
+}
+
+function assertXrInputIndex(value: unknown, label: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new TypeError(`${label} must be a non-negative integer.`)
+  }
 }
 
 function assertWeakMapKey(value: unknown, label: string): asserts value is object {

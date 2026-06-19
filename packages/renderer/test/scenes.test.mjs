@@ -2132,8 +2132,12 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
   assert.equal(renderer.xr.getReferenceSpaceType(), 'local-floor')
   assert.equal(renderer.xr.setReferenceSpaceType('local'), undefined)
   assert.equal(renderer.xr.getReferenceSpaceType(), 'local')
+  assert.equal(renderer.xr.getBaseLayer(), null)
+  assert.equal(renderer.xr.getBinding(), null)
+  assert.equal(renderer.xr.getFrame(), null)
   assert.equal(renderer.xr.setFramebufferScaleFactor(0.5), undefined)
   assert.equal(renderer.xr.getEnvironmentBlendMode(), 'opaque')
+  assert.equal(renderer.xr.getDepthTexture(), null)
   assert.equal(renderer.xr.hasDepthSensing(), false)
   assert.equal(renderer.xr.getDepthSensingMesh(), null)
   assert.equal(renderer.xr.getCamera(), null)
@@ -2165,8 +2169,32 @@ test('CubeCamera.update works with Renderer render-target state', async () => {
     /Renderer\.xr\.setReferenceSpaceType type must be a non-empty string/i,
   )
   assert.throws(
+    () => renderer.xr.setReferenceSpace(null),
+    /Renderer\.xr\.setReferenceSpace space must be a WebXR reference-space-like object/i,
+  )
+  assert.throws(
+    () => renderer.xr.setReferenceSpace({}),
+    /Renderer\.xr\.setReferenceSpace\(\) is not supported.*WebXR runtime/i,
+  )
+  assert.throws(
     () => renderer.xr.setFramebufferScaleFactor(0),
     /Renderer\.xr\.setFramebufferScaleFactor value must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.xr.getController(-1),
+    /Renderer\.xr\.getController index must be a non-negative integer/i,
+  )
+  assert.throws(
+    () => renderer.xr.getController(0),
+    /Renderer\.xr\.getController\(\) is not supported.*WebXR runtime/i,
+  )
+  assert.throws(
+    () => renderer.xr.getControllerGrip(0),
+    /Renderer\.xr\.getControllerGrip\(\) is not supported.*WebXR runtime/i,
+  )
+  assert.throws(
+    () => renderer.xr.getHand(0),
+    /Renderer\.xr\.getHand\(\) is not supported.*WebXR runtime/i,
   )
   assert.throws(
     () => renderer.xr.getCameraTexture(null),
