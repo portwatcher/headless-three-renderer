@@ -134,6 +134,14 @@ export type RenderPixelRectLike = {
   w?: number
 } | ArrayLike<number>
 
+export type RenderSizeLike = {
+  width?: number
+  height?: number
+  x?: number
+  y?: number
+  set?(width: number, height: number): unknown
+} | ArrayLike<number>
+
 export interface ThreeLayersLike {
   mask?: number
   test?(layers: ThreeLayersLike): boolean

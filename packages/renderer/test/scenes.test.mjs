@@ -27742,6 +27742,73 @@ test('render option null background clears scene backgrounds', () => {
   )
 })
 
+test('Renderer size state applies as render fallback', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer.getSize(), null)
+  assert.equal(renderer.getSize(new THREE.Vector2()), null)
+
+  renderer.setSize(40, 28)
+  assert.deepEqual(renderer.getSize(), { width: 40, height: 28 })
+
+  const vectorTarget = new THREE.Vector2()
+  const objectTarget = { width: 0, height: 0 }
+  const arrayTarget = [0, 0]
+  assert.strictEqual(renderer.getSize(vectorTarget), vectorTarget)
+  assert.deepEqual(vectorTarget.toArray(), [40, 28])
+  assert.strictEqual(renderer.getSize(objectTarget), objectTarget)
+  assert.deepEqual(objectTarget, { width: 40, height: 28 })
+  assert.strictEqual(renderer.getSize(arrayTarget), arrayTarget)
+  assert.deepEqual(arrayTarget, [40, 28])
+
+  const rgba = renderer.render(scene, camera, { format: 'rgba' })
+  assert.equal(rgba.length, 40 * 28 * 4)
+  const mean = meanRegion(rgba, 40, 28, 12, 8, 28, 20)
+  assert.ok(mean.r > mean.b + 80, `Renderer size fallback should render the red mesh (${mean.r} vs ${mean.b})`)
+
+  const override = renderer.render(scene, camera, { width: 24, height: 16, format: 'rgba' })
+  assert.equal(override.length, 24 * 16 * 4)
+
+  const target = renderer.renderToTarget(scene, camera)
+  assert.equal(target.width, 40)
+  assert.equal(target.height, 28)
+  assert.equal(target.data.length, 40 * 28 * 4)
+
+  const sizedTarget = { width: 32, height: 20 }
+  renderer.renderToTarget(scene, camera, sizedTarget)
+  assert.equal(sizedTarget.width, 32)
+  assert.equal(sizedTarget.height, 20)
+  assert.equal(sizedTarget.data.length, 32 * 20 * 4)
+
+  const activeTarget = { width: 30, height: 18 }
+  renderer.setRenderTarget(activeTarget)
+  const targetBuffer = renderer.render(scene, camera, { format: 'rgba' })
+  assert.equal(targetBuffer.length, 30 * 18 * 4)
+  assert.equal(activeTarget.data.length, 30 * 18 * 4)
+  renderer.setRenderTarget(null)
+
+  const cubeImages = Array.from({ length: 6 }, () => ({ width: 16, height: 16 }))
+  const cubeTarget = {
+    texture: { isCubeTexture: true, image: cubeImages, source: { data: cubeImages } },
+  }
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(16))
+  cubeCamera.renderTarget = cubeTarget
+  const cubeFace = renderer.render(scene, cubeCamera, { format: 'rgba' })
+  assert.equal(cubeFace.length, 16 * 16 * 4)
+  assert.equal(cubeTarget.width, 16)
+  assert.equal(cubeTarget.height, 16)
+})
+
 test('render options viewport confines draws to an output rectangle', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
@@ -27920,6 +27987,14 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   assert.throws(
     () => renderer.setScissorTest('yes'),
     /Renderer\.setScissorTest enabled must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.setSize('32', 16),
+    /Renderer\.setSize width must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.setSize(32, 16.5),
+    /Renderer\.setSize height must be a positive integer/i,
   )
   renderer.setViewport(0, 0, 64, 16)
   assert.throws(

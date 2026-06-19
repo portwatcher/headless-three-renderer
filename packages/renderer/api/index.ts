@@ -8,6 +8,7 @@ import type {
   RenderTargetTextureLike,
   RenderTargetImageLike,
   RenderPixelRectLike,
+  RenderSizeLike,
   NativeRenderScene,
   NativeCamera,
   NativeSceneMesh,
@@ -76,6 +77,7 @@ export type {
   ThreeEulerLike,
   ThreePlaneLike,
   RenderPixelRectLike,
+  RenderSizeLike,
   ThreeLayersLike,
   ThreeMaterialLike,
   ThreeBoneLike,
@@ -102,6 +104,7 @@ export class Renderer {
   private currentRenderTarget: RenderTargetLike | null = null
   private currentActiveCubeFace = 0
   private currentActiveMipmapLevel = 0
+  private currentSize: PixelSize | null = null
   private currentViewport: PixelRect | null = null
   private currentScissor: PixelRect | null = null
   private currentScissorTest = false
@@ -160,6 +163,18 @@ export class Renderer {
     this.currentActiveMipmapLevel = activeMipmapLevel
   }
 
+  setSize(width: number, height: number, _updateStyle = true): void {
+    this.currentSize = rendererStateSize(width, height, 'Renderer.setSize')
+  }
+
+  getSize(): RenderSizeLike | null
+  getSize<T extends RenderSizeLike>(target: T): T | null
+  getSize(target?: RenderSizeLike): RenderSizeLike | null {
+    return target === undefined
+      ? clonePixelSize(this.currentSize)
+      : clonePixelSize(this.currentSize, target)
+  }
+
   setViewport(rect: RenderPixelRectLike | null): void
   setViewport(x: number, y: number, width: number, height: number): void
   setViewport(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
@@ -207,7 +222,10 @@ export class Renderer {
     validateThreeSceneRoot(scene)
     validateTopLevelRenderCamera(camera)
     assertRenderOptionsLike(options, 'options')
-    const renderOptions = this.resolveRenderOptions(options)
+    const renderOptions = this.resolveRenderOptions(
+      options,
+      isCubeCamera(camera) ? options.target ?? camera.renderTarget : options.target ?? this.currentRenderTarget,
+    )
     if (isCubeCamera(camera)) {
       const { buffer } = renderCubeCamera(
         scene,
@@ -294,7 +312,7 @@ export class Renderer {
     validateTopLevelRenderCamera(camera)
     assertRenderTargetLike(target, 'target')
     assertRenderOptionsLike(options, 'options')
-    const targetOptions: RenderOptions = this.resolveRenderOptions({ ...options, target, format: options.format ?? 'rgba' })
+    const targetOptions: RenderOptions = this.resolveRenderOptions({ ...options, target, format: options.format ?? 'rgba' }, target)
     if (isCubeCamera(camera)) {
       const { target: cubeTarget } = renderCubeCamera(
         scene,
@@ -501,16 +519,32 @@ export class Renderer {
     return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, nativeCamera, objectIdEntries }
   }
 
-  private resolveRenderOptions(options: RenderOptions): InternalRenderOptions {
+  private resolveRenderOptions(options: RenderOptions, fallbackTarget: RenderTargetLike | null | undefined = options.target): InternalRenderOptions {
+    const sizeOptions = this.optionsWithRendererSizeFallback(options, fallbackTarget)
     return {
-      ...options,
-      sortObjects: options.sortObjects ?? this.sortObjects,
-      opaqueSort: options.opaqueSort === undefined ? this.opaqueSort : options.opaqueSort,
-      transparentSort: options.transparentSort === undefined ? this.transparentSort : options.transparentSort,
+      ...sizeOptions,
+      sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
+      opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
+      transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
       __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
       __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
       __headlessThreeRendererScissorTest: this.currentScissorTest,
     }
+  }
+
+  private optionsWithRendererSizeFallback(
+    options: RenderOptions,
+    fallbackTarget: RenderTargetLike | null | undefined,
+  ): RenderOptions {
+    if (
+      this.currentSize === null ||
+      options.width != null ||
+      options.height != null ||
+      renderTargetHasExplicitSize(fallbackTarget)
+    ) {
+      return options
+    }
+    return { ...options, width: this.currentSize.width, height: this.currentSize.height }
   }
 }
 
@@ -953,6 +987,14 @@ function renderTargetDepthBuffer(
   return renderNativeScene(depthReadbackScene(nativeScene), nativeCamera)
 }
 
+function renderTargetHasExplicitSize(target: RenderTargetLike | null | undefined): boolean {
+  if (!target) return false
+  if (target.width != null || target.height != null) return true
+  const texture = cubeTargetTexture(target)
+  const firstImage = Array.isArray(texture?.image) ? texture.image[0] : undefined
+  return firstImage?.width != null || firstImage?.height != null
+}
+
 function renderAuxiliaryTargetAttachments(
   target: RenderTargetLike | undefined,
   options: RenderOptions,
@@ -1155,6 +1197,10 @@ type RenderNativeScene = (scene: NativeRenderScene, camera: NativeCamera) => Buf
 type PixelRect = {
   x: number
   y: number
+  width: number
+  height: number
+}
+type PixelSize = {
   width: number
   height: number
 }
@@ -1925,6 +1971,51 @@ function rendererStatePixelRectFromComponents(values: unknown[], label: string):
     throw new TypeError(`${label} width and height must be greater than 0.`)
   }
   return { x, y, width, height }
+}
+
+function rendererStateSize(width: unknown, height: unknown, label: string): PixelSize {
+  return {
+    width: rendererStateSizeDimension(width, `${label} width`),
+    height: rendererStateSizeDimension(height, `${label} height`),
+  }
+}
+
+function rendererStateSizeDimension(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new TypeError(`${label} must be a positive integer.`)
+  }
+  return value
+}
+
+function clonePixelSize(size: PixelSize | null | undefined): PixelSize | null
+function clonePixelSize<T extends RenderSizeLike>(size: PixelSize | null | undefined, target: T): T | null
+function clonePixelSize<T extends RenderSizeLike>(
+  size: PixelSize | null | undefined,
+  target?: T,
+): PixelSize | T | null {
+  if (!size) return null
+  if (target) {
+    const mutable = target as any
+    if (typeof mutable.length === 'number') {
+      mutable[0] = size.width
+      mutable[1] = size.height
+    } else {
+      if (typeof mutable.set === 'function') mutable.set(size.width, size.height)
+      if ('width' in mutable || 'height' in mutable || typeof mutable.set !== 'function') {
+        mutable.width = size.width
+        mutable.height = size.height
+      }
+      if ('x' in mutable || 'y' in mutable || typeof mutable.set === 'function') {
+        mutable.x = size.width
+        mutable.y = size.height
+      }
+    }
+    return target
+  }
+  return { width: size.width, height: size.height }
 }
 
 function clonePixelRect(rect: PixelRect | null | undefined): PixelRect | null
