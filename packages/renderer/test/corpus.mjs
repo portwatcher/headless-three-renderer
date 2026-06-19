@@ -38,6 +38,7 @@ export function createSceneCorpus() {
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
     customWgslPremultipliedCorpus(),
+    sceneOverrideMaterialCorpus(),
     maskRenderModeCorpus(),
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
@@ -650,6 +651,43 @@ function customWgslPremultipliedCorpus() {
       const center = pixelAt(rgba, width, 48, 48)
       if (!(center.g > 60 && center.g < 150 && center.a > 120 && center.a < 140)) {
         throw new Error(`custom WGSL premultiplied corpus should output half-alpha premultiplied green, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function sceneOverrideMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const left = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.85, 1.35),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  left.position.x = -0.45
+  scene.add(left)
+  const right = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.85, 1.35),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  right.position.x = 0.45
+  scene.add(right)
+  scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, toneMapped: false })
+
+  return {
+    name: 'scene-override-material',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const leftMean = meanRegion(rgba, width, 24, 30, 42, 66)
+      const rightMean = meanRegion(rgba, width, 54, 30, 72, 66)
+      for (const [label, mean] of [['left', leftMean], ['right', rightMean]]) {
+        if (!(mean.g > mean.r + 100 && mean.g > mean.b + 100)) {
+          throw new Error(`scene override-material corpus should replace ${label} source material with green, got ${JSON.stringify(mean)}`)
+        }
       }
     },
   }
