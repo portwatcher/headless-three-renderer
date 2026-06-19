@@ -200,12 +200,12 @@ function addSupportedLightBudget(scene, count = 8) {
   }
 }
 
-test('large scene budget renders many meshes, textures, and supported lights', () => {
+test('large scene budget renders 144 meshes, textures, and supported lights', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 10
-  const rows = 10
+  const columns = 12
+  const rows = 12
   const geometry = new THREE.BoxGeometry(0.115, 0.115, 0.115)
   const textures = Array.from({ length: 10 }, (_, i) => makeTexture(i))
   const materials = textures.map((map, i) => new THREE.MeshStandardMaterial({
