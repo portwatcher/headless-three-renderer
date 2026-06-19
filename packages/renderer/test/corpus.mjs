@@ -21,6 +21,7 @@ export function createSceneCorpus() {
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
     materialEnvMapPbrCorpus(),
+    cubeUvMaterialEnvMapCorpus(),
     narrowRawIblCorpus(),
     meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
@@ -122,6 +123,19 @@ function cubeTexture(faceColors) {
   }))
   const texture = new THREE.CubeTexture(faces)
   texture.needsUpdate = true
+  return texture
+}
+
+function cubeUvGreenCubeTexture() {
+  const texture = cubeTexture([
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+    [0, 255, 0],
+  ])
+  texture.mapping = THREE.CubeUVReflectionMapping
   return texture
 }
 
@@ -1267,6 +1281,38 @@ function materialEnvMapPbrCorpus() {
         if (!(mean.g > mean.r + 20 && mean.g > mean.b + 8)) {
           throw new Error(`PBR material envMap should render green ${label} IBL (${mean.r}, ${mean.g}, ${mean.b})`)
         }
+      }
+    },
+  }
+}
+
+function cubeUvMaterialEnvMapCorpus() {
+  const envMap = cubeUvGreenCubeTexture()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.025)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.45, 1.45),
+    new THREE.MeshBasicMaterial({
+      color: 0xaa3322,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+    }),
+  ))
+
+  return {
+    name: 'cubeuv-cube-material-env-map',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [5, 5, 6],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 45 && center.g > center.b + 20)) {
+        throw new Error(`CubeUV cube material envMap corpus should render green IBL, got ${JSON.stringify(center)}`)
       }
     },
   }
