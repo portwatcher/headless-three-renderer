@@ -27573,6 +27573,42 @@ test('render option texture backgrounds honor their own UV transforms', () => {
   assert.ok(shifted.r < unshifted.r - 80, `options.background texture offset should reduce red coverage (${shifted.r} vs ${unshifted.r})`)
 })
 
+test('render option texture backgrounds honor option intensity and blurriness controls', () => {
+  const background = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+
+  const scene = new THREE.Scene()
+  scene.background = solidTexture(0, 0, 255)
+  scene.backgroundIntensity = 0
+  scene.backgroundBlurriness = 1
+
+  const options = {
+    width: 64,
+    height: 64,
+    background,
+  }
+
+  const sharp = meanRegion(renderRgba(scene, makeCamera(), options), 64, 64, 28, 20, 31, 44)
+  const dimmed = meanRegion(renderRgba(scene, makeCamera(), {
+    ...options,
+    backgroundIntensity: 0.25,
+  }), 64, 64, 28, 20, 31, 44)
+  const blurred = meanRegion(renderRgba(scene, makeCamera(), {
+    ...options,
+    backgroundBlurriness: 1,
+  }), 64, 64, 28, 20, 31, 44)
+
+  assert.ok(sharp.r > sharp.g + 120, `options.background texture should keep its red texel sharp (${sharp.r} vs ${sharp.g})`)
+  assert.ok(sharp.r > 180, `scene.backgroundIntensity should not dim an option texture background (${sharp.r})`)
+  assert.ok(dimmed.r < sharp.r - 60, `options.backgroundIntensity should dim the option texture background (${dimmed.r} vs ${sharp.r})`)
+  assert.ok(blurred.g > sharp.g + 80, `options.backgroundBlurriness should mix in the green texel (${blurred.g} vs ${sharp.g})`)
+  assert.ok(sharp.r > blurred.r + 20, `options.backgroundBlurriness should soften the red texel (${sharp.r} vs ${blurred.r})`)
+})
+
 test('render option color backgrounds override scene texture backgrounds', () => {
   const scene = new THREE.Scene()
   scene.background = Object.assign(solidTexture(0, 255, 0), { mapping: THREE.EquirectangularReflectionMapping })
