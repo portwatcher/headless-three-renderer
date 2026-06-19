@@ -97,6 +97,38 @@ export type {
   PostProcessingOptions,
 } from './types'
 
+class RendererShadowMapState {
+  private enabledValue = true
+  private autoUpdateValue = true
+  private needsUpdateValue = false
+
+  type: unknown = undefined
+
+  get enabled(): boolean {
+    return this.enabledValue
+  }
+
+  set enabled(value: boolean) {
+    this.enabledValue = rendererStateBoolean(value, 'Renderer.shadowMap.enabled')
+  }
+
+  get autoUpdate(): boolean {
+    return this.autoUpdateValue
+  }
+
+  set autoUpdate(value: boolean) {
+    this.autoUpdateValue = rendererStateBoolean(value, 'Renderer.shadowMap.autoUpdate')
+  }
+
+  get needsUpdate(): boolean {
+    return this.needsUpdateValue
+  }
+
+  set needsUpdate(value: boolean) {
+    this.needsUpdateValue = rendererStateBoolean(value, 'Renderer.shadowMap.needsUpdate')
+  }
+}
+
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private opaqueSort: RenderSortFunction | null = null
@@ -118,6 +150,7 @@ export class Renderer {
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly reversedDepthBuffer = false
+  readonly shadowMap = new RendererShadowMapState()
   readonly xr = { enabled: false }
 
   constructor() {
@@ -620,6 +653,7 @@ export class Renderer {
       __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
       __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
       __headlessThreeRendererScissorTest: this.currentScissorTest,
+      __headlessThreeRendererShadowMapEnabled: this.shadowMap.enabled,
     }
   }
 
@@ -828,7 +862,9 @@ function toNativeInput(
     )
     : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
-  const lights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
+  const rendererShadowMapEnabled = (options as InternalRenderOptions).__headlessThreeRendererShadowMapEnabled !== false
+  const extractedLights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
+  const lights = rendererShadowMapEnabled ? extractedLights : nativeLightsWithoutShadows(extractedLights)
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
   const flattenedMeshes = flattenScene(
     scene,
@@ -933,6 +969,15 @@ function shadowMaterialModeForLights(lights: NativeSceneLight[] | undefined): Sh
   const shadowLight = lights?.find((light) => light.castShadow === true)
   if (!shadowLight) return undefined
   return shadowLight.lightType === 'point' ? 'distance' : 'depth'
+}
+
+function nativeLightsWithoutShadows(lights: NativeSceneLight[] | undefined): NativeSceneLight[] | undefined {
+  if (!lights) return undefined
+  return lights.map((light) => {
+    const withoutShadow = { ...light }
+    delete withoutShadow.castShadow
+    return withoutShadow
+  })
 }
 
 function applyRenderMode(meshes: NativeSceneMesh[], mode: RenderMode): NativeSceneMesh[] {
@@ -1317,6 +1362,7 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeRendererViewport?: PixelRect | null
   __headlessThreeRendererScissor?: PixelRect | null
   __headlessThreeRendererScissorTest?: boolean
+  __headlessThreeRendererShadowMapEnabled?: boolean
 }
 
 const CUBE_FACE_COUNT = 6
