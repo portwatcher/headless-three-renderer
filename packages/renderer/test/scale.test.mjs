@@ -311,19 +311,19 @@ test('instanced mesh budget renders 7,056 transformed colored instances', () => 
   assert.ok(mean.r > 40 && mean.g > 40 && mean.b > 40, `instanced colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
-test('texture-heavy scene budget renders 196 unique maps', () => {
+test('texture-heavy scene budget renders 225 unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 14
-  const rows = 14
-  const geometry = new THREE.PlaneGeometry(0.13, 0.13)
+  const columns = 15
+  const rows = 15
+  const geometry = new THREE.PlaneGeometry(0.12, 0.12)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const index = row * columns + col
       const material = new THREE.MeshBasicMaterial({ map: makeTexture(index) })
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set((col - (columns - 1) / 2) * 0.15, (row - (rows - 1) / 2) * 0.15, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.14, (row - (rows - 1) / 2) * 0.14, 0)
       scene.add(mesh)
     }
   }
@@ -340,19 +340,19 @@ test('texture-heavy scene budget renders 196 unique maps', () => {
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `texture-heavy scene should retain textured color (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
-test('encoded texture budget renders 144 unique PNG buffer maps', () => {
+test('encoded texture budget renders 169 unique PNG buffer maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 12
-  const rows = 12
-  const geometry = new THREE.PlaneGeometry(0.13, 0.13)
+  const columns = 13
+  const rows = 13
+  const geometry = new THREE.PlaneGeometry(0.12, 0.12)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const index = row * columns + col
       const material = new THREE.MeshBasicMaterial({ map: makeEncodedTexture(index) })
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set((col - (columns - 1) / 2) * 0.16, (row - (rows - 1) / 2) * 0.16, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.15, (row - (rows - 1) / 2) * 0.15, 0)
       scene.add(mesh)
     }
   }
