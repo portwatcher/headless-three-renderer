@@ -11562,10 +11562,12 @@ test('custom shadow material alphaMaps sample selected UV channels', () => {
     return alphaMap
   }
 
-  function casterGeometry(size) {
+  function casterGeometry(size, channel) {
     const geometry = new THREE.BoxGeometry(size, size, size)
     setConstantUvAttribute(geometry, 'uv', 0.75, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+    for (const index of [1, 2, 3]) {
+      setConstantUvAttribute(geometry, `uv${index}`, index === channel ? 0.25 : 0.75, 0.5)
+    }
     return geometry
   }
 
@@ -11585,7 +11587,7 @@ test('custom shadow material alphaMaps sample selected UV channels', () => {
     addReceiver(scene)
 
     const caster = new THREE.Mesh(
-      casterGeometry(3),
+      casterGeometry(3, channel),
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
     )
     caster.position.y = 1.5
@@ -11621,7 +11623,7 @@ test('custom shadow material alphaMaps sample selected UV channels', () => {
     addReceiver(scene)
 
     const caster = new THREE.Mesh(
-      casterGeometry(2.5),
+      casterGeometry(2.5, channel),
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
     )
     caster.position.y = 1.25
@@ -11648,22 +11650,26 @@ test('custom shadow material alphaMaps sample selected UV channels', () => {
   }
 
   const primaryDepth = renderDirectionalCustomDepthChannel(0)
-  const secondaryDepth = renderDirectionalCustomDepthChannel(1)
   const primaryDepthLum = primaryDepth.r + primaryDepth.g + primaryDepth.b
-  const secondaryDepthLum = secondaryDepth.r + secondaryDepth.g + secondaryDepth.b
-  assert.ok(
-    secondaryDepthLum > primaryDepthLum + 30,
-    `customDepthMaterial alphaMap channel=1 should sample transparent uv1 and remove the caster shadow (${secondaryDepthLum} vs ${primaryDepthLum})`,
-  )
+  for (const channel of [1, 2, 3]) {
+    const selectedDepth = renderDirectionalCustomDepthChannel(channel)
+    const selectedDepthLum = selectedDepth.r + selectedDepth.g + selectedDepth.b
+    assert.ok(
+      selectedDepthLum > primaryDepthLum + 30,
+      `customDepthMaterial alphaMap channel=${channel} should sample transparent uv${channel} and remove the caster shadow (${selectedDepthLum} vs ${primaryDepthLum})`,
+    )
+  }
 
   const primaryDistance = renderPointCustomDistanceChannel(0)
-  const secondaryDistance = renderPointCustomDistanceChannel(1)
   const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
-  const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
-  assert.ok(
-    secondaryDistanceLum > primaryDistanceLum + 20,
-    `customDistanceMaterial alphaMap channel=1 should sample transparent uv1 and remove the caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
-  )
+  for (const channel of [1, 2, 3]) {
+    const selectedDistance = renderPointCustomDistanceChannel(channel)
+    const selectedDistanceLum = selectedDistance.r + selectedDistance.g + selectedDistance.b
+    assert.ok(
+      selectedDistanceLum > primaryDistanceLum + 20,
+      `customDistanceMaterial alphaMap channel=${channel} should sample transparent uv${channel} and remove the caster shadow (${selectedDistanceLum} vs ${primaryDistanceLum})`,
+    )
+  }
 })
 
 test('custom shadow material base-map alpha controls mesh shadow casters', () => {
@@ -11872,10 +11878,12 @@ test('source material alphaMaps sample selected UV channels on custom shadow cas
     return alphaMap
   }
 
-  function casterGeometry(size) {
+  function casterGeometry(size, channel) {
     const geometry = new THREE.BoxGeometry(size, size, size)
     setConstantUvAttribute(geometry, 'uv', 0.75, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+    for (const index of [1, 2, 3]) {
+      setConstantUvAttribute(geometry, `uv${index}`, index === channel ? 0.25 : 0.75, 0.5)
+    }
     return geometry
   }
 
@@ -11904,7 +11912,7 @@ test('source material alphaMaps sample selected UV channels on custom shadow cas
     scene.background = new THREE.Color(1, 1, 1)
     addReceiver(scene)
 
-    const caster = new THREE.Mesh(casterGeometry(3), sourceMaterialForChannel(channel))
+    const caster = new THREE.Mesh(casterGeometry(3, channel), sourceMaterialForChannel(channel))
     caster.position.y = 1.5
     caster.castShadow = true
     caster.customDepthMaterial = new THREE.MeshDepthMaterial()
@@ -11934,7 +11942,7 @@ test('source material alphaMaps sample selected UV channels on custom shadow cas
     scene.background = new THREE.Color(1, 1, 1)
     addReceiver(scene)
 
-    const caster = new THREE.Mesh(casterGeometry(2.5), sourceMaterialForChannel(channel))
+    const caster = new THREE.Mesh(casterGeometry(2.5, channel), sourceMaterialForChannel(channel))
     caster.position.y = 1.25
     caster.castShadow = true
     caster.customDistanceMaterial = new THREE.MeshDistanceMaterial()
@@ -11956,22 +11964,26 @@ test('source material alphaMaps sample selected UV channels on custom shadow cas
   }
 
   const primaryDepth = renderDirectionalCustomDepthSourceChannel(0)
-  const secondaryDepth = renderDirectionalCustomDepthSourceChannel(1)
   const primaryDepthLum = primaryDepth.r + primaryDepth.g + primaryDepth.b
-  const secondaryDepthLum = secondaryDepth.r + secondaryDepth.g + secondaryDepth.b
-  assert.ok(
-    secondaryDepthLum > primaryDepthLum + 30,
-    `source alphaMap channel=1 should sample transparent uv1 and remove the customDepthMaterial caster shadow (${secondaryDepthLum} vs ${primaryDepthLum})`,
-  )
+  for (const channel of [1, 2, 3]) {
+    const selectedDepth = renderDirectionalCustomDepthSourceChannel(channel)
+    const selectedDepthLum = selectedDepth.r + selectedDepth.g + selectedDepth.b
+    assert.ok(
+      selectedDepthLum > primaryDepthLum + 30,
+      `source alphaMap channel=${channel} should sample transparent uv${channel} and remove the customDepthMaterial caster shadow (${selectedDepthLum} vs ${primaryDepthLum})`,
+    )
+  }
 
   const primaryDistance = renderPointCustomDistanceSourceChannel(0)
-  const secondaryDistance = renderPointCustomDistanceSourceChannel(1)
   const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
-  const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
-  assert.ok(
-    secondaryDistanceLum > primaryDistanceLum + 20,
-    `source alphaMap channel=1 should sample transparent uv1 and remove the customDistanceMaterial caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
-  )
+  for (const channel of [1, 2, 3]) {
+    const selectedDistance = renderPointCustomDistanceSourceChannel(channel)
+    const selectedDistanceLum = selectedDistance.r + selectedDistance.g + selectedDistance.b
+    assert.ok(
+      selectedDistanceLum > primaryDistanceLum + 20,
+      `source alphaMap channel=${channel} should sample transparent uv${channel} and remove the customDistanceMaterial caster shadow (${selectedDistanceLum} vs ${primaryDistanceLum})`,
+    )
+  }
 })
 
 test('custom and source shadow base maps sample selected UV channels', () => {
@@ -11986,10 +11998,12 @@ test('custom and source shadow base maps sample selected UV channels', () => {
     return map
   }
 
-  function casterGeometry(size) {
+  function casterGeometry(size, channel) {
     const geometry = new THREE.BoxGeometry(size, size, size)
     setConstantUvAttribute(geometry, 'uv', 0.75, 0.5)
-    setConstantUvAttribute(geometry, 'uv1', 0.25, 0.5)
+    for (const index of [1, 2, 3]) {
+      setConstantUvAttribute(geometry, `uv${index}`, index === channel ? 0.25 : 0.75, 0.5)
+    }
     return geometry
   }
 
@@ -12019,7 +12033,7 @@ test('custom and source shadow base maps sample selected UV channels', () => {
     addReceiver(scene)
 
     const caster = new THREE.Mesh(
-      casterGeometry(3),
+      casterGeometry(3, channel),
       inheritFromSource
         ? sourceMaterialWithBaseMap(channel)
         : new THREE.MeshBasicMaterial({ color: 0xffffff }),
@@ -12059,7 +12073,7 @@ test('custom and source shadow base maps sample selected UV channels', () => {
     addReceiver(scene)
 
     const caster = new THREE.Mesh(
-      casterGeometry(2.5),
+      casterGeometry(2.5, channel),
       inheritFromSource
         ? sourceMaterialWithBaseMap(channel)
         : new THREE.MeshBasicMaterial({ color: 0xffffff }),
@@ -12092,22 +12106,26 @@ test('custom and source shadow base maps sample selected UV channels', () => {
   for (const inheritFromSource of [false, true]) {
     const label = inheritFromSource ? 'source material' : 'custom shadow material'
     const primaryDepth = renderDirectionalCustomDepthBaseChannel(0, inheritFromSource)
-    const secondaryDepth = renderDirectionalCustomDepthBaseChannel(1, inheritFromSource)
     const primaryDepthLum = primaryDepth.r + primaryDepth.g + primaryDepth.b
-    const secondaryDepthLum = secondaryDepth.r + secondaryDepth.g + secondaryDepth.b
-    assert.ok(
-      secondaryDepthLum > primaryDepthLum + 30,
-      `${label} map channel=1 should sample transparent uv1 and remove the customDepthMaterial caster shadow (${secondaryDepthLum} vs ${primaryDepthLum})`,
-    )
+    for (const channel of [1, 2, 3]) {
+      const selectedDepth = renderDirectionalCustomDepthBaseChannel(channel, inheritFromSource)
+      const selectedDepthLum = selectedDepth.r + selectedDepth.g + selectedDepth.b
+      assert.ok(
+        selectedDepthLum > primaryDepthLum + 30,
+        `${label} map channel=${channel} should sample transparent uv${channel} and remove the customDepthMaterial caster shadow (${selectedDepthLum} vs ${primaryDepthLum})`,
+      )
+    }
 
     const primaryDistance = renderPointCustomDistanceBaseChannel(0, inheritFromSource)
-    const secondaryDistance = renderPointCustomDistanceBaseChannel(1, inheritFromSource)
     const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
-    const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
-    assert.ok(
-      secondaryDistanceLum > primaryDistanceLum + 20,
-      `${label} map channel=1 should sample transparent uv1 and remove the customDistanceMaterial caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
-    )
+    for (const channel of [1, 2, 3]) {
+      const selectedDistance = renderPointCustomDistanceBaseChannel(channel, inheritFromSource)
+      const selectedDistanceLum = selectedDistance.r + selectedDistance.g + selectedDistance.b
+      assert.ok(
+        selectedDistanceLum > primaryDistanceLum + 20,
+        `${label} map channel=${channel} should sample transparent uv${channel} and remove the customDistanceMaterial caster shadow (${selectedDistanceLum} vs ${primaryDistanceLum})`,
+      )
+    }
   }
 })
 
