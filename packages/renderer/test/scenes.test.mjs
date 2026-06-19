@@ -6941,6 +6941,108 @@ test('CustomBlending honors custom factors and equation', () => {
   assert.ok(mean.b > 180, `ReverseSubtractEquation should preserve the blue destination channel (${mean.b})`)
 })
 
+test('CustomBlending honors min and max equations', () => {
+  function renderSingle(color) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  function renderEquation(blendEquation, backColor, frontColor) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: backColor }),
+    )
+    back.position.z = -0.1
+    scene.add(back)
+    const front = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: frontColor,
+        transparent: true,
+        blending: THREE.CustomBlending,
+        blendEquation,
+        blendSrc: THREE.OneFactor,
+        blendDst: THREE.OneFactor,
+        blendEquationAlpha: THREE.AddEquation,
+        blendSrcAlpha: THREE.OneFactor,
+        blendDstAlpha: THREE.ZeroFactor,
+      }),
+    )
+    front.position.z = 0.1
+    scene.add(front)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const red = renderSingle(0xff0000)
+  const green = renderSingle(0x00ff00)
+  const min = renderEquation(THREE.MinEquation, 0x00ff00, 0xff0000)
+  assert.ok(Math.abs(min.r - Math.min(red.r, green.r)) < 12, `MinEquation should keep the lower red channel (${min.r} vs ${red.r}/${green.r})`)
+  assert.ok(Math.abs(min.g - Math.min(red.g, green.g)) < 12, `MinEquation should keep the lower green channel (${min.g} vs ${red.g}/${green.g})`)
+  assert.ok(Math.abs(min.b - Math.min(red.b, green.b)) < 12, `MinEquation should keep the lower blue channel (${min.b} vs ${red.b}/${green.b})`)
+
+  const blue = renderSingle(0x0000ff)
+  const max = renderEquation(THREE.MaxEquation, 0x0000ff, 0xff0000)
+  assert.ok(Math.abs(max.r - Math.max(red.r, blue.r)) < 12, `MaxEquation should keep the higher red channel (${max.r} vs ${red.r}/${blue.r})`)
+  assert.ok(Math.abs(max.g - Math.max(red.g, blue.g)) < 12, `MaxEquation should keep the higher green channel (${max.g} vs ${red.g}/${blue.g})`)
+  assert.ok(Math.abs(max.b - Math.max(red.b, blue.b)) < 12, `MaxEquation should keep the higher blue channel (${max.b} vs ${red.b}/${blue.b})`)
+})
+
+test('CustomBlending honors separate alpha equation and factors', () => {
+  function renderAlphaBlend(blendEquationAlpha, blendSrcAlpha, blendDstAlpha) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        opacity: 0.25,
+        transparent: true,
+        blending: THREE.CustomBlending,
+        blendEquation: THREE.AddEquation,
+        blendSrc: THREE.OneFactor,
+        blendDst: THREE.ZeroFactor,
+        blendEquationAlpha,
+        blendSrcAlpha,
+        blendDstAlpha,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const sourceAlpha = renderAlphaBlend(THREE.AddEquation, THREE.OneFactor, THREE.ZeroFactor)
+  const reverseSubtract = renderAlphaBlend(THREE.ReverseSubtractEquation, THREE.OneFactor, THREE.OneFactor)
+  assert.ok(reverseSubtract.r > 180, `color blend state should still overwrite RGB with the red source (${reverseSubtract.r})`)
+  assert.ok(reverseSubtract.g < 30, `color blend state should still suppress green output (${reverseSubtract.g})`)
+  assert.ok(reverseSubtract.b < 30, `color blend state should still suppress blue output (${reverseSubtract.b})`)
+  assert.ok(sourceAlpha.a < 80, `source alpha control should produce a translucent alpha baseline (${sourceAlpha.a})`)
+  assert.ok(
+    Math.abs(reverseSubtract.a - (255 - sourceAlpha.a)) < 12,
+    `ReverseSubtractEquation alpha should resolve to destination minus source alpha (${reverseSubtract.a} vs source ${sourceAlpha.a})`,
+  )
+})
+
 test('CustomBlending honors constant color and alpha factors', () => {
   function renderConstantBlend(blendSrc, blendColor, blendAlpha) {
     const scene = new THREE.Scene()
