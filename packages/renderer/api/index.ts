@@ -699,6 +699,12 @@ export class Renderer {
     assertEffectsArrayOrNull(effects, 'Renderer.setEffects effects')
   }
 
+  renderBufferDirect(): never {
+    throw new Error(
+      'Renderer.renderBufferDirect() is not supported by @headless-three/renderer because it does not expose WebGL buffer binding or direct material program dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
+    )
+  }
+
   initRenderTarget(target: RenderTargetLike): void {
     assertRenderTargetLike(target, 'Renderer.initRenderTarget target')
     validateUnsupportedRenderTargetOptions(target)

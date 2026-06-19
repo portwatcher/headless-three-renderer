@@ -29624,6 +29624,15 @@ test('Renderer setEffects is an inert validated compatibility hook', () => {
   )
 })
 
+test('Renderer renderBufferDirect fails clearly as unsupported', () => {
+  const renderer = new Renderer()
+
+  assert.throws(
+    () => renderer.renderBufferDirect(),
+    /Renderer\.renderBufferDirect\(\) is not supported.*WebGL buffer binding.*Renderer\.render\(\) or renderToTarget\(\)/i,
+  )
+})
+
 test('Renderer resource init hooks are validated no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
