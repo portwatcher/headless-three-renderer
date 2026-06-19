@@ -15851,7 +15851,11 @@ test('explicit raw texture mipmaps upload for material and background maps', () 
   backgroundScene.background = mipmappedCheckerTexture()
 
   for (const [name, scene] of [['material', materialScene], ['background', backgroundScene]]) {
-    const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }))
+    const mean = meanRgba(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
     assert.ok(mean.b > 180, `${name} explicit mipmap levels should drive minified sampling (${mean.r}, ${mean.g}, ${mean.b})`)
     assert.ok(mean.r < 80 && mean.g < 80, `${name} base checker colors should not dominate explicit mip sampling (${mean.r}, ${mean.g}, ${mean.b})`)
   }
@@ -20596,6 +20600,45 @@ test('clearcoatMap samples selected uv1-uv3 texture channels', () => {
     const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
     assert.ok(secondaryLum > primaryLum + 80, `clearcoatMap channel=${channel} should enable stronger clearcoat IBL from uv${channel} (${secondaryLum.toFixed(1)} vs ${primaryLum.toFixed(1)})`)
   }
+})
+
+test('clearcoatMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const clearcoatMap = solidTexture(128, 0, 0, 255)
+    clearcoatMap.colorSpace = colorSpace
+    clearcoatMap.magFilter = THREE.NearestFilter
+    clearcoatMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        clearcoatMap,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }))
+    return 0.2126 * mean.r + 0.7152 * mean.g + 0.0722 * mean.b
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  assert.ok(
+    linear > srgb + 25,
+    `linear clearcoatMap should preserve the stronger red-channel factor before sRGB decode (${linear.toFixed(1)} vs ${srgb.toFixed(1)})`,
+  )
 })
 
 test('clearcoatRoughnessMap samples selected uv1-uv3 texture channels', () => {

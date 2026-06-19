@@ -602,6 +602,7 @@ export function extractPbrProperties(
     props.clearcoatMapMinFilter = minFilterModeToString(material.clearcoatMap)
     props.clearcoatMapAnisotropy = textureAnisotropy(material.clearcoatMap, 'material.clearcoatMap')
     props.clearcoatMapTransform = textureTransform(material.clearcoatMap, 'material.clearcoatMap')
+    props.clearcoatMapColorSpace = textureColorSpace(material.clearcoatMap)
     props.clearcoatMapUsesUv2 = textureUvChannel(material.clearcoatMap) > 0
   }
   const clearcoatRoughness = optionalFiniteNumber(material.clearcoatRoughness, 'material.clearcoatRoughness')

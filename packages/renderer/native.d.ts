@@ -303,6 +303,8 @@ export interface SceneMesh {
   clearcoatMapAnisotropy?: number
   /** Clearcoat map UV transform `[a, c, tx, b, d, ty]`. */
   clearcoatMapTransform?: Array<number>
+  /** Clearcoat map color space. `"srgb"` is decoded to linear before shading. */
+  clearcoatMapColorSpace?: string
   /** Whether clearcoat map sampling uses the secondary UV stream. */
   clearcoatMapUsesUv2?: boolean
   /** Clearcoat roughness (0..1). Defaults to 0. */

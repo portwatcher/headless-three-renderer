@@ -918,6 +918,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         thickness: thickness_map.as_ref(),
         specular_color: specular_color_map.as_ref(),
         specular_intensity: specular_intensity_map.as_ref(),
+        clearcoat_is_srgb: matches!(mesh.clearcoat_map_color_space.as_deref(), Some("srgb")),
         sheen_color_is_srgb: matches!(mesh.sheen_color_map_color_space.as_deref(), Some("srgb")),
         specular_color_is_srgb: matches!(
             mesh.specular_color_map_color_space.as_deref(),
@@ -2359,6 +2360,7 @@ struct PhysicalMapInputs<'a> {
     thickness: Option<&'a PreparedTexture>,
     specular_color: Option<&'a PreparedTexture>,
     specular_intensity: Option<&'a PreparedTexture>,
+    clearcoat_is_srgb: bool,
     sheen_color_is_srgb: bool,
     specular_color_is_srgb: bool,
 }
@@ -2411,7 +2413,15 @@ fn pack_physical_maps(inputs: PhysicalMapInputs<'_>) -> Option<PreparedPhysicalM
         for x in 0..width {
             let out = ((y * width + x) * 4) as usize;
             if let Some(map) = inputs.clearcoat {
-                scalar[out] = sample_texture_channel(map, x, y, width, height, 0);
+                scalar[out] = sample_texture_color_channel(
+                    map,
+                    x,
+                    y,
+                    width,
+                    height,
+                    0,
+                    inputs.clearcoat_is_srgb,
+                );
             }
             if let Some(map) = inputs.clearcoat_roughness {
                 scalar[out + 1] = sample_texture_channel(map, x, y, width, height, 1);

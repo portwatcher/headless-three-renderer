@@ -269,6 +269,8 @@ pub struct SceneMesh {
     pub clearcoat_map_anisotropy: Option<f64>,
     /// Clearcoat map UV transform `[a, c, tx, b, d, ty]`.
     pub clearcoat_map_transform: Option<Vec<f64>>,
+    /// Clearcoat map color space. `"srgb"` is decoded to linear before shading.
+    pub clearcoat_map_color_space: Option<String>,
     /// Whether clearcoat map sampling uses the secondary UV stream.
     pub clearcoat_map_uses_uv2: Option<bool>,
     /// Clearcoat roughness (0..1). Defaults to 0.

@@ -737,6 +737,7 @@ export interface NativeSceneMesh {
   clearcoatMapMinFilter?: string
   clearcoatMapAnisotropy?: number
   clearcoatMapTransform?: number[]
+  clearcoatMapColorSpace?: string
   clearcoatMapUsesUv2?: boolean
   clearcoatRoughness?: number
   clearcoatRoughnessMap?: Buffer
@@ -1130,6 +1131,7 @@ export interface PbrProperties {
   clearcoatMapMinFilter?: string
   clearcoatMapAnisotropy?: number
   clearcoatMapTransform?: number[]
+  clearcoatMapColorSpace?: string
   clearcoatMapUsesUv2?: boolean
   clearcoatRoughness?: number
   clearcoatRoughnessMap?: Buffer
