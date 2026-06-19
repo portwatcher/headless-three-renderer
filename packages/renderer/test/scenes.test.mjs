@@ -24558,42 +24558,51 @@ test('LineDashedMaterial alphaMap honors horizontal and vertical repeat wrapping
   assert.ok(mirroredVerticalGreen < 20, `mirrored dashed-line alphaMap V coordinates should reflect to the transparent texel (${mirroredVerticalGreen})`)
 })
 
-test('LineDashedMaterial map samples the selected secondary UV channel', () => {
+test('LineDashedMaterial map samples selected uv1-uv3 texture channels', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
     0, 255, 0, 255,
   ], 2, 1)
-  map.channel = 1
 
-  const geom = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-1.5, 0, 0),
-    new THREE.Vector3(1.5, 0, 0),
-  ])
-  geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
-    0.25, 0.5,
-    0.25, 0.5,
-  ]), 2))
-  geom.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
-    0.75, 0.5,
-    0.75, 0.5,
-  ]), 2))
+  function renderLine(channel) {
+    map.channel = channel
 
-  const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
-    color: 0xffffff,
-    map,
-    dashSize: 0.5,
-    gapSize: 0.2,
-    scale: 1,
-  }))
-  line.computeLineDistances()
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.25, 0.5,
+      0.25, 0.5,
+    ]), 2))
+    for (const index of [1, 2, 3]) {
+      const u = index === channel ? 0.75 : 0.25
+      geom.setAttribute(`uv${index}`, new THREE.BufferAttribute(new Float32Array([
+        u, 0.5,
+        u, 0.5,
+      ]), 2))
+    }
 
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(line)
+    const line = new THREE.Line(geom, new THREE.LineDashedMaterial({
+      color: 0xffffff,
+      map,
+      dashSize: 0.5,
+      gapSize: 0.2,
+      scale: 1,
+    }))
+    line.computeLineDistances()
 
-  const rgba = renderRgba(scene, makeCamera(), { width: 96, height: 96 })
-  const greenPixels = countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
-  assert.ok(greenPixels > 2, `dashed line map channel=1 should sample uv1 green texel (${greenPixels})`)
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(line)
+    return renderRgba(scene, makeCamera(), { width: 96, height: 96 })
+  }
+
+  for (const channel of [1, 2, 3]) {
+    const rgba = renderLine(channel)
+    const greenPixels = countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => g > r + 40 && g > b + 40)
+    assert.ok(greenPixels > 2, `dashed line map channel=${channel} should sample uv${channel} green texel (${greenPixels})`)
+  }
 })
 
 test('line and point maps sample texture channel 3 from uv3 attributes', () => {
