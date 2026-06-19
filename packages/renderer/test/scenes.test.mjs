@@ -25704,6 +25704,33 @@ test('points topology renders successfully', () => {
   assertValidPng(buf, { width: SIZE, height: SIZE })
 })
 
+test('PointsMaterial material arrays honor geometry groups', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.addGroup(0, 1, 0)
+  geometry.addGroup(1, 1, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Points(geometry, [
+    new THREE.PointsMaterial({ color: 0xff0000, size: 24, sizeAttenuation: false }),
+    new THREE.PointsMaterial({ color: 0x00ff00, size: 24, sizeAttenuation: false }),
+  ]))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 18, 34, 44, 62, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 34, 78, 62, (r, g, b) => g > r + 40 && g > b + 40)
+  assert.ok(redPixels > 20, `left point group should use the red material (${redPixels})`)
+  assert.ok(greenPixels > 20, `right point group should use the green material (${greenPixels})`)
+})
+
 test('PointsMaterial size controls billboard pixel bounds', () => {
   function renderPoint(size) {
     const geometry = new THREE.BufferGeometry()
