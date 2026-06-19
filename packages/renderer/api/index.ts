@@ -15,6 +15,7 @@ import type {
   NativeSceneMesh,
   NativeSceneLight,
   RenderMode,
+  RenderOutputColorSpace,
   Color4,
   RenderObjectIdEntry,
   ThreeEulerLike,
@@ -147,6 +148,7 @@ export class Renderer {
   private autoClearColorValue = true
   private autoClearDepthValue = true
   private autoClearStencilValue = true
+  private outputColorSpaceValue: RenderOutputColorSpace = 'srgb'
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly reversedDepthBuffer = false
@@ -198,6 +200,14 @@ export class Renderer {
       throw new TypeError(`Renderer.sortObjects must be a boolean; received ${String(value)}.`)
     }
     this.sortObjectsValue = value
+  }
+
+  get outputColorSpace(): RenderOutputColorSpace {
+    return this.outputColorSpaceValue
+  }
+
+  set outputColorSpace(value: RenderOutputColorSpace) {
+    this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer.outputColorSpace')
   }
 
   setOpaqueSort(method: RenderSortFunction | null): void {
@@ -646,6 +656,7 @@ export class Renderer {
     const sizeOptions = this.optionsWithRendererSizeFallback(options, fallbackTarget)
     return {
       ...sizeOptions,
+      outputColorSpace: sizeOptions.outputColorSpace ?? this.outputColorSpace,
       sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
       opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
       transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
@@ -2681,15 +2692,19 @@ function assertSupportedOutputFormat(value: unknown, label: string): void {
 
 function assertSupportedOutputColorSpace(value: unknown): void {
   if (value == null) return
+  checkedOutputColorSpace(value, 'options.outputColorSpace')
+}
+
+function checkedOutputColorSpace(value: unknown, label: string): RenderOutputColorSpace {
   if (
     value === 'srgb' ||
     value === 'srgb-linear' ||
     value === 'linear-srgb' ||
     value === 'linearsrgb' ||
     value === 'linear'
-  ) return
+  ) return value
   throw new Error(
-    `options.outputColorSpace ${String(value)} is not supported by @headless-three/renderer. Use THREE.SRGBColorSpace or THREE.LinearSRGBColorSpace.`,
+    `${label} ${String(value)} is not supported by @headless-three/renderer. Use THREE.SRGBColorSpace or THREE.LinearSRGBColorSpace.`,
   )
 }
 

@@ -16398,6 +16398,48 @@ test('outputColorSpace controls material and texture background output conversio
   )
 })
 
+test('Renderer outputColorSpace state applies as render fallback', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.5, 0.5) }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer.outputColorSpace, THREE.SRGBColorSpace)
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+  assert.equal(renderer.outputColorSpace, THREE.LinearSRGBColorSpace)
+
+  const fallback = meanRgba(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }))
+  const explicit = meanRgba(renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.SRGBColorSpace,
+  }))
+  assert.ok(
+    explicit.r > fallback.r + 20,
+    `explicit outputColorSpace should override Renderer outputColorSpace fallback (${explicit.r} vs ${fallback.r})`,
+  )
+
+  const target = renderer.renderToTarget(scene, camera, {}, { width: 32, height: 32 })
+  const targetMean = meanRgba(target.data)
+  assert.ok(
+    explicit.r > targetMean.r + 20,
+    `renderToTarget should use Renderer outputColorSpace fallback (${explicit.r} vs ${targetMean.r})`,
+  )
+
+  assert.throws(
+    () => { renderer.outputColorSpace = 'display-p3' },
+    /Renderer\.outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+  )
+})
+
 test('material.toneMapped=false skips material tone mapping before output conversion', () => {
   function renderToneMapped(toneMapped) {
     const scene = new THREE.Scene()
