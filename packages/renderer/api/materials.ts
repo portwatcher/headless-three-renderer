@@ -2162,9 +2162,9 @@ function textureBytesWithExplicitMipmaps(
 
 function unsupportedRawTextureDataError(label: string, usage: string): Error {
   const supported = 'one-channel, two-channel, RGB, or RGBA numeric pixel data'
-  const unsupported = 'mismatched data lengths are not supported yet'
+  const expected = 'mismatched data lengths must match width * height texels, width * height * 2 values, width * height * 3 values, or width * height * 4 values; packed color types use one value per texel'
   return new Error(
-    `${label} raw texture data must contain ${supported} for ${usage}; ${unsupported}.`,
+    `${label} raw texture data must contain ${supported} for ${usage}; ${expected}.`,
   )
 }
 
