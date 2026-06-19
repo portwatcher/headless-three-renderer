@@ -733,6 +733,8 @@ export interface SceneMesh {
   aoMapAnisotropy?: number
   /** AO map UV transform `[a, c, tx, b, d, ty]`. */
   aoMapTransform?: Array<number>
+  /** AO map color space. `"srgb"` decodes the red channel to linear before shading. */
+  aoMapColorSpace?: string
   /** Whether AO map sampling uses the secondary UV stream. */
   aoMapUsesUv2?: boolean
   /** AO map intensity multiplier (0..1). Defaults to 1. */

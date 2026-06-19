@@ -1040,6 +1040,7 @@ export function extractPbrProperties(
     props.aoMapMinFilter = minFilterModeToString(material.aoMap)
     props.aoMapAnisotropy = textureAnisotropy(material.aoMap, 'material.aoMap')
     props.aoMapTransform = textureTransform(material.aoMap, 'material.aoMap')
+    props.aoMapColorSpace = textureColorSpace(material.aoMap)
     props.aoMapUsesUv2 = textureUvChannel(material.aoMap) > 0
     props.aoMapIntensity = finiteNumberOrDefault(material.aoMapIntensity, 'material.aoMapIntensity', 1)
   }

@@ -959,6 +959,7 @@ export interface NativeSceneMesh {
   aoMapMinFilter?: string
   aoMapAnisotropy?: number
   aoMapTransform?: number[]
+  aoMapColorSpace?: string
   aoMapUsesUv2?: boolean
   aoMapIntensity?: number
   lightMap?: Buffer
@@ -1357,6 +1358,7 @@ export interface PbrProperties {
   aoMapMinFilter?: string
   aoMapAnisotropy?: number
   aoMapTransform?: number[]
+  aoMapColorSpace?: string
   aoMapUsesUv2?: boolean
   aoMapIntensity?: number
   lightMap?: Buffer

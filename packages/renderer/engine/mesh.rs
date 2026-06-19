@@ -146,6 +146,7 @@ pub struct PreparedMesh {
     pub emissive_map_transform: [f32; 6],
     pub emissive_map_uses_uv2: bool,
     pub ao_map_transform: [f32; 6],
+    pub ao_map_is_srgb: bool,
     pub ao_map_uses_uv2: bool,
     pub light_map_transform: [f32; 6],
     pub light_map_uses_uv2: bool,
@@ -862,6 +863,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         matcap_map_is_srgb,
         gradient_map_is_srgb,
         emissive_map_is_srgb,
+        ao_map_is_srgb,
         light_map_is_srgb,
         specular_map_is_srgb,
         common,
@@ -1237,6 +1239,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         emissive_map_transform,
         emissive_map_uses_uv2: mesh.emissive_map_uses_uv2.unwrap_or(false),
         ao_map_transform,
+        ao_map_is_srgb,
         ao_map_uses_uv2: mesh.ao_map_uses_uv2.unwrap_or(false),
         light_map_transform,
         light_map_uses_uv2: mesh.light_map_uses_uv2.unwrap_or(false),
@@ -1675,6 +1678,7 @@ struct SurfaceTextureInputs {
     matcap_map_is_srgb: bool,
     gradient_map_is_srgb: bool,
     emissive_map_is_srgb: bool,
+    ao_map_is_srgb: bool,
     light_map_is_srgb: bool,
     specular_map_is_srgb: bool,
     common: CommonTextureInputs,
@@ -1778,6 +1782,7 @@ fn prepare_surface_texture_inputs(
         let matcap_map_is_srgb = matches!(mesh.matcap_map_color_space.as_deref(), Some("srgb"));
         let gradient_map_is_srgb = matches!(mesh.gradient_map_color_space.as_deref(), Some("srgb"));
         let emissive_map_is_srgb = matches!(mesh.emissive_map_color_space.as_deref(), Some("srgb"));
+        let ao_map_is_srgb = matches!(mesh.ao_map_color_space.as_deref(), Some("srgb"));
         let light_map_is_srgb = matches!(mesh.light_map_color_space.as_deref(), Some("srgb"));
         let specular_map_is_srgb = matches!(mesh.specular_map_color_space.as_deref(), Some("srgb"));
 
@@ -1817,6 +1822,7 @@ fn prepare_surface_texture_inputs(
             matcap_map_is_srgb,
             gradient_map_is_srgb,
             emissive_map_is_srgb,
+            ao_map_is_srgb,
             light_map_is_srgb,
             specular_map_is_srgb,
             common,

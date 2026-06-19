@@ -62,6 +62,7 @@ struct Uniforms {
   // map_transform_rows[3].w = metallic-roughness map uses secondary UV stream.
   // map_transform_rows[4].w = emissive map is sRGB.
   // map_transform_rows[5].w = emissive map uses secondary UV stream.
+  // map_transform_rows[6].w = AO map is sRGB.
   // map_transform_rows[7].w = AO map uses secondary UV stream.
   // map_transform_rows[8].w = light map is sRGB.
   // map_transform_rows[9].w = light map uses secondary UV stream.
@@ -814,6 +815,13 @@ fn decode_emissive_map_sample(sample: vec4<f32>) -> vec4<f32> {
   return sample;
 }
 
+fn decode_ao_map_sample(sample: f32) -> f32 {
+  if uniforms.map_transform_rows[6u].w > 0.5 {
+    return srgb_to_linear_channel(sample);
+  }
+  return sample;
+}
+
 fn decode_light_map_sample(sample: vec4<f32>) -> vec4<f32> {
   if uniforms.map_transform_rows[8u].w > 0.5 {
     return vec4<f32>(srgb_to_linear(sample.rgb), sample.a);
@@ -1064,7 +1072,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
   var ao: f32 = 1.0;
   if uniforms.ao_params.y > 0.5 {
-    let ao_sample = textureSample(t_ao, s_ao, transform_ao_map_uv(uv, uv2)).r;
+    let ao_sample = decode_ao_map_sample(textureSample(t_ao, s_ao, transform_ao_map_uv(uv, uv2)).r);
     ao = (ao_sample - 1.0) * uniforms.ao_params.x + 1.0;
   }
   let has_light_map = uniforms.ao_params.w > 0.5;

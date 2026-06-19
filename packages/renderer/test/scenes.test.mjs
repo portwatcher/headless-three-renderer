@@ -8995,6 +8995,39 @@ test('aoMap samples selected uv1-uv3 texture channels', () => {
   }
 })
 
+test('aoMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const aoMap = solidTexture(128, 128, 128)
+    aoMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(3, 3),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        aoMap,
+        aoMapIntensity: 1,
+        toneMapped: false,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRgba(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })).r
+  }
+
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  assert.ok(linear > srgb + 40, `linear aoMap should leave the surface brighter than decoded sRGB (${linear} vs ${srgb})`)
+})
+
 test('aoMap applies texture UV transforms on the selected channel', () => {
   const aoMap = rgbaTexture([
     255, 255, 255, 255,

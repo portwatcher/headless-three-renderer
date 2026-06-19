@@ -695,6 +695,8 @@ pub struct SceneMesh {
     pub ao_map_anisotropy: Option<f64>,
     /// AO map UV transform `[a, c, tx, b, d, ty]`.
     pub ao_map_transform: Option<Vec<f64>>,
+    /// AO map color space. `"srgb"` decodes the red channel to linear before shading.
+    pub ao_map_color_space: Option<String>,
     /// Whether AO map sampling uses the secondary UV stream.
     pub ao_map_uses_uv2: Option<bool>,
     /// AO map intensity multiplier (0..1). Defaults to 1.
