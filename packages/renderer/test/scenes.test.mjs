@@ -28152,6 +28152,24 @@ test('Renderer dispose is a no-op compatibility hook', () => {
   assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer dispose should preserve renderer clear alpha (${clear.a})`)
 })
 
+test('Renderer resetState is a no-op compatibility hook', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  renderer.setClearColor(0x204080, 0.5)
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+  renderer.localClippingEnabled = false
+  renderer.resetState()
+
+  assert.equal(renderer.outputColorSpace, THREE.LinearSRGBColorSpace)
+  assert.equal(renderer.localClippingEnabled, false)
+
+  const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer resetState should preserve renderer state')
+  assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer resetState should preserve renderer clear alpha (${clear.a})`)
+})
+
 test('Renderer size state applies as render fallback', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

@@ -360,6 +360,10 @@ export class Renderer {
     // Native resources are owned by the renderer instance and released with normal object lifetime.
   }
 
+  resetState(): void {
+    // Native render state is rebuilt for each pass, so there is no persistent GL state to reset.
+  }
+
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
     validateThreeSceneRoot(scene)
     validateTopLevelRenderCamera(camera)
