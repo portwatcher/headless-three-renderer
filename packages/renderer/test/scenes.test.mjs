@@ -6897,50 +6897,76 @@ test('material polygonOffset applies depth bias', () => {
 })
 
 test('material stencil state masks later draws', () => {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
+  function renderStencilFill(stencilFunc) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
 
-  const mask = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 2),
-    new THREE.MeshBasicMaterial({
-      color: 0xff0000,
-      colorWrite: false,
-      depthWrite: false,
-      stencilWrite: true,
-      stencilFunc: THREE.AlwaysStencilFunc,
-      stencilRef: 1,
-      stencilZPass: THREE.ReplaceStencilOp,
-    }),
-  )
-  mask.position.x = -0.5
-  mask.renderOrder = 0
-  scene.add(mask)
+    const mask = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0xff0000,
+        colorWrite: false,
+        depthWrite: false,
+        stencilWrite: true,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilRef: 1,
+        stencilZPass: THREE.ReplaceStencilOp,
+      }),
+    )
+    mask.position.x = -0.5
+    mask.renderOrder = 0
+    scene.add(mask)
 
-  const fill = new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({
-      color: 0x0000ff,
-      stencilWrite: true,
-      stencilFunc: THREE.EqualStencilFunc,
-      stencilRef: 1,
-      stencilFail: THREE.KeepStencilOp,
-      stencilZFail: THREE.KeepStencilOp,
-      stencilZPass: THREE.KeepStencilOp,
-      stencilWriteMask: 0,
-    }),
-  )
-  fill.renderOrder = 1
-  scene.add(fill)
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({
+        color: 0x0000ff,
+        stencilWrite: true,
+        stencilFunc,
+        stencilRef: 1,
+        stencilFail: THREE.KeepStencilOp,
+        stencilZFail: THREE.KeepStencilOp,
+        stencilZPass: THREE.KeepStencilOp,
+        stencilWriteMask: 0,
+      }),
+    )
+    fill.renderOrder = 1
+    scene.add(fill)
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
 
-  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
-  const left = meanRegion(rgba, 64, 64, 16, 24, 28, 40)
-  const right = meanRegion(rgba, 64, 64, 42, 24, 54, 40)
-  assert.ok(left.b > 150, `stencil fill should render inside the mask (${left.b})`)
-  assert.ok(right.b < 10, `stencil fill should be rejected outside the mask (${right.b})`)
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    return {
+      left: meanRegion(rgba, 64, 64, 16, 24, 28, 40),
+      right: meanRegion(rgba, 64, 64, 42, 24, 54, 40),
+    }
+  }
+
+  const cases = [
+    ['NeverStencilFunc', THREE.NeverStencilFunc, false, false],
+    ['LessStencilFunc', THREE.LessStencilFunc, false, false],
+    ['EqualStencilFunc', THREE.EqualStencilFunc, true, false],
+    ['LessEqualStencilFunc', THREE.LessEqualStencilFunc, true, false],
+    ['GreaterStencilFunc', THREE.GreaterStencilFunc, false, true],
+    ['NotEqualStencilFunc', THREE.NotEqualStencilFunc, false, true],
+    ['GreaterEqualStencilFunc', THREE.GreaterEqualStencilFunc, true, true],
+    ['AlwaysStencilFunc', THREE.AlwaysStencilFunc, true, true],
+  ]
+  for (const [label, stencilFunc, expectLeft, expectRight] of cases) {
+    const { left, right } = renderStencilFill(stencilFunc)
+    if (expectLeft) {
+      assert.ok(left.b > 150, `${label} should render inside the stencil mask (${left.b})`)
+    } else {
+      assert.ok(left.b < 10, `${label} should reject inside the stencil mask (${left.b})`)
+    }
+    if (expectRight) {
+      assert.ok(right.b > 150, `${label} should render outside the stencil mask (${right.b})`)
+    } else {
+      assert.ok(right.b < 10, `${label} should reject outside the stencil mask (${right.b})`)
+    }
+  }
 })
 
 function assertMaterialRenderStateFails(material, pattern) {
