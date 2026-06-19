@@ -389,6 +389,14 @@ export class Renderer {
     return { ...this.contextAttributes }
   }
 
+  forceContextLoss(): void {
+    // There is no browser WebGL context; native resources follow renderer object lifetime.
+  }
+
+  forceContextRestore(): void {
+    // Native render state is recreated per pass, so there is no persistent WebGL context to restore.
+  }
+
   getRenderTarget(): RenderTargetLike | null {
     return this.currentRenderTarget
   }
