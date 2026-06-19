@@ -20,6 +20,7 @@ export function createSceneCorpus() {
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
     materialEnvMapPbrCorpus(),
+    narrowRawIblCorpus(),
     meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
     meshDepthMaterialWireframeCorpus(),
@@ -1265,6 +1266,43 @@ function materialEnvMapPbrCorpus() {
         if (!(mean.g > mean.r + 20 && mean.g > mean.b + 8)) {
           throw new Error(`PBR material envMap should render green ${label} IBL (${mean.r}, ${mean.g}, ${mean.b})`)
         }
+      }
+    },
+  }
+}
+
+function narrowRawIblCorpus() {
+  const environment = new THREE.DataTexture(new Uint8Array([220, 64]), 1, 1, THREE.RGFormat)
+  environment.colorSpace = THREE.LinearSRGBColorSpace
+  environment.mapping = THREE.EquirectangularReflectionMapping
+  environment.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.015, 0.015, 0.02)
+  scene.environment = environment
+  scene.environmentIntensity = 2.4
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 32, 18),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+  ))
+
+  return {
+    name: 'narrow-raw-ibl-environment',
+    scene,
+    camera: makeCamera([0.8, 0.25, 3.0], [0, 0, 0]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    },
+    background: [4, 4, 5],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 34, 34, 62, 62)
+      if (!(center.r > 180 && center.g > 140 && center.b < 120 && center.r > center.b + 110 && center.g > center.b + 70)) {
+        throw new Error(`narrow raw IBL corpus should expand RG environment data into warm reflected light, got ${JSON.stringify(center)}`)
       }
     },
   }
