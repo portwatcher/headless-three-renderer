@@ -10426,6 +10426,94 @@ test('Points customDistanceMaterial alphaMaps sample selected geometry UV channe
   }
 })
 
+test('Points customDistanceMaterial base maps sample selected geometry UV channels', () => {
+  function baseMapForChannel(channel) {
+    const map = rgbaTexture([
+      255, 255, 255, 0,
+      255, 255, 255, 255,
+    ], 2, 1)
+    map.magFilter = THREE.NearestFilter
+    map.minFilter = THREE.NearestFilter
+    map.channel = channel
+    return map
+  }
+
+  function pointGeometry(position) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
+    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
+    geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([0.25, 0.5]), 2))
+    return geometry
+  }
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function pointsMaterial(channel, inheritFromSource) {
+    const material = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 48,
+      sizeAttenuation: false,
+      map: inheritFromSource ? baseMapForChannel(channel) : null,
+      alphaTest: inheritFromSource ? 0.5 : 0,
+    })
+    if (inheritFromSource) {
+      material.colorWrite = false
+      material.depthWrite = false
+    }
+    return material
+  }
+
+  function renderPointCustomDistancePoint(channel, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const points = new THREE.Points(pointGeometry([0, 2.2, 1.8]), pointsMaterial(channel, inheritFromSource))
+    points.castShadow = true
+    points.customDistanceMaterial = inheritFromSource
+      ? new THREE.MeshDistanceMaterial()
+      : new THREE.MeshDistanceMaterial({
+        map: baseMapForChannel(channel),
+        alphaTest: 0.5,
+      })
+    scene.add(points)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  for (const inheritFromSource of [false, true]) {
+    const label = inheritFromSource ? 'source material' : 'custom shadow material'
+    const primaryDistance = renderPointCustomDistancePoint(0, inheritFromSource)
+    const secondaryDistance = renderPointCustomDistancePoint(1, inheritFromSource)
+    const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
+    const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
+    assert.ok(
+      secondaryDistanceLum > primaryDistanceLum + 10,
+      `${label} point map channel=1 should sample transparent uv1 and remove the customDistanceMaterial caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
+    )
+  }
+})
+
 test('Sprite and Points source alphaHash applies to custom shadow material casters', () => {
   function sourceBillboardMaterial(kind, alphaHash) {
     const params = {
