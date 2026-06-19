@@ -888,6 +888,11 @@ fn clipping_plane_alpha_coverage(world_pos: vec3<f32>) -> f32 {
   return clip_opacity;
 }
 
+fn alpha_test_alpha_coverage(alpha: f32, cutoff: f32) -> f32 {
+  let alpha_gradient = max(abs(dpdx(alpha)) + abs(dpdy(alpha)), 0.000001);
+  return smoothstep(cutoff, cutoff + alpha_gradient, alpha);
+}
+
 fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
   let pixel = floor(position.xy);
   return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
@@ -988,8 +993,15 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
 
   // Alpha test: discard fragments below the cutoff threshold
   let alpha_cutoff = uniforms.emissive.w;
-  if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
-    discard;
+  if alpha_cutoff > 0.0 {
+    if uniforms.output_params.z > 0.5 {
+      alpha = alpha_test_alpha_coverage(alpha, alpha_cutoff);
+      if alpha <= 0.0 {
+        discard;
+      }
+    } else if alpha < alpha_cutoff {
+      discard;
+    }
   }
   if uniforms.clipping_params.z > 0.5 && alpha < alpha_hash_threshold(input.position) {
     discard;
@@ -1726,6 +1738,11 @@ fn clipping_plane_alpha_coverage(world_pos: vec3<f32>) -> f32 {
   return clip_opacity;
 }
 
+fn alpha_test_alpha_coverage(alpha: f32, cutoff: f32) -> f32 {
+  let alpha_gradient = max(abs(dpdx(alpha)) + abs(dpdy(alpha)), 0.000001);
+  return smoothstep(cutoff, cutoff + alpha_gradient, alpha);
+}
+
 fn alpha_hash_threshold(position: vec4<f32>) -> f32 {
   let pixel = floor(position.xy);
   return fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715))));
@@ -1779,8 +1796,15 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   }
   alpha = alpha * clip_opacity;
   let alpha_cutoff = uniforms.emissive.w;
-  if alpha_cutoff > 0.0 && alpha < alpha_cutoff {
-    discard;
+  if alpha_cutoff > 0.0 {
+    if uniforms.output_params.z > 0.5 {
+      alpha = alpha_test_alpha_coverage(alpha, alpha_cutoff);
+      if alpha <= 0.0 {
+        discard;
+      }
+    } else if alpha < alpha_cutoff {
+      discard;
+    }
   }
   if uniforms.clipping_params.z > 0.5 && alpha < alpha_hash_threshold(input.position) {
     discard;

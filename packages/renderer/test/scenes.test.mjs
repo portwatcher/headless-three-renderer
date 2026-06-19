@@ -8269,6 +8269,66 @@ test('material alphaToCoverage uses MSAA coverage from output alpha', () => {
   assert.ok(coverage.r > 30 && coverage.r < noCoverage.r - 80, `4x alphaToCoverage should resolve partial RGB coverage (${coverage.r} vs ${noCoverage.r})`)
 })
 
+test('material alphaToCoverage smooths alphaTest thresholds', () => {
+  function thresholdAlphaMap() {
+    const texture = rgbaTexture([
+      255, 0, 255, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    texture.magFilter = THREE.LinearFilter
+    texture.minFilter = THREE.LinearFilter
+    return texture
+  }
+
+  function renderThreshold(material) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      sampleCount: 4,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  function softThresholdPixels(rgba) {
+    return countRegionPixels(rgba, 64, 64, 14, 14, 50, 50, (r, g, b) => {
+      return r > 40 && r < 180 && Math.abs(r - g) < 3 && Math.abs(r - b) < 3
+    })
+  }
+
+  const hard = softThresholdPixels(renderThreshold(new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    alphaMap: thresholdAlphaMap(),
+    alphaTest: 0.5,
+    alphaToCoverage: false,
+  })))
+
+  const builtIn = softThresholdPixels(renderThreshold(new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    alphaMap: thresholdAlphaMap(),
+    alphaTest: 0.5,
+    alphaToCoverage: true,
+  })))
+  assert.ok(builtIn > hard + 20, `built-in material alphaTest should add partial coverage pixels (${builtIn} vs ${hard})`)
+
+  const custom = new THREE.ShaderMaterial()
+  custom.alphaMap = thresholdAlphaMap()
+  custom.alphaTest = 0.5
+  custom.alphaToCoverage = true
+  custom.userData.headlessThreeRenderer = {
+    fragmentWgsl: 'return vec4<f32>(1.0, 1.0, 1.0, alpha);',
+  }
+  const customSoft = softThresholdPixels(renderThreshold(custom))
+  assert.ok(customSoft > hard + 20, `custom WGSL alphaTest should add partial coverage pixels (${customSoft} vs ${hard})`)
+})
+
 test('material alphaToCoverage smooths clipping plane edges', () => {
   function renderClipped(material) {
     material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 1, 0).normalize(), 0)]
