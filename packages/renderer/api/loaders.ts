@@ -264,7 +264,7 @@ export async function loadGltfFromFile<T = unknown>(
 ): Promise<T> {
   const loaderOptions = objectOptions(options, 'options') as LoadGltfFromFileOptions
   validateLoadGltfFromFileOptions(loaderOptions)
-  const absolute = path.resolve(requiredString(filePath, 'filePath'))
+  const absolute = resolveLocalAssetPath(requiredString(filePath, 'filePath'))
   const root = path.resolve(optionalString(loaderOptions.rootDir, 'options.rootDir') ?? path.dirname(absolute))
   const baseUrl = optionalString(loaderOptions.baseUrl, 'options.baseUrl') ?? pathToFileURL(`${root}${path.sep}`).href
   const { loader } = await createNodeGltfLoader(root, loaderOptions)

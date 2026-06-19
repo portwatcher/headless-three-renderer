@@ -7,10 +7,12 @@ in a plain Node process.
 
 ## Load A Local glTF Or GLB
 
-Use `loadGltfFromFile()` for local `.gltf` or `.glb` files. It reads bytes from
-disk, installs the local `file://` fetch bridge used by Three.js `FileLoader`,
-and registers encoded PNG/JPEG/WebP image handlers so external files, data URI
-images, and embedded GLB bufferView images expose renderer-supported buffers.
+Use `loadGltfFromFile()` for local `.gltf` or `.glb` files. Its `filePath`
+argument accepts relative paths, absolute paths, and `file://` URLs. It reads
+bytes from disk, installs the local `file://` fetch bridge used by Three.js
+`FileLoader`, and registers encoded PNG/JPEG/WebP image handlers so external
+files, data URI images, and embedded GLB bufferView images expose
+renderer-supported buffers.
 
 ```js
 import fs from 'node:fs/promises'

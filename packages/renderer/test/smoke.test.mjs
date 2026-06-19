@@ -176,6 +176,12 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     installLocalFileFetch()
     const response = await fetch(pathToFileURL(imagePath).href)
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), imageBytes)
+
+    const fileUrlGltf = await loadGltfFromFile(
+      new URL('./fixtures/simple-triangle.gltf', import.meta.url).href,
+      { installFetch: false },
+    )
+    assert.equal(fileUrlGltf.scene.name, 'SimpleTriangleScene')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
