@@ -30,6 +30,7 @@ export function createSceneCorpus() {
     narrowRawIblCorpus(),
     meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
+    meshDepthPackingVariantsCorpus(),
     meshDepthDisplacementMapCorpus(),
     meshDepthMaterialWireframeCorpus(),
     meshDistanceMaterialCorpus(),
@@ -1594,6 +1595,92 @@ function meshDepthMaterialCorpus() {
       if (!(center.r > 18 && center.r < 35 && Math.abs(center.r - center.g) <= 1 && Math.abs(center.r - center.b) <= 1 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
         throw new Error(`depth material corpus should render a low grayscale depth sphere, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
+    },
+  }
+}
+
+function meshDepthPackingVariantsCorpus() {
+  function packDepthToRG(v) {
+    if (v <= 0) return [0, 0, 0, 255]
+    if (v >= 1) return [255, 255, 0, 255]
+    const vuf = Math.floor(v * 256)
+    const gf = (v * 256) - vuf
+    return [vuf, gf * 255, 0, 255]
+  }
+
+  function assertChannels(actual, expected, label, tolerance = 3) {
+    for (const [channel, expectedValue] of [['r', expected[0]], ['g', expected[1]], ['b', expected[2]], ['a', expected[3]]]) {
+      if (Math.abs(actual[channel] - expectedValue) > tolerance) {
+        throw new Error(`depth packing corpus ${label}.${channel} expected ${expectedValue}, got ${actual[channel]}`)
+      }
+    }
+  }
+
+  function assertPrefix(actual, expected, label) {
+    if (Math.abs(actual.r - expected[0]) > 8 || Math.abs(actual.g - expected[1]) > 8) {
+      throw new Error(`depth packing corpus ${label} expected rg=${expected[0]},${expected[1]}, got mean=${JSON.stringify(actual)}`)
+    }
+  }
+
+  function makeDepthPackingScene(depthPacking) {
+    const z = 2.5
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshDepthMaterial({ depthPacking }))
+    mesh.position.z = z
+    scene.add(mesh)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld()
+    camera.updateProjectionMatrix()
+
+    const ndc = new THREE.Vector3(0, 0, z).project(camera)
+    return {
+      scene,
+      camera,
+      fragDepth: ndc.z * 0.5 + 0.5,
+    }
+  }
+
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const rgbaFixture = makeDepthPackingScene(THREE.RGBADepthPacking)
+  const rgbFixture = makeDepthPackingScene(THREE.RGBDepthPacking)
+  const rgFixture = makeDepthPackingScene(THREE.RGDepthPacking)
+  let rgbaMean = null
+  let rgbMean = null
+  let rgMean = null
+
+  return {
+    name: 'mesh-depth-material-packed-depth-variants',
+    scene: rgbFixture.scene,
+    camera: rgbFixture.camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const rgba = renderer.render(rgbaFixture.scene, rgbaFixture.camera, options)
+      rgbaMean = pixelAt(rgba, options.width, 48, 48)
+      const rgb = renderer.render(rgbFixture.scene, rgbFixture.camera, options)
+      rgbMean = pixelAt(rgb, options.width, 48, 48)
+      const rg = renderer.render(rgFixture.scene, rgFixture.camera, options)
+      rgMean = pixelAt(rg, options.width, 48, 48)
+      return rgb
+    },
+    validate() {
+      assertPrefix(rgbaMean, packDepthToRG(rgbaFixture.fragDepth), 'rgba')
+      if (!(rgbaMean.b > 10 && rgbaMean.a < 5)) {
+        throw new Error(`depth packing corpus rgba should carry lower packed depth bits in b/a, got mean=${JSON.stringify(rgbaMean)}`)
+      }
+
+      assertPrefix(rgbMean, packDepthToRG(rgbFixture.fragDepth), 'rgb')
+      if (!(rgbMean.b > 10 && rgbMean.a > 250)) {
+        throw new Error(`depth packing corpus rgb should carry lower packed depth bits with opaque alpha, got mean=${JSON.stringify(rgbMean)}`)
+      }
+
+      assertChannels(rgMean, packDepthToRG(rgFixture.fragDepth), 'rg', 8)
     },
   }
 }
