@@ -162,6 +162,7 @@ pub struct GpuRenderer {
     sampler: wgpu::Sampler,
     sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
     texture_cache: Mutex<HashMap<TextureCacheKey, wgpu::Texture>>,
+    physical_layers_texture_cache: Mutex<HashMap<PhysicalLayersTextureCacheKey, wgpu::Texture>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -263,6 +264,13 @@ struct TextureMipCacheKey {
     rgba_hash: u64,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct PhysicalLayersTextureCacheKey {
+    scalar: TextureCacheKey,
+    anisotropy: Option<TextureCacheKey>,
+    iridescence: Option<TextureCacheKey>,
+}
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 struct StatePipelineKey {
     topology: Topology,
@@ -353,6 +361,29 @@ impl TextureCacheKey {
                 .collect(),
         }
     }
+}
+
+impl PhysicalLayersTextureCacheKey {
+    fn from_layers(
+        scalar: &PreparedTexture,
+        anisotropy: Option<&PreparedTexture>,
+        iridescence: Option<&PreparedTexture>,
+    ) -> Self {
+        Self {
+            scalar: TextureCacheKey::from_texture(scalar),
+            anisotropy: matching_layer_key(scalar, anisotropy),
+            iridescence: matching_layer_key(scalar, iridescence),
+        }
+    }
+}
+
+fn matching_layer_key(
+    scalar: &PreparedTexture,
+    layer: Option<&PreparedTexture>,
+) -> Option<TextureCacheKey> {
+    layer
+        .filter(|texture| texture.width == scalar.width && texture.height == scalar.height)
+        .map(TextureCacheKey::from_texture)
 }
 
 fn hash_bytes(bytes: &[u8]) -> u64 {
@@ -1722,6 +1753,7 @@ impl GpuRenderer {
             sampler,
             sampler_cache: Mutex::new(HashMap::new()),
             texture_cache: Mutex::new(HashMap::new()),
+            physical_layers_texture_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -2519,6 +2551,34 @@ impl GpuRenderer {
     }
 
     fn upload_physical_layers_texture(
+        &self,
+        label: &'static str,
+        scalar: &PreparedTexture,
+        anisotropy: Option<&PreparedTexture>,
+        iridescence: Option<&PreparedTexture>,
+    ) -> wgpu::Texture {
+        let key = PhysicalLayersTextureCacheKey::from_layers(scalar, anisotropy, iridescence);
+        if let Some(texture) = self
+            .physical_layers_texture_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return texture;
+        }
+
+        let texture =
+            self.upload_physical_layers_texture_uncached(label, scalar, anisotropy, iridescence);
+        self.physical_layers_texture_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| texture.clone())
+            .clone()
+    }
+
+    fn upload_physical_layers_texture_uncached(
         &self,
         label: &'static str,
         scalar: &PreparedTexture,
@@ -4749,8 +4809,8 @@ fn create_cubemap_with_mips(
 #[cfg(test)]
 mod tests {
     use super::{
-        CustomBlendPipelineKey, MeshBufferCacheKey, SamplerKey, TextureCacheKey,
-        downsample_rgba_mip, f32_key, texture_mip_level_count,
+        CustomBlendPipelineKey, MeshBufferCacheKey, PhysicalLayersTextureCacheKey, SamplerKey,
+        TextureCacheKey, downsample_rgba_mip, f32_key, texture_mip_level_count,
     };
     use crate::mesh::{
         BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, PreparedTexture,
@@ -4758,10 +4818,18 @@ mod tests {
     };
 
     fn single_pixel_texture(rgba: [u8; 4]) -> PreparedTexture {
+        solid_texture(1, 1, rgba)
+    }
+
+    fn solid_texture(width: u32, height: u32, rgba: [u8; 4]) -> PreparedTexture {
+        let mut data = Vec::with_capacity((width * height * 4) as usize);
+        for _ in 0..(width * height) {
+            data.extend_from_slice(&rgba);
+        }
         PreparedTexture {
-            rgba: rgba.to_vec(),
-            width: 1,
-            height: 1,
+            rgba: data,
+            width,
+            height,
             mipmaps: Vec::new(),
             wrap_s: WrapMode::ClampToEdge,
             wrap_t: WrapMode::ClampToEdge,
@@ -4958,6 +5026,32 @@ mod tests {
                 Some(&[1, 0, 0, 0, 0, 0, 0, 0]),
             ),
             "index data changes need a distinct buffer entry",
+        );
+    }
+
+    #[test]
+    fn physical_layers_cache_keys_track_effective_layer_uploads() {
+        let scalar = solid_texture(2, 2, [255, 0, 0, 255]);
+        let anisotropy = solid_texture(2, 2, [0, 128, 255, 255]);
+        let iridescence = solid_texture(2, 2, [255, 255, 128, 255]);
+        let mismatched_anisotropy = single_pixel_texture([0, 255, 0, 255]);
+
+        assert_eq!(
+            PhysicalLayersTextureCacheKey::from_layers(&scalar, None, None),
+            PhysicalLayersTextureCacheKey::from_layers(&scalar, Some(&mismatched_anisotropy), None),
+            "mismatched optional layers use generated defaults during upload",
+        );
+        assert_ne!(
+            PhysicalLayersTextureCacheKey::from_layers(&scalar, None, None),
+            PhysicalLayersTextureCacheKey::from_layers(&scalar, Some(&anisotropy), None),
+        );
+        assert_ne!(
+            PhysicalLayersTextureCacheKey::from_layers(&scalar, Some(&anisotropy), None),
+            PhysicalLayersTextureCacheKey::from_layers(
+                &scalar,
+                Some(&anisotropy),
+                Some(&iridescence),
+            ),
         );
     }
 
