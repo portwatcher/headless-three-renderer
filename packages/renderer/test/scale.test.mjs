@@ -232,13 +232,13 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
-test('mesh render budget handles 1,600 separate mesh objects', () => {
+test('mesh render budget handles 1,764 separate mesh objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 40
-  const rows = 40
-  const geometry = new THREE.PlaneGeometry(0.036, 0.036)
+  const columns = 42
+  const rows = 42
+  const geometry = new THREE.PlaneGeometry(0.034, 0.034)
   const materials = [
     new THREE.MeshBasicMaterial({ color: 0xf25f5c }),
     new THREE.MeshBasicMaterial({ color: 0x247ba0 }),
@@ -250,7 +250,7 @@ test('mesh render budget handles 1,600 separate mesh objects', () => {
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const mesh = new THREE.Mesh(geometry, materials[(row + col) % materials.length])
-      mesh.position.set((col - (columns - 1) / 2) * 0.051, (row - (rows - 1) / 2) * 0.051, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.049, (row - (rows - 1) / 2) * 0.049, 0)
       mesh.rotation.z = ((row * columns + col) % 7) * 0.04
       scene.add(mesh)
     }
@@ -258,7 +258,7 @@ test('mesh render budget handles 1,600 separate mesh objects', () => {
 
   assert.equal(scene.children.length, rows * columns)
 
-  const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.01, 10)
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
   camera.position.set(0, 0, 2)
   camera.lookAt(0, 0, 0)
 
@@ -274,8 +274,8 @@ test('instanced mesh budget renders thousands of transformed colored instances',
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 75
-  const rows = 75
+  const columns = 80
+  const rows = 80
   const count = columns * rows
   const mesh = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(0.022, 0.022),
