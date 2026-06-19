@@ -23,7 +23,7 @@ const referencesRequired = areBrowserReferencesRequired()
 const DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF = 18
 const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map([
   ['array-camera-viewport-split', 64],
-  ['material-env-map-pbr', 64],
+  ['material-env-map-pbr', 63],
   ['avatar-like-skinned-toon', 45],
   ['alpha-to-coverage-msaa-plane', 44],
   ['transparent-layer-stack', 44],
@@ -41,7 +41,7 @@ const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map([
   ['linear-fog-material-opt-out', 25],
   ['mesh-matcap-material-map', 24],
   ['light-probe-lit-material-models', 24],
-  ['mesh-normal-material-flat', 20],
+  ['mesh-normal-material-flat', 19],
 ])
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
