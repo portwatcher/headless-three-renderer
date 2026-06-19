@@ -21141,6 +21141,31 @@ test('reusable renderer updates cached background and post-processing uniforms',
   assert.ok(Math.abs(invertedAgain.g - inverted.g) < 4 && Math.abs(invertedAgain.b - inverted.b) < 4, `post uniform buffer should update back to invert settings (${invertedAgain.r}, ${invertedAgain.g}, ${invertedAgain.b})`)
 })
 
+test('reusable renderer reflects mutated background texture bytes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const data = new Uint8Array([255, 0, 0, 255])
+  const background = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat)
+  background.needsUpdate = true
+  scene.background = background
+
+  const options = { width: 64, height: 64, format: 'rgba' }
+  const sample = () => meanRgba(renderer.render(scene, camera, options))
+
+  const red = sample()
+  data.set([0, 255, 0, 255])
+  background.needsUpdate = true
+  const green = sample()
+  data.set([255, 0, 0, 255])
+  background.needsUpdate = true
+  const redAgain = sample()
+
+  assert.ok(red.r > red.g + 80, `initial background texture should render red (${red.r}, ${red.g}, ${red.b})`)
+  assert.ok(green.g > green.r + 80, `mutated background texture should render green (${green.r}, ${green.g}, ${green.b})`)
+  assert.ok(redAgain.r > redAgain.g + 80, `background texture upload should update back to red (${redAgain.r}, ${redAgain.g}, ${redAgain.b})`)
+})
+
 test('reusable renderer reflects mutated mesh material texture and transform state', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
