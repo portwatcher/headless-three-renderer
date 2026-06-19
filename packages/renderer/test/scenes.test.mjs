@@ -4216,6 +4216,55 @@ test('material envMapRotation rotates shared IBL', () => {
   assert.ok(rotated.g > rotated.r + 15, `rotated material reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
 })
 
+test('material envMapRotation rotates Basic and Lambert legacy env maps', () => {
+  function renderWithRotation(makeMaterial, yRotation) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const envMap = splitEnvironmentTexture()
+    const material = makeMaterial(envMap)
+    material.envMapIntensity = 4
+    material.envMapRotation = new THREE.Euler(0, yRotation, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    if (material.isMeshLambertMaterial === true) {
+      const light = new THREE.DirectionalLight(0xffffff, 4)
+      light.position.set(0, 0, 3)
+      scene.add(light)
+    }
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const cases = [
+    ['Basic', (envMap) => new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+    })],
+    ['Lambert', (envMap) => new THREE.MeshLambertMaterial({
+      color: 0xffffff,
+      envMap,
+      combine: THREE.MixOperation,
+      reflectivity: 1,
+    })],
+  ]
+
+  for (const [name, makeMaterial] of cases) {
+    const unrotated = renderWithRotation(makeMaterial, 0)
+    const rotated = renderWithRotation(makeMaterial, -Math.PI / 2)
+    assert.ok(unrotated.r > unrotated.g + 40, `${name} unrotated envMap should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
+    assert.ok(rotated.g > rotated.r + 30, `${name} rotated envMap should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+  }
+})
+
 test('material envMap fallback does not light unrelated materials', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
