@@ -39,6 +39,7 @@ export function createSceneCorpus() {
     meshNormalMaterialObjectSpaceNormalMapCorpus(),
     meshNormalMaterialBumpMapCorpus(),
     meshMatcapMaterialCorpus(),
+    meshMatcapMaterialFlatShadingCorpus(),
     meshMatcapMaterialNormalMapCorpus(),
     meshMatcapMaterialObjectSpaceNormalMapCorpus(),
     meshMatcapMaterialBumpMapCorpus(),
@@ -1982,6 +1983,74 @@ function meshMatcapMaterialCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.b > center.r + 20 && center.g > center.r + 10)) {
         throw new Error(`matcap corpus should sample the blue-green matcap blend, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function meshMatcapMaterialFlatShadingCorpus() {
+  function makeGeometry() {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -1, -1, 0,
+      1, -1, 0,
+      -1, 1, 0,
+      1, 1, 1,
+    ]), 3))
+    geometry.setIndex([0, 1, 2, 1, 3, 2])
+    return geometry
+  }
+
+  function makeMatcap() {
+    const data = []
+    for (let y = 0; y < 4; y += 1) {
+      for (let x = 0; x < 4; x += 1) {
+        data.push(x * 85, y * 85, 255 - x * 85, 255)
+      }
+    }
+    const texture = new THREE.DataTexture(new Uint8Array(data), 4, 4, THREE.RGBAFormat)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(flatShading) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      makeGeometry(),
+      new THREE.MeshMatcapMaterial({
+        color: 0xffffff,
+        matcap: makeMatcap(),
+        flatShading,
+        side: THREE.DoubleSide,
+      }),
+    ))
+    return scene
+  }
+
+  const smoothScene = makeScene(false)
+  const flatScene = makeScene(true)
+  const camera = makeCamera([0, 0, 4], [0, 0, 0.2])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let shadingDiff = 0
+
+  return {
+    name: 'mesh-matcap-material-flat-shading',
+    scene: flatScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      const smooth = renderer.render(smoothScene, camera, options).slice()
+      const flat = renderer.render(flatScene, camera, options)
+      shadingDiff = meanAbsDiff(smooth, flat)
+      return flat
+    },
+    validate() {
+      if (!(shadingDiff > 1)) {
+        throw new Error(`matcap flat-shading corpus should change face-normal lookup, diff=${shadingDiff.toFixed(3)}`)
       }
     },
   }
