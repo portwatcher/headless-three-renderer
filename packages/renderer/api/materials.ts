@@ -634,6 +634,7 @@ export function extractPbrProperties(
     props.clearcoatNormalMapMinFilter = minFilterModeToString(material.clearcoatNormalMap)
     props.clearcoatNormalMapAnisotropy = textureAnisotropy(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
     props.clearcoatNormalMapTransform = textureTransform(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
+    props.clearcoatNormalMapColorSpace = textureColorSpace(material.clearcoatNormalMap)
     props.clearcoatNormalMapUsesUv2 = textureUvChannel(material.clearcoatNormalMap) > 0
   }
   if (material.clearcoatNormalScale != null) {
@@ -880,6 +881,7 @@ export function extractPbrProperties(
     props.normalMapMinFilter = minFilterModeToString(material.normalMap)
     props.normalMapAnisotropy = textureAnisotropy(material.normalMap, 'material.normalMap')
     props.normalMapTransform = textureTransform(material.normalMap, 'material.normalMap')
+    props.normalMapColorSpace = textureColorSpace(material.normalMap)
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
     props.normalMapType = materialNormalMapType(material)
   }

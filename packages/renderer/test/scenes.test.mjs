@@ -3050,6 +3050,40 @@ test('MeshNormalMaterial bumpMap decodes sRGB colorSpace before perturbing norma
   )
 })
 
+test('MeshNormalMaterial normalMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const normalMap = solidTexture(192, 128, 255, 255)
+    normalMap.colorSpace = colorSpace
+    normalMap.magFilter = THREE.NearestFilter
+    normalMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({ normalMap }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const diff = meanAbsDiff(linear, srgb)
+  assert.ok(
+    diff > 5,
+    `sRGB-decoded normalMap should produce different normal output from linear sampling (diff=${diff.toFixed(2)})`,
+  )
+})
+
 test('MeshNormalMaterial bumpMap honors explicit texture matrices', () => {
   function renderBumpMaterial(matrixOffsetX) {
     const bumpMap = rgbaTexture([
@@ -20895,6 +20929,50 @@ test('clearcoatNormalMap samples selected uv1-uv3 texture channels', () => {
     const diff = meanAbsDiff(primary, renderWithChannel(channel))
     assert.ok(diff > 5, `clearcoatNormalMap channel=${channel} should sample the tilted uv${channel} normal, mean diff=${diff.toFixed(2)}`)
   }
+})
+
+test('clearcoatNormalMap decodes sRGB colorSpace before shading', () => {
+  function renderColorSpace(colorSpace) {
+    const clearcoatNormalMap = solidTexture(192, 128, 255, 255)
+    clearcoatNormalMap.colorSpace = colorSpace
+    clearcoatNormalMap.magFilter = THREE.NearestFilter
+    clearcoatNormalMap.minFilter = THREE.NearestFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        clearcoatNormalMap,
+        clearcoatNormalScale: new THREE.Vector2(1, 1),
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
+  const srgb = renderColorSpace(THREE.SRGBColorSpace)
+  const diff = meanAbsDiff(linear, srgb)
+  assert.ok(
+    diff > 2,
+    `sRGB-decoded clearcoatNormalMap should alter the clearcoat response from linear sampling (diff=${diff.toFixed(2)})`,
+  )
 })
 
 test('sheenColorMap samples selected uv1-uv3 texture channels', () => {

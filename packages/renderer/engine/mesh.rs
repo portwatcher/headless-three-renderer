@@ -2048,7 +2048,12 @@ fn prepare_common_texture_inputs(
                 mesh.light_map_anisotropy,
             )
         });
-        let normal_map = join_texture_worker(normal_map, "normal map worker")?;
+        let mut normal_map = join_texture_worker(normal_map, "normal map worker")?;
+        if matches!(mesh.normal_map_color_space.as_deref(), Some("srgb")) {
+            if let Some(texture) = normal_map.as_mut() {
+                decode_texture_rgb_srgb_to_linear(texture);
+            }
+        }
         let normal_map_type =
             NormalMapType::from_str_opt(mesh.normal_map_type.as_deref(), mesh_index)?;
         let normal_scale = match mesh.normal_scale.as_deref() {
@@ -2316,10 +2321,19 @@ fn prepare_physical_texture_inputs(
                 clearcoat_roughness_map,
                 "clearcoat roughness map worker",
             )?,
-            clearcoat_normal_map: join_texture_worker(
-                clearcoat_normal_map,
-                "clearcoat normal map worker",
-            )?,
+            clearcoat_normal_map: {
+                let mut texture =
+                    join_texture_worker(clearcoat_normal_map, "clearcoat normal map worker")?;
+                if matches!(
+                    mesh.clearcoat_normal_map_color_space.as_deref(),
+                    Some("srgb")
+                ) {
+                    if let Some(texture) = texture.as_mut() {
+                        decode_texture_rgb_srgb_to_linear(texture);
+                    }
+                }
+                texture
+            },
             sheen_color_map: join_texture_worker(sheen_color_map, "sheen color map worker")?,
             sheen_roughness_map: join_texture_worker(
                 sheen_roughness_map,

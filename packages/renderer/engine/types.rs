@@ -315,6 +315,8 @@ pub struct SceneMesh {
     pub clearcoat_normal_map_anisotropy: Option<f64>,
     /// Clearcoat normal map UV transform `[a, c, tx, b, d, ty]`.
     pub clearcoat_normal_map_transform: Option<Vec<f64>>,
+    /// Clearcoat normal map color space. `"srgb"` decodes RGB channels before normal sampling.
+    pub clearcoat_normal_map_color_space: Option<String>,
     /// Whether clearcoat normal map sampling uses the secondary UV stream.
     pub clearcoat_normal_map_uses_uv2: Option<bool>,
     /// Clearcoat normal map scale `[x, y]`. Defaults to `[1, 1]`.
@@ -571,6 +573,8 @@ pub struct SceneMesh {
     pub normal_map_anisotropy: Option<f64>,
     /// Normal map UV transform `[a, c, tx, b, d, ty]`.
     pub normal_map_transform: Option<Vec<f64>>,
+    /// Normal map color space. `"srgb"` decodes RGB channels before normal sampling.
+    pub normal_map_color_space: Option<String>,
     /// Whether normal map sampling uses the secondary UV stream.
     pub normal_map_uses_uv2: Option<bool>,
     /// Normal map space: "tangent" (default) or "object".

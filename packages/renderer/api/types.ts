@@ -760,6 +760,7 @@ export interface NativeSceneMesh {
   clearcoatNormalMapMinFilter?: string
   clearcoatNormalMapAnisotropy?: number
   clearcoatNormalMapTransform?: number[]
+  clearcoatNormalMapColorSpace?: string
   clearcoatNormalMapUsesUv2?: boolean
   clearcoatNormalScale?: number[]
   sheenColor?: number[]
@@ -886,6 +887,7 @@ export interface NativeSceneMesh {
   normalMapMinFilter?: string
   normalMapAnisotropy?: number
   normalMapTransform?: number[]
+  normalMapColorSpace?: string
   normalMapUsesUv2?: boolean
   normalMapType?: 'tangent' | 'object'
   normalScale?: number[]
@@ -1162,6 +1164,7 @@ export interface PbrProperties {
   clearcoatNormalMapMinFilter?: string
   clearcoatNormalMapAnisotropy?: number
   clearcoatNormalMapTransform?: number[]
+  clearcoatNormalMapColorSpace?: string
   clearcoatNormalMapUsesUv2?: boolean
   clearcoatNormalScale?: number[]
   sheenColor?: number[]
@@ -1296,6 +1299,7 @@ export interface PbrProperties {
   normalMapMinFilter?: string
   normalMapAnisotropy?: number
   normalMapTransform?: number[]
+  normalMapColorSpace?: string
   normalMapUsesUv2?: boolean
   normalMapType?: 'tangent' | 'object'
   normalScale?: number[]

@@ -349,6 +349,8 @@ export interface SceneMesh {
   clearcoatNormalMapAnisotropy?: number
   /** Clearcoat normal map UV transform `[a, c, tx, b, d, ty]`. */
   clearcoatNormalMapTransform?: Array<number>
+  /** Clearcoat normal map color space. `"srgb"` decodes RGB channels before normal sampling. */
+  clearcoatNormalMapColorSpace?: string
   /** Whether clearcoat normal map sampling uses the secondary UV stream. */
   clearcoatNormalMapUsesUv2?: boolean
   /** Clearcoat normal map scale `[x, y]`. Defaults to `[1, 1]`. */
@@ -605,6 +607,8 @@ export interface SceneMesh {
   normalMapAnisotropy?: number
   /** Normal map UV transform `[a, c, tx, b, d, ty]`. */
   normalMapTransform?: Array<number>
+  /** Normal map color space. `"srgb"` decodes RGB channels before normal sampling. */
+  normalMapColorSpace?: string
   /** Whether normal map sampling uses the secondary UV stream. */
   normalMapUsesUv2?: boolean
   /** Normal map space: "tangent" (default) or "object". */
