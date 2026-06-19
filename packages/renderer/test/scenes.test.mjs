@@ -17058,6 +17058,43 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleAttachmentMrtTarget.textures[0].source.data, singleAttachmentMrtTarget.textures[0].image)
 })
 
+test('Renderer.setRenderTarget state writes regular targets', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  renderer.setRenderTarget(target)
+
+  const returned = renderer.render(scene, camera, {
+    width: 32,
+    height: 32,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(returned, target.data)
+  assert.strictEqual(renderer.getRenderTarget(), target)
+  assert.equal(renderer.getActiveCubeFace(), 0)
+  assert.equal(renderer.getActiveMipmapLevel(), 0)
+  assert.equal(target.width, 32)
+  assert.equal(target.height, 32)
+  assert.equal(target.texture.image.data, target.data)
+  assert.equal(target.texture.source.data.data, target.data)
+
+  const mean = meanRegion(target.data, 32, 32, 12, 12, 20, 20)
+  assert.ok(mean.r > mean.g + 80 && mean.r > mean.b + 80, `active render target should capture red (${mean.r}, ${mean.g}, ${mean.b})`)
+
+  renderer.setRenderTarget(null)
+  assert.equal(renderer.getRenderTarget(), null)
+})
+
 test('renderToTarget and options.target populate depthTexture with normalized RGBA depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
