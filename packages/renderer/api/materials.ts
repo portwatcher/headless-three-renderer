@@ -2142,12 +2142,13 @@ function assertSupportedRawTextureType(type: unknown, label: string, usage: stri
     type === HalfFloatType ||
     type === FloatType ||
     type === UnsignedShort4444Type ||
-    type === UnsignedShort5551Type
+    type === UnsignedShort5551Type ||
+    type === UnsignedInt5999Type
   ) {
     return
   }
   throw new Error(
-    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, or UnsignedShort5551Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
+    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, or UnsignedInt5999Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
   )
 }
 
@@ -2539,6 +2540,10 @@ function toRgba8(
     if (!(data instanceof Uint32Array)) return null
     return normalizedUnsignedIntegerDataToRgba8(data, pixels, allowNarrowChannels, 0xffffffff)
   }
+  if (textureType === UnsignedInt5999Type) {
+    if (!(data instanceof Uint32Array)) return null
+    return packedUnsignedInt5999ToRgba8(data, pixels)
+  }
   if (textureType === UnsignedShort4444Type) {
     if (!(data instanceof Uint16Array)) return null
     return packedUnsignedShort4444ToRgba8(data, pixels)
@@ -2835,6 +2840,24 @@ function packedUnsignedShort5551ToRgba8(data: Uint16Array, pixels: number): Uint
     out[i * 4 + 3] = (value & 0x1) === 1 ? 255 : 0
   }
   return out
+}
+
+function packedUnsignedInt5999ToRgba8(data: Uint32Array, pixels: number): Uint8Array | null {
+  if (data.length !== pixels) return null
+  const out = new Uint8Array(pixels * 4)
+  for (let i = 0; i < pixels; i++) {
+    const value = data[i]
+    const scale = 2 ** (((value >>> 27) & 0x1f) - 24)
+    out[i * 4] = normalizedPackedRgb9E5ToByte(value & 0x1ff, scale)
+    out[i * 4 + 1] = normalizedPackedRgb9E5ToByte((value >>> 9) & 0x1ff, scale)
+    out[i * 4 + 2] = normalizedPackedRgb9E5ToByte((value >>> 18) & 0x1ff, scale)
+    out[i * 4 + 3] = 255
+  }
+  return out
+}
+
+function normalizedPackedRgb9E5ToByte(mantissa: number, scale: number): number {
+  return Math.max(0, Math.min(255, Math.round(mantissa * scale * 255)))
 }
 
 function halfFloatDataToRgba8(

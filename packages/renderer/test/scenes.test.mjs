@@ -230,6 +230,32 @@ function assertRgbClose(mean, expected, label) {
   assert.ok(Math.abs(mean.b - expected[2]) <= 1, `${label} blue should be ${expected[2]}, got ${mean.b}`)
 }
 
+function packRgb9E5(r, g, b) {
+  const maxChannel = Math.max(r, g, b)
+  if (maxChannel <= 0) return 0
+
+  let exponent = Math.max(0, Math.min(31, Math.floor(Math.log2(maxChannel)) + 16))
+  let scale = 2 ** (24 - exponent)
+  let rm = Math.round(r * scale)
+  let gm = Math.round(g * scale)
+  let bm = Math.round(b * scale)
+
+  if (rm > 0x1ff || gm > 0x1ff || bm > 0x1ff) {
+    exponent = Math.min(31, exponent + 1)
+    scale = 2 ** (24 - exponent)
+    rm = Math.round(r * scale)
+    gm = Math.round(g * scale)
+    bm = Math.round(b * scale)
+  }
+
+  return (
+    (exponent << 27) |
+    ((Math.min(0x1ff, bm) & 0x1ff) << 18) |
+    ((Math.min(0x1ff, gm) & 0x1ff) << 9) |
+    (Math.min(0x1ff, rm) & 0x1ff)
+  ) >>> 0
+}
+
 function maxLuminance(rgba) {
   let max = 0
   for (let i = 0; i < rgba.length; i += 4) {
@@ -12602,8 +12628,9 @@ test('float raw environment textures decode for IBL', () => {
 
 test('packed raw environment textures unpack for IBL', () => {
   const cases = [
-    ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, 0x84ff, [136, 68, 255]],
-    ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, 0x823f, [132, 66, 255]],
+    ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x84ff]), [136, 68, 255]],
+    ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, THREE.RGBAFormat, new Uint16Array([0x823f]), [132, 66, 255]],
+    ['UnsignedInt5999Type', THREE.UnsignedInt5999Type, THREE.RGBFormat, new Uint32Array([packRgb9E5(0.5, 0.25, 1)]), [128, 64, 255]],
   ]
 
   function byteEnvironmentTexture([r, g, b]) {
@@ -12613,8 +12640,8 @@ test('packed raw environment textures unpack for IBL', () => {
     return texture
   }
 
-  function packedEnvironmentTexture(type, value) {
-    const texture = new THREE.DataTexture(new Uint16Array([value]), 1, 1, THREE.RGBAFormat, type)
+  function packedEnvironmentTexture(type, format, data) {
+    const texture = new THREE.DataTexture(data, 1, 1, format, type)
     texture.colorSpace = THREE.LinearSRGBColorSpace
     texture.mapping = THREE.EquirectangularReflectionMapping
     texture.needsUpdate = true
@@ -12647,38 +12674,39 @@ test('packed raw environment textures unpack for IBL', () => {
     })
   }
 
-  for (const [label, type, value, equivalentByteColor] of cases) {
+  for (const [label, type, format, data, equivalentByteColor] of cases) {
     for (const kind of ['scene', 'reflectionProbe', 'materialEnvMap']) {
       const byteRender = renderEnvironment(kind, byteEnvironmentTexture(equivalentByteColor))
-      const packedRender = renderEnvironment(kind, packedEnvironmentTexture(type, value))
+      const packedRender = renderEnvironment(kind, packedEnvironmentTexture(type, format, data))
       const diff = meanAbsDiff(byteRender, packedRender)
       assert.ok(diff < 3, `${kind} ${label} environment should match equivalent linear RGBA8 IBL (diff=${diff.toFixed(3)})`)
     }
   }
 })
 
-test('packed unsigned short raw DataTexture maps unpack RGBA channels', () => {
+test('packed raw DataTexture maps unpack color channels', () => {
   const cases = [
-    ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, 0x842f, 'red-dominant'],
-    ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, 0x823f, 'blue-dominant'],
+    ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x842f]), 'red-dominant'],
+    ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, THREE.RGBAFormat, new Uint16Array([0x823f]), 'blue-dominant'],
+    ['UnsignedInt5999Type', THREE.UnsignedInt5999Type, THREE.RGBFormat, new Uint32Array([packRgb9E5(0.5, 0.25, 1)]), 'blue-dominant'],
   ]
 
-  function packedTexture(type, value) {
-    const texture = new THREE.DataTexture(new Uint16Array([value]), 1, 1, THREE.RGBAFormat, type)
+  function packedTexture(type, format, data) {
+    const texture = new THREE.DataTexture(data, 1, 1, format, type)
     texture.needsUpdate = true
     return texture
   }
 
-  function renderTexture(kind, type, value) {
+  function renderTexture(kind, type, format, data) {
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
     camera.position.set(0, 0, 3)
     camera.lookAt(0, 0, 0)
     if (kind === 'material') {
       scene.background = new THREE.Color(0, 0, 0)
-      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: packedTexture(type, value) })))
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: packedTexture(type, format, data) })))
     } else {
-      scene.background = packedTexture(type, value)
+      scene.background = packedTexture(type, format, data)
     }
     return meanRegion(
       renderRgba(scene, camera, { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }),
@@ -12691,9 +12719,9 @@ test('packed unsigned short raw DataTexture maps unpack RGBA channels', () => {
     )
   }
 
-  for (const [name, type, value, expectation] of cases) {
+  for (const [name, type, format, data, expectation] of cases) {
     for (const kind of ['material', 'background']) {
-      const mean = renderTexture(kind, type, value)
+      const mean = renderTexture(kind, type, format, data)
       if (expectation === 'red-dominant') {
         assert.ok(mean.r > 100, `${kind} ${name} red channel should unpack strongly (${mean.r})`)
         assert.ok(mean.r > mean.g + 20, `${kind} ${name} red should exceed green (${mean.r} vs ${mean.g})`)
