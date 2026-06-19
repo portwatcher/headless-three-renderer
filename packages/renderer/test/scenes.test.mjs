@@ -29056,6 +29056,49 @@ test('Renderer compile hooks are validated no-op compatibility hooks', async () 
   )
 })
 
+test('Renderer resource init hooks are validated no-op compatibility hooks', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  const texture = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
+
+  assert.equal(renderer.initRenderTarget(target), undefined)
+  assert.equal(renderer.initTexture(texture), undefined)
+
+  const out = renderer.renderToTarget(scene, camera, target, {
+    width: 32,
+    height: 32,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(out, target)
+  assert.equal(target.data.length, 32 * 32 * 4)
+  const mean = meanRegion(target.data, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `init hooks should not alter later rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => renderer.initRenderTarget(null),
+    /Renderer\.initRenderTarget target must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.initRenderTarget({ texture: [{}, {}] }),
+    /secondary color attachment.*renderMode/i,
+  )
+  assert.throws(
+    () => renderer.initTexture(null),
+    /Renderer\.initTexture texture must be a texture-like object/i,
+  )
+  assert.throws(
+    () => renderer.initTexture([]),
+    /Renderer\.initTexture texture must be a texture-like object/i,
+  )
+})
+
 test('Renderer clear methods are no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()

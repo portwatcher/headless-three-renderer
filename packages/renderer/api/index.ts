@@ -19,6 +19,7 @@ import type {
   Color4,
   RenderObjectIdEntry,
   ThreeEulerLike,
+  ThreeTextureLike,
   RenderSortFunction,
   RenderAnimationLoopCallback,
   RendererParametersLike,
@@ -370,6 +371,15 @@ export class Renderer {
     targetScene: ThreeSceneRootLike | null = null,
   ): Promise<void> {
     this.compile(scene, camera, targetScene)
+  }
+
+  initRenderTarget(target: RenderTargetLike): void {
+    assertRenderTargetLike(target, 'Renderer.initRenderTarget target')
+    validateUnsupportedRenderTargetOptions(target)
+  }
+
+  initTexture(texture: ThreeTextureLike): void {
+    assertThreeTextureLike(texture, 'Renderer.initTexture texture')
   }
 
   setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
@@ -2935,6 +2945,12 @@ function assertRenderOptionsLike(value: unknown, label: string): asserts value i
 function assertRenderTargetLike(value: unknown, label: string): asserts value is RenderTargetLike {
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a target-like object.`)
+  }
+}
+
+function assertThreeTextureLike(value: unknown, label: string): asserts value is ThreeTextureLike {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a texture-like object.`)
   }
 }
 
