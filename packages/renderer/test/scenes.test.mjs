@@ -256,6 +256,14 @@ function packRgb9E5(r, g, b) {
   ) >>> 0
 }
 
+function packR11G11B10F(redBits, greenBits, blueBits) {
+  return (
+    ((blueBits & 0x3ff) << 22) |
+    ((greenBits & 0x7ff) << 11) |
+    (redBits & 0x7ff)
+  ) >>> 0
+}
+
 function maxLuminance(rgba) {
   let max = 0
   for (let i = 0; i < rgba.length; i += 4) {
@@ -12631,6 +12639,7 @@ test('packed raw environment textures unpack for IBL', () => {
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x84ff]), [136, 68, 255]],
     ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, THREE.RGBAFormat, new Uint16Array([0x823f]), [132, 66, 255]],
     ['UnsignedInt5999Type', THREE.UnsignedInt5999Type, THREE.RGBFormat, new Uint32Array([packRgb9E5(0.5, 0.25, 1)]), [128, 64, 255]],
+    ['UnsignedInt101111Type', THREE.UnsignedInt101111Type, THREE.RGBFormat, new Uint32Array([packR11G11B10F(0x380, 0x340, 0x1e0)]), [128, 64, 255]],
   ]
 
   function byteEnvironmentTexture([r, g, b]) {
@@ -12689,6 +12698,7 @@ test('packed raw DataTexture maps unpack color channels', () => {
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x842f]), 'red-dominant'],
     ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, THREE.RGBAFormat, new Uint16Array([0x823f]), 'blue-dominant'],
     ['UnsignedInt5999Type', THREE.UnsignedInt5999Type, THREE.RGBFormat, new Uint32Array([packRgb9E5(0.5, 0.25, 1)]), 'blue-dominant'],
+    ['UnsignedInt101111Type', THREE.UnsignedInt101111Type, THREE.RGBFormat, new Uint32Array([packR11G11B10F(0x380, 0x340, 0x1e0)]), 'blue-dominant'],
   ]
 
   function packedTexture(type, format, data) {

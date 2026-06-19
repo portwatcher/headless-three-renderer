@@ -113,6 +113,7 @@ const UnsignedShort4444Type = 1017
 const UnsignedShort5551Type = 1018
 const UnsignedInt248Type = 1020
 const UnsignedInt5999Type = 35902
+const UnsignedInt101111Type = 35899
 const LinearEncoding = 3000
 const sRGBEncoding = 3001
 
@@ -2143,12 +2144,13 @@ function assertSupportedRawTextureType(type: unknown, label: string, usage: stri
     type === FloatType ||
     type === UnsignedShort4444Type ||
     type === UnsignedShort5551Type ||
-    type === UnsignedInt5999Type
+    type === UnsignedInt5999Type ||
+    type === UnsignedInt101111Type
   ) {
     return
   }
   throw new Error(
-    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, or UnsignedInt5999Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
+    `${label} raw texture type ${textureTypeName(type)} is not supported by @headless-three/renderer for ${usage}. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt5999Type, or UnsignedInt101111Type raw data, or pre-convert the texture to RGBA8 before rendering.`,
   )
 }
 
@@ -2164,6 +2166,8 @@ function textureTypeName(type: unknown): string {
       return 'UnsignedInt248Type'
     case UnsignedInt5999Type:
       return 'UnsignedInt5999Type'
+    case UnsignedInt101111Type:
+      return 'UnsignedInt101111Type'
     default:
       return String(type)
   }
@@ -2544,6 +2548,10 @@ function toRgba8(
     if (!(data instanceof Uint32Array)) return null
     return packedUnsignedInt5999ToRgba8(data, pixels)
   }
+  if (textureType === UnsignedInt101111Type) {
+    if (!(data instanceof Uint32Array)) return null
+    return packedUnsignedInt101111ToRgba8(data, pixels)
+  }
   if (textureType === UnsignedShort4444Type) {
     if (!(data instanceof Uint16Array)) return null
     return packedUnsignedShort4444ToRgba8(data, pixels)
@@ -2858,6 +2866,34 @@ function packedUnsignedInt5999ToRgba8(data: Uint32Array, pixels: number): Uint8A
 
 function normalizedPackedRgb9E5ToByte(mantissa: number, scale: number): number {
   return Math.max(0, Math.min(255, Math.round(mantissa * scale * 255)))
+}
+
+function packedUnsignedInt101111ToRgba8(data: Uint32Array, pixels: number): Uint8Array | null {
+  if (data.length !== pixels) return null
+  const out = new Uint8Array(pixels * 4)
+  for (let i = 0; i < pixels; i++) {
+    const value = data[i]
+    out[i * 4] = unsignedPackedFloatToByte(value & 0x7ff, 6)
+    out[i * 4 + 1] = unsignedPackedFloatToByte((value >>> 11) & 0x7ff, 6)
+    out[i * 4 + 2] = unsignedPackedFloatToByte((value >>> 22) & 0x3ff, 5)
+    out[i * 4 + 3] = 255
+  }
+  return out
+}
+
+function unsignedPackedFloatToByte(bits: number, mantissaBits: 5 | 6): number {
+  const exponent = bits >>> mantissaBits
+  const mantissa = bits & ((1 << mantissaBits) - 1)
+  let value: number
+  if (exponent === 0) {
+    value = (mantissa / (2 ** mantissaBits)) * (2 ** -14)
+  } else if (exponent === 0x1f) {
+    value = mantissa === 0 ? Infinity : Number.NaN
+  } else {
+    value = (1 + mantissa / (2 ** mantissaBits)) * (2 ** (exponent - 15))
+  }
+  if (!Number.isFinite(value)) return value > 0 ? 255 : 0
+  return Math.max(0, Math.min(255, Math.round(value * 255)))
 }
 
 function halfFloatDataToRgba8(
