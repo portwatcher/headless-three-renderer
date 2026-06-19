@@ -303,9 +303,13 @@ class RendererExtensionsState {
 
 class RendererCapabilitiesState {
   readonly isWebGL2 = false
+  readonly drawBuffers = false
   readonly precision = 'highp'
   readonly logarithmicDepthBuffer = false
   readonly reversedDepthBuffer = false
+  readonly vertexTextures = false
+  readonly floatFragmentTextures = false
+  readonly floatVertexTextures = false
   readonly maxTextures = 0
   readonly maxVertexTextures = 0
   readonly maxTextureSize = 0
@@ -314,6 +318,8 @@ class RendererCapabilitiesState {
   readonly maxVertexUniforms = 0
   readonly maxVaryings = 0
   readonly maxFragmentUniforms = 0
+  readonly maxDrawBuffers = 1
+  readonly maxColorAttachments = 1
   readonly maxSamples = 4
   readonly samples = 0
 
