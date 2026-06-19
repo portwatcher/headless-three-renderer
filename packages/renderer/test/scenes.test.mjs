@@ -13164,6 +13164,101 @@ test('unsupported texture inputs fail clearly for background and environment slo
   }
 })
 
+test('texture source.data images render across material, background, and IBL slots', () => {
+  function sourceDataTexture(data, width = 1, height = 1) {
+    const texture = new THREE.Texture()
+    texture.source = {
+      data: {
+        data: new Uint8Array(data),
+        width,
+        height,
+      },
+    }
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function sourceEnvironmentTexture() {
+    const texture = sourceDataTexture([
+      255, 80, 32, 255,
+      255, 80, 32, 255,
+    ], 2, 1)
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ map: sourceDataTexture([255, 0, 0, 255]) }),
+    ))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 2)
+    camera.lookAt(0, 0, 0)
+
+    const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+    assert.ok(mean.r > mean.g + 80 && mean.r > mean.b + 80, `material map source.data should render red (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
+
+  {
+    const scene = new THREE.Scene()
+    scene.background = sourceDataTexture([0, 255, 0, 255])
+
+    const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+    assert.ok(mean.g > mean.r + 80 && mean.g > mean.b + 80, `background source.data should render green (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
+
+  function reflectiveScene(setup) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (setup) setup(scene)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.2 }),
+    ))
+    return scene
+  }
+
+  const camera = makeCamera()
+  const iblOptions = { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace }
+  const noIbl = renderRgba(reflectiveScene(), camera, iblOptions)
+  const sceneEnvironment = renderRgba(reflectiveScene((scene) => {
+    scene.environment = sourceEnvironmentTexture()
+    scene.environmentIntensity = 4
+  }), camera, iblOptions)
+
+  function materialEnvMapScene(envMap = null) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, envMap }),
+    ))
+    return scene
+  }
+
+  const noMaterialEnvMap = renderRgba(materialEnvMapScene(), camera, iblOptions)
+  const materialEnvMap = renderRgba(materialEnvMapScene(sourceEnvironmentTexture()), camera, iblOptions)
+  const reflectionProbe = renderRgba(reflectiveScene((scene) => {
+    scene.userData.headlessThreeRenderer = {
+      reflectionProbe: {
+        texture: sourceEnvironmentTexture(),
+        intensity: 4,
+      },
+    }
+  }), camera, iblOptions)
+
+  const environmentDiff = meanAbsDiff(noIbl, sceneEnvironment)
+  const materialDiff = meanAbsDiff(noMaterialEnvMap, materialEnvMap)
+  const probeDiff = meanAbsDiff(noIbl, reflectionProbe)
+  assert.ok(environmentDiff > 0.5, `scene.environment source.data should affect IBL, diff=${environmentDiff.toFixed(3)}`)
+  assert.ok(materialDiff > 0.5, `material.envMap source.data should affect material IBL, diff=${materialDiff.toFixed(3)}`)
+  assert.ok(probeDiff > 0.5, `reflection probe source.data should affect IBL, diff=${probeDiff.toFixed(3)}`)
+})
+
 test('unsupported array and 3D texture inputs fail clearly', () => {
   function dataArrayTexture() {
     const texture = new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1)
