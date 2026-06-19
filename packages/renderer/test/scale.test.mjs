@@ -204,18 +204,20 @@ test('large scene budget renders many meshes, textures, and supported lights', (
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const geometry = new THREE.BoxGeometry(0.14, 0.14, 0.14)
-  const textures = Array.from({ length: 8 }, (_, i) => makeTexture(i))
+  const columns = 9
+  const rows = 9
+  const geometry = new THREE.BoxGeometry(0.125, 0.125, 0.125)
+  const textures = Array.from({ length: 9 }, (_, i) => makeTexture(i))
   const materials = textures.map((map, i) => new THREE.MeshStandardMaterial({
     map,
     roughness: 0.48 + (i % 3) * 0.12,
     metalness: i % 2 === 0 ? 0.05 : 0.18,
   }))
 
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      const mesh = new THREE.Mesh(geometry, materials[(row * 8 + col) % materials.length])
-      mesh.position.set((col - 3.5) * 0.24, (row - 3.5) * 0.2, Math.sin(row * 0.8 + col * 0.45) * 0.2)
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const mesh = new THREE.Mesh(geometry, materials[(row * columns + col) % materials.length])
+      mesh.position.set((col - (columns - 1) / 2) * 0.2, (row - (rows - 1) / 2) * 0.18, Math.sin(row * 0.8 + col * 0.45) * 0.18)
       mesh.rotation.set(row * 0.07, col * 0.05, (row + col) * 0.03)
       scene.add(mesh)
     }
