@@ -18048,6 +18048,8 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'color array texture'],
     [{ depthTexture: new THREE.Data3DTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target\.depthTexture uses an array or 3D texture/i, 'depth 3D texture'],
+    [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'color compressed texture'],
+    [{ depthTexture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target\.depthTexture uses a compressed texture/i, 'depth compressed texture'],
     [{ texture: { isCubeTexture: true } }, /target color texture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube color texture'],
     [{ depthTexture: { isCubeTexture: true } }, /target\.depthTexture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube depth texture'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
@@ -18071,6 +18073,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   const optionsTargetCases = [
     [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'options.target texture array'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
+    [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'options.target compressed color texture'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'options.target sampleCount'],
     [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'options.target color texture format'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'options.target depth texture type'],

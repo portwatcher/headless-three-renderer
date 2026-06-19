@@ -532,12 +532,13 @@ export interface RenderTargetTextureLike {
     data?: RenderTargetImageLike | RenderTargetImageLike[]
   }
   isCubeTexture?: boolean
+  isCompressedTexture?: boolean
   isDataArrayTexture?: boolean
   isData3DTexture?: boolean
   isArrayTexture?: boolean
   is3DTexture?: boolean
   format?: number
-  /** Color targets support Alpha/Red/RG/RGB/RGBA readback with byte, signed/unsigned integer, packed color, FloatType, and HalfFloatType arrays. */
+  /** Color targets support Alpha/Red/RG/RGB/RGBA and integer channel formats with byte, signed/unsigned integer, packed color, FloatType, and HalfFloatType arrays. */
   type?: number
   generateMipmaps?: boolean
   needsUpdate?: boolean

@@ -1840,6 +1840,8 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
   const colorTexture = renderTargetColorTexture(target)
   assertSupportedRenderTargetTextureDimensionality(colorTexture, 'target color texture')
   assertSupportedRenderTargetTextureDimensionality(target.depthTexture, 'target.depthTexture')
+  assertSupportedRenderTargetTextureClass(colorTexture, 'target color texture')
+  assertSupportedRenderTargetTextureClass(target.depthTexture, 'target.depthTexture')
   assertSupportedRenderTargetColorTexture(colorTexture)
   assertSupportedDepthTextureType(target.depthTexture)
   assertSupportedDepthTextureFormat(target.depthTexture)
@@ -2064,6 +2066,15 @@ function assertSupportedRenderTargetTextureDimensionality(texture: RenderTargetT
   ) {
     throw new Error(
       `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer render targets yet. Use a single 2D texture target or render layers separately.`,
+    )
+  }
+}
+
+function assertSupportedRenderTargetTextureClass(texture: RenderTargetTextureLike | undefined, label: string): void {
+  if (!texture) return
+  if (texture.isCompressedTexture === true) {
+    throw new Error(
+      `${label} uses a compressed texture, which is not supported by @headless-three/renderer render targets. Use a regular 2D target texture and compress output after readback if needed.`,
     )
   }
 }
