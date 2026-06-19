@@ -28838,6 +28838,34 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
     reverseDepthBuffer: false,
   })
   assert.equal(renderer.reversedDepthBuffer, false)
+  assert.deepEqual(renderer.getContextAttributes(), {
+    alpha: true,
+    depth: true,
+    stencil: false,
+    antialias: true,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: true,
+    powerPreference: 'high-performance',
+    failIfMajorPerformanceCaveat: false,
+  })
+  const mutableAttributes = renderer.getContextAttributes()
+  mutableAttributes.alpha = false
+  assert.equal(renderer.getContextAttributes().alpha, true)
+
+  assert.deepEqual(new Renderer().getContextAttributes(), {
+    alpha: false,
+    depth: true,
+    stencil: false,
+    antialias: false,
+    premultipliedAlpha: true,
+    preserveDrawingBuffer: false,
+    powerPreference: 'default',
+    failIfMajorPerformanceCaveat: false,
+  })
+  assert.throws(
+    () => renderer.getContext(),
+    /Renderer\.getContext\(\) is not supported/i,
+  )
 
   const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
   const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)

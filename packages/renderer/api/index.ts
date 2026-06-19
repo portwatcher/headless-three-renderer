@@ -22,6 +22,7 @@ import type {
   RenderSortFunction,
   RenderAnimationLoopCallback,
   RendererParametersLike,
+  RendererContextAttributesLike,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -70,6 +71,16 @@ const RendererBooleanParameters = [
   'preserveDrawingBuffer',
   'failIfMajorPerformanceCaveat',
 ] as const
+const DefaultRendererContextAttributes: RendererContextAttributesLike = {
+  alpha: false,
+  depth: true,
+  stencil: false,
+  antialias: false,
+  premultipliedAlpha: true,
+  preserveDrawingBuffer: false,
+  powerPreference: 'default',
+  failIfMajorPerformanceCaveat: false,
+}
 
 export {
   applyVrmAnimation,
@@ -130,6 +141,8 @@ export type {
   RenderObjectIdEntry,
   RenderAnimationLoopCallback,
   RendererParametersLike,
+  RendererContextAttributesLike,
+  RendererPowerPreferenceLike,
   RenderSortFunction,
   RenderSortItem,
   PostProcessingOptions,
@@ -246,6 +259,7 @@ export class Renderer {
   private toneMappingValue = ACESFilmicToneMapping
   private toneMappingExposureValue = 1
   private animationLoop: RenderAnimationLoopCallback | null = null
+  private readonly contextAttributes: RendererContextAttributesLike
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly info = new RendererInfoState()
@@ -255,6 +269,7 @@ export class Renderer {
 
   constructor(parameters?: RendererParametersLike) {
     assertRendererParametersLike(parameters, 'Renderer parameters')
+    this.contextAttributes = rendererContextAttributes(parameters)
     this.native = new native.NativeRenderer()
   }
 
@@ -348,6 +363,16 @@ export class Renderer {
       throw new TypeError('Renderer.setAnimationLoop callback must be a function or null.')
     }
     this.animationLoop = callback
+  }
+
+  getContext(): never {
+    throw new Error(
+      'Renderer.getContext() is not supported by @headless-three/renderer because it renders offscreen through wgpu instead of a browser WebGL context.',
+    )
+  }
+
+  getContextAttributes(): RendererContextAttributesLike {
+    return { ...this.contextAttributes }
   }
 
   getRenderTarget(): RenderTargetLike | null {
@@ -2446,6 +2471,20 @@ function rendererStatePowerPreference(value: unknown, label: string): void {
   }
   if (!SupportedRendererPowerPreferences.has(value)) {
     throw new TypeError(`${label} "${value}" is not supported. Use "default", "high-performance", or "low-power".`)
+  }
+}
+
+function rendererContextAttributes(parameters?: RendererParametersLike): RendererContextAttributesLike {
+  return {
+    alpha: parameters?.alpha ?? DefaultRendererContextAttributes.alpha,
+    depth: parameters?.depth ?? DefaultRendererContextAttributes.depth,
+    stencil: parameters?.stencil ?? DefaultRendererContextAttributes.stencil,
+    antialias: parameters?.antialias ?? DefaultRendererContextAttributes.antialias,
+    premultipliedAlpha: parameters?.premultipliedAlpha ?? DefaultRendererContextAttributes.premultipliedAlpha,
+    preserveDrawingBuffer: parameters?.preserveDrawingBuffer ?? DefaultRendererContextAttributes.preserveDrawingBuffer,
+    powerPreference: parameters?.powerPreference ?? DefaultRendererContextAttributes.powerPreference,
+    failIfMajorPerformanceCaveat: parameters?.failIfMajorPerformanceCaveat
+      ?? DefaultRendererContextAttributes.failIfMajorPerformanceCaveat,
   }
 }
 

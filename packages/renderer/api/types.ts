@@ -6,6 +6,7 @@ export type RenderOutputFormat = 'png' | 'rgba'
 export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'linearsrgb' | 'linear'
 export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal'
 export type RenderAnimationLoopCallback = (time: number, frame?: unknown) => void
+export type RendererPowerPreferenceLike = 'default' | 'high-performance' | 'low-power'
 
 export interface RendererParametersLike {
   canvas?: unknown
@@ -16,10 +17,21 @@ export interface RendererParametersLike {
   antialias?: boolean
   premultipliedAlpha?: boolean
   preserveDrawingBuffer?: boolean
-  powerPreference?: 'default' | 'high-performance' | 'low-power'
+  powerPreference?: RendererPowerPreferenceLike
   failIfMajorPerformanceCaveat?: boolean
   logarithmicDepthBuffer?: boolean
   reverseDepthBuffer?: boolean
+}
+
+export interface RendererContextAttributesLike {
+  alpha: boolean
+  depth: boolean
+  stencil: boolean
+  antialias: boolean
+  premultipliedAlpha: boolean
+  preserveDrawingBuffer: boolean
+  powerPreference: RendererPowerPreferenceLike
+  failIfMajorPerformanceCaveat: boolean
 }
 
 export interface ThreeColorLike {
