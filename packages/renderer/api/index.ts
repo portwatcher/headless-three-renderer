@@ -31,6 +31,8 @@ import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
 import { matrixElements } from './math'
 
+const WEBGL_COORDINATE_SYSTEM = 2000
+
 export {
   applyVrmAnimation,
   EncodedImageTextureLoader,
@@ -97,6 +99,14 @@ export class Renderer {
   private opaqueSort: RenderSortFunction | null = null
   private sortObjectsValue = true
   private transparentSort: RenderSortFunction | null = null
+  private currentRenderTarget: RenderTargetLike | null = null
+  private currentActiveCubeFace = 0
+  private currentActiveMipmapLevel = 0
+
+  readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
+  readonly reversedDepthBuffer = false
+  readonly xr = { enabled: false }
+  autoClear = true
 
   constructor() {
     this.native = new native.NativeRenderer()
@@ -123,6 +133,34 @@ export class Renderer {
     this.transparentSort = method
   }
 
+  getRenderTarget(): RenderTargetLike | null {
+    return this.currentRenderTarget
+  }
+
+  getActiveCubeFace(): number {
+    return this.currentActiveCubeFace
+  }
+
+  getActiveMipmapLevel(): number {
+    return this.currentActiveMipmapLevel
+  }
+
+  setRenderTarget(target: RenderTargetLike | null = null, activeCubeFace = 0, activeMipmapLevel = 0): void {
+    if (target !== null) {
+      assertRenderTargetLike(target, 'Renderer.setRenderTarget target')
+      validateUnsupportedRenderTargetOptions(target)
+    }
+    assertActiveCubeFace(activeCubeFace, 'Renderer.setRenderTarget activeCubeFace')
+    assertActiveMipmapLevel(activeMipmapLevel, 'Renderer.setRenderTarget activeMipmapLevel')
+    this.currentRenderTarget = target
+    this.currentActiveCubeFace = activeCubeFace
+    this.currentActiveMipmapLevel = activeMipmapLevel
+  }
+
+  clearDepth(): void {
+    // Depth is owned by each native render pass, so there is no persistent buffer to clear.
+  }
+
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
     validateThreeSceneRoot(scene)
     validateTopLevelRenderCamera(camera)
@@ -136,6 +174,10 @@ export class Renderer {
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
       return buffer
+    }
+
+    if (renderOptions.target === undefined && this.currentRenderTarget !== null) {
+      return this.renderCurrentRenderTarget(scene, camera, renderOptions)
     }
 
     if (renderOptions.target) assertNonCubeCameraRenderTargetTextures(renderOptions.target)
@@ -207,6 +249,93 @@ export class Renderer {
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
     return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+  }
+
+  private renderCurrentRenderTarget(
+    scene: ThreeSceneRootLike,
+    camera: ThreeCameraLike,
+    options: RenderOptions,
+  ): Buffer {
+    const target = this.currentRenderTarget!
+    const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
+
+    if (isCubeRenderTarget(target)) {
+      if (isArrayCamera(camera)) {
+        throw new Error(
+          'THREE.ArrayCamera cannot render into an active cube render target. Render each cube face with a regular THREE.Camera or pass a THREE.CubeCamera as the top-level camera.',
+        )
+      }
+      return this.renderCurrentCubeFace(scene, camera, target, targetOptions)
+    }
+
+    assertNonCubeCameraRenderTargetTextures(target)
+
+    if (isArrayCamera(camera)) {
+      const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
+        scene,
+        camera,
+        targetOptions,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
+      return buffer
+    }
+
+    const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, targetOptions)
+    const depthData = renderTargetDepthBuffer(
+      target,
+      nativeScene,
+      nativeCamera,
+      (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+    )
+    writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+    return buffer
+  }
+
+  private renderCurrentCubeFace(
+    scene: ThreeSceneRootLike,
+    camera: ThreeCameraLike,
+    target: RenderTargetLike,
+    options: RenderOptions,
+  ): Buffer {
+    const { width: targetWidth, height: targetHeight } = resolveCubeTargetSize(target, options)
+    const activeMipmapLevel = resolveActiveMipmapLevel(
+      this.currentActiveMipmapLevel,
+      targetWidth,
+      'Renderer activeMipmapLevel',
+    )
+    const { width, height } = cubeMipmapSize(targetWidth, targetHeight, activeMipmapLevel)
+    const faceOptions: InternalRenderOptions = {
+      ...options,
+      target,
+      width,
+      height,
+      format: 'rgba',
+      viewport: cubeMipmapViewport(options, target, activeMipmapLevel),
+      scissor: cubeMipmapScissor(options, target, activeMipmapLevel),
+      __headlessThreeViewportLabel: cubeMipmapViewportLabel(options),
+      __headlessThreeScissorLabel: cubeMipmapScissorLabel(options, target),
+    }
+    const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, faceOptions)
+    const depthData = renderTargetDepthBuffer(
+      target,
+      nativeScene,
+      nativeCamera,
+      (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+    )
+    writeCubeRenderTargetFace(
+      target,
+      buffer,
+      targetWidth,
+      targetHeight,
+      width,
+      height,
+      this.currentActiveCubeFace,
+      activeMipmapLevel,
+      depthData ? cloneTargetData(depthTextureData(target.depthTexture!, depthData)) : undefined,
+      objectIdEntries,
+    )
+    return buffer
   }
 
   private renderNative(
@@ -608,7 +737,6 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeScissorLabel?: string
 }
 
-const WEBGL_COORDINATE_SYSTEM = 2000
 const CUBE_FACE_COUNT = 6
 const UnsignedByteType = 1009
 const ByteType = 1010
@@ -749,17 +877,32 @@ function resolveCubeTargetSize(target: RenderTargetLike, options: RenderOptions)
 }
 
 function resolveCubeMipmapLevel(camera: ThreeCubeCameraLike, targetSize: number): number {
-  const level = camera.activeMipmapLevel ?? 0
+  return resolveActiveMipmapLevel(camera.activeMipmapLevel ?? 0, targetSize, 'THREE.CubeCamera activeMipmapLevel')
+}
+
+function resolveActiveMipmapLevel(level: number, targetSize: number, label: string): number {
   if (!Number.isInteger(level) || level < 0) {
-    throw new TypeError(`THREE.CubeCamera activeMipmapLevel must be a non-negative integer; received ${String(level)}.`)
+    throw new TypeError(`${label} must be a non-negative integer; received ${String(level)}.`)
   }
   const maxLevel = Math.floor(Math.log2(targetSize))
   if (level > maxLevel) {
     throw new Error(
-      `THREE.CubeCamera activeMipmapLevel ${level} exceeds the maximum mip level ${maxLevel} for a ${targetSize}x${targetSize} cube target.`,
+      `${label} ${level} exceeds the maximum mip level ${maxLevel} for a ${targetSize}x${targetSize} cube target.`,
     )
   }
   return level
+}
+
+function assertActiveCubeFace(value: number, label: string): void {
+  if (!Number.isInteger(value) || value < 0 || value >= CUBE_FACE_COUNT) {
+    throw new TypeError(`${label} must be an integer from 0 to ${CUBE_FACE_COUNT - 1}; received ${String(value)}.`)
+  }
+}
+
+function assertActiveMipmapLevel(value: number, label: string): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new TypeError(`${label} must be a non-negative integer; received ${String(value)}.`)
+  }
 }
 
 function cubeMipmapSize(width: number, height: number, activeMipmapLevel: number): { width: number; height: number } {
@@ -844,6 +987,42 @@ function writeCubeRenderTarget(
   return target
 }
 
+function writeCubeRenderTargetFace(
+  target: RenderTargetLike,
+  face: Buffer,
+  targetWidth: number,
+  targetHeight: number,
+  faceWidth: number,
+  faceHeight: number,
+  activeCubeFace: number,
+  activeMipmapLevel: number,
+  depthFace?: NonNullable<RenderTargetImageLike['data']>,
+  objectIdEntries?: RenderObjectIdEntry[],
+): RenderTargetLike {
+  assertActiveCubeFace(activeCubeFace, 'Renderer activeCubeFace')
+  target.width = targetWidth
+  target.height = targetHeight
+  target.data = face
+
+  const texture = ensureCubeTargetTexture(target)
+  texture.isCubeTexture = true
+  writeCubeTextureFace(
+    texture,
+    colorTextureData(texture, face),
+    faceWidth,
+    faceHeight,
+    activeCubeFace,
+    activeMipmapLevel,
+    'target.texture',
+  )
+  texture.needsPMREMUpdate = true
+  if (target.depthTexture && depthFace) {
+    writeCubeTextureFace(target.depthTexture, depthFace, faceWidth, faceHeight, activeCubeFace, activeMipmapLevel, 'target.depthTexture')
+  }
+  writeObjectIdMetadata(target, objectIdEntries)
+  return target
+}
+
 function writeCubeTextureFaces(
   texture: RenderTargetTextureLike,
   faces: NonNullable<RenderTargetImageLike['data']>[],
@@ -874,6 +1053,49 @@ function writeCubeTextureFaces(
   texture.needsUpdate = true
 }
 
+function writeCubeTextureFace(
+  texture: RenderTargetTextureLike,
+  data: NonNullable<RenderTargetImageLike['data']>,
+  width: number,
+  height: number,
+  activeCubeFace: number,
+  activeMipmapLevel: number,
+  label: string,
+): void {
+  const image = { data, width, height, depth: 1 }
+  if (activeMipmapLevel === 0) {
+    const images = cubeTextureImages(texture.image)
+    images[activeCubeFace] = image
+    texture.image = images
+    texture.source ??= {}
+    texture.source.data = images
+  } else {
+    if (texture.mipmaps != null && !Array.isArray(texture.mipmaps)) {
+      throw new TypeError(`${label}.mipmaps must be an array of image-like objects.`)
+    }
+    const mipmaps = texture.mipmaps ?? (texture.mipmaps = [])
+    for (let level = 0; level <= activeMipmapLevel; level += 1) {
+      mipmaps[level] ??= {}
+    }
+    const mipmap = mipmaps[activeMipmapLevel]
+    const images = cubeTextureImages(mipmap.image)
+    images[activeCubeFace] = image
+    mipmap.image = images
+    mipmap.width = width
+    mipmap.height = height
+    mipmap.depth = 1
+  }
+  texture.needsUpdate = true
+}
+
+function cubeTextureImages(value: RenderTargetImageLike | RenderTargetImageLike[] | undefined): RenderTargetImageLike[] {
+  const images = Array.isArray(value) ? value.slice() : Array.from({ length: CUBE_FACE_COUNT }, () => ({}))
+  while (images.length < CUBE_FACE_COUNT) {
+    images.push({})
+  }
+  return images
+}
+
 function cubeTargetTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {
   return Array.isArray(target.texture)
     ? target.texture[0]
@@ -887,6 +1109,12 @@ function ensureCubeTargetTexture(target: RenderTargetLike): RenderTargetTextureL
   const created: RenderTargetTextureLike = { image: images, source: { data: images }, isCubeTexture: true }
   target.texture = created
   return created
+}
+
+function isCubeRenderTarget(target: RenderTargetLike): boolean {
+  return target.isWebGLCubeRenderTarget === true ||
+    cubeTargetTexture(target)?.isCubeTexture === true ||
+    target.depthTexture?.isCubeTexture === true
 }
 
 function renderArrayCamera(

@@ -1845,6 +1845,46 @@ test('CubeCamera renders cube target faces', () => {
   assert.ok(depthPx > 0 && depthPx <= 1, `cube depth face should contain normalized depth (${depthPx})`)
 })
 
+test('CubeCamera.update works with Renderer render-target state', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32, { generateMipmaps: true })
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  const renderer = new Renderer()
+  renderer.xr.enabled = true
+
+  cubeCamera.update(renderer, scene)
+
+  assert.equal(renderer.getRenderTarget(), null)
+  assert.equal(renderer.getActiveCubeFace(), 0)
+  assert.equal(renderer.getActiveMipmapLevel(), 0)
+  assert.equal(renderer.xr.enabled, true)
+  assert.equal(cubeTarget.texture.generateMipmaps, true)
+  assert.equal(cubeTarget.texture.image.length, 6)
+  assert.strictEqual(cubeTarget.texture.source.data, cubeTarget.texture.image)
+  assert.ok(cubeTarget.texture.pmremVersion > 0, 'CubeCamera.update should request a PMREM refresh')
+
+  const px = meanRegion(cubeTarget.texture.image[0].data, 32, 32, 12, 12, 20, 20)
+  const nx = meanRegion(cubeTarget.texture.image[1].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(px.r > px.g + 80 && px.r > px.b + 80, `+X update face should capture red (${px.r}, ${px.g}, ${px.b})`)
+  assert.ok(nx.g > nx.r + 60 && nx.g > nx.b + 60, `-X update face should capture green (${nx.r}, ${nx.g}, ${nx.b})`)
+
+  const previousTarget = { width: 8, height: 8, texture: {} }
+  renderer.setRenderTarget(previousTarget, 2, 1)
+  cubeCamera.activeMipmapLevel = 1
+  cubeCamera.update(renderer, scene)
+
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+  assert.equal(renderer.getActiveCubeFace(), 2)
+  assert.equal(renderer.getActiveMipmapLevel(), 1)
+
+  const mip = cubeTarget.texture.mipmaps[1]
+  assert.equal(mip.image.length, 6)
+  assert.equal(mip.image[0].width, 16)
+  assert.equal(mip.image[0].height, 16)
+  const mipPx = meanRegion(mip.image[0].data, 16, 16, 5, 5, 11, 11)
+  assert.ok(mipPx.r > mipPx.g + 80 && mipPx.r > mipPx.b + 80, `+X update mip face should capture red (${mipPx.r}, ${mipPx.g}, ${mipPx.b})`)
+})
+
 test('CubeCamera object-id target includes reverse lookup metadata', () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)

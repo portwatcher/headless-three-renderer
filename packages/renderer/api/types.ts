@@ -539,8 +539,10 @@ export interface RenderTargetTextureLike {
   format?: number
   /** Color targets support Alpha/Red/RG/RGB/RGBA readback with byte, signed/unsigned integer, packed color, FloatType, and HalfFloatType arrays. */
   type?: number
+  generateMipmaps?: boolean
   needsUpdate?: boolean
   needsPMREMUpdate?: boolean
+  pmremVersion?: number
 }
 
 export interface RenderTargetImageLike {
@@ -566,6 +568,7 @@ export interface RenderTargetLike {
   samples?: number
   /** MSAA sample count. Supports 4x MSAA; omitted, 0, or 1 use the single-sample path. */
   sampleCount?: number
+  isWebGLCubeRenderTarget?: boolean
   isWebGLMultipleRenderTargets?: boolean
   image?: {
     data?: Buffer
