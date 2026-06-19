@@ -74,6 +74,12 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     assert.equal(texture.isTexture, true)
     assert.deepEqual(Buffer.from(texture.image), imageBytes)
     assert.equal(texture.source.data, texture.image)
+
+    const asyncTexture = await loader.loadAsync('tex.png')
+    assert.equal(asyncTexture.isTexture, true)
+    assert.deepEqual(Buffer.from(asyncTexture.image), imageBytes)
+    assert.equal(asyncTexture.source.data, asyncTexture.image)
+
     assert.equal(resolveLocalAssetPath('tex.png', dir), imagePath)
     assert.equal(resolveLocalAssetPath(imagePath, dir), imagePath)
     assert.equal(resolveLocalAssetPath(pathToFileURL(imagePath).href, dir), imagePath)
@@ -275,6 +281,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
   )
   assert.throws(
     () => imageLoader.load(123),
+    /url must be a string/i,
+  )
+  await assert.rejects(
+    () => imageLoader.loadAsync(123),
     /url must be a string/i,
   )
   assert.throws(

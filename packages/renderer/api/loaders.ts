@@ -198,6 +198,16 @@ export class EncodedImageTextureLoader {
 
     return texture
   }
+
+  loadAsync(url: string, onProgress?: unknown): Promise<TextureLike> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.load(url, resolve, onProgress, reject)
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }
 }
 
 export function createEncodedImageTextureLoader(rootDir?: string): EncodedImageTextureLoader {
