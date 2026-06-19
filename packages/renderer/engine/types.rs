@@ -50,6 +50,8 @@ pub struct RenderScene {
     pub tone_mapping: Option<u32>,
     /// Material tone-mapping exposure multiplier. Defaults to 1.
     pub tone_mapping_exposure: Option<f64>,
+    /// Scene-color texture resolution scale for physical transmission. Defaults to 1.
+    pub transmission_resolution_scale: Option<f64>,
     /// MSAA sample count. Supports `4`; omitted, `0`, or `1` use the single-sample path.
     pub sample_count: Option<u32>,
     /// Three.js shadow-map type. Supports Basic, PCF, PCFSoft, and VSM constants; defaults to PCF.

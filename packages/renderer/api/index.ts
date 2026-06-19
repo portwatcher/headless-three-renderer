@@ -1402,6 +1402,7 @@ export class Renderer {
       __headlessThreeRendererShadowMapType: this.shadowMap.type,
       __headlessThreeRendererToneMapping: this.toneMapping,
       __headlessThreeRendererToneMappingExposure: this.toneMappingExposure,
+      __headlessThreeRendererTransmissionResolutionScale: this.transmissionResolutionScale,
     }
   }
 
@@ -1680,6 +1681,7 @@ function toNativeInput(
     outputColorSpace: options.outputColorSpace,
     toneMapping: rendererToneMapping,
     toneMappingExposure,
+    transmissionResolutionScale: (options as InternalRenderOptions).__headlessThreeRendererTransmissionResolutionScale,
     sampleCount: resolveSampleCount(options),
     shadowMapType: rendererShadowMapType,
     meshes,
@@ -2130,6 +2132,7 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeClippingPlanesLabel?: string
   __headlessThreeRendererToneMapping?: number
   __headlessThreeRendererToneMappingExposure?: number
+  __headlessThreeRendererTransmissionResolutionScale?: number
 }
 
 const CUBE_FACE_COUNT = 6

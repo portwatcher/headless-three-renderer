@@ -23810,6 +23810,66 @@ test('physical transmission roughness softens scene-color refraction', () => {
   )
 })
 
+test('Renderer transmissionResolutionScale controls transmission scene-color resolution', () => {
+  const width = 64
+  const height = 64
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function makeScene() {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const left = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    left.position.set(-0.8, 0, -0.1)
+    scene.add(left)
+
+    const right = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    right.position.set(0.8, 0, -0.1)
+    scene.add(right)
+
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(3, 3),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness: 0.02,
+        transmission: 1,
+        thickness: 0,
+        ior: 1.5,
+      }),
+    ))
+    return scene
+  }
+
+  function centerEdgeContrast(rgba) {
+    const left = meanRegion(rgba, width, height, 25, 20, 31, 44)
+    const right = meanRegion(rgba, width, height, 33, 20, 39, 44)
+    return Math.abs((left.r - left.b) - (right.r - right.b))
+  }
+
+  const renderer = new Renderer()
+  renderer.transmissionResolutionScale = 1
+  const fullResolution = renderer.render(makeScene(), camera, { width, height, format: 'rgba' })
+  renderer.transmissionResolutionScale = 0.125
+  const lowResolution = renderer.render(makeScene(), camera, { width, height, format: 'rgba' })
+
+  const fullContrast = centerEdgeContrast(fullResolution)
+  const lowContrast = centerEdgeContrast(lowResolution)
+  assert.ok(fullContrast > 80, `full-resolution transmission scene color should preserve the edge (${fullContrast.toFixed(1)})`)
+  assert.ok(
+    lowContrast < fullContrast - 20,
+    `low transmissionResolutionScale should soften the scene-color edge (${lowContrast.toFixed(1)} vs ${fullContrast.toFixed(1)})`,
+  )
+})
+
 test('physical transmission dispersion separates transmitted color channels', () => {
   const width = 64
   const height = 64

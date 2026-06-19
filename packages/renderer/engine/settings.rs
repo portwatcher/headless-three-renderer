@@ -67,6 +67,7 @@ pub struct RenderSettings {
     pub output_color_space: OutputColorSpace,
     pub tone_mapping: f32,
     pub tone_mapping_exposure: f32,
+    pub transmission_resolution_scale: f32,
     pub sample_count: u32,
     pub shadow_map_type: f32,
     pub view: Mat4,
@@ -233,6 +234,16 @@ impl RenderSettings {
             if tone_mapping_exposure < 0.0 {
                 bail!("scene.toneMappingExposure must be non-negative");
             }
+            let transmission_resolution_scale = finite_positive(
+                scene.transmission_resolution_scale.unwrap_or(1.0),
+                "scene.transmissionResolutionScale",
+            )?;
+            validate_transmission_resolution_scale(
+                width,
+                height,
+                transmission_resolution_scale,
+                limits.max_texture_dimension_2d,
+            )?;
             let sample_count = resolve_sample_count(scene.sample_count)?;
             let shadow_map_type = resolve_shadow_map_type(scene.shadow_map_type)?;
             let lights = prepare_lights(scene)?;
@@ -262,6 +273,7 @@ impl RenderSettings {
                 output_color_space,
                 tone_mapping,
                 tone_mapping_exposure,
+                transmission_resolution_scale,
                 sample_count,
                 shadow_map_type,
                 view,
@@ -343,6 +355,27 @@ fn prepare_background_texture(
         }
         _ => Ok(None),
     }
+}
+
+fn validate_transmission_resolution_scale(
+    width: u32,
+    height: u32,
+    scale: f32,
+    max_texture_dimension: u32,
+) -> Result<()> {
+    let scaled_width = (width as f64 * f64::from(scale)).round();
+    let scaled_height = (height as f64 * f64::from(scale)).round();
+    if scaled_width < 1.0 || scaled_height < 1.0 {
+        bail!("scene.transmissionResolutionScale must produce at least a 1x1 texture");
+    }
+    if scaled_width > f64::from(max_texture_dimension)
+        || scaled_height > f64::from(max_texture_dimension)
+    {
+        bail!(
+            "scene.transmissionResolutionScale produces an intermediate texture above max_texture_dimension_2d {max_texture_dimension}"
+        );
+    }
+    Ok(())
 }
 
 fn prepare_scene_ibl(scene: &RenderScene) -> Result<Option<IblMaps>> {

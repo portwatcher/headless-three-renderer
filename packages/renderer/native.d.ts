@@ -88,6 +88,8 @@ export interface RenderScene {
   toneMapping?: number
   /** Material tone-mapping exposure multiplier. Defaults to 1. */
   toneMappingExposure?: number
+  /** Scene-color texture resolution scale for physical transmission. Defaults to 1. */
+  transmissionResolutionScale?: number
   /** MSAA sample count. Supports `4`; omitted, `0`, or `1` use the single-sample path. */
   sampleCount?: number
   /** Three.js shadow-map type. Supports Basic, PCF, PCFSoft, and VSM constants; defaults to PCF. */

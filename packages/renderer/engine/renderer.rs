@@ -2275,30 +2275,43 @@ impl GpuRenderer {
         }
 
         if !transmissive_order.is_empty() || !transparent_order.is_empty() {
+            let scene_color_size = transmission_scene_color_size(settings);
             let (scene_color_texture, guard) = self.cached_scratch_texture(
                 &self.scene_color_texture_cache,
-                texture_size,
+                scene_color_size,
                 "headless-three-renderer scene color texture",
-                wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+                wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | wgpu::TextureUsages::RENDER_ATTACHMENT,
             );
             scene_color_texture_guard = Some(guard);
-            encoder.copy_texture_to_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture: &color_texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                wgpu::TexelCopyTextureInfo {
-                    texture: &scene_color_texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                texture_size,
-            );
             let scene_color_view =
                 scene_color_texture.create_view(&wgpu::TextureViewDescriptor::default());
+            if scene_color_size.width == texture_size.width
+                && scene_color_size.height == texture_size.height
+            {
+                encoder.copy_texture_to_texture(
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &color_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    wgpu::TexelCopyTextureInfo {
+                        texture: &scene_color_texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    texture_size,
+                );
+            } else {
+                self.blit_scene_color_for_transmission(
+                    &mut encoder,
+                    &color_view,
+                    &scene_color_view,
+                );
+            }
             let shadow_view = match &_shadow_texture {
                 Some(texture) => texture.create_view(&wgpu::TextureViewDescriptor {
                     dimension: Some(wgpu::TextureViewDimension::D2Array),
@@ -2699,6 +2712,66 @@ impl GpuRenderer {
                 },
             ],
         })
+    }
+
+    fn blit_scene_color_for_transmission(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        source_view: &wgpu::TextureView,
+        destination_view: &wgpu::TextureView,
+    ) {
+        let post_uniforms = post_uniforms(PostProcessingSettings {
+            active: false,
+            exposure: 0.0,
+            contrast: 1.0,
+            saturation: 1.0,
+            vignette: 0.0,
+            grayscale: 0.0,
+            invert: 0.0,
+        });
+        let mut guard = self
+            .post_uniform_buffer
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let post_uniform_buffer = self.write_post_uniform_buffer(&mut guard, &post_uniforms);
+        let post_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer transmission scene-color blit bind group"),
+            layout: &self.post_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(source_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: post_uniform_buffer.as_entire_binding(),
+                },
+            ],
+        });
+        let color_attachments = [Some(wgpu::RenderPassColorAttachment {
+            view: destination_view,
+            depth_slice: None,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                store: wgpu::StoreOp::Store,
+            },
+        })];
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("headless-three-renderer transmission scene-color blit pass"),
+            color_attachments: &color_attachments,
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&self.post_pipeline);
+        pass.set_bind_group(0, &post_bind_group, &[]);
+        pass.draw(0..3, 0..1);
     }
 
     fn sampler_for_texture(
@@ -4982,6 +5055,15 @@ fn post_uniforms(settings: PostProcessingSettings) -> PostUniforms {
             settings.vignette,
         ],
         params2: [settings.grayscale, settings.invert, 0.0, 0.0],
+    }
+}
+
+fn transmission_scene_color_size(settings: &RenderSettings) -> wgpu::Extent3d {
+    let scale = settings.transmission_resolution_scale;
+    wgpu::Extent3d {
+        width: ((settings.width as f32 * scale).round() as u32).max(1),
+        height: ((settings.height as f32 * scale).round() as u32).max(1),
+        depth_or_array_layers: 1,
     }
 }
 
