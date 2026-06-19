@@ -45,6 +45,25 @@ const PCFShadowMap = 1
 const PCFSoftShadowMap = 2
 const VSMShadowMap = 3
 const SupportedRendererShadowMapTypes = new Set([BasicShadowMap, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap])
+const CullFaceNone = 0
+const CullFaceBack = 1
+const CullFaceFront = 2
+const CullFaceFrontBack = 3
+const SupportedRendererStateCullFaces = new Set([CullFaceNone, CullFaceBack, CullFaceFront, CullFaceFrontBack])
+const NoBlending = 0
+const NormalBlending = 1
+const AdditiveBlending = 2
+const SubtractiveBlending = 3
+const MultiplyBlending = 4
+const CustomBlending = 5
+const SupportedRendererStateBlendingModes = new Set([
+  NoBlending,
+  NormalBlending,
+  AdditiveBlending,
+  SubtractiveBlending,
+  MultiplyBlending,
+  CustomBlending,
+])
 const NoToneMapping = 0
 const LinearToneMapping = 1
 const ReinhardToneMapping = 2
@@ -680,12 +699,157 @@ class RendererStateBuffersState {
 class RendererState {
   readonly buffers = new RendererStateBuffersState()
 
+  setBlending(
+    blending: unknown,
+    blendEquation?: unknown,
+    blendSrc?: unknown,
+    blendDst?: unknown,
+    blendEquationAlpha?: unknown,
+    blendSrcAlpha?: unknown,
+    blendDstAlpha?: unknown,
+    blendColor?: unknown,
+    blendAlpha?: unknown,
+    premultipliedAlpha?: unknown,
+  ): void {
+    assertRendererStateBlendingMode(blending, 'Renderer.state.setBlending blending')
+    rendererStateOptionalFiniteInteger(blendEquation, 'Renderer.state.setBlending blendEquation')
+    rendererStateOptionalFiniteInteger(blendSrc, 'Renderer.state.setBlending blendSrc')
+    rendererStateOptionalFiniteInteger(blendDst, 'Renderer.state.setBlending blendDst')
+    rendererStateOptionalFiniteInteger(blendEquationAlpha, 'Renderer.state.setBlending blendEquationAlpha')
+    rendererStateOptionalFiniteInteger(blendSrcAlpha, 'Renderer.state.setBlending blendSrcAlpha')
+    rendererStateOptionalFiniteInteger(blendDstAlpha, 'Renderer.state.setBlending blendDstAlpha')
+    if (blendColor !== undefined && (blendColor === null || typeof blendColor !== 'object')) {
+      throw new TypeError('Renderer.state.setBlending blendColor must be a color-like object when provided.')
+    }
+    if (blendAlpha !== undefined) {
+      rendererStateClearAlpha(blendAlpha, 'Renderer.state.setBlending blendAlpha')
+    }
+    if (premultipliedAlpha !== undefined) {
+      rendererStateBoolean(premultipliedAlpha, 'Renderer.state.setBlending premultipliedAlpha')
+    }
+  }
+
+  setMaterial(material: unknown, frontFaceCW?: unknown): void {
+    if (material === null || typeof material !== 'object' || Array.isArray(material)) {
+      throw new TypeError('Renderer.state.setMaterial material must be a material-like object.')
+    }
+    if (frontFaceCW !== undefined) {
+      rendererStateBoolean(frontFaceCW, 'Renderer.state.setMaterial frontFaceCW')
+    }
+  }
+
+  setFlipSided(flipSided: unknown): void {
+    rendererStateBoolean(flipSided, 'Renderer.state.setFlipSided flipSided')
+  }
+
+  setCullFace(cullFace: unknown): void {
+    assertRendererStateCullFace(cullFace, 'Renderer.state.setCullFace cullFace')
+  }
+
+  setLineWidth(width: unknown): void {
+    rendererStatePositiveFiniteNumber(width, 'Renderer.state.setLineWidth width')
+  }
+
+  setPolygonOffset(polygonOffset: unknown, factor = 0, units = 0): void {
+    rendererStateBoolean(polygonOffset, 'Renderer.state.setPolygonOffset polygonOffset')
+    rendererStateFiniteNumber(factor, 'Renderer.state.setPolygonOffset factor')
+    rendererStateFiniteNumber(units, 'Renderer.state.setPolygonOffset units')
+  }
+
+  setScissorTest(scissorTest: unknown): void {
+    rendererStateBoolean(scissorTest, 'Renderer.state.setScissorTest scissorTest')
+  }
+
+  scissor(rect: RenderPixelRectLike): void {
+    rendererStatePixelRect(rect, undefined, undefined, undefined, 'Renderer.state.scissor')
+  }
+
+  viewport(rect: RenderPixelRectLike): void {
+    rendererStatePixelRect(rect, undefined, undefined, undefined, 'Renderer.state.viewport')
+  }
+
   reset(): void {
     // Native render state is rebuilt for each pass.
   }
 
   unbindTexture(): void {
     // Texture binding is not exposed by the wgpu-backed adapter.
+  }
+
+  enable(): never {
+    throwUnsupportedRendererStateWebGl('enable', 'WebGL capability flags')
+  }
+
+  disable(): never {
+    throwUnsupportedRendererStateWebGl('disable', 'WebGL capability flags')
+  }
+
+  bindFramebuffer(): never {
+    throwUnsupportedRendererStateWebGl('bindFramebuffer', 'WebGL framebuffer binding')
+  }
+
+  drawBuffers(): never {
+    throwUnsupportedRendererStateWebGl('drawBuffers', 'WebGL draw-buffer binding')
+  }
+
+  useProgram(): never {
+    throwUnsupportedRendererStateWebGl('useProgram', 'WebGL program binding')
+  }
+
+  activeTexture(): never {
+    throwUnsupportedRendererStateWebGl('activeTexture', 'WebGL texture-unit binding')
+  }
+
+  bindTexture(): never {
+    throwUnsupportedRendererStateWebGl('bindTexture', 'WebGL texture binding')
+  }
+
+  compressedTexImage2D(): never {
+    throwUnsupportedRendererStateWebGl('compressedTexImage2D', 'WebGL texture uploads')
+  }
+
+  compressedTexImage3D(): never {
+    throwUnsupportedRendererStateWebGl('compressedTexImage3D', 'WebGL texture uploads')
+  }
+
+  texImage2D(): never {
+    throwUnsupportedRendererStateWebGl('texImage2D', 'WebGL texture uploads')
+  }
+
+  texImage3D(): never {
+    throwUnsupportedRendererStateWebGl('texImage3D', 'WebGL texture uploads')
+  }
+
+  texStorage2D(): never {
+    throwUnsupportedRendererStateWebGl('texStorage2D', 'WebGL texture storage')
+  }
+
+  texStorage3D(): never {
+    throwUnsupportedRendererStateWebGl('texStorage3D', 'WebGL texture storage')
+  }
+
+  texSubImage2D(): never {
+    throwUnsupportedRendererStateWebGl('texSubImage2D', 'WebGL texture uploads')
+  }
+
+  texSubImage3D(): never {
+    throwUnsupportedRendererStateWebGl('texSubImage3D', 'WebGL texture uploads')
+  }
+
+  compressedTexSubImage2D(): never {
+    throwUnsupportedRendererStateWebGl('compressedTexSubImage2D', 'WebGL texture uploads')
+  }
+
+  compressedTexSubImage3D(): never {
+    throwUnsupportedRendererStateWebGl('compressedTexSubImage3D', 'WebGL texture uploads')
+  }
+
+  updateUBOMapping(): never {
+    throwUnsupportedRendererStateWebGl('updateUBOMapping', 'WebGL uniform-buffer binding')
+  }
+
+  uniformBlockBinding(): never {
+    throwUnsupportedRendererStateWebGl('uniformBlockBinding', 'WebGL uniform-buffer binding')
   }
 }
 
@@ -3395,11 +3559,46 @@ function rendererStatePositiveFiniteNumber(value: unknown, label: string): numbe
   return value
 }
 
+function rendererStateFiniteNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  return value
+}
+
+function rendererStateOptionalFiniteInteger(value: unknown, label: string): void {
+  if (value !== undefined) {
+    rendererStateClearStencil(value, label)
+  }
+}
+
 function rendererStateBoolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') {
     throw new TypeError(`${label} must be a boolean.`)
   }
   return value
+}
+
+function assertRendererStateCullFace(value: unknown, label: string): asserts value is number {
+  if (!SupportedRendererStateCullFaces.has(value as number)) {
+    throw new Error(
+      `${label} ${String(value)} is not supported. Use THREE.CullFaceNone, CullFaceBack, CullFaceFront, or CullFaceFrontBack.`,
+    )
+  }
+}
+
+function assertRendererStateBlendingMode(value: unknown, label: string): asserts value is number {
+  if (!SupportedRendererStateBlendingModes.has(value as number)) {
+    throw new Error(
+      `${label} ${String(value)} is not supported. Use a Three.js blending constant such as NormalBlending, AdditiveBlending, or CustomBlending.`,
+    )
+  }
+}
+
+function throwUnsupportedRendererStateWebGl(method: string, operation: string): never {
+  throw new Error(
+    `Renderer.state.${method}() is not supported by @headless-three/renderer because it does not expose ${operation}. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().`,
+  )
 }
 
 function assertRendererParametersLike(value: RendererParametersLike | undefined, label: string): void {

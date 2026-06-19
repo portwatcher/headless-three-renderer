@@ -30375,6 +30375,26 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   ), undefined)
   assert.equal(renderer.state.buffers.stencil.setClear(1), undefined)
   assert.equal(renderer.state.buffers.stencil.setLocked(false), undefined)
+  assert.equal(renderer.state.setBlending(
+    THREE.CustomBlending,
+    THREE.AddEquation,
+    THREE.SrcAlphaFactor,
+    THREE.OneMinusSrcAlphaFactor,
+    THREE.AddEquation,
+    THREE.OneFactor,
+    THREE.OneMinusSrcAlphaFactor,
+    new THREE.Color(0, 0, 0),
+    0,
+    true,
+  ), undefined)
+  assert.equal(renderer.state.setMaterial(new THREE.MeshBasicMaterial(), false), undefined)
+  assert.equal(renderer.state.setFlipSided(false), undefined)
+  assert.equal(renderer.state.setCullFace(THREE.CullFaceBack), undefined)
+  assert.equal(renderer.state.setLineWidth(2), undefined)
+  assert.equal(renderer.state.setPolygonOffset(true, 1, -1), undefined)
+  assert.equal(renderer.state.setScissorTest(true), undefined)
+  assert.equal(renderer.state.scissor(new THREE.Vector4(0, 0, 8, 8)), undefined)
+  assert.equal(renderer.state.viewport({ x: 0, y: 0, width: 16, height: 16 }), undefined)
   assert.equal(renderer.state.reset(), undefined)
   assert.equal(renderer.state.unbindTexture(), undefined)
   assert.throws(
@@ -30392,6 +30412,42 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.throws(
     () => renderer.state.buffers.stencil.setClear(0.5),
     /Renderer\.state\.buffers\.stencil\.setClear stencil must be a finite integer/i,
+  )
+  assert.throws(
+    () => renderer.state.setBlending('normal'),
+    /Renderer\.state\.setBlending blending normal is not supported/i,
+  )
+  assert.throws(
+    () => renderer.state.setMaterial(null),
+    /Renderer\.state\.setMaterial material must be a material-like object/i,
+  )
+  assert.throws(
+    () => renderer.state.setCullFace(99),
+    /Renderer\.state\.setCullFace cullFace 99 is not supported/i,
+  )
+  assert.throws(
+    () => renderer.state.setLineWidth(0),
+    /Renderer\.state\.setLineWidth width must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.state.setPolygonOffset(1, 0, 0),
+    /Renderer\.state\.setPolygonOffset polygonOffset must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.viewport({ x: 0, y: 0, width: 0, height: 1 }),
+    /Renderer\.state\.viewport width and height must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.state.bindTexture(0, {}),
+    /Renderer\.state\.bindTexture\(\) is not supported.*WebGL texture binding/i,
+  )
+  assert.throws(
+    () => renderer.state.texImage2D(),
+    /Renderer\.state\.texImage2D\(\) is not supported.*WebGL texture uploads/i,
+  )
+  assert.throws(
+    () => renderer.state.uniformBlockBinding({}, {}),
+    /Renderer\.state\.uniformBlockBinding\(\) is not supported.*WebGL uniform-buffer binding/i,
   )
 
   const object = {}
