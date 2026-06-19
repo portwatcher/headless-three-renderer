@@ -9376,6 +9376,50 @@ test('localClippingEnabled false ignores material planes but preserves global pl
   assert.ok(bottomRight.b > bottomRight.r + 80, `bottom-right should still be clipped by the global y-plane (${bottomRight.b} vs ${bottomRight.r})`)
 })
 
+test('Renderer localClippingEnabled state applies as render fallback', () => {
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer.localClippingEnabled, true)
+  renderer.localClippingEnabled = false
+  assert.equal(renderer.localClippingEnabled, false)
+
+  const disabled = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  const disabledLeft = meanRegion(disabled, 64, 64, 12, 22, 24, 42)
+  const disabledRight = meanRegion(disabled, 64, 64, 40, 22, 52, 42)
+  assert.ok(disabledLeft.r > disabledLeft.b + 80, `Renderer localClippingEnabled=false should keep the left side visible (${disabledLeft.r} vs ${disabledLeft.b})`)
+  assert.ok(disabledRight.r > disabledRight.b + 80, `Renderer localClippingEnabled=false should keep the right side visible (${disabledRight.r} vs ${disabledRight.b})`)
+
+  const explicit = renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    localClippingEnabled: true,
+  })
+  const explicitLeft = meanRegion(explicit, 64, 64, 12, 22, 24, 42)
+  const explicitRight = meanRegion(explicit, 64, 64, 40, 22, 52, 42)
+  assert.ok(explicitLeft.b > explicitLeft.r + 80, `explicit localClippingEnabled=true should restore clipping (${explicitLeft.b} vs ${explicitLeft.r})`)
+  assert.ok(explicitRight.r > explicitRight.b + 80, `explicit localClippingEnabled=true should keep the unclipped side (${explicitRight.r} vs ${explicitRight.b})`)
+
+  const target = renderer.renderToTarget(scene, camera, {}, { width: 64, height: 64 })
+  const targetLeft = meanRegion(target.data, 64, 64, 12, 22, 24, 42)
+  assert.ok(targetLeft.r > targetLeft.b + 80, `renderToTarget should use Renderer localClippingEnabled fallback (${targetLeft.r} vs ${targetLeft.b})`)
+
+  assert.throws(
+    () => { renderer.localClippingEnabled = 'no' },
+    /Renderer\.localClippingEnabled must be a boolean/i,
+  )
+})
+
 test('localClippingEnabled false ignores line material planes but preserves global planes', () => {
   const material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 8 })
   material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]

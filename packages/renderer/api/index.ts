@@ -149,6 +149,7 @@ export class Renderer {
   private autoClearDepthValue = true
   private autoClearStencilValue = true
   private outputColorSpaceValue: RenderOutputColorSpace = 'srgb'
+  private localClippingEnabledValue = true
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly reversedDepthBuffer = false
@@ -208,6 +209,14 @@ export class Renderer {
 
   set outputColorSpace(value: RenderOutputColorSpace) {
     this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer.outputColorSpace')
+  }
+
+  get localClippingEnabled(): boolean {
+    return this.localClippingEnabledValue
+  }
+
+  set localClippingEnabled(value: boolean) {
+    this.localClippingEnabledValue = rendererStateBoolean(value, 'Renderer.localClippingEnabled')
   }
 
   setOpaqueSort(method: RenderSortFunction | null): void {
@@ -657,6 +666,7 @@ export class Renderer {
     return {
       ...sizeOptions,
       outputColorSpace: sizeOptions.outputColorSpace ?? this.outputColorSpace,
+      localClippingEnabled: sizeOptions.localClippingEnabled ?? this.localClippingEnabled,
       sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
       opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
       transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
