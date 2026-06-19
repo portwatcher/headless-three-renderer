@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Context, Result, anyhow, bail};
 use bytemuck::{Pod, Zeroable};
@@ -217,10 +217,11 @@ struct GpuMesh {
     _clearcoat_normal_map: Option<wgpu::Texture>,
 }
 
-struct GpuBackground {
+struct GpuBackground<'a> {
     bind_group: wgpu::BindGroup,
     _texture: wgpu::Texture,
     _uniform_buffer: wgpu::Buffer,
+    _cache_guard: MutexGuard<'a, HashMap<BackgroundBindGroupKey, CachedBackgroundBindGroup>>,
 }
 
 #[derive(Clone)]
@@ -325,7 +326,6 @@ struct TextureBindGroupKey {
 struct BackgroundBindGroupKey {
     texture: TextureCacheKey,
     sampler: SamplerKey,
-    uniforms: BufferCacheKey,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -494,11 +494,10 @@ impl TextureBindGroupKey {
 }
 
 impl BackgroundBindGroupKey {
-    fn new(texture: &PreparedTexture, uniforms: &BackgroundUniforms) -> Self {
+    fn new(texture: &PreparedTexture) -> Self {
         Self {
             texture: TextureCacheKey::from_texture(texture),
             sampler: SamplerKey::from_texture(texture),
-            uniforms: BufferCacheKey::from_bytes(bytemuck::bytes_of(uniforms)),
         }
     }
 }
@@ -2681,7 +2680,7 @@ impl GpuRenderer {
         background: &BackgroundTexture,
         settings: &RenderSettings,
         output_color_space: OutputColorSpace,
-    ) -> GpuBackground {
+    ) -> GpuBackground<'_> {
         let gpu_texture = self.upload_texture(
             "headless-three-renderer scene background texture",
             &background.texture,
@@ -2722,18 +2721,19 @@ impl GpuRenderer {
             rotation2: background.rotation[1],
             rotation3: background.rotation[2],
         };
-        let key = BackgroundBindGroupKey::new(&background.texture, &uniforms);
-        if let Some(cached) = self
+        let key = BackgroundBindGroupKey::new(&background.texture);
+        let mut cache_guard = self
             .background_bind_group_cache
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .get(&key)
-            .cloned()
-        {
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(cached) = cache_guard.get(&key).cloned() {
+            self.queue
+                .write_buffer(&cached.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
             return GpuBackground {
                 bind_group: cached.bind_group,
                 _texture: gpu_texture,
                 _uniform_buffer: cached.uniform_buffer,
+                _cache_guard: cache_guard,
             };
         }
 
@@ -2751,7 +2751,7 @@ impl GpuRenderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("headless-three-renderer background uniform buffer"),
                 contents: bytemuck::bytes_of(&uniforms),
-                usage: wgpu::BufferUsages::UNIFORM,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("headless-three-renderer background bind group"),
@@ -2775,10 +2775,7 @@ impl GpuRenderer {
             uniform_buffer,
             bind_group,
         };
-        let cached = self
-            .background_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        let cached = cache_guard
             .entry(key)
             .or_insert_with(|| cached.clone())
             .clone();
@@ -2786,6 +2783,7 @@ impl GpuRenderer {
             bind_group: cached.bind_group,
             _texture: gpu_texture,
             _uniform_buffer: cached.uniform_buffer,
+            _cache_guard: cache_guard,
         }
     }
 
@@ -5485,35 +5483,39 @@ mod tests {
     }
 
     #[test]
-    fn background_bind_group_keys_track_texture_sampler_and_uniforms() {
+    fn background_bind_group_keys_track_texture_and_sampler() {
         let base = single_pixel_texture([255, 0, 0, 255]);
         let same = single_pixel_texture([255, 0, 0, 255]);
         let uniforms = BackgroundUniforms::zeroed();
         assert_eq!(
-            BackgroundBindGroupKey::new(&base, &uniforms),
-            BackgroundBindGroupKey::new(&same, &uniforms),
+            BackgroundBindGroupKey::new(&base),
+            BackgroundBindGroupKey::new(&same)
         );
 
         let different_texture = single_pixel_texture([0, 255, 0, 255]);
         assert_ne!(
-            BackgroundBindGroupKey::new(&base, &uniforms),
-            BackgroundBindGroupKey::new(&different_texture, &uniforms),
+            BackgroundBindGroupKey::new(&base),
+            BackgroundBindGroupKey::new(&different_texture),
         );
 
         let mut repeated_texture = single_pixel_texture([255, 0, 0, 255]);
         repeated_texture.wrap_t = WrapMode::Repeat;
         assert_ne!(
-            BackgroundBindGroupKey::new(&base, &uniforms),
-            BackgroundBindGroupKey::new(&repeated_texture, &uniforms),
+            BackgroundBindGroupKey::new(&base),
+            BackgroundBindGroupKey::new(&repeated_texture),
             "background sampler state is part of the cached bind group",
         );
 
         let mut changed_uniforms = uniforms;
         changed_uniforms.camera_params[0] = 1.0;
         assert_ne!(
-            BackgroundBindGroupKey::new(&base, &uniforms),
-            BackgroundBindGroupKey::new(&base, &changed_uniforms),
-            "camera and background uniform content must not share bind groups",
+            bytemuck::bytes_of(&uniforms),
+            bytemuck::bytes_of(&changed_uniforms),
+        );
+        assert_eq!(
+            BackgroundBindGroupKey::new(&base),
+            BackgroundBindGroupKey::new(&base),
+            "camera and background uniform content update the cached buffer instead of splitting bind groups",
         );
     }
 
