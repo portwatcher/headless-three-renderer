@@ -17764,7 +17764,7 @@ test('outputColorSpace string aliases match Three.js constants', () => {
   )
 })
 
-test('Renderer _outputColorSpace mirrors outputColorSpace compatibility state', () => {
+test('Renderer currentColorSpace and _outputColorSpace mirror outputColorSpace compatibility state', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.04, 0.08, 0.12)
   scene.add(new THREE.Mesh(
@@ -17777,15 +17777,29 @@ test('Renderer _outputColorSpace mirrors outputColorSpace compatibility state', 
   camera.lookAt(0, 0, 0)
 
   const renderer = new Renderer()
+  assert.equal(renderer.outputColorSpace, THREE.SRGBColorSpace)
+  assert.equal(renderer.currentColorSpace, THREE.SRGBColorSpace)
   assert.equal(renderer._outputColorSpace, THREE.SRGBColorSpace)
 
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+  assert.equal(renderer.currentColorSpace, THREE.LinearSRGBColorSpace)
   assert.equal(renderer._outputColorSpace, THREE.LinearSRGBColorSpace)
   const linearViaPublicState = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
 
   renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.currentColorSpace = THREE.LinearSRGBColorSpace
+  assert.equal(renderer.outputColorSpace, THREE.LinearSRGBColorSpace)
+  assert.equal(renderer._outputColorSpace, THREE.LinearSRGBColorSpace)
+  assert.deepEqual(
+    renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
+    linearViaPublicState,
+    'Renderer.currentColorSpace should feed the same output conversion state',
+  )
+
+  renderer.currentColorSpace = THREE.SRGBColorSpace
   renderer._outputColorSpace = THREE.LinearSRGBColorSpace
   assert.equal(renderer.outputColorSpace, THREE.LinearSRGBColorSpace)
+  assert.equal(renderer.currentColorSpace, THREE.LinearSRGBColorSpace)
   assert.deepEqual(
     renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }),
     linearViaPublicState,
@@ -17794,6 +17808,11 @@ test('Renderer _outputColorSpace mirrors outputColorSpace compatibility state', 
 
   renderer._outputColorSpace = 'srgb'
   assert.equal(renderer.outputColorSpace, THREE.SRGBColorSpace)
+  assert.equal(renderer.currentColorSpace, THREE.SRGBColorSpace)
+  assert.throws(
+    () => { renderer.currentColorSpace = 'display-p3' },
+    /Renderer\.currentColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+  )
   assert.throws(
     () => { renderer._outputColorSpace = 'display-p3' },
     /Renderer\._outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,

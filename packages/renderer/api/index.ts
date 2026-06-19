@@ -811,6 +811,14 @@ export class Renderer {
     this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer.outputColorSpace')
   }
 
+  get currentColorSpace(): RenderOutputColorSpace {
+    return this.outputColorSpaceValue
+  }
+
+  set currentColorSpace(value: RenderOutputColorSpace) {
+    this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer.currentColorSpace')
+  }
+
   get _outputColorSpace(): RenderOutputColorSpace {
     return this.outputColorSpaceValue
   }
