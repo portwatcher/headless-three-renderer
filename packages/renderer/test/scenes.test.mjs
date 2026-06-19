@@ -6460,6 +6460,68 @@ test('Renderer.setTransparentSort overrides transparent depth sorting', () => {
   assert.ok(mean.b > mean.r + 160, `custom transparent sort should draw blue after red (${mean.b} vs ${mean.r})`)
 })
 
+test('opaque sort callbacks receive object-level render item metadata', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const redGroup = new THREE.Group()
+  redGroup.renderOrder = 2
+  const red = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false }),
+  )
+  red.renderOrder = 4
+  redGroup.add(red)
+  scene.add(redGroup)
+
+  const blueGroup = new THREE.Group()
+  blueGroup.renderOrder = 1
+  const blue = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, depthTest: false }),
+  )
+  blue.renderOrder = 3
+  blueGroup.add(blue)
+  scene.add(blueGroup)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const seen = new Map()
+  const opaqueSort = (a, b) => {
+    for (const item of [a, b]) {
+      seen.set(item.object, {
+        groupOrder: item.groupOrder,
+        renderOrder: item.renderOrder,
+        materialVariant: item.materialVariant,
+        z: item.z,
+      })
+      assert.equal(item.geometry, item.object.geometry)
+      assert.equal(item.material, item.object.material)
+      assert.equal(item.group.materialIndex, 0)
+    }
+    return (a.object === red ? 1 : 0) - (b.object === red ? 1 : 0)
+  }
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, opaqueSort })
+  const redItem = seen.get(red)
+  const blueItem = seen.get(blue)
+  assert.ok(redItem)
+  assert.ok(blueItem)
+  assert.equal(redItem.groupOrder, 2)
+  assert.equal(redItem.renderOrder, 4)
+  assert.equal(redItem.materialVariant, 0)
+  assert.ok(Number.isFinite(redItem.z))
+  assert.equal(blueItem.groupOrder, 1)
+  assert.equal(blueItem.renderOrder, 3)
+  assert.equal(blueItem.materialVariant, 0)
+  assert.ok(Number.isFinite(blueItem.z))
+
+  const mean = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.r > mean.b + 160, `metadata-aware opaque sort should draw red after blue (${mean.r} vs ${mean.b})`)
+})
+
 test('opaque sort callbacks receive geometry group render items', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
