@@ -159,6 +159,7 @@ pub struct GpuRenderer {
     line_shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
     sampler: wgpu::Sampler,
     sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
+    state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     _default_normal_map_texture: wgpu::Texture,
@@ -219,6 +220,96 @@ struct SamplerKey {
     mipmap_filter: MipmapFilter,
     mip_lod_enabled: bool,
     anisotropy_clamp: u16,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct StatePipelineKey {
+    topology: Topology,
+    side: MeshSide,
+    sample_count: u32,
+    blending: BlendMode,
+    custom_blend: Option<CustomBlendPipelineKey>,
+    is_transparent: bool,
+    premultiplied_alpha: bool,
+    depth_test: bool,
+    depth_func: StencilCompare,
+    depth_write: bool,
+    color_write: bool,
+    polygon_offset: bool,
+    polygon_offset_factor: u32,
+    polygon_offset_units: i32,
+    alpha_to_coverage: bool,
+    stencil_write: bool,
+    stencil_write_mask: u32,
+    stencil_func: StencilCompare,
+    stencil_ref: u32,
+    stencil_func_mask: u32,
+    stencil_fail: StencilOperation,
+    stencil_z_fail: StencilOperation,
+    stencil_z_pass: StencilOperation,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct CustomBlendPipelineKey {
+    color_equation: BlendEquation,
+    alpha_equation: BlendEquation,
+    color_src_factor: BlendFactor,
+    color_dst_factor: BlendFactor,
+    alpha_src_factor: BlendFactor,
+    alpha_dst_factor: BlendFactor,
+}
+
+impl StatePipelineKey {
+    fn new(mesh: &PreparedMesh, sample_count: u32) -> Self {
+        Self {
+            topology: mesh.topology,
+            side: mesh.side,
+            sample_count,
+            blending: mesh.blending,
+            custom_blend: if effective_blend_mode(mesh.blending, mesh.is_transparent)
+                == BlendMode::Custom
+            {
+                mesh.custom_blend.map(CustomBlendPipelineKey::from)
+            } else {
+                None
+            },
+            is_transparent: mesh.is_transparent,
+            premultiplied_alpha: mesh.premultiplied_alpha,
+            depth_test: mesh.depth_test,
+            depth_func: mesh.depth_func,
+            depth_write: mesh.depth_write,
+            color_write: mesh.color_write,
+            polygon_offset: mesh.polygon_offset,
+            polygon_offset_factor: f32_key(mesh.polygon_offset_factor),
+            polygon_offset_units: mesh.polygon_offset_units,
+            alpha_to_coverage: mesh.alpha_to_coverage,
+            stencil_write: mesh.stencil_write,
+            stencil_write_mask: mesh.stencil_write_mask,
+            stencil_func: mesh.stencil_func,
+            stencil_ref: mesh.stencil_ref,
+            stencil_func_mask: mesh.stencil_func_mask,
+            stencil_fail: mesh.stencil_fail,
+            stencil_z_fail: mesh.stencil_z_fail,
+            stencil_z_pass: mesh.stencil_z_pass,
+        }
+    }
+}
+
+impl From<CustomBlendState> for CustomBlendPipelineKey {
+    fn from(state: CustomBlendState) -> Self {
+        Self {
+            color_equation: state.color_equation,
+            alpha_equation: state.alpha_equation,
+            color_src_factor: state.color_src_factor,
+            color_dst_factor: state.color_dst_factor,
+            alpha_src_factor: state.alpha_src_factor,
+            alpha_dst_factor: state.alpha_dst_factor,
+        }
+    }
+}
+
+fn f32_key(value: f32) -> u32 {
+    if value == 0.0 { 0 } else { value.to_bits() }
 }
 
 impl SamplerKey {
@@ -1528,6 +1619,7 @@ impl GpuRenderer {
             line_shadow_pipelines,
             sampler,
             sampler_cache: Mutex::new(HashMap::new()),
+            state_pipeline_cache: Mutex::new(HashMap::new()),
             shadow_sampler,
             _default_texture: default_texture,
             _default_normal_map_texture: default_normal_map,
@@ -2525,12 +2617,30 @@ impl GpuRenderer {
         mesh: &PreparedMesh,
         sample_count: u32,
     ) -> wgpu::RenderPipeline {
-        self.create_material_pipeline(
+        let key = StatePipelineKey::new(mesh, sample_count);
+        if let Some(pipeline) = self
+            .state_pipeline_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return pipeline;
+        }
+
+        let pipeline = self.create_material_pipeline(
             &self.shader,
             mesh,
             sample_count,
             "headless-three-renderer material state override pipeline",
-        )
+        );
+
+        self.state_pipeline_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| pipeline.clone())
+            .clone()
     }
 
     fn create_material_pipeline(
@@ -4464,8 +4574,12 @@ fn create_cubemap_with_mips(
 
 #[cfg(test)]
 mod tests {
-    use super::{SamplerKey, downsample_rgba_mip, texture_mip_level_count};
-    use crate::mesh::{MipmapFilter, TextureFilter, WrapMode};
+    use super::{
+        CustomBlendPipelineKey, SamplerKey, downsample_rgba_mip, f32_key, texture_mip_level_count,
+    };
+    use crate::mesh::{
+        BlendEquation, BlendFactor, CustomBlendState, MipmapFilter, TextureFilter, WrapMode,
+    };
 
     #[test]
     fn mip_level_count_tracks_min_filter_mode() {
@@ -4539,5 +4653,34 @@ mod tests {
         assert_eq!(nearest.anisotropy_clamp, 1);
         assert_eq!(nearest.mipmap_filter, MipmapFilter::Linear);
         assert_eq!(nearest.lod_max_clamp(), 32.0);
+    }
+
+    #[test]
+    fn state_pipeline_keys_ignore_dynamic_blend_constants() {
+        let first = CustomBlendState {
+            color_equation: BlendEquation::Add,
+            alpha_equation: BlendEquation::Max,
+            color_src_factor: BlendFactor::ConstantColor,
+            color_dst_factor: BlendFactor::OneMinusSrcAlpha,
+            alpha_src_factor: BlendFactor::One,
+            alpha_dst_factor: BlendFactor::OneMinusConstantAlpha,
+            constant: [0.1, 0.2, 0.3, 0.4],
+        };
+        let second = CustomBlendState {
+            constant: [0.9, 0.8, 0.7, 0.6],
+            ..first
+        };
+
+        assert_eq!(
+            CustomBlendPipelineKey::from(first),
+            CustomBlendPipelineKey::from(second),
+            "blend constants are set on the render pass, not baked into the pipeline",
+        );
+    }
+
+    #[test]
+    fn state_pipeline_float_keys_normalize_signed_zero() {
+        assert_eq!(f32_key(0.0), f32_key(-0.0));
+        assert_ne!(f32_key(0.0), f32_key(0.25));
     }
 }

@@ -247,7 +247,7 @@ impl TextureSamplerSettings {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Topology {
     #[default]
     Triangles,
@@ -375,7 +375,7 @@ impl NormalMapType {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum MeshSide {
     #[default]
     Front,
@@ -401,7 +401,7 @@ impl MeshSide {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlendMode {
     None,
     #[default]
@@ -425,7 +425,7 @@ impl BlendMode {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BlendEquation {
     Add,
     Subtract,
@@ -434,7 +434,7 @@ pub enum BlendEquation {
     Max,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BlendFactor {
     Zero,
     One,
@@ -464,7 +464,7 @@ pub struct CustomBlendState {
     pub constant: [f32; 4],
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StencilCompare {
     Never,
     Less,
@@ -476,7 +476,7 @@ pub enum StencilCompare {
     Always,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StencilOperation {
     Zero,
     Keep,
