@@ -72,6 +72,7 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    multipleDirectionalShadowCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
@@ -3335,6 +3336,101 @@ function physicalIblShadowCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(sphere.r > 200 && sphere.g > 210 && sphere.b > 220 && ground.r > 80 && ground.g > 80 && ground.b > 90 && corner.r === 10 && corner.g === 10 && corner.b === 13)) {
         throw new Error(`physical IBL shadow corpus should render a bright physical sphere and visible shadowed ground, got sphere=${JSON.stringify(sphere)} ground=${JSON.stringify(ground)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function multipleDirectionalShadowCorpus() {
+  function makeScene(lightXs) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        colorWrite: false,
+        depthWrite: false,
+      }),
+    )
+    caster.position.y = 0.75
+    caster.castShadow = true
+    scene.add(caster)
+
+    for (const x of lightXs) {
+      const light = new THREE.DirectionalLight(0xffffff, 2)
+      light.position.set(x, 5, 0)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.left = -6
+      light.shadow.camera.right = 6
+      light.shadow.camera.top = 6
+      light.shadow.camera.bottom = -6
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 12
+      scene.add(light)
+      scene.add(light.target)
+    }
+
+    return scene
+  }
+
+  const firstScene = makeScene([5])
+  const secondScene = makeScene([-5])
+  const bothScene = makeScene([5, -5])
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 10, 0)
+  camera.up.set(0, 0, -1)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const left = [21, 40, 36, 56]
+  const right = [60, 40, 75, 56]
+  const stats = {}
+
+  function luminance(rgba, region) {
+    const mean = meanRegion(rgba, options.width, ...region)
+    return mean.r + mean.g + mean.b
+  }
+
+  return {
+    name: 'multiple-directional-shadows',
+    scene: bothScene,
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    render(renderer) {
+      const first = renderer.render(firstScene, camera, options)
+      const second = renderer.render(secondScene, camera, options)
+      const both = renderer.render(bothScene, camera, options)
+      stats.firstLeft = luminance(first, left)
+      stats.firstRight = luminance(first, right)
+      stats.secondLeft = luminance(second, left)
+      stats.secondRight = luminance(second, right)
+      stats.bothLeft = luminance(both, left)
+      stats.bothRight = luminance(both, right)
+      return both
+    },
+    validate() {
+      if (!(stats.firstLeft < stats.firstRight - 25)) {
+        throw new Error(`first directional light should cast the left shadow, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.secondRight < stats.secondLeft - 25)) {
+        throw new Error(`second directional light should cast the right shadow, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.bothLeft < stats.secondLeft - 25 && stats.bothRight < stats.firstRight - 25)) {
+        throw new Error(`dual directional shadow maps should preserve both shadow regions, stats=${JSON.stringify(stats)}`)
       }
     },
   }
