@@ -1295,6 +1295,9 @@ function appendLineOrPoints(
     const textureInfo = extractTextureData(material)
     const drawStart = group.start
     const drawEnd = group.start + group.count
+    if (topology === 'lines') {
+      validateLineMaterialCompatibilityHints(material)
+    }
     const lineWidth = positiveMaterialOrObjectNumber(material?.linewidth, 'material.linewidth', 1)
     const thickLine = topology === 'lines' && lineWidth > 1
 
@@ -2102,6 +2105,36 @@ function positiveMaterialOrObjectNumber(value: unknown, label: string, fallback:
     throw new TypeError(`${label} must be positive.`)
   }
   return number
+}
+
+function validateLineMaterialCompatibilityHints(material: ThreeMaterialLike | undefined): void {
+  if (!material) return
+  optionalLineCap(material.linecap)
+  optionalLineJoin(material.linejoin)
+}
+
+function optionalLineCap(value: unknown): void {
+  if (value == null) return
+  if (typeof value !== 'string') {
+    throw new TypeError('material.linecap must be a string.')
+  }
+  if (value !== 'butt' && value !== 'round' && value !== 'square') {
+    throw new Error(
+      `material.linecap ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "butt", "round", "square", null, or undefined.`,
+    )
+  }
+}
+
+function optionalLineJoin(value: unknown): void {
+  if (value == null) return
+  if (typeof value !== 'string') {
+    throw new TypeError('material.linejoin must be a string.')
+  }
+  if (value !== 'round' && value !== 'bevel' && value !== 'miter') {
+    throw new Error(
+      `material.linejoin ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "round", "bevel", "miter", null, or undefined.`,
+    )
+  }
 }
 
 function normalizedMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {

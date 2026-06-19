@@ -291,6 +291,8 @@ export interface ThreeMaterialLike {
   gapSize?: number
   scale?: number
   linewidth?: number
+  linecap?: 'butt' | 'round' | 'square' | null
+  linejoin?: 'round' | 'bevel' | 'miter' | null
   rotation?: number
   customFragmentShader?: string
   customFragmentWgsl?: string

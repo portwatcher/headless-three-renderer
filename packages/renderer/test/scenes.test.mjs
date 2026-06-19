@@ -24556,6 +24556,41 @@ test('LineBasicMaterial and LineDashedMaterial ignore linecap and linejoin like 
   }
 })
 
+test('invalid LineBasicMaterial linecap and linejoin values fail clearly', () => {
+  function renderLine(material) {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0, 0),
+      new THREE.Vector3(1.2, 0, 0),
+    ])
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Line(geom, material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    renderRgba(scene, camera, { width: 32, height: 32 })
+  }
+
+  for (const [mutate, pattern] of [
+    [(material) => {
+      material.linecap = 1
+    }, /material\.linecap must be a string/i],
+    [(material) => {
+      material.linecap = 'triangle'
+    }, /material\.linecap "triangle" is not supported.*butt.*round.*square/i],
+    [(material) => {
+      material.linejoin = 1
+    }, /material\.linejoin must be a string/i],
+    [(material) => {
+      material.linejoin = 'triangle'
+    }, /material\.linejoin "triangle" is not supported.*round.*bevel.*miter/i],
+  ]) {
+    const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+    mutate(material)
+    assert.throws(() => renderLine(material), pattern)
+  }
+})
+
 test('LineBasicMaterial and LineDashedMaterial receiveShadow is accepted as an unlit WebGL-compatible no-op', () => {
   function renderLine(kind, receiveShadow) {
     const geom = new THREE.BufferGeometry().setFromPoints([
