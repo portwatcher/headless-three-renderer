@@ -798,6 +798,7 @@ export class Renderer {
       __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
       __headlessThreeRendererScissorTest: this.currentScissorTest,
       __headlessThreeRendererShadowMapEnabled: this.shadowMap.enabled,
+      __headlessThreeRendererShadowMapType: this.shadowMap.type,
       __headlessThreeRendererToneMapping: this.toneMapping,
       __headlessThreeRendererToneMappingExposure: this.toneMappingExposure,
     }
@@ -1009,6 +1010,7 @@ function toNativeInput(
     : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
   const rendererShadowMapEnabled = (options as InternalRenderOptions).__headlessThreeRendererShadowMapEnabled !== false
+  const rendererShadowMapType = (options as InternalRenderOptions).__headlessThreeRendererShadowMapType ?? PCFShadowMap
   const rendererToneMapping = (options as InternalRenderOptions).__headlessThreeRendererToneMapping ?? ACESFilmicToneMapping
   const toneMappingExposure = (options as InternalRenderOptions).__headlessThreeRendererToneMappingExposure ?? 1
   const extractedLights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
@@ -1075,6 +1077,7 @@ function toNativeInput(
     toneMapping: rendererToneMapping,
     toneMappingExposure,
     sampleCount: resolveSampleCount(options),
+    shadowMapType: rendererShadowMapType,
     meshes,
     lights,
     ambientLight: colorMode ? extractAmbientLight(scene, camera) ?? undefined : undefined,
@@ -1518,6 +1521,7 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeRendererScissor?: PixelRect | null
   __headlessThreeRendererScissorTest?: boolean
   __headlessThreeRendererShadowMapEnabled?: boolean
+  __headlessThreeRendererShadowMapType?: number
   __headlessThreeRendererToneMapping?: number
   __headlessThreeRendererToneMappingExposure?: number
 }

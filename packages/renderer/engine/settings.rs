@@ -68,6 +68,7 @@ pub struct RenderSettings {
     pub tone_mapping: f32,
     pub tone_mapping_exposure: f32,
     pub sample_count: u32,
+    pub shadow_map_type: f32,
     pub view: Mat4,
     pub view_projection: Mat4,
     pub camera_pos: Vec3,
@@ -233,6 +234,7 @@ impl RenderSettings {
                 bail!("scene.toneMappingExposure must be non-negative");
             }
             let sample_count = resolve_sample_count(scene.sample_count)?;
+            let shadow_map_type = resolve_shadow_map_type(scene.shadow_map_type)?;
             let lights = prepare_lights(scene)?;
             let ambient_color = parse_color(
                 scene.ambient_light.as_deref(),
@@ -261,6 +263,7 @@ impl RenderSettings {
                 tone_mapping,
                 tone_mapping_exposure,
                 sample_count,
+                shadow_map_type,
                 view,
                 view_projection,
                 camera_pos,
@@ -558,6 +561,18 @@ fn resolve_tone_mapping(value: Option<u32>) -> Result<f32> {
         7 => Ok(7.0), // THREE.NeutralToneMapping
         other => bail!(
             "unsupported scene.toneMapping `{other}`; expected NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, CustomToneMapping, AgXToneMapping, or NeutralToneMapping"
+        ),
+    }
+}
+
+fn resolve_shadow_map_type(value: Option<u32>) -> Result<f32> {
+    match value.unwrap_or(1) {
+        0 => Ok(0.0), // THREE.BasicShadowMap
+        1 => Ok(1.0), // THREE.PCFShadowMap
+        2 => Ok(2.0), // THREE.PCFSoftShadowMap
+        3 => Ok(3.0), // THREE.VSMShadowMap
+        other => bail!(
+            "unsupported scene.shadowMapType `{other}`; expected BasicShadowMap, PCFShadowMap, PCFSoftShadowMap, or VSMShadowMap"
         ),
     }
 }

@@ -1044,6 +1044,7 @@ export interface NativeRenderScene {
   toneMapping?: number
   toneMappingExposure?: number
   sampleCount?: number
+  shadowMapType?: number
   meshes?: NativeSceneMesh[]
   lights?: NativeSceneLight[]
   ambientLight?: number[]

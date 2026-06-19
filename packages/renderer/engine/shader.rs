@@ -355,6 +355,11 @@ fn sample_shadow_layer(shadow_slot: u32, world_pos: vec3<f32>, layer: u32, world
 
   let reference = proj.z - bias.x;
   let texel = uniforms.shadow_params2.yz;
+  let shadow_map_type = uniforms.shadow_params2.w;
+
+  if shadow_map_type < 0.5 {
+    return textureSampleCompareLevel(t_shadow, s_shadow, uv, layer, reference);
+  }
 
   // 3x3 PCF.
   var sum: f32 = 0.0;

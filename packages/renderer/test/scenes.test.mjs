@@ -23189,6 +23189,67 @@ test('Renderer shadowMap enabled gates reusable renderer shadows', () => {
   assert.ok(explicitLum < disabledLum - 20, `Renderer shadowMap.enabled=true should keep shadows enabled (${explicitLum} vs ${disabledLum})`)
 })
 
+test('Renderer shadowMap type controls Basic versus PCF sampling', () => {
+  function renderShadowType(type, radius) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.radius = radius
+    light.shadow.mapSize.set(128, 128)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+
+    const renderer = new Renderer()
+    renderer.shadowMap.type = type
+    const rgba = renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+    const mean = meanRegion(rgba, 96, 96, 28, 42, 68, 82)
+    return mean.r + mean.g + mean.b
+  }
+
+  const basicSmallRadius = renderShadowType(THREE.BasicShadowMap, 0)
+  const basicLargeRadius = renderShadowType(THREE.BasicShadowMap, 4)
+  const pcfLargeRadius = renderShadowType(THREE.PCFShadowMap, 4)
+
+  assert.ok(
+    Math.abs(basicSmallRadius - basicLargeRadius) < 1,
+    `BasicShadowMap should ignore PCF radius (${basicSmallRadius} vs ${basicLargeRadius})`,
+  )
+  assert.ok(
+    pcfLargeRadius < basicLargeRadius - 10,
+    `PCFShadowMap should use radius-based PCF sampling (${pcfLargeRadius} vs ${basicLargeRadius})`,
+  )
+})
+
 test('shadow lights over the native layer budget fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)

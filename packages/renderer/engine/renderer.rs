@@ -79,7 +79,7 @@ pub struct Uniforms {
     pub light_space_matrices: [[[f32; 4]; 4]; MAX_SHADOW_LAYERS],
     /// x = shadow count, y = first bias, z = first normal_bias, w = receive_shadow
     pub shadow_params: [f32; 4],
-    /// x = first shadow light index, y = 1/map_width, z = 1/map_height, w = first shadow kind.
+    /// x = first shadow light index, y = 1/map_width, z = 1/map_height, w = shadow-map type.
     pub shadow_params2: [f32; 4],
     /// x/y/z = first cascade split distances, w = shadow layer count.
     pub shadow_params3: [f32; 4],
@@ -4333,7 +4333,7 @@ fn shadow_params2(settings: &RenderSettings) -> [f32; 4] {
         first.light_index as f32,
         1.0 / shadow_maps.map_width as f32,
         1.0 / shadow_maps.map_height as f32,
-        shadow_kind_mode(first.kind),
+        settings.shadow_map_type,
     ]
 }
 
