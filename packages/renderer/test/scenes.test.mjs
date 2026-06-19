@@ -18717,6 +18717,44 @@ test('reusable renderer updates cached background and post-processing uniforms',
   assert.ok(Math.abs(invertedAgain.g - inverted.g) < 4 && Math.abs(invertedAgain.b - inverted.b) < 4, `post uniform buffer should update back to invert settings (${invertedAgain.r}, ${invertedAgain.g}, ${invertedAgain.b})`)
 })
 
+test('reusable renderer reflects mutated mesh material texture and transform state', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const texture = rgbaTexture([255, 255, 255, 255], 1, 1)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000, map: texture })
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.position.x = -0.5
+  scene.add(mesh)
+
+  const options = { width: 64, height: 64, format: 'rgba' }
+  const first = renderer.render(scene, camera, options)
+  const firstLeft = meanRegion(first, 64, 64, 8, 24, 28, 40)
+  const firstRight = meanRegion(first, 64, 64, 36, 24, 56, 40)
+
+  assert.ok(firstLeft.r > 180, `initial material color should render red on the left (${firstLeft.r}, ${firstLeft.g}, ${firstLeft.b})`)
+  assert.ok(firstLeft.g < 40 && firstLeft.b < 40, `initial left region should not include stale green/blue (${firstLeft.r}, ${firstLeft.g}, ${firstLeft.b})`)
+  assert.ok(firstRight.r < 20 && firstRight.g < 20 && firstRight.b < 20, `initial right region should remain background (${firstRight.r}, ${firstRight.g}, ${firstRight.b})`)
+
+  texture.image.data.set([0, 255, 0, 255])
+  texture.needsUpdate = true
+  material.color.set(0xffffff)
+  mesh.position.x = 0.5
+
+  const second = renderer.render(scene, camera, options)
+  const secondLeft = meanRegion(second, 64, 64, 8, 24, 28, 40)
+  const secondRight = meanRegion(second, 64, 64, 36, 24, 56, 40)
+
+  assert.ok(secondLeft.r < 20 && secondLeft.g < 20 && secondLeft.b < 20, `updated transform should clear the previous left region (${secondLeft.r}, ${secondLeft.g}, ${secondLeft.b})`)
+  assert.ok(secondRight.g > 180, `updated texture data should render green on the right (${secondRight.r}, ${secondRight.g}, ${secondRight.b})`)
+  assert.ok(secondRight.g > secondRight.r + 50 && secondRight.g > secondRight.b + 80, `updated material and texture state should produce a green-dominant right region (${secondRight.r}, ${secondRight.g}, ${secondRight.b})`)
+})
+
 test('invalid post-processing option values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)

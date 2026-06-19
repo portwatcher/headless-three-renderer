@@ -123,7 +123,7 @@ consistency test keeping that list synchronized with `gltf.test.mjs`.
 
 | Area | Status | Notes |
 |---|---|---|
-| Smoke tests | Supported | Module load, simple renders, output dimensions, reusable renderer. |
+| Smoke tests | Supported | Module load, simple renders, output dimensions, reusable renderer, and reusable renderer state freshness for mutated mesh transform/material/texture inputs. |
 | Conformance invariants | Supported | Scene-level render invariants for materials, PBR, IBL, shadows, post-processing, lines, points, layers, and render order. |
 | Scale budget tests | Supported | CI renders a 1,936-mesh scene, mixed 144-mesh raw-texture/light scene, 7,056-instance scene, 225-map raw texture, 169-map encoded texture, generated NodePerformanceTest-shaped glTF graph, and supported 64-light budget scenes, and checks the clear failure path for larger visible non-ambient light sets. Covered budgets and platform notes are documented in [scale-budgets.md](./scale-budgets.md). |
 | Packed artifact verification | Supported | CI packs the package and matching native binary across Linux x64, Linux arm64, macOS x64, macOS arm64, and Windows x64, installs them in clean temp projects, and renders a scene. |
