@@ -18093,6 +18093,14 @@ test('renderToTarget and options.target use target viewport and scissor fields',
   const returned = renderRgba(scene, camera, { width: 64, height: 64, target: options.target })
   assert.equal(returned, options.target.data, 'options.target should return target.data')
   assertTargetClip('options.target', options.target, options.depthTexture)
+
+  const rendererTarget = makeTarget()
+  const renderer = new Renderer()
+  renderer.setRenderTarget(rendererTarget.target)
+  const rendererReturned = renderer.render(scene, camera, { width: 64, height: 64 })
+  assert.equal(rendererReturned, rendererTarget.target.data, 'Renderer.setRenderTarget should return target.data')
+  assertTargetClip('Renderer.setRenderTarget', rendererTarget.target, rendererTarget.depthTexture)
+  renderer.setRenderTarget(null)
 })
 
 test('renderToTarget depthTexture preserves alphaMap cutouts', () => {
