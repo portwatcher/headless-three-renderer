@@ -11448,6 +11448,142 @@ test('custom and source shadow base maps sample selected UV channels', () => {
   }
 })
 
+test('custom and source shadow alphaMaps apply texture UV transforms', () => {
+  function alphaMapWithOffset(offsetX) {
+    const alphaMap = rgbaTexture([
+      255, 0, 255, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    alphaMap.magFilter = THREE.NearestFilter
+    alphaMap.minFilter = THREE.NearestFilter
+    alphaMap.offset.set(offsetX, 0)
+    return alphaMap
+  }
+
+  function casterGeometry(size) {
+    const geometry = new THREE.BoxGeometry(size, size, size)
+    setConstantUvAttribute(geometry, 'uv', 0.25, 0.5)
+    return geometry
+  }
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function sourceMaterialWithAlphaMap(offsetX) {
+    return new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      alphaMap: alphaMapWithOffset(offsetX),
+      alphaTest: 0.5,
+      colorWrite: false,
+      depthWrite: false,
+    })
+  }
+
+  function renderDirectionalCustomDepthAlphaTransform(offsetX, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const caster = new THREE.Mesh(
+      casterGeometry(3),
+      inheritFromSource
+        ? sourceMaterialWithAlphaMap(offsetX)
+        : new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    caster.customDepthMaterial = inheritFromSource
+      ? new THREE.MeshDepthMaterial()
+      : new THREE.MeshDepthMaterial({
+        alphaMap: alphaMapWithOffset(offsetX),
+        alphaTest: 0.5,
+      })
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  function renderPointCustomDistanceAlphaTransform(offsetX, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const caster = new THREE.Mesh(
+      casterGeometry(2.5),
+      inheritFromSource
+        ? sourceMaterialWithAlphaMap(offsetX)
+        : new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.25
+    caster.castShadow = true
+    caster.customDistanceMaterial = inheritFromSource
+      ? new THREE.MeshDistanceMaterial()
+      : new THREE.MeshDistanceMaterial({
+        alphaMap: alphaMapWithOffset(offsetX),
+        alphaTest: 0.5,
+      })
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+  }
+
+  for (const inheritFromSource of [false, true]) {
+    const label = inheritFromSource ? 'source material' : 'custom shadow material'
+    const transparentDepth = renderDirectionalCustomDepthAlphaTransform(0, inheritFromSource)
+    const offsetDepth = renderDirectionalCustomDepthAlphaTransform(0.5, inheritFromSource)
+    const transparentDepthLum = transparentDepth.r + transparentDepth.g + transparentDepth.b
+    const offsetDepthLum = offsetDepth.r + offsetDepth.g + offsetDepth.b
+    assert.ok(
+      offsetDepthLum < transparentDepthLum - 30,
+      `${label} alphaMap offset should shift customDepthMaterial caster UVs into the opaque texel (${offsetDepthLum} vs ${transparentDepthLum})`,
+    )
+
+    const transparentDistance = renderPointCustomDistanceAlphaTransform(0, inheritFromSource)
+    const offsetDistance = renderPointCustomDistanceAlphaTransform(0.5, inheritFromSource)
+    const transparentDistanceLum = transparentDistance.r + transparentDistance.g + transparentDistance.b
+    const offsetDistanceLum = offsetDistance.r + offsetDistance.g + offsetDistance.b
+    assert.ok(
+      offsetDistanceLum < transparentDistanceLum - 20,
+      `${label} alphaMap offset should shift customDistanceMaterial caster UVs into the opaque texel (${offsetDistanceLum} vs ${transparentDistanceLum})`,
+    )
+  }
+})
+
 test('source material alphaHash applies to custom shadow material casters', () => {
   function sourceMaterial(alphaHash) {
     return new THREE.MeshBasicMaterial({
