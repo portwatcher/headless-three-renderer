@@ -160,6 +160,7 @@ pub struct GpuRenderer {
     sampler: wgpu::Sampler,
     sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
+    custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
     shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     _default_normal_map_texture: wgpu::Texture,
@@ -257,6 +258,12 @@ struct CustomBlendPipelineKey {
     color_dst_factor: BlendFactor,
     alpha_src_factor: BlendFactor,
     alpha_dst_factor: BlendFactor,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct CustomPipelineKey {
+    state: StatePipelineKey,
+    fragment_body: String,
 }
 
 impl StatePipelineKey {
@@ -1620,6 +1627,7 @@ impl GpuRenderer {
             sampler,
             sampler_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
+            custom_pipeline_cache: Mutex::new(HashMap::new()),
             shadow_sampler,
             _default_texture: default_texture,
             _default_normal_map_texture: default_normal_map,
@@ -2597,6 +2605,20 @@ impl GpuRenderer {
         fragment_body: &str,
         sample_count: u32,
     ) -> Result<wgpu::RenderPipeline> {
+        let key = CustomPipelineKey {
+            state: StatePipelineKey::new(mesh, sample_count),
+            fragment_body: fragment_body.to_owned(),
+        };
+        if let Some(pipeline) = self
+            .custom_pipeline_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return Ok(pipeline);
+        }
+
         let source = custom_shader_source(fragment_body);
         let shader = self
             .device
@@ -2604,12 +2626,20 @@ impl GpuRenderer {
                 label: Some("headless-three-renderer custom material shader"),
                 source: wgpu::ShaderSource::Wgsl(source.into()),
             });
-        Ok(self.create_material_pipeline(
+        let pipeline = self.create_material_pipeline(
             &shader,
             mesh,
             sample_count,
             "headless-three-renderer custom material pipeline",
-        ))
+        );
+
+        Ok(self
+            .custom_pipeline_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| pipeline.clone())
+            .clone())
     }
 
     fn create_state_override_pipeline(
