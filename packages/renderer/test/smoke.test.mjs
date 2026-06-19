@@ -83,6 +83,14 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     })
     assert.deepEqual(Buffer.from(dataUriTexture.image), imageBytes)
     assert.equal(dataUriTexture.source.data, dataUriTexture.image)
+    assert.throws(
+      () => loader.load('data:text/plain,not-an-image'),
+      /Data URI texture is not a supported encoded image/i,
+    )
+    assert.throws(
+      () => loader.load('data:image/png;base64AAAA'),
+      /Data URI texture is missing a comma separator/i,
+    )
 
     const blobUrl = URL.createObjectURL(new Blob([imageBytes], { type: 'image/png' }))
     try {
@@ -93,6 +101,18 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
       assert.equal(blobTexture.source.data, blobTexture.image)
     } finally {
       URL.revokeObjectURL(blobUrl)
+    }
+
+    const unsupportedBlobUrl = URL.createObjectURL(new Blob(['not an image'], { type: 'text/plain' }))
+    try {
+      await new Promise((resolve, reject) => {
+        loader.load(unsupportedBlobUrl, () => reject(new Error('unsupported Blob URL should not load')), undefined, (error) => {
+          assert.match(String(error?.message ?? error), /Blob URL texture has unsupported content type "text\/plain"/i)
+          resolve()
+        })
+      })
+    } finally {
+      URL.revokeObjectURL(unsupportedBlobUrl)
     }
 
     await new Promise((resolve, reject) => {
