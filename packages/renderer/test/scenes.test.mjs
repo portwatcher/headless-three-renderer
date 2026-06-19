@@ -2038,6 +2038,11 @@ test('CubeCamera.update works with Renderer render-target state', () => {
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32, { generateMipmaps: true })
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
   const renderer = new Renderer()
+  assert.equal(renderer.xr.enabled, false)
+  assert.throws(
+    () => { renderer.xr.enabled = 'yes' },
+    /Renderer\.xr\.enabled must be a boolean/i,
+  )
   renderer.xr.enabled = true
 
   cubeCamera.update(renderer, scene)

@@ -165,6 +165,18 @@ class RendererInfoState {
   }
 }
 
+class RendererXrState {
+  private enabledValue = false
+
+  get enabled(): boolean {
+    return this.enabledValue
+  }
+
+  set enabled(value: boolean) {
+    this.enabledValue = rendererStateBoolean(value, 'Renderer.xr.enabled')
+  }
+}
+
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private opaqueSort: RenderSortFunction | null = null
@@ -190,7 +202,7 @@ export class Renderer {
   readonly info = new RendererInfoState()
   readonly reversedDepthBuffer = false
   readonly shadowMap = new RendererShadowMapState()
-  readonly xr = { enabled: false }
+  readonly xr = new RendererXrState()
 
   constructor() {
     this.native = new native.NativeRenderer()
