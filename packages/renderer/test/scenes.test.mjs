@@ -19951,6 +19951,7 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(target.texture.source.data.data, target.data)
   assert.equal(target.texture.source.data.width, 64)
   assert.equal(target.texture.source.data.height, 32)
+  assert.equal(target.texture.needsUpdate, true)
 
   const singleTextureArrayTarget = { texture: [{}] }
   renderToTarget(scene, makeCamera(), singleTextureArrayTarget, { width: 32, height: 16 })
@@ -19958,6 +19959,7 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleTextureArrayTarget.height, 16)
   assert.equal(singleTextureArrayTarget.texture[0].image.data, singleTextureArrayTarget.data)
   assert.equal(singleTextureArrayTarget.texture[0].source.data, singleTextureArrayTarget.texture[0].image)
+  assert.equal(singleTextureArrayTarget.texture[0].needsUpdate, true)
 
   const texturesTarget = { textures: [{}] }
   renderToTarget(scene, makeCamera(), texturesTarget, { width: 16, height: 8 })
@@ -19965,6 +19967,7 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(texturesTarget.height, 8)
   assert.equal(texturesTarget.textures[0].image.data, texturesTarget.data)
   assert.equal(texturesTarget.textures[0].source.data, texturesTarget.textures[0].image)
+  assert.equal(texturesTarget.textures[0].needsUpdate, true)
 
   const singleAttachmentMrtTarget = { isWebGLMultipleRenderTargets: true, textures: [{}] }
   renderToTarget(scene, makeCamera(), singleAttachmentMrtTarget, { width: 8, height: 4 })
@@ -19972,6 +19975,7 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleAttachmentMrtTarget.height, 4)
   assert.equal(singleAttachmentMrtTarget.textures[0].image.data, singleAttachmentMrtTarget.data)
   assert.equal(singleAttachmentMrtTarget.textures[0].source.data, singleAttachmentMrtTarget.textures[0].image)
+  assert.equal(singleAttachmentMrtTarget.textures[0].needsUpdate, true)
 })
 
 test('Renderer.setRenderTarget state writes regular targets', () => {
@@ -20085,6 +20089,7 @@ test('renderToTarget and options.target populate depthTexture with normalized RG
   assert.equal(depthTexture.source.data.data, depthTexture.image.data)
   assert.equal(depthTexture.source.data.width, 64)
   assert.equal(depthTexture.source.data.height, 64)
+  assert.equal(depthTexture.needsUpdate, true)
 
   const leftDepth = meanRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
   const rightDepth = meanRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
@@ -20105,6 +20110,7 @@ test('renderToTarget and options.target populate depthTexture with normalized RG
   assert.equal(optionsDepthTexture.source.data.data, optionsDepthTexture.image.data)
   assert.equal(optionsDepthTexture.source.data.width, 64)
   assert.equal(optionsDepthTexture.source.data.height, 64)
+  assert.equal(optionsDepthTexture.needsUpdate, true)
 
   const optionsLeftDepth = meanRegion(optionsDepthTexture.image.data, 64, 64, 18, 26, 26, 38)
   const optionsRightDepth = meanRegion(optionsDepthTexture.image.data, 64, 64, 38, 26, 46, 38)

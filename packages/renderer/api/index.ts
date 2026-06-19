@@ -2725,6 +2725,7 @@ function writeRenderTargetTexture(
   sourceData.data = data
   sourceData.width = width
   sourceData.height = height
+  texture.needsUpdate = true
 }
 
 function colorTextureData(texture: RenderTargetTextureLike, rgba: Buffer): NonNullable<RenderTargetImageLike['data']> {
