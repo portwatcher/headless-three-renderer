@@ -26930,6 +26930,33 @@ test('background textures apply UV transforms', () => {
   assert.ok(mean.g > mean.r + 40, `background texture offset should shift the sampled texel from red to green (${mean.g} vs ${mean.r})`)
 })
 
+test('background textures honor flipY', () => {
+  function renderBackground(flipY) {
+    const background = rgbaTexture([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ], 1, 2)
+    background.magFilter = THREE.NearestFilter
+    background.minFilter = THREE.NearestFilter
+    background.flipY = flipY
+
+    const scene = new THREE.Scene()
+    scene.background = background
+    const rgba = renderRgba(scene, makeCamera(), { width: 64, height: 64 })
+    return {
+      top: meanRegion(rgba, 64, 64, 24, 8, 40, 24),
+      bottom: meanRegion(rgba, 64, 64, 24, 40, 40, 56),
+    }
+  }
+
+  const unflipped = renderBackground(false)
+  const flipped = renderBackground(true)
+  assert.ok(unflipped.top.g > unflipped.top.r + 80, `unflipped background top should sample green (${unflipped.top.g} vs ${unflipped.top.r})`)
+  assert.ok(unflipped.bottom.r > unflipped.bottom.g + 80, `unflipped background bottom should sample red (${unflipped.bottom.r} vs ${unflipped.bottom.g})`)
+  assert.ok(flipped.top.r > flipped.top.g + 80, `flipped background top should sample red (${flipped.top.r} vs ${flipped.top.g})`)
+  assert.ok(flipped.bottom.g > flipped.bottom.r + 80, `flipped background bottom should sample green (${flipped.bottom.g} vs ${flipped.bottom.r})`)
+})
+
 test('background textures honor explicit texture matrices', () => {
   const background = rgbaTexture([
     255, 0, 0, 255,
