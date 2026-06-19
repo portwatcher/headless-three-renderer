@@ -6,6 +6,8 @@ export function createSceneCorpus() {
   return [
     transparentLayerCorpus(),
     alphaToCoverageCorpus(),
+    alphaToCoverageAlphaTestCorpus(),
+    alphaToCoverageClippingCorpus(),
     stencilRenderStateCorpus(),
     customBlendingCorpus(),
     backgroundOverrideCorpus(),
@@ -183,6 +185,12 @@ function countRegionPixels(rgba, width, x0, y0, x1, y1, predicate) {
   return count
 }
 
+function alphaCoverageBandPixels(rgba, width) {
+  return countRegionPixels(rgba, width, 20, 20, 76, 76, (r, g, b) => {
+    return r > 35 && r < 180 && Math.abs(r - g) < 4 && Math.abs(r - b) < 4
+  })
+}
+
 function pixelAt(rgba, width, x, y) {
   const offset = (y * width + x) * 4
   return {
@@ -261,6 +269,86 @@ function alphaToCoverageCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(center.r > 35 && center.r < 70 && center.g > 35 && center.g < 70 && center.b > 35 && center.b < 70 && center.a < 240 && corner.r === 0 && corner.g === 0 && corner.b === 0 && corner.a === 255)) {
         throw new Error(`alpha-to-coverage corpus should resolve a partial gray plane over black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function alphaToCoverageAlphaTestCorpus() {
+  const alphaMap = new THREE.DataTexture(new Uint8Array([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  alphaMap.magFilter = THREE.LinearFilter
+  alphaMap.minFilter = THREE.LinearFilter
+  alphaMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      alphaMap,
+      alphaTest: 0.5,
+      alphaToCoverage: true,
+    }),
+  ))
+
+  return {
+    name: 'alpha-to-coverage-alpha-test-threshold',
+    browserReference: false,
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      sampleCount: 4,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const softPixels = alphaCoverageBandPixels(rgba, width)
+      if (softPixels < 24) {
+        throw new Error(`alpha-to-coverage alphaTest corpus should produce a soft threshold band, got ${softPixels} partial pixels`)
+      }
+    },
+  }
+}
+
+function alphaToCoverageClippingCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 1.7),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      alphaToCoverage: true,
+      clippingPlanes: [new THREE.Plane(new THREE.Vector3(1, 1, 0).normalize(), 0)],
+    }),
+  ))
+
+  return {
+    name: 'alpha-to-coverage-clipping-plane',
+    browserReference: false,
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      sampleCount: 4,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+      localClippingEnabled: true,
+    },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const softPixels = alphaCoverageBandPixels(rgba, width)
+      if (softPixels < 24) {
+        throw new Error(`alpha-to-coverage clipping corpus should produce a soft clipping band, got ${softPixels} partial pixels`)
       }
     },
   }
