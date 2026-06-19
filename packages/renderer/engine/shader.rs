@@ -45,7 +45,7 @@ struct Uniforms {
   ao_params: vec4<f32>,
   // x = 1/width, y = 1/height, z = width, w = height
   render_params: vec4<f32>,
-  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped; z = alpha-to-coverage active.
+  // x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped; z = alpha-to-coverage active; w = toneMappingExposure.
   output_params: vec4<f32>,
   // texture_transform1.xyz / texture_transform2.xyz = base-color texture transform rows.
   // texture_transform1.w = base texture uses secondary UV stream.
@@ -1521,7 +1521,7 @@ fn aces_filmic_tone_mapping(color_in: vec3<f32>) -> vec3<f32> {
     vec3<f32>(-0.53108,  1.10813, -0.07276),
     vec3<f32>(-0.07367, -0.00605,  1.07602),
   );
-  var color = color_in * (1.0 / 0.6);
+  var color = color_in * (uniforms.output_params.w / 0.6);
   color = aces_input * color;
   color = rrt_and_odt_fit(color);
   color = aces_output * color;

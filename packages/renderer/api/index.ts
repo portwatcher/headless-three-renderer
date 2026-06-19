@@ -41,6 +41,8 @@ const PCFShadowMap = 1
 const PCFSoftShadowMap = 2
 const VSMShadowMap = 3
 const SupportedRendererShadowMapTypes = new Set([BasicShadowMap, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap])
+const NoToneMapping = 0
+const ACESFilmicToneMapping = 4
 
 export {
   applyVrmAnimation,
@@ -211,6 +213,8 @@ export class Renderer {
   private autoClearStencilValue = true
   private outputColorSpaceValue: RenderOutputColorSpace = 'srgb'
   private localClippingEnabledValue = true
+  private toneMappingValue = ACESFilmicToneMapping
+  private toneMappingExposureValue = 1
   private animationLoop: RenderAnimationLoopCallback | null = null
 
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
@@ -272,6 +276,22 @@ export class Renderer {
 
   set outputColorSpace(value: RenderOutputColorSpace) {
     this.outputColorSpaceValue = checkedOutputColorSpace(value, 'Renderer.outputColorSpace')
+  }
+
+  get toneMapping(): number {
+    return this.toneMappingValue
+  }
+
+  set toneMapping(value: number) {
+    this.toneMappingValue = rendererStateToneMapping(value)
+  }
+
+  get toneMappingExposure(): number {
+    return this.toneMappingExposureValue
+  }
+
+  set toneMappingExposure(value: number) {
+    this.toneMappingExposureValue = finiteNonNegativeNumber(value, 'Renderer.toneMappingExposure')
   }
 
   get localClippingEnabled(): boolean {
@@ -762,6 +782,8 @@ export class Renderer {
       __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
       __headlessThreeRendererScissorTest: this.currentScissorTest,
       __headlessThreeRendererShadowMapEnabled: this.shadowMap.enabled,
+      __headlessThreeRendererToneMapping: this.toneMapping,
+      __headlessThreeRendererToneMappingExposure: this.toneMappingExposure,
     }
   }
 
@@ -971,6 +993,8 @@ function toNativeInput(
     : undefined
   const clippingPlanes = extractClippingPlanes(options.clippingPlanes, 'options.clippingPlanes')
   const rendererShadowMapEnabled = (options as InternalRenderOptions).__headlessThreeRendererShadowMapEnabled !== false
+  const rendererToneMapping = (options as InternalRenderOptions).__headlessThreeRendererToneMapping ?? ACESFilmicToneMapping
+  const toneMappingExposure = (options as InternalRenderOptions).__headlessThreeRendererToneMappingExposure ?? 1
   const extractedLights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
   const lights = rendererShadowMapEnabled ? extractedLights : nativeLightsWithoutShadows(extractedLights)
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
@@ -990,7 +1014,7 @@ function toNativeInput(
     overrideMaterial,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
-  const meshes = applyRenderMode(flattenedMeshes, renderMode)
+  const meshes = applyRendererToneMapping(applyRenderMode(flattenedMeshes, renderMode), rendererToneMapping)
   const viewport = normalizeOptionalPixelRect(
     effectiveViewport(options),
     size.width,
@@ -1032,6 +1056,7 @@ function toNativeInput(
     backgroundTextureBlurriness,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
     outputColorSpace: options.outputColorSpace,
+    toneMappingExposure,
     sampleCount: resolveSampleCount(options),
     meshes,
     lights,
@@ -1091,6 +1116,11 @@ function nativeLightsWithoutShadows(lights: NativeSceneLight[] | undefined): Nat
 function applyRenderMode(meshes: NativeSceneMesh[], mode: RenderMode): NativeSceneMesh[] {
   if (mode === 'color') return meshes
   return meshes.map((mesh, index) => renderModeMesh(mesh, mode, index))
+}
+
+function applyRendererToneMapping(meshes: NativeSceneMesh[], toneMapping: number): NativeSceneMesh[] {
+  if (toneMapping !== NoToneMapping) return meshes
+  return meshes.map((mesh) => (mesh.toneMapped === false ? mesh : { ...mesh, toneMapped: false }))
 }
 
 function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'>, index: number): NativeSceneMesh {
@@ -1471,6 +1501,8 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeRendererScissor?: PixelRect | null
   __headlessThreeRendererScissorTest?: boolean
   __headlessThreeRendererShadowMapEnabled?: boolean
+  __headlessThreeRendererToneMapping?: number
+  __headlessThreeRendererToneMappingExposure?: number
 }
 
 const CUBE_FACE_COUNT = 6
@@ -2052,6 +2084,7 @@ function depthReadbackScene(scene: NativeRenderScene): NativeRenderScene {
     backgroundTextureBlurriness: undefined,
     format: 'rgba',
     outputColorSpace: 'srgb-linear',
+    toneMappingExposure: undefined,
     sampleCount: 1,
     meshes: scene.meshes?.map(depthReadbackMesh),
     lights: [],
@@ -2332,6 +2365,18 @@ function rendererStateShadowMapType(value: unknown): number {
   return value
 }
 
+function rendererStateToneMapping(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`Renderer.toneMapping must be a Three.js tone mapping constant; received ${String(value)}.`)
+  }
+  if (!Number.isInteger(value) || (value !== ACESFilmicToneMapping && value !== NoToneMapping)) {
+    throw new TypeError(
+      `Renderer.toneMapping ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.ACESFilmicToneMapping or THREE.NoToneMapping.`,
+    )
+  }
+  return value
+}
+
 function assertOptionalBoolean(value: unknown, label: string): void {
   rendererStateBoolean(value, label)
 }
@@ -2409,6 +2454,16 @@ function optionalNonNegativeFiniteNumber(value: unknown, label: string): number 
     throw new TypeError(`${label} must be non-negative.`)
   }
   return number
+}
+
+function finiteNonNegativeNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  if (value < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
+  }
+  return value
 }
 
 function optionalNormalizedFiniteNumber(value: unknown, label: string): number | undefined {

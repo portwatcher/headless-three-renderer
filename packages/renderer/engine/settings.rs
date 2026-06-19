@@ -65,6 +65,7 @@ pub struct RenderSettings {
     pub background_texture: Option<BackgroundTexture>,
     pub output_format: OutputFormat,
     pub output_color_space: OutputColorSpace,
+    pub tone_mapping_exposure: f32,
     pub sample_count: u32,
     pub view: Mat4,
     pub view_projection: Mat4,
@@ -222,6 +223,13 @@ impl RenderSettings {
 
             let output_format = OutputFormat::from_scene(scene)?;
             let output_color_space = OutputColorSpace::from_scene(scene)?;
+            let tone_mapping_exposure = finite_f32(
+                scene.tone_mapping_exposure.unwrap_or(1.0),
+                "scene.toneMappingExposure",
+            )?;
+            if tone_mapping_exposure < 0.0 {
+                bail!("scene.toneMappingExposure must be non-negative");
+            }
             let sample_count = resolve_sample_count(scene.sample_count)?;
             let lights = prepare_lights(scene)?;
             let ambient_color = parse_color(
@@ -248,6 +256,7 @@ impl RenderSettings {
                 background_texture,
                 output_format,
                 output_color_space,
+                tone_mapping_exposure,
                 sample_count,
                 view,
                 view_projection,

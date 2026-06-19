@@ -53,7 +53,7 @@ pub struct Uniforms {
     pub ao_params: [f32; 4],
     /// x = 1/width, y = 1/height, z = width, w = height
     pub render_params: [f32; 4],
-    /// x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped; z = alpha-to-coverage active.
+    /// x = 1 for LinearSRGBColorSpace output, 0 for SRGBColorSpace output; y = material toneMapped; z = alpha-to-coverage active; w = toneMappingExposure.
     pub output_params: [f32; 4],
     /// x/y/z = base-color texture transform row 0 (`u' = x*u + y*v + z`), w = reserved
     pub texture_transform1: [f32; 4],
@@ -3926,7 +3926,7 @@ impl GpuRenderer {
                 } else {
                     0.0
                 },
-                0.0,
+                settings.tone_mapping_exposure,
             ],
             texture_transform1: [
                 mesh.texture_transform[0],

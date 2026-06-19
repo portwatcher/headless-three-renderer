@@ -16604,6 +16604,66 @@ test('material.toneMapped=false skips material tone mapping before output conver
   assert.ok(unmapped.r > 245, `toneMapped=false should preserve white output (${unmapped.r})`)
 })
 
+test('Renderer toneMapping state controls material tone mapping exposure', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1) }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const renderToneMappingState = () => meanRgba(renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }))
+
+  assert.equal(renderer.toneMapping, THREE.ACESFilmicToneMapping)
+  assert.equal(renderer.toneMappingExposure, 1)
+  const mapped = renderToneMappingState()
+
+  renderer.toneMapping = THREE.NoToneMapping
+  const unmapped = renderToneMappingState()
+  assert.ok(
+    unmapped.r > mapped.r + 35,
+    `Renderer.toneMapping=NoToneMapping should keep brighter linear white (${unmapped.r} vs ${mapped.r})`,
+  )
+  assert.ok(unmapped.r > 245, `Renderer.toneMapping=NoToneMapping should preserve white output (${unmapped.r})`)
+
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 0.25
+  const dimmed = renderToneMappingState()
+  renderer.toneMappingExposure = 2
+  const brightened = renderToneMappingState()
+  assert.ok(
+    brightened.r > dimmed.r + 60,
+    `Renderer.toneMappingExposure should scale ACES tone mapping (${brightened.r} vs ${dimmed.r})`,
+  )
+
+  assert.throws(
+    () => { renderer.toneMapping = 'aces' },
+    /Renderer\.toneMapping must be a Three\.js tone mapping constant/i,
+  )
+  assert.throws(
+    () => { renderer.toneMapping = THREE.LinearToneMapping },
+    /Renderer\.toneMapping 1 is not supported.*ACESFilmicToneMapping.*NoToneMapping/i,
+  )
+  assert.throws(
+    () => { renderer.toneMappingExposure = Number.NaN },
+    /Renderer\.toneMappingExposure must be a finite number/i,
+  )
+  assert.throws(
+    () => { renderer.toneMappingExposure = -0.1 },
+    /Renderer\.toneMappingExposure must be non-negative/i,
+  )
+})
+
 test('outputColorSpace string aliases match Three.js constants', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.04, 0.08, 0.12)
