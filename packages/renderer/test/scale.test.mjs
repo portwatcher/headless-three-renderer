@@ -232,12 +232,12 @@ test('large scene budget renders 144 meshes, textures, and supported lights', ()
   assert.ok(mean.a > 240, `scale scene should remain opaque on average (${mean.a})`)
 })
 
-test('mesh render budget handles 1,764 separate mesh objects', () => {
+test('mesh render budget handles 1,936 separate mesh objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 42
-  const rows = 42
+  const columns = 44
+  const rows = 44
   const geometry = new THREE.PlaneGeometry(0.034, 0.034)
   const materials = [
     new THREE.MeshBasicMaterial({ color: 0xf25f5c }),
@@ -270,12 +270,12 @@ test('mesh render budget handles 1,764 separate mesh objects', () => {
   assert.ok(mean.r > 25 && mean.g > 25 && mean.b > 25, `separate mesh colors should survive rendering (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
-test('instanced mesh budget renders thousands of transformed colored instances', () => {
+test('instanced mesh budget renders 7,056 transformed colored instances', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 80
-  const rows = 80
+  const columns = 84
+  const rows = 84
   const count = columns * rows
   const mesh = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(0.022, 0.022),
