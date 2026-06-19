@@ -19712,6 +19712,33 @@ test('ShaderMaterial, RawShaderMaterial, NodeMaterial, and base Material can opt
   }
 })
 
+test('custom WGSL fragment top-level aliases render custom output', () => {
+  function renderWithAlias(alias) {
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    material[alias] = 'return vec4<f32>(0.0, 0.0, 1.0, alpha);'
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  for (const alias of [
+    'customFragmentWgsl',
+    'customFragmentShader',
+    'headlessFragmentWgsl',
+    'headlessFragmentShader',
+  ]) {
+    const mean = renderWithAlias(alias)
+    assert.ok(mean.b > mean.r + 40, `${alias} should render custom blue output (${mean.b} vs ${mean.r})`)
+    assert.ok(mean.b > mean.g + 40, `${alias} should render custom blue output (${mean.b} vs ${mean.g})`)
+  }
+})
+
 test('ShaderMaterial custom WGSL preserves output alpha', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
