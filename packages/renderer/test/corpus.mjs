@@ -30,6 +30,7 @@ export function createSceneCorpus() {
     narrowRawIblCorpus(),
     meshBasicMaterialWireframeCorpus(),
     meshDepthMaterialCorpus(),
+    meshDepthDisplacementMapCorpus(),
     meshDepthMaterialWireframeCorpus(),
     meshDistanceMaterialCorpus(),
     meshDistanceMaterialWireframeCorpus(),
@@ -118,6 +119,15 @@ function gradientTexture() {
   texture.minFilter = THREE.NearestFilter
   texture.needsUpdate = true
   return texture
+}
+
+function constantUvPlane(u, v, width = 2, height = 2) {
+  const geometry = new THREE.PlaneGeometry(width, height)
+  const uv = geometry.getAttribute('uv')
+  for (let i = 0; i < uv.count; i += 1) {
+    uv.setXY(i, u, v)
+  }
+  return geometry
 }
 
 function cubeTexture(faceColors) {
@@ -1573,6 +1583,65 @@ function meshDepthMaterialCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(center.r > 18 && center.r < 35 && Math.abs(center.r - center.g) <= 1 && Math.abs(center.r - center.b) <= 1 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
         throw new Error(`depth material corpus should render a low grayscale depth sphere, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function meshDepthDisplacementMapCorpus() {
+  function makeDisplacementMap() {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(u) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(u, 0.5),
+      new THREE.MeshDepthMaterial({
+        displacementMap: makeDisplacementMap(),
+        displacementScale: 2.5,
+        displacementBias: 0,
+        depthPacking: THREE.BasicDepthPacking,
+      }),
+    ))
+    return scene
+  }
+
+  const flatScene = makeScene(0.25)
+  const displacedScene = makeScene(0.75)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let flatCenter = null
+  let displacedCenter = null
+
+  return {
+    name: 'mesh-depth-material-displacement-map',
+    scene: displacedScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(flatScene, camera, options)
+      flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
+      const displaced = renderer.render(displacedScene, camera, options)
+      displacedCenter = meanRegion(displaced, options.width, 32, 32, 64, 64)
+      return displaced
+    },
+    validate() {
+      if (!(displacedCenter.r > flatCenter.r + 15)) {
+        throw new Error(`depth displacement corpus should move the plane nearer, flat=${JSON.stringify(flatCenter)} displaced=${JSON.stringify(displacedCenter)}`)
       }
     },
   }
