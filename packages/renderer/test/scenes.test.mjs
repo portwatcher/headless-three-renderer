@@ -27742,6 +27742,49 @@ test('render option null background clears scene backgrounds', () => {
   )
 })
 
+test('Renderer clear color state applies as background fallback', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  renderer.setClearColor(0x204080, 0.5)
+  assert.equal(renderer.getClearAlpha(), 0.5)
+
+  const clearColor = renderer.getClearColor()
+  assert.ok(Math.abs(clearColor.r - 0x20 / 255) < 1e-6, `clear red should match hex input (${clearColor.r})`)
+  assert.ok(Math.abs(clearColor.g - 0x40 / 255) < 1e-6, `clear green should match hex input (${clearColor.g})`)
+  assert.ok(Math.abs(clearColor.b - 0x80 / 255) < 1e-6, `clear blue should match hex input (${clearColor.b})`)
+
+  const colorTarget = new THREE.Color()
+  assert.strictEqual(renderer.getClearColor(colorTarget), colorTarget)
+  assert.ok(Math.abs(colorTarget.r - 0x20 / 255) < 1e-6, `target clear red should match hex input (${colorTarget.r})`)
+  assert.ok(Math.abs(colorTarget.g - 0x40 / 255) < 1e-6, `target clear green should match hex input (${colorTarget.g})`)
+  assert.ok(Math.abs(colorTarget.b - 0x80 / 255) < 1e-6, `target clear blue should match hex input (${colorTarget.b})`)
+
+  const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer clear color fallback')
+  assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer clear alpha fallback should be half opacity (${clear.a})`)
+
+  scene.background = new THREE.Color(1, 0, 0)
+  const sceneBackground = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
+  assertRgbClose(sceneBackground, [255, 0, 0], 'scene background should override Renderer clear color')
+  assert.ok(Math.abs(sceneBackground.a - 255) <= 1, `scene background alpha should remain opaque (${sceneBackground.a})`)
+
+  renderer.setClearAlpha(0.25)
+  const cleared = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba', background: null }))
+  assertRgbClose(cleared, [0x20, 0x40, 0x80], 'options.background null should use Renderer clear color')
+  assert.ok(Math.abs(cleared.a - 64) <= 1, `setClearAlpha should update fallback alpha (${cleared.a})`)
+
+  const optionBackground = meanRgba(renderer.render(scene, camera, {
+    width: 32,
+    height: 32,
+    format: 'rgba',
+    background: [0, 1, 0, 0.75],
+  }))
+  assertRgbClose(optionBackground, [0, 255, 0], 'options.background color should override Renderer clear color')
+  assert.ok(Math.abs(optionBackground.a - 191) <= 1, `options.background alpha should override Renderer clear alpha (${optionBackground.a})`)
+})
+
 test('Renderer size state applies as render fallback', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
@@ -27995,6 +28038,22 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   assert.throws(
     () => renderer.setSize(32, 16.5),
     /Renderer\.setSize height must be a positive integer/i,
+  )
+  assert.throws(
+    () => renderer.setClearColor('red'),
+    /Renderer\.setClearColor color must be a color-like object/i,
+  )
+  assert.throws(
+    () => renderer.setClearColor(0x1000000),
+    /Renderer\.setClearColor color must be between 0x000000 and 0xffffff/i,
+  )
+  assert.throws(
+    () => renderer.setClearColor(0xffffff, 'opaque'),
+    /Renderer\.setClearColor alpha must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.setClearAlpha(Number.NaN),
+    /Renderer\.setClearAlpha alpha must be a finite number/i,
   )
   renderer.setViewport(0, 0, 64, 16)
   assert.throws(

@@ -3,6 +3,8 @@ import { clamp01, areFiniteNumbers } from './math'
 
 type ColorLikeWithAlpha = Partial<ThreeColorLike> & { a?: unknown }
 
+export const DEFAULT_BACKGROUND_COLOR: Color4 = [0.04, 0.045, 0.05, 1]
+
 export function colorLikeToArray(value: unknown): Color4 | null {
   if (!value) return null
   if (Array.isArray(value)) return normalizeColorArray(value)
@@ -61,17 +63,22 @@ export function normalizeColorArray(values: number[], label?: string): Color4 {
   ]
 }
 
-export function resolveBackground(scene: ThreeSceneRootLike, options: RenderOptions, hasBackgroundTexture = false): Color4 {
+export function resolveBackground(
+  scene: ThreeSceneRootLike,
+  options: RenderOptions,
+  hasBackgroundTexture = false,
+  fallbackBackground: Color4 = DEFAULT_BACKGROUND_COLOR,
+): Color4 {
   const hasBackgroundOverride = options.background !== undefined
   if (hasBackgroundOverride) {
     const color = strictColorLikeToArray(options.background, 'options.background')
     if (color) return color
-    if (options.background == null || hasBackgroundTexture) return [0.04, 0.045, 0.05, 1]
+    if (options.background == null || hasBackgroundTexture) return fallbackBackground
     throw new TypeError('options.background must be a color, texture, or null.')
   }
   const color = strictColorLikeToArray(scene.background, 'scene.background')
   if (color) return color
-  if (scene.background == null || hasBackgroundTexture) return [0.04, 0.045, 0.05, 1]
+  if (scene.background == null || hasBackgroundTexture) return fallbackBackground
   throw new TypeError('scene.background must be a color, texture, or null.')
 }
 

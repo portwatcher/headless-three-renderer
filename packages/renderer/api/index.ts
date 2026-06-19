@@ -9,6 +9,7 @@ import type {
   RenderTargetImageLike,
   RenderPixelRectLike,
   RenderSizeLike,
+  ThreeColorLike,
   NativeRenderScene,
   NativeCamera,
   NativeSceneMesh,
@@ -24,13 +25,13 @@ import type {
 const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
-import { resolveBackground, validatedColorLikeToArray } from './color'
+import { DEFAULT_BACKGROUND_COLOR, resolveBackground, validatedColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
-import { matrixElements } from './math'
+import { clamp01, matrixElements } from './math'
 
 const WEBGL_COORDINATE_SYSTEM = 2000
 
@@ -105,6 +106,7 @@ export class Renderer {
   private currentActiveCubeFace = 0
   private currentActiveMipmapLevel = 0
   private currentSize: PixelSize | null = null
+  private currentClearColor: Color4 = [...DEFAULT_BACKGROUND_COLOR] as Color4
   private currentViewport: PixelRect | null = null
   private currentScissor: PixelRect | null = null
   private currentScissorTest = false
@@ -173,6 +175,31 @@ export class Renderer {
     return target === undefined
       ? clonePixelSize(this.currentSize)
       : clonePixelSize(this.currentSize, target)
+  }
+
+  setClearColor(color: number | ThreeColorLike | number[], alpha?: number): void {
+    this.currentClearColor = rendererStateClearColor(color, alpha)
+  }
+
+  getClearColor(): ThreeColorLike
+  getClearColor<T extends ThreeColorLike>(target: T): T
+  getClearColor(target?: ThreeColorLike): ThreeColorLike {
+    return target === undefined
+      ? cloneColor3(this.currentClearColor)
+      : cloneColor3(this.currentClearColor, target)
+  }
+
+  setClearAlpha(alpha: number): void {
+    this.currentClearColor = [
+      this.currentClearColor[0],
+      this.currentClearColor[1],
+      this.currentClearColor[2],
+      rendererStateClearAlpha(alpha, 'Renderer.setClearAlpha alpha'),
+    ]
+  }
+
+  getClearAlpha(): number {
+    return this.currentClearColor[3]
   }
 
   setViewport(rect: RenderPixelRectLike | null): void
@@ -526,6 +553,7 @@ export class Renderer {
       sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
       opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
       transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
+      __headlessThreeRendererClearColor: cloneColor4(this.currentClearColor),
       __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
       __headlessThreeRendererScissor: clonePixelRect(this.currentScissor),
       __headlessThreeRendererScissorTest: this.currentScissorTest,
@@ -771,7 +799,14 @@ function toNativeInput(
   const nativeScene: NativeRenderScene = {
     width: size.width,
     height: size.height,
-    background: colorMode ? resolveBackground(scene, options, backgroundTexture != null) : [0, 0, 0, 1],
+    background: colorMode
+      ? resolveBackground(
+        scene,
+        options,
+        backgroundTexture != null,
+        (options as InternalRenderOptions).__headlessThreeRendererClearColor,
+      )
+      : [0, 0, 0, 1],
     backgroundIntensity,
     viewport: pixelRectToArray(viewport),
     scissor: pixelRectToArray(scissor),
@@ -1215,6 +1250,7 @@ type RenderCubeTargetAttachmentData = {
 type InternalRenderOptions = RenderOptions & {
   __headlessThreeViewportLabel?: string
   __headlessThreeScissorLabel?: string
+  __headlessThreeRendererClearColor?: Color4
   __headlessThreeRendererViewport?: PixelRect | null
   __headlessThreeRendererScissor?: PixelRect | null
   __headlessThreeRendererScissorTest?: boolean
@@ -1971,6 +2007,64 @@ function rendererStatePixelRectFromComponents(values: unknown[], label: string):
     throw new TypeError(`${label} width and height must be greater than 0.`)
   }
   return { x, y, width, height }
+}
+
+function rendererStateClearColor(color: number | ThreeColorLike | number[], alpha?: number): Color4 {
+  const colorArray = typeof color === 'number'
+    ? rendererStateHexColor(color, 'Renderer.setClearColor color')
+    : validatedColorLikeToArray(color, 'Renderer.setClearColor color')
+  if (!colorArray) {
+    throw new TypeError('Renderer.setClearColor color must be a hex number, color-like object, or [r, g, b].')
+  }
+  return [
+    colorArray[0],
+    colorArray[1],
+    colorArray[2],
+    alpha === undefined ? colorArray[3] : rendererStateClearAlpha(alpha, 'Renderer.setClearColor alpha'),
+  ]
+}
+
+function rendererStateHexColor(value: number, label: string): Color4 {
+  if (!Number.isFinite(value) || !Number.isInteger(value)) {
+    throw new TypeError(`${label} must be a finite integer hex color.`)
+  }
+  if (value < 0 || value > 0xffffff) {
+    throw new TypeError(`${label} must be between 0x000000 and 0xffffff.`)
+  }
+  return [
+    ((value >> 16) & 0xff) / 255,
+    ((value >> 8) & 0xff) / 255,
+    (value & 0xff) / 255,
+    1,
+  ]
+}
+
+function rendererStateClearAlpha(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  return clamp01(value)
+}
+
+function cloneColor4(color: Color4): Color4 {
+  return [color[0], color[1], color[2], color[3]]
+}
+
+function cloneColor3(color: Color4): ThreeColorLike
+function cloneColor3<T extends ThreeColorLike>(color: Color4, target: T): T
+function cloneColor3<T extends ThreeColorLike>(color: Color4, target?: T): ThreeColorLike | T {
+  if (target) {
+    const mutable = target as any
+    if (typeof mutable.setRGB === 'function') {
+      mutable.setRGB(color[0], color[1], color[2])
+    } else {
+      mutable.r = color[0]
+      mutable.g = color[1]
+      mutable.b = color[2]
+    }
+    return target
+  }
+  return { isColor: true, r: color[0], g: color[1], b: color[2] }
 }
 
 function rendererStateSize(width: unknown, height: unknown, label: string): PixelSize {
