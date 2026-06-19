@@ -7,9 +7,11 @@ import { fileURLToPath } from 'node:url'
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const COMPATIBILITY_DOC = path.join(REPO_ROOT, 'docs', 'compatibility.md')
 const GLTF_SAMPLE_ASSETS_DOC = path.join(REPO_ROOT, 'docs', 'gltf-sample-assets.md')
+const NODE_LOADER_SETUP_DOC = path.join(REPO_ROOT, 'docs', 'node-loader-setup.md')
 const RELEASE_CHECKLIST_DOC = path.join(REPO_ROOT, 'docs', 'release-checklist.md')
 const CI_WORKFLOW = path.join(REPO_ROOT, '.github', 'workflows', 'CI.yml')
 const PACKAGE_JSON = path.join(REPO_ROOT, 'packages', 'renderer', 'package.json')
+const API_INDEX = path.join(REPO_ROOT, 'packages', 'renderer', 'api', 'index.ts')
 const GLTF_TEST = path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'gltf.test.mjs')
 
 test('public documentation links point at committed files', async () => {
@@ -17,6 +19,7 @@ test('public documentation links point at committed files', async () => {
     path.join(REPO_ROOT, 'README.md'),
     path.join(REPO_ROOT, 'docs', 'compatibility.md'),
     path.join(REPO_ROOT, 'docs', 'gltf-sample-assets.md'),
+    path.join(REPO_ROOT, 'docs', 'node-loader-setup.md'),
     path.join(REPO_ROOT, 'docs', 'release-checklist.md'),
     path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'README.md'),
   ]
@@ -108,6 +111,28 @@ test('release checklist gates compatibility and golden-reference updates', async
     /pnpm -C packages\/renderer run test:golden/,
     'release checklist should require the golden-reference harness',
   )
+})
+
+test('node loader setup docs name every exported loader helper', async () => {
+  const [doc, apiIndex] = await Promise.all([
+    readFile(NODE_LOADER_SETUP_DOC, 'utf8'),
+    readFile(API_INDEX, 'utf8'),
+  ])
+  const loaderExportBlock = apiIndex.match(/export \{\n([\s\S]*?)\n\} from '\.\/loaders'/)
+  assert.ok(loaderExportBlock, 'api/index.ts should re-export public loader helpers from ./loaders')
+  const exportedLoaderNames = loaderExportBlock[1]
+    .split('\n')
+    .map((line) => line.replace(/[, ]/g, ''))
+    .filter(Boolean)
+
+  for (const name of exportedLoaderNames) {
+    const documentedNamePattern = new RegExp(`\`${escapeRegExp(name)}(?:\\([^\`]*\\))?\``)
+    assert.match(
+      doc,
+      documentedNamePattern,
+      `docs/node-loader-setup.md should name exported loader helper ${name}`,
+    )
+  }
 })
 
 test('compatibility matrix and CI stay synchronized with packaged platform targets', async () => {
