@@ -417,6 +417,7 @@ export interface ThreeObject3DLike {
 
 export interface ThreeSceneRootLike extends ThreeObject3DLike {
   isScene?: boolean
+  overrideMaterial?: ThreeMaterialLike | null
   background?: ThreeColorLike | ThreeTextureLike | null
   backgroundIntensity?: number
   backgroundBlurriness?: number

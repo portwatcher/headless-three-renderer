@@ -26,7 +26,7 @@ import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPositio
 import { resolveBackground, validatedColorLikeToArray } from './color'
 import { flattenScene, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
-import { extractBackgroundTexture, resolveEnvironmentMap } from './materials'
+import { extractBackgroundTexture, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
 import { matrixElements } from './math'
@@ -305,7 +305,8 @@ function toNativeInput(
   }
 
   const size = resolveSize(camera, options)
-  const environment = colorMode ? resolveEnvironmentMap(scene, options.environmentIntensity) : { envMap: null }
+  const overrideMaterial = colorMode ? resolveSceneOverrideMaterial(scene) : undefined
+  const environment = colorMode ? resolveEnvironmentMap(scene, options.environmentIntensity, overrideMaterial) : { envMap: null }
   const envMap = environment.envMap
   const hasEnvironmentRotationOverride = options.environmentRotation !== undefined
   const environmentRotation = environment.rotation ?? (
@@ -363,6 +364,7 @@ function toNativeInput(
       opaqueSort: options.opaqueSort,
       transparentSort: options.transparentSort,
     },
+    overrideMaterial,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRenderMode(flattenedMeshes, renderMode)

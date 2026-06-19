@@ -139,6 +139,7 @@ export function flattenScene(
   shadowMaterialMode?: ShadowMaterialMode,
   materialContext: MaterialExtractionContext = {},
   sortOptions: SceneSortOptions = {},
+  overrideMaterial?: ThreeMaterialLike,
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
   const clippingContext: ClippingContext = {
@@ -146,7 +147,7 @@ export function flattenScene(
     intersectionPlanes: [],
     clipShadows: false,
   }
-  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
   return sortFlattenedMeshes(meshes, sortOptions)
     .map(({ mesh }) => mesh)
 }
@@ -161,6 +162,7 @@ function visitObject(
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
+  overrideMaterial: ThreeMaterialLike | undefined,
 ): void {
   if (!object) return
   if (optionalObjectBoolean(object.visible, 'object.visible') === false) return
@@ -177,27 +179,27 @@ function visitObject(
 
     if (object.isBatchedMesh === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
       }
     } else if (object.isMesh === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
       }
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext)
+        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext, overrideMaterial)
       }
     } else if (object.isPoints === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
       }
     } else if (object.isSprite === true) {
-      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
     }
   }
 
   for (const child of objectChildren(object)) {
-    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext)
+    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
   }
 }
 
@@ -210,6 +212,7 @@ function appendBatchedMesh(
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
+  overrideMaterial: ThreeMaterialLike | undefined,
 ): void {
   const geometry = object.geometry!
   const draws = batchedMeshDraws(object, camera, geometry)
@@ -239,6 +242,7 @@ function appendBatchedMesh(
       localClippingEnabled,
       shadowMaterialMode,
       materialContext,
+      overrideMaterial,
       [draw.instance],
       sortKeyOverride,
       object,
@@ -255,6 +259,7 @@ function appendMesh(
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
+  overrideMaterial?: ThreeMaterialLike,
   instanceOverride?: MeshInstance[],
   sortKeyOverride?: SortKeyOverride,
   sortItemObject?: ThreeObject3DLike,
@@ -301,7 +306,7 @@ function appendMesh(
   const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
 
   for (const group of groups) {
-    const material = materialForGroup(object.material, group.materialIndex)
+    const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
 
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
@@ -640,6 +645,18 @@ function customShadowMaterialForMode(
   return undefined
 }
 
+function materialForObjectGroup(
+  object: ThreeObject3DLike,
+  materialIndex: number,
+  overrideMaterial: ThreeMaterialLike | undefined,
+): ThreeMaterialLike | undefined {
+  if (overrideMaterial !== undefined) {
+    assertMaterialLike(overrideMaterial, 'scene.overrideMaterial')
+    return overrideMaterial
+  }
+  return materialForGroup(object.material, materialIndex)
+}
+
 function shadowOnlyMainPassState(): Pick<
   NativeSceneMesh,
   'blending' | 'colorWrite' | 'depthTest' | 'depthWrite' | 'stencilWrite' | 'transparent'
@@ -663,11 +680,12 @@ function appendSprite(
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
+  overrideMaterial: ThreeMaterialLike | undefined,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
 
-  const material = materialForGroup(object.material, 0)
+  const material = materialForObjectGroup(object, 0, overrideMaterial)
   if (material?.visible === false) return
 
   validateSpriteScale(object)
@@ -786,6 +804,7 @@ function appendPoints(
   localClippingEnabled: boolean,
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
+  overrideMaterial: ThreeMaterialLike | undefined,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
@@ -806,7 +825,7 @@ function appendPoints(
   const axes = cameraBillboardAxes(camera)
 
   for (const group of groups) {
-    const material = materialForGroup(object.material, group.materialIndex)
+    const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
     const pointUvStreams = primaryPointUvs && (material?.map || material?.alphaMap)
       ? textureUvStreamsForMapAlphaMaterial(pointUvChannels, {
@@ -1186,6 +1205,7 @@ function appendLineOrPoints(
   clippingContext: ClippingContext,
   localClippingEnabled: boolean,
   materialContext: MaterialExtractionContext,
+  overrideMaterial?: ThreeMaterialLike,
 ): void {
   validateObjectShadowFlags(object)
   const objectCastsShadow = topology === 'lines' && optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
@@ -1204,7 +1224,7 @@ function appendLineOrPoints(
   const groups = effectiveGroups(geometry, indexAttr, vertexCount)
 
   for (const group of groups) {
-    const material = materialForGroup(object.material, group.materialIndex)
+    const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
 
     const uvStreams: TextureUvStreams = topology === 'lines'

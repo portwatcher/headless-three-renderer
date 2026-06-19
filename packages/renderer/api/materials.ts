@@ -166,10 +166,29 @@ export function extractEnvironmentMap(scene: ThreeSceneRootLike, intensityOverri
   return extractEnvironmentMapFromTexture(probe.texture, probe.label, intensity)
 }
 
-export function resolveEnvironmentMap(scene: ThreeSceneRootLike, intensityOverride?: number): EnvironmentMapResolution {
+export function resolveSceneOverrideMaterial(scene: ThreeSceneRootLike): ThreeMaterialLike | undefined {
+  const overrideMaterial = scene.overrideMaterial
+  if (overrideMaterial == null) return undefined
+  assertMaterialLike(overrideMaterial, 'scene.overrideMaterial')
+  return overrideMaterial
+}
+
+export function resolveEnvironmentMap(
+  scene: ThreeSceneRootLike,
+  intensityOverride?: number,
+  overrideMaterial?: ThreeMaterialLike,
+): EnvironmentMapResolution {
   const sceneEnvMap = extractEnvironmentMap(scene, intensityOverride)
   if (sceneEnvMap) {
     return { envMap: sceneEnvMap }
+  }
+
+  if (overrideMaterial) {
+    const overrideEnvMap = extractOverrideMaterialEnvironmentMap(overrideMaterial)
+    if (overrideEnvMap) {
+      return overrideEnvMap
+    }
+    return { envMap: null }
   }
 
   const materialEnvMap = extractMaterialEnvironmentMap(scene)
@@ -183,6 +202,28 @@ export function resolveEnvironmentMap(scene: ThreeSceneRootLike, intensityOverri
     materialContext: {
       materialEnvironmentSource: 'material',
       materialEnvironmentMaps: materialEnvMap.materials,
+    },
+  }
+}
+
+function extractOverrideMaterialEnvironmentMap(material: ThreeMaterialLike): EnvironmentMapResolution | null {
+  if (optionalBoolean(material.visible, 'scene.overrideMaterial.visible') === false) return null
+  const materialEnvMap = material.envMap
+  if (!materialEnvMap) return null
+  if (!supportsNativeMaterialEnvironmentMap(material)) return null
+
+  assertSupportedMaterialEnvironmentMap(material)
+  const usesRefraction = isRefractionEnvironmentMapping(materialEnvMap.mapping)
+  const envMap = extractEnvironmentMapFromTexture(materialEnvMap, 'material.envMap', 1, { allowRefraction: usesRefraction })
+  const materials = new WeakSet<ThreeMaterialLike>()
+  materials.add(material)
+
+  return {
+    envMap,
+    rotation: materialEnvMapRotation(material),
+    materialContext: {
+      materialEnvironmentSource: 'material',
+      materialEnvironmentMaps: materials,
     },
   }
 }

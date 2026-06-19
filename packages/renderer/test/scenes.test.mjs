@@ -345,6 +345,79 @@ test('invalid render scene and camera containers fail clearly', () => {
   )
 })
 
+test('scene.overrideMaterial replaces mesh material arrays', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const geometry = new THREE.PlaneGeometry(1.6, 1.6)
+  geometry.clearGroups()
+  geometry.addGroup(0, 3, 0)
+  geometry.addGroup(3, 3, 1)
+  scene.add(new THREE.Mesh(geometry, [
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  ]))
+  scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, toneMapped: false })
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 18, 18, 46, 46)
+  assert.ok(mean.g > mean.r + 120, `override material should replace red group material (${mean.g} vs ${mean.r})`)
+  assert.ok(mean.g > mean.b + 120, `override material should replace blue group material (${mean.g} vs ${mean.b})`)
+})
+
+test('scene.overrideMaterial owns material envMap discovery', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const redEnvMap = solidTexture(255, 0, 0)
+  redEnvMap.mapping = THREE.EquirectangularReflectionMapping
+  const blueEnvMap = solidTexture(0, 0, 255)
+  blueEnvMap.mapping = THREE.EquirectangularReflectionMapping
+  const greenEnvMap = solidTexture(0, 255, 0)
+  greenEnvMap.mapping = THREE.EquirectangularReflectionMapping
+
+  const geometry = new THREE.PlaneGeometry(1.6, 1.6)
+  geometry.clearGroups()
+  geometry.addGroup(0, 3, 0)
+  geometry.addGroup(3, 3, 1)
+  scene.add(new THREE.Mesh(geometry, [
+    new THREE.MeshBasicMaterial({ color: 0xffffff, envMap: redEnvMap }),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, envMap: blueEnvMap }),
+  ]))
+  scene.overrideMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    envMap: greenEnvMap,
+    combine: THREE.MixOperation,
+    reflectivity: 1,
+  })
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRegion(renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }), 64, 64, 18, 18, 46, 46)
+  assert.ok(mean.g > mean.r + 40, `override envMap should replace source material red output (${mean.g} vs ${mean.r})`)
+  assert.ok(mean.g > mean.b + 40, `override envMap should replace source material blue output (${mean.g} vs ${mean.b})`)
+})
+
+test('invalid scene.overrideMaterial values fail clearly', () => {
+  const scene = new THREE.Scene()
+  scene.overrideMaterial = 'green'
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ color: 0xffffff })))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /scene\.overrideMaterial must be a material-like object/i,
+  )
+})
+
 test('invalid transform matrix values fail clearly', () => {
   const camera = makeCamera()
 
