@@ -22929,6 +22929,62 @@ test('Line and LineLoop with InstancedBufferGeometry expand instanced map UV att
   }
 })
 
+test('Line and LineLoop with InstancedBufferGeometry expand selected instanced map UV channels', () => {
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  function renderLine(makeObject) {
+    const geometry = new THREE.InstancedBufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -0.25, 0, 0,
+      0.25, 0, 0,
+    ]), 3))
+    geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+      -0.45, 0, 0,
+      0.45, 0, 0,
+    ]), 3))
+    geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+      0.25, 0.5,
+      0.25, 0.5,
+    ]), 2))
+    geometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+      0.25, 0.5,
+      0.75, 0.5,
+    ]), 2))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(makeObject(geometry, new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      linewidth: 8,
+      map,
+    })))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const [label, makeObject] of [
+    ['Line', (geometry, material) => new THREE.Line(geometry, material)],
+    ['LineLoop', (geometry, material) => new THREE.LineLoop(geometry, material)],
+  ]) {
+    const rgba = renderLine(makeObject)
+    const redPixels = countRegionPixels(rgba, 96, 96, 12, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
+    const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
+    const bridgePixels = countRegionPixels(rgba, 96, 96, 43, 40, 53, 56, (r, g, b) => r > 30 || g > 30 || b > 30)
+    assert.ok(redPixels > 4, `${label} selected instanced line uv1 should sample red (${redPixels})`)
+    assert.ok(greenPixels > 4, `${label} selected instanced line uv1 should sample green (${greenPixels})`)
+    assert.ok(bridgePixels < 4, `${label} selected instanced line uv should not connect separate instances (${bridgePixels})`)
+  }
+})
+
 test('LineDashedMaterial with InstancedBufferGeometry default instanceCount expands instanced map UV attributes', () => {
   const geometry = new THREE.InstancedBufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
@@ -22972,6 +23028,56 @@ test('LineDashedMaterial with InstancedBufferGeometry default instanceCount expa
   const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
   assert.ok(redPixels > 4, `left instanced dashed line uv should sample red (${redPixels})`)
   assert.ok(greenPixels > 4, `right instanced dashed line uv should sample green (${greenPixels})`)
+})
+
+test('LineDashedMaterial with InstancedBufferGeometry expands selected instanced map UV channels', () => {
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.25, 0, 0,
+    0.25, 0, 0,
+  ]), 3))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.45, 0, 0,
+    0.45, 0, 0,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  geometry.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([0, 1]), 1))
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.LineSegments(geometry, new THREE.LineDashedMaterial({
+    color: 0xffffff,
+    dashSize: 4,
+    gapSize: 0,
+    linewidth: 8,
+    map,
+    scale: 1,
+  })))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+  const redPixels = countRegionPixels(rgba, 96, 96, 12, 40, 44, 56, (r, g, b) => r > g + 30 && r > b + 30)
+  const greenPixels = countRegionPixels(rgba, 96, 96, 52, 40, 84, 56, (r, g, b) => g > r + 30 && g > b + 30)
+  assert.ok(redPixels > 4, `left selected instanced dashed-line uv1 should sample red (${redPixels})`)
+  assert.ok(greenPixels > 4, `right selected instanced dashed-line uv1 should sample green (${greenPixels})`)
 })
 
 test('LineDashedMaterial with InstancedBufferGeometry default instanceCount expands offsets and colors', () => {
