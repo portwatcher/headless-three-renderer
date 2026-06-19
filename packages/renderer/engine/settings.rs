@@ -1,3 +1,5 @@
+use std::thread;
+
 use anyhow::{Result, bail};
 use glam::{Mat4, Vec3};
 
@@ -167,161 +169,183 @@ impl RenderSettings {
             "scene.backgroundIntensity",
         )?
         .max(0.0);
-        let background_texture = match &scene.background_texture {
-            Some(data) if !data.is_empty() => {
-                let mut texture = decode_texture_with_label(
-                    data,
-                    scene.background_texture_width,
-                    scene.background_texture_height,
-                    "scene.backgroundTexture",
-                )?;
-                texture.wrap_s = WrapMode::from_str_opt(scene.background_texture_wrap_s.as_deref());
-                texture.wrap_t = WrapMode::from_str_opt(scene.background_texture_wrap_t.as_deref());
-                texture.mag_filter =
-                    TextureFilter::from_str_opt(scene.background_texture_mag_filter.as_deref());
-                texture.min_filter = TextureFilter::from_min_filter_str(
-                    scene.background_texture_min_filter.as_deref(),
-                );
-                texture.mipmap_filter = MipmapFilter::from_min_filter_str(
-                    scene.background_texture_min_filter.as_deref(),
-                );
-                texture.anisotropy = texture_anisotropy(scene.background_texture_anisotropy);
-                Some(BackgroundTexture {
-                    texture,
-                    transform: parse_texture_transform(
-                        scene.background_texture_transform.as_deref(),
-                        "scene.backgroundTextureTransform",
-                    )?,
-                    is_srgb: matches!(
-                        scene.background_texture_color_space.as_deref(),
-                        Some("srgb")
-                    ),
-                    mapping: BackgroundTextureMapping::from_scene(
-                        scene.background_texture_mapping.as_deref(),
-                    )?,
-                    rotation: parse_rotation_columns(
-                        scene.background_texture_rotation.as_deref(),
-                        "scene.backgroundTextureRotation",
-                    )?,
-                    intensity: background_intensity,
-                    blurriness: finite_f32(
-                        scene.background_texture_blurriness.unwrap_or(0.0),
-                        "scene.backgroundTextureBlurriness",
-                    )?
-                    .clamp(0.0, 1.0),
-                })
+        thread::scope(|scope| {
+            let background_handle =
+                scope.spawn(|| prepare_background_texture(scene, background_intensity));
+            let ibl_handle = scope.spawn(|| prepare_scene_ibl(scene));
+
+            let background_texture =
+                join_prepare_worker(background_handle, "background texture worker")?;
+
+            let eye = parse_vec3(camera.eye.as_deref(), [2.5, 1.8, 3.2], "camera.eye")?;
+            let target = parse_vec3(camera.target.as_deref(), [0.0, 0.0, 0.0], "camera.target")?;
+            let up = parse_vec3(camera.up.as_deref(), [0.0, 1.0, 0.0], "camera.up")?;
+
+            if eye.distance_squared(target) <= f32::EPSILON {
+                bail!("camera.eye must not equal camera.target");
             }
-            _ => None,
-        };
-
-        let eye = parse_vec3(camera.eye.as_deref(), [2.5, 1.8, 3.2], "camera.eye")?;
-        let target = parse_vec3(camera.target.as_deref(), [0.0, 0.0, 0.0], "camera.target")?;
-        let up = parse_vec3(camera.up.as_deref(), [0.0, 1.0, 0.0], "camera.up")?;
-
-        if eye.distance_squared(target) <= f32::EPSILON {
-            bail!("camera.eye must not equal camera.target");
-        }
-        if up.length_squared() <= f32::EPSILON {
-            bail!("camera.up must not be a zero vector");
-        }
-
-        let fov_y_degrees = camera.fov_y_degrees.unwrap_or(45.0);
-        if !fov_y_degrees.is_finite() || !(1.0..179.0).contains(&fov_y_degrees) {
-            bail!("camera.fov_y_degrees must be finite and between 1 and 179");
-        }
-
-        let near = finite_positive(camera.near.unwrap_or(0.01), "camera.near")?;
-        let far = finite_positive(camera.far.unwrap_or(100.0), "camera.far")?;
-        if far <= near {
-            bail!("camera.far must be greater than camera.near");
-        }
-
-        let view = match camera.view_matrix.as_deref() {
-            Some(matrix) => parse_mat4(matrix, "camera.viewMatrix")?,
-            None => Mat4::look_at_rh(eye, target, up.normalize()),
-        };
-
-        let view_projection = match camera.view_projection.as_deref() {
-            Some(matrix) => parse_mat4(matrix, "camera.viewProjection")?,
-            None => {
-                let aspect = width as f32 / height as f32;
-                let projection =
-                    Mat4::perspective_rh(fov_y_degrees.to_radians() as f32, aspect, near, far);
-                projection * view
+            if up.length_squared() <= f32::EPSILON {
+                bail!("camera.up must not be a zero vector");
             }
-        };
 
-        let camera_pos = parse_vec3(
-            camera.camera_position.as_deref(),
-            eye.to_array(),
-            "camera.cameraPosition",
-        )?;
-
-        let output_format = OutputFormat::from_scene(scene)?;
-        let output_color_space = OutputColorSpace::from_scene(scene)?;
-        let sample_count = resolve_sample_count(scene.sample_count)?;
-        let lights = prepare_lights(scene)?;
-        let ambient_color = parse_color(
-            scene.ambient_light.as_deref(),
-            [1.0, 1.0, 1.0, 1.0],
-            "scene.ambientLight",
-        )?;
-        let ambient_intensity = scene.ambient_intensity.unwrap_or(0.0) as f32;
-        let (light_probe, has_light_probe) = parse_light_probe(scene.light_probe.as_deref())?;
-
-        let ibl = match &scene.environment_map {
-            Some(data) if !data.is_empty() => {
-                let rotation = parse_rotation_columns(
-                    scene.environment_map_rotation.as_deref(),
-                    "scene.environmentMapRotation",
-                )?;
-                let env_map = EnvMap::from_bytes(
-                    data,
-                    scene.environment_map_width,
-                    scene.environment_map_height,
-                    parse_environment_color_space(scene.environment_map_color_space.as_deref())?,
-                )?;
-                Some(compute_ibl(&env_map, rotation))
+            let fov_y_degrees = camera.fov_y_degrees.unwrap_or(45.0);
+            if !fov_y_degrees.is_finite() || !(1.0..179.0).contains(&fov_y_degrees) {
+                bail!("camera.fov_y_degrees must be finite and between 1 and 179");
             }
-            _ => None,
-        };
-        let env_intensity = scene.environment_map_intensity.unwrap_or(1.0) as f32;
 
-        let fog = FogSettings::from_scene(scene, background)?;
-        let shadow = resolve_shadow_maps(scene)?;
-        let post_processing = PostProcessingSettings::from_scene(scene);
+            let near = finite_positive(camera.near.unwrap_or(0.01), "camera.near")?;
+            let far = finite_positive(camera.far.unwrap_or(100.0), "camera.far")?;
+            if far <= near {
+                bail!("camera.far must be greater than camera.near");
+            }
 
-        Ok(Self {
-            width,
-            height,
-            background,
-            background_intensity,
-            viewport,
-            scissor,
-            background_texture,
-            output_format,
-            output_color_space,
-            sample_count,
-            view,
-            view_projection,
-            camera_pos,
-            near,
-            far,
-            lights,
-            ambient_color: [
-                ambient_color[0] as f32,
-                ambient_color[1] as f32,
-                ambient_color[2] as f32,
-            ],
-            ambient_intensity,
-            light_probe,
-            has_light_probe,
-            ibl,
-            env_intensity,
-            fog,
-            shadow,
-            post_processing,
+            let view = match camera.view_matrix.as_deref() {
+                Some(matrix) => parse_mat4(matrix, "camera.viewMatrix")?,
+                None => Mat4::look_at_rh(eye, target, up.normalize()),
+            };
+
+            let view_projection = match camera.view_projection.as_deref() {
+                Some(matrix) => parse_mat4(matrix, "camera.viewProjection")?,
+                None => {
+                    let aspect = width as f32 / height as f32;
+                    let projection =
+                        Mat4::perspective_rh(fov_y_degrees.to_radians() as f32, aspect, near, far);
+                    projection * view
+                }
+            };
+
+            let camera_pos = parse_vec3(
+                camera.camera_position.as_deref(),
+                eye.to_array(),
+                "camera.cameraPosition",
+            )?;
+
+            let output_format = OutputFormat::from_scene(scene)?;
+            let output_color_space = OutputColorSpace::from_scene(scene)?;
+            let sample_count = resolve_sample_count(scene.sample_count)?;
+            let lights = prepare_lights(scene)?;
+            let ambient_color = parse_color(
+                scene.ambient_light.as_deref(),
+                [1.0, 1.0, 1.0, 1.0],
+                "scene.ambientLight",
+            )?;
+            let ambient_intensity = scene.ambient_intensity.unwrap_or(0.0) as f32;
+            let (light_probe, has_light_probe) = parse_light_probe(scene.light_probe.as_deref())?;
+            let ibl = join_prepare_worker(ibl_handle, "environment map worker")?;
+            let env_intensity = scene.environment_map_intensity.unwrap_or(1.0) as f32;
+
+            let fog = FogSettings::from_scene(scene, background)?;
+            let shadow = resolve_shadow_maps(scene)?;
+            let post_processing = PostProcessingSettings::from_scene(scene);
+
+            Ok(Self {
+                width,
+                height,
+                background,
+                background_intensity,
+                viewport,
+                scissor,
+                background_texture,
+                output_format,
+                output_color_space,
+                sample_count,
+                view,
+                view_projection,
+                camera_pos,
+                near,
+                far,
+                lights,
+                ambient_color: [
+                    ambient_color[0] as f32,
+                    ambient_color[1] as f32,
+                    ambient_color[2] as f32,
+                ],
+                ambient_intensity,
+                light_probe,
+                has_light_probe,
+                ibl,
+                env_intensity,
+                fog,
+                shadow,
+                post_processing,
+            })
         })
+    }
+}
+
+fn join_prepare_worker<T>(
+    handle: thread::ScopedJoinHandle<'_, Result<T>>,
+    label: &str,
+) -> Result<T> {
+    handle.join().unwrap_or_else(|_| panic!("{label} panicked"))
+}
+
+fn prepare_background_texture(
+    scene: &RenderScene,
+    background_intensity: f32,
+) -> Result<Option<BackgroundTexture>> {
+    match &scene.background_texture {
+        Some(data) if !data.is_empty() => {
+            let mut texture = decode_texture_with_label(
+                data,
+                scene.background_texture_width,
+                scene.background_texture_height,
+                "scene.backgroundTexture",
+            )?;
+            texture.wrap_s = WrapMode::from_str_opt(scene.background_texture_wrap_s.as_deref());
+            texture.wrap_t = WrapMode::from_str_opt(scene.background_texture_wrap_t.as_deref());
+            texture.mag_filter =
+                TextureFilter::from_str_opt(scene.background_texture_mag_filter.as_deref());
+            texture.min_filter =
+                TextureFilter::from_min_filter_str(scene.background_texture_min_filter.as_deref());
+            texture.mipmap_filter =
+                MipmapFilter::from_min_filter_str(scene.background_texture_min_filter.as_deref());
+            texture.anisotropy = texture_anisotropy(scene.background_texture_anisotropy);
+            Ok(Some(BackgroundTexture {
+                texture,
+                transform: parse_texture_transform(
+                    scene.background_texture_transform.as_deref(),
+                    "scene.backgroundTextureTransform",
+                )?,
+                is_srgb: matches!(
+                    scene.background_texture_color_space.as_deref(),
+                    Some("srgb")
+                ),
+                mapping: BackgroundTextureMapping::from_scene(
+                    scene.background_texture_mapping.as_deref(),
+                )?,
+                rotation: parse_rotation_columns(
+                    scene.background_texture_rotation.as_deref(),
+                    "scene.backgroundTextureRotation",
+                )?,
+                intensity: background_intensity,
+                blurriness: finite_f32(
+                    scene.background_texture_blurriness.unwrap_or(0.0),
+                    "scene.backgroundTextureBlurriness",
+                )?
+                .clamp(0.0, 1.0),
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn prepare_scene_ibl(scene: &RenderScene) -> Result<Option<IblMaps>> {
+    match &scene.environment_map {
+        Some(data) if !data.is_empty() => {
+            let rotation = parse_rotation_columns(
+                scene.environment_map_rotation.as_deref(),
+                "scene.environmentMapRotation",
+            )?;
+            let env_map = EnvMap::from_bytes(
+                data,
+                scene.environment_map_width,
+                scene.environment_map_height,
+                parse_environment_color_space(scene.environment_map_color_space.as_deref())?,
+            )?;
+            Ok(Some(compute_ibl(&env_map, rotation)))
+        }
+        _ => Ok(None),
     }
 }
 
@@ -824,4 +848,45 @@ fn shadow_map_dimensions(
         bail!("{prefix}.shadow.mapSize must be square for point-light cube shadows");
     }
     Ok((width, height))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Camera;
+
+    #[test]
+    fn render_settings_prepares_background_texture_on_worker() {
+        let scene = RenderScene {
+            width: Some(16),
+            height: Some(16),
+            background_texture: Some(vec![64u8, 128, 255, 255].into()),
+            background_texture_width: Some(1),
+            background_texture_height: Some(1),
+            background_texture_wrap_s: Some("repeat".into()),
+            background_texture_mag_filter: Some("nearest".into()),
+            background_texture_min_filter: Some("nearest".into()),
+            background_texture_blurriness: Some(0.25),
+            ..RenderScene::default()
+        };
+        let camera = Camera::default();
+        let limits = wgpu::Limits {
+            max_texture_dimension_2d: 8192,
+            ..wgpu::Limits::default()
+        };
+
+        let settings = RenderSettings::from_scene(&scene, &camera, limits).unwrap();
+        let background = settings.background_texture.unwrap();
+
+        assert_eq!(background.texture.width, 1);
+        assert_eq!(background.texture.height, 1);
+        assert_eq!(background.texture.rgba, vec![64, 128, 255, 255]);
+        assert!(matches!(background.texture.wrap_s, WrapMode::Repeat));
+        assert!(matches!(
+            background.texture.mag_filter,
+            TextureFilter::Nearest
+        ));
+        assert!((background.blurriness - 0.25).abs() < f32::EPSILON);
+        assert!(settings.ibl.is_none());
+    }
 }
