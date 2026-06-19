@@ -409,7 +409,7 @@ async function readBlobUrlBuffer(url: string): Promise<Buffer> {
 
 export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd()): string {
   const assetUrl = requiredString(url, 'url')
-  const root = requiredString(rootDir, 'rootDir')
+  requiredString(rootDir, 'rootDir')
   if (/^data:/i.test(assetUrl)) {
     throw new Error('Data URI textures should be decoded or written to files before loading in Node.')
   }
@@ -418,6 +418,7 @@ export function resolveLocalAssetPath(url: string, rootDir: string = process.cwd
   if (/^[a-z][a-z0-9+.-]*:/i.test(assetUrl)) {
     throw new Error(`Remote texture URL is not a local file: ${assetUrl}`)
   }
+  const root = resolveLocalRootDir(rootDir, 'rootDir')
   return path.resolve(root, assetUrl)
 }
 

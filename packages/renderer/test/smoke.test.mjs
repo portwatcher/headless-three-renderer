@@ -117,6 +117,7 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     ])
 
     assert.equal(resolveLocalAssetPath('tex.png', dir), imagePath)
+    assert.equal(resolveLocalAssetPath('tex.png', pathToFileURL(dir).href), imagePath)
     assert.equal(resolveLocalAssetPath(imagePath, dir), imagePath)
     assert.equal(resolveLocalAssetPath(pathToFileURL(imagePath).href, dir), imagePath)
 
@@ -366,6 +367,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
   assert.throws(
     () => resolveLocalAssetPath('https://example.com/tex.png'),
     /Remote texture URL is not a local file/i,
+  )
+  assert.throws(
+    () => resolveLocalAssetPath('tex.png', 'https://example.com/assets'),
+    /rootDir is not a local directory path/i,
   )
   const windowsPath = String.raw`C:\assets\tex.png`
   assert.equal(resolveLocalAssetPath(windowsPath, process.cwd()), path.normalize(windowsPath))
