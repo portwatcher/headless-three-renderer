@@ -18050,6 +18050,86 @@ test('single-attachment target array paths honor typed color readback requests',
   assert.ok(data[center + 1] < 0.05, `options.target green channel should stay near zero (${data[center + 1]})`)
 })
 
+test('MRT-shaped targets can request auxiliary render-mode attachments', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  mesh.rotation.y = Math.PI * 0.2
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const target = {
+    isWebGLMultipleRenderTargets: true,
+    textures: [
+      {},
+      { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
+      { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
+      { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+    ],
+  }
+  renderToTarget(scene, camera, target, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  assert.equal(target.textures[0].image.data, target.data)
+  const colorCenter = meanRegion(target.data, 64, 64, 28, 28, 36, 36)
+  assert.ok(colorCenter.r > 180 && colorCenter.g < 20 && colorCenter.b < 20, `primary color attachment should stay red (${colorCenter.r}, ${colorCenter.g}, ${colorCenter.b})`)
+
+  const maskCenter = meanRegion(target.textures[1].image.data, 64, 64, 28, 28, 36, 36)
+  const maskCorner = meanRegion(target.textures[1].image.data, 64, 64, 0, 0, 8, 8)
+  assert.ok(maskCenter.r > 250 && maskCenter.g > 250 && maskCenter.b > 250, `mask attachment center should be white (${maskCenter.r}, ${maskCenter.g}, ${maskCenter.b})`)
+  assert.ok(maskCorner.r < 2 && maskCorner.g < 2 && maskCorner.b < 2, `mask attachment background should be black (${maskCorner.r}, ${maskCorner.g}, ${maskCorner.b})`)
+
+  const objectIdCenter = meanRegion(target.textures[2].image.data, 64, 64, 28, 28, 36, 36)
+  const encoded = mesh.id + 1
+  assertRgbClose(objectIdCenter, objectIdBytes(encoded), 'auxiliary object-id attachment')
+  assert.equal(target.objectIdMap[String(encoded)].id, mesh.id)
+
+  const normalCenter = meanRegion(target.textures[3].image.data, 64, 64, 28, 28, 36, 36)
+  assert.ok(normalCenter.r > 120 && normalCenter.b > 200, `normal attachment should encode the tilted view normal (${normalCenter.r}, ${normalCenter.g}, ${normalCenter.b})`)
+
+  const optionsTarget = {
+    textures: [
+      {},
+      { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
+    ],
+  }
+  const returned = renderRgba(scene, camera, {
+    width: 64,
+    height: 64,
+    target: optionsTarget,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(returned, optionsTarget.data)
+  const optionsMaskCenter = meanRegion(optionsTarget.textures[1].image.data, 64, 64, 28, 28, 36, 36)
+  assert.ok(optionsMaskCenter.r > 250, `options.target auxiliary mask should render (${optionsMaskCenter.r})`)
+
+  const rendererTarget = {
+    textures: [
+      {},
+      { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+    ],
+  }
+  const renderer = new Renderer()
+  renderer.setRenderTarget(rendererTarget)
+  const rendererReturned = renderer.render(scene, camera, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.equal(rendererReturned, rendererTarget.data)
+  const rendererNormalCenter = meanRegion(rendererTarget.textures[1].image.data, 64, 64, 28, 28, 36, 36)
+  assert.ok(rendererNormalCenter.r > 120 && rendererNormalCenter.b > 200, `Renderer.setRenderTarget auxiliary normal should render (${rendererNormalCenter.r}, ${rendererNormalCenter.g}, ${rendererNormalCenter.b})`)
+})
+
 test('MSAA sampleCount 4 resolves antialiased color output and render targets', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -18172,7 +18252,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   )
   assert.throws(
     () => renderer.setRenderTarget({ texture: [{}, {}] }),
-    /Multiple render target color attachments.*not supported/i,
+    /secondary color attachment.*renderMode/i,
   )
 
   const targetCases = [
@@ -18188,8 +18268,10 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: { mipmaps: ['bad'] } }, /target\.texture\.mipmaps\[0\] must be an image-like object/i, 'texture mipmap container'],
     [{ texture: { source: 'bad' } }, /target\.texture\.source must be a source-like object/i, 'texture source container'],
     [{ texture: { source: { data: 'bad' } } }, /target\.texture\.source\.data must be an image-like object/i, 'texture source data container'],
-    [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'texture array'],
-    [{ textures: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'textures array'],
+    [{ texture: [{}, {}] }, /secondary color attachment.*renderMode/i, 'texture array'],
+    [{ textures: [{}, {}] }, /secondary color attachment.*renderMode/i, 'textures array'],
+    [{ textures: [{}, { userData: { headlessThreeRenderer: { renderMode: 'depth' } } }] }, /target color texture\[1\]\.userData\.headlessThreeRenderer\.renderMode must be "color", "mask", "object-id", or "normal"/i, 'secondary renderMode value'],
+    [{ textures: [{}, { userData: { headlessThreeRenderer: 'mask' } }] }, /target color texture\[1\]\.userData\.headlessThreeRenderer must be an object/i, 'secondary renderMode hints'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'color array texture'],
     [{ depthTexture: new THREE.Data3DTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target\.depthTexture uses an array or 3D texture/i, 'depth 3D texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'color compressed texture'],
@@ -18217,7 +18299,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   }
 
   const optionsTargetCases = [
-    [{ texture: [{}, {}] }, /Multiple render target color attachments.*not supported/i, 'options.target texture array'],
+    [{ texture: [{}, {}] }, /secondary color attachment.*renderMode/i, 'options.target texture array'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'options.target compressed color texture'],
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'options.target compressed color format'],

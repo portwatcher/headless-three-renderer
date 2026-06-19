@@ -532,6 +532,7 @@ export interface RenderTargetTextureLike {
   source?: {
     data?: RenderTargetImageLike | RenderTargetImageLike[]
   }
+  userData?: Record<string, any>
   isCubeTexture?: boolean
   isCompressedTexture?: boolean
   isDataArrayTexture?: boolean

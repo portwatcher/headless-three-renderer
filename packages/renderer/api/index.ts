@@ -217,6 +217,7 @@ export class Renderer {
     if (renderOptions.target) assertNonCubeCameraRenderTargetTextures(renderOptions.target)
 
     if (isArrayCamera(camera)) {
+      assertNoAuxiliaryTargetAttachments(renderOptions.target, 'THREE.ArrayCamera')
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
@@ -237,7 +238,24 @@ export class Renderer {
         nativeCamera,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      writeRenderTarget(renderOptions.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+      const auxiliary = renderAuxiliaryTargetAttachments(
+        scene,
+        camera,
+        renderOptions.target,
+        renderOptions,
+        buffer,
+        objectIdEntries,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      writeRenderTarget(
+        renderOptions.target,
+        buffer,
+        nativeScene.width!,
+        nativeScene.height!,
+        auxiliary.objectIdEntries,
+        depthData,
+        auxiliary.attachments,
+      )
     }
     return buffer
   }
@@ -266,6 +284,7 @@ export class Renderer {
     assertNonCubeCameraRenderTargetTextures(target)
 
     if (isArrayCamera(camera)) {
+      assertNoAuxiliaryTargetAttachments(target, 'THREE.ArrayCamera')
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
@@ -282,7 +301,24 @@ export class Renderer {
       nativeCamera,
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
-    return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+    const auxiliary = renderAuxiliaryTargetAttachments(
+      scene,
+      camera,
+      target,
+      targetOptions,
+      buffer,
+      objectIdEntries,
+      (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+    )
+    return writeRenderTarget(
+      target,
+      buffer,
+      nativeScene.width!,
+      nativeScene.height!,
+      auxiliary.objectIdEntries,
+      depthData,
+      auxiliary.attachments,
+    )
   }
 
   private renderCurrentRenderTarget(
@@ -294,6 +330,7 @@ export class Renderer {
     const targetOptions: RenderOptions = { ...options, target, format: options.format ?? 'rgba' }
 
     if (isCubeRenderTarget(target)) {
+      assertNoAuxiliaryTargetAttachments(target, 'THREE.CubeCamera')
       if (isArrayCamera(camera)) {
         throw new Error(
           'THREE.ArrayCamera cannot render into an active cube render target. Render each cube face with a regular THREE.Camera or pass a THREE.CubeCamera as the top-level camera.',
@@ -305,6 +342,7 @@ export class Renderer {
     assertNonCubeCameraRenderTargetTextures(target)
 
     if (isArrayCamera(camera)) {
+      assertNoAuxiliaryTargetAttachments(target, 'THREE.ArrayCamera')
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
@@ -322,7 +360,24 @@ export class Renderer {
       nativeCamera,
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
-    writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+    const auxiliary = renderAuxiliaryTargetAttachments(
+      scene,
+      camera,
+      target,
+      targetOptions,
+      buffer,
+      objectIdEntries,
+      (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+    )
+    writeRenderTarget(
+      target,
+      buffer,
+      nativeScene.width!,
+      nativeScene.height!,
+      auxiliary.objectIdEntries,
+      depthData,
+      auxiliary.attachments,
+    )
     return buffer
   }
 
@@ -406,6 +461,7 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike,
   if (options.target) assertNonCubeCameraRenderTargetTextures(options.target)
 
   if (isArrayCamera(camera)) {
+    assertNoAuxiliaryTargetAttachments(options.target, 'THREE.ArrayCamera')
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, options, native.renderNative)
     if (options.target) {
       writeRenderTarget(options.target, buffer, width, height, objectIdEntries, depthData)
@@ -417,7 +473,24 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike,
   const buffer = native.renderNative(nativeScene, nativeCamera)
   if (options.target) {
     const depthData = renderTargetDepthBuffer(options.target, nativeScene, nativeCamera, native.renderNative)
-    writeRenderTarget(options.target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+    const auxiliary = renderAuxiliaryTargetAttachments(
+      scene,
+      camera,
+      options.target,
+      options,
+      buffer,
+      objectIdEntries,
+      native.renderNative,
+    )
+    writeRenderTarget(
+      options.target,
+      buffer,
+      nativeScene.width!,
+      nativeScene.height!,
+      auxiliary.objectIdEntries,
+      depthData,
+      auxiliary.attachments,
+    )
   }
   return buffer
 }
@@ -441,6 +514,7 @@ export function renderToTarget(
   assertNonCubeCameraRenderTargetTextures(target)
 
   if (isArrayCamera(camera)) {
+    assertNoAuxiliaryTargetAttachments(target, 'THREE.ArrayCamera')
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, targetOptions, native.renderNative)
     return writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
   }
@@ -448,7 +522,24 @@ export function renderToTarget(
   const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, targetOptions)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   const depthData = renderTargetDepthBuffer(target, nativeScene, nativeCamera, native.renderNative)
-  return writeRenderTarget(target, buffer, nativeScene.width!, nativeScene.height!, objectIdEntries, depthData)
+  const auxiliary = renderAuxiliaryTargetAttachments(
+    scene,
+    camera,
+    target,
+    targetOptions,
+    buffer,
+    objectIdEntries,
+    native.renderNative,
+  )
+  return writeRenderTarget(
+    target,
+    buffer,
+    nativeScene.width!,
+    nativeScene.height!,
+    auxiliary.objectIdEntries,
+    depthData,
+    auxiliary.attachments,
+  )
 }
 
 function toNativeInput(
@@ -599,9 +690,13 @@ function toNativeInput(
 
 function normalizedRenderMode(mode: RenderOptions['renderMode']): RenderMode {
   if (mode == null) return 'color'
+  return checkedRenderMode(mode, 'options.renderMode')
+}
+
+function checkedRenderMode(mode: unknown, label: string): RenderMode {
   if (mode === 'color' || mode === 'mask' || mode === 'object-id' || mode === 'normal') return mode
   throw new TypeError(
-    `options.renderMode must be "color", "mask", "object-id", or "normal"; received ${String(mode)}`,
+    `${label} must be "color", "mask", "object-id", or "normal"; received ${String(mode)}`,
   )
 }
 
@@ -761,6 +856,51 @@ function renderTargetDepthBuffer(
   return renderNativeScene(depthReadbackScene(nativeScene), nativeCamera)
 }
 
+function renderAuxiliaryTargetAttachments(
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  target: RenderTargetLike | undefined,
+  options: RenderOptions,
+  primaryData: Buffer,
+  primaryObjectIdEntries: RenderObjectIdEntry[] | undefined,
+  renderNativeScene: (scene: NativeRenderScene, camera: NativeCamera) => Buffer,
+): { attachments?: RenderTargetAttachmentData[]; objectIdEntries?: RenderObjectIdEntry[] } {
+  if (!target) return { objectIdEntries: primaryObjectIdEntries }
+  const colorTextures = renderTargetColorTextures(target)
+  if (colorTextures.length <= 1) return { objectIdEntries: primaryObjectIdEntries }
+
+  const primaryMode = normalizedRenderMode(options.renderMode)
+  let targetObjectIdEntries = primaryObjectIdEntries
+  const attachments: RenderTargetAttachmentData[] = []
+
+  for (let i = 1; i < colorTextures.length; i += 1) {
+    const texture = colorTextures[i]
+    const mode = renderTargetTextureRenderMode(texture, targetColorTextureLabel(i))!
+    if (mode === primaryMode) {
+      attachments.push({ texture, data: primaryData })
+      if (mode === 'object-id') targetObjectIdEntries = primaryObjectIdEntries
+      continue
+    }
+
+    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, {
+      ...options,
+      renderMode: mode,
+      format: 'rgba',
+    })
+    attachments.push({ texture, data: renderNativeScene(nativeScene, nativeCamera) })
+    if (mode === 'object-id') targetObjectIdEntries = objectIdEntries
+  }
+
+  return { attachments, objectIdEntries: targetObjectIdEntries }
+}
+
+function assertNoAuxiliaryTargetAttachments(target: RenderTargetLike | undefined, cameraLabel: string): void {
+  if (!target || renderTargetColorTextures(target).length <= 1) return
+  throw new Error(
+    `Auxiliary render-mode target attachments are not supported with ${cameraLabel} yet. Render regular-camera auxiliary targets or run separate passes for composed camera outputs.`,
+  )
+}
+
 type RenderNativeScene = (scene: NativeRenderScene, camera: NativeCamera) => Buffer
 
 type PixelRect = {
@@ -768,6 +908,10 @@ type PixelRect = {
   y: number
   width: number
   height: number
+}
+type RenderTargetAttachmentData = {
+  texture: RenderTargetTextureLike
+  data: Buffer
 }
 type InternalRenderOptions = RenderOptions & {
   __headlessThreeViewportLabel?: string
@@ -817,6 +961,7 @@ function renderCubeCamera(
   }
   assertRenderTargetLike(target, options.target !== undefined ? 'options.target' : 'THREE.CubeCamera renderTarget')
   validateUnsupportedRenderTargetOptions(target)
+  assertNoAuxiliaryTargetAttachments(target, 'THREE.CubeCamera')
 
   const { width: targetWidth, height: targetHeight } = resolveCubeTargetSize(target, options)
   const activeMipmapLevel = resolveCubeMipmapLevel(camera, targetWidth)
@@ -1821,30 +1966,82 @@ function validateUnsupportedRenderTargetOptions(target: RenderTargetLike): void 
   if (target.scissorTest != null && typeof target.scissorTest !== 'boolean') {
     throw new TypeError('target.scissorTest must be a boolean.')
   }
-  if (Array.isArray(target.texture) && target.texture.length > 1) {
-    throw new Error(
-      'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
-    )
-  }
-  if (Array.isArray(target.textures) && target.textures.length > 1) {
-    throw new Error(
-      'Multiple render target color attachments are not supported by @headless-three/renderer yet. Render separate passes or use a single color target until MRT support lands.',
-    )
-  }
   if (target.image != null) assertRenderTargetImageLike(target.image, 'target.image')
   assertRenderTargetTextureSlot(target.texture, 'target.texture')
   assertRenderTargetTexturesSlot(target.textures, 'target.textures')
   if (target.depthTexture != null) assertRenderTargetTextureLike(target.depthTexture, 'target.depthTexture')
   assertSupportedSampleCount(target.samples, 'target.samples')
   assertSupportedSampleCount(target.sampleCount, 'target.sampleCount')
-  const colorTexture = renderTargetColorTexture(target)
-  assertSupportedRenderTargetTextureDimensionality(colorTexture, 'target color texture')
+  const colorTextures = renderTargetColorTextures(target)
+  assertAuxiliaryRenderTargetAttachments(colorTextures)
+  for (let i = 0; i < colorTextures.length; i += 1) {
+    const colorTexture = colorTextures[i]
+    const label = targetColorTextureLabel(i)
+    assertSupportedRenderTargetTextureDimensionality(colorTexture, label)
+    assertSupportedRenderTargetTextureClass(colorTexture, label)
+    assertSupportedRenderTargetColorTexture(colorTexture, label)
+  }
   assertSupportedRenderTargetTextureDimensionality(target.depthTexture, 'target.depthTexture')
-  assertSupportedRenderTargetTextureClass(colorTexture, 'target color texture')
   assertSupportedRenderTargetTextureClass(target.depthTexture, 'target.depthTexture')
-  assertSupportedRenderTargetColorTexture(colorTexture)
   assertSupportedDepthTextureType(target.depthTexture)
   assertSupportedDepthTextureFormat(target.depthTexture)
+}
+
+function assertAuxiliaryRenderTargetAttachments(colorTextures: RenderTargetTextureLike[]): void {
+  if (colorTextures.length <= 1) {
+    for (let i = 0; i < colorTextures.length; i += 1) {
+      renderTargetTextureRenderMode(colorTextures[i], targetColorTextureLabel(i))
+    }
+    return
+  }
+
+  for (let i = 0; i < colorTextures.length; i += 1) {
+    const mode = renderTargetTextureRenderMode(colorTextures[i], targetColorTextureLabel(i))
+    if (i > 0 && mode == null) {
+      throw new Error(
+        `${targetColorTextureLabel(i)} is a secondary color attachment and must declare userData.headlessThreeRenderer.renderMode as "color", "mask", "object-id", or "normal". Arbitrary native MRT shader outputs are not supported yet.`,
+      )
+    }
+  }
+}
+
+function renderTargetTextureRenderMode(texture: RenderTargetTextureLike, label: string): RenderMode | undefined {
+  const hints = renderTargetTextureRendererHints(texture, label)
+  if (!hints || hints.value.renderMode == null) return undefined
+  return checkedRenderMode(hints.value.renderMode, `${hints.label}.renderMode`)
+}
+
+function renderTargetTextureRendererHints(
+  texture: RenderTargetTextureLike,
+  label: string,
+): { value: Record<string, unknown>; label: string } | undefined {
+  const userData = texture.userData
+  if (userData == null) return undefined
+  assertPlainObject(userData, `${label}.userData`)
+
+  const modernHints = userData.headlessThreeRenderer
+  if (modernHints != null) {
+    assertPlainObject(modernHints, `${label}.userData.headlessThreeRenderer`)
+    return { value: modernHints, label: `${label}.userData.headlessThreeRenderer` }
+  }
+
+  const legacyHints = userData.headlessRenderer
+  if (legacyHints != null) {
+    assertPlainObject(legacyHints, `${label}.userData.headlessRenderer`)
+    return { value: legacyHints, label: `${label}.userData.headlessRenderer` }
+  }
+
+  return undefined
+}
+
+function assertPlainObject(value: unknown, label: string): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object.`)
+  }
+}
+
+function targetColorTextureLabel(index: number): string {
+  return index === 0 ? 'target color texture' : `target color texture[${index}]`
 }
 
 function assertSupportedSampleCount(value: unknown, label: string): void {
@@ -1889,8 +2086,8 @@ function assertRenderTargetTextureSlot(value: unknown, label: string): void {
     if (value.length === 0) {
       throw new TypeError(`${label} must contain one texture-like object when provided as an array.`)
     }
-    if (value.length === 1) {
-      assertRenderTargetTextureLike(value[0], `${label}[0]`)
+    for (let i = 0; i < value.length; i += 1) {
+      assertRenderTargetTextureLike(value[i], `${label}[${i}]`)
     }
     return
   }
@@ -1905,8 +2102,8 @@ function assertRenderTargetTexturesSlot(value: unknown, label: string): void {
   if (value.length === 0) {
     throw new TypeError(`${label} must contain one texture-like object when provided.`)
   }
-  if (value.length === 1) {
-    assertRenderTargetTextureLike(value[0], `${label}[0]`)
+  for (let i = 0; i < value.length; i += 1) {
+    assertRenderTargetTextureLike(value[i], `${label}[${i}]`)
   }
 }
 
@@ -2015,12 +2212,12 @@ function assertNormalizedNumberOption(value: unknown, label: string): void {
   }
 }
 
-function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined): void {
+function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined, label = 'target color texture'): void {
   if (!texture) return
   const format = texture.format
   if (isCompressedTextureFormat(format)) {
     throw new Error(
-      'target color texture format uses a compressed texture format, which is not supported by @headless-three/renderer render targets. Use a regular 2D target texture and compress output after readback if needed.',
+      `${label} format uses a compressed texture format, which is not supported by @headless-three/renderer render targets. Use a regular 2D target texture and compress output after readback if needed.`,
     )
   }
   if (
@@ -2036,7 +2233,7 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     format !== RGBAIntegerFormat
   ) {
     throw new Error(
-      `target color texture format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBFormat, RGBIntegerFormat, RGBAFormat, RGBAIntegerFormat, or omit format for RGBA8 readback.`,
+      `${label} format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBFormat, RGBIntegerFormat, RGBAFormat, RGBAIntegerFormat, or omit format for RGBA8 readback.`,
     )
   }
   const type = texture.type
@@ -2056,7 +2253,7 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     type !== UnsignedInt5999Type
   ) {
     throw new Error(
-      `target color texture type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt101111Type, UnsignedInt5999Type, or omit type for RGBA8 readback.`,
+      `${label} type ${String(type)} is not supported by @headless-three/renderer yet. Use UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, HalfFloatType, FloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt101111Type, UnsignedInt5999Type, or omit type for RGBA8 readback.`,
     )
   }
 }
@@ -2085,11 +2282,13 @@ function assertSupportedRenderTargetTextureClass(texture: RenderTargetTextureLik
 }
 
 function assertNonCubeCameraRenderTargetTextures(target: RenderTargetLike): void {
-  const colorTexture = renderTargetColorTexture(target)
-  if (colorTexture?.isCubeTexture === true) {
-    throw new Error(
-      'target color texture uses a cube texture, which is only supported when rendering with THREE.CubeCamera. Use a 2D texture target for regular cameras.',
-    )
+  const colorTextures = renderTargetColorTextures(target)
+  for (let i = 0; i < colorTextures.length; i += 1) {
+    if (colorTextures[i]?.isCubeTexture === true) {
+      throw new Error(
+        `${targetColorTextureLabel(i)} uses a cube texture, which is only supported when rendering with THREE.CubeCamera. Use a 2D texture target for regular cameras.`,
+      )
+    }
   }
   if (target.depthTexture?.isCubeTexture === true) {
     throw new Error(
@@ -2157,6 +2356,7 @@ function writeRenderTarget(
   height: number,
   objectIdEntries?: RenderObjectIdEntry[],
   depthData?: Buffer,
+  colorAttachments?: RenderTargetAttachmentData[],
 ): RenderTargetLike {
   target.width = width
   target.height = height
@@ -2170,6 +2370,10 @@ function writeRenderTarget(
   const texture = renderTargetColorTexture(target)
   if (texture) {
     writeRenderTargetTexture(texture, colorTextureData(texture, data), width, height)
+  }
+
+  for (const attachment of colorAttachments ?? []) {
+    writeRenderTargetTexture(attachment.texture, colorTextureData(attachment.texture, attachment.data), width, height)
   }
 
   if (target.depthTexture != null && depthData) {
@@ -2192,9 +2396,13 @@ function writeObjectIdMetadata(target: RenderTargetLike, objectIdEntries?: Rende
 }
 
 function renderTargetColorTexture(target: RenderTargetLike): RenderTargetTextureLike | undefined {
-  return Array.isArray(target.texture)
-    ? target.texture[0]
-    : target.texture ?? target.textures?.[0]
+  return renderTargetColorTextures(target)[0]
+}
+
+function renderTargetColorTextures(target: RenderTargetLike): RenderTargetTextureLike[] {
+  if (Array.isArray(target.texture)) return target.texture
+  if (target.texture) return [target.texture]
+  return target.textures ?? []
 }
 
 function writeRenderTargetTexture(
