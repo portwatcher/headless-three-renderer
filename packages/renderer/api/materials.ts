@@ -349,11 +349,17 @@ function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): bool
     || material.isMeshLambertMaterial === true
 }
 
+function supportsLegacyMaterialEnvironmentRefraction(material: ThreeMaterialLike): boolean {
+  return material.isMeshBasicMaterial === true
+    || material.isMeshPhongMaterial === true
+    || material.isMeshLambertMaterial === true
+}
+
 function assertSupportedMaterialEnvironmentMap(material: ThreeMaterialLike): void {
   const usesRefraction = isRefractionEnvironmentMapping(material.envMap!.mapping)
-  if (usesRefraction && material.isMeshBasicMaterial !== true) {
+  if (usesRefraction && !supportsLegacyMaterialEnvironmentRefraction(material)) {
     throw new Error(
-      'material.envMap refraction mappings are only supported for MeshBasicMaterial by @headless-three/renderer yet. Use a reflection mapping, remove material.envMap, or render this material separately.',
+      'material.envMap refraction mappings are only supported for MeshBasicMaterial, MeshLambertMaterial, and MeshPhongMaterial by @headless-three/renderer yet. Use a reflection mapping, remove material.envMap, or render this material separately.',
     )
   }
   assertSupportedEnvironmentTexture(material.envMap!, 'material.envMap', { allowRefraction: usesRefraction })

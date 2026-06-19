@@ -4124,20 +4124,13 @@ test('CubeUV-mapped cube material envMap feeds supported material paths', () => 
   assert.ok(mean.g > mean.r + 40, `CubeUV-mapped cube material envMap should replace with green (${mean.r}, ${mean.g})`)
 })
 
-test('MeshBasicMaterial material envMap supports refraction mapping', () => {
-  function renderBasicEnvironmentMapping(mapping) {
+test('legacy material envMap supports refraction mapping', () => {
+  function renderLegacyEnvironmentMapping(makeMaterial, mapping) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     const envMap = splitEnvironmentTexture()
     envMap.mapping = mapping
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      envMap,
-      combine: THREE.MixOperation,
-      reflectivity: 1,
-      refractionRatio: 0.5,
-      side: THREE.DoubleSide,
-    })
+    const material = makeMaterial(envMap)
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
     mesh.rotation.y = 0.5
     scene.add(mesh)
@@ -4152,10 +4145,26 @@ test('MeshBasicMaterial material envMap supports refraction mapping', () => {
     }), 64, 64, 24, 24, 40, 40)
   }
 
-  const reflected = renderBasicEnvironmentMapping(THREE.EquirectangularReflectionMapping)
-  const refracted = renderBasicEnvironmentMapping(THREE.EquirectangularRefractionMapping)
-  assert.ok(reflected.g > reflected.r + 15, `reflection should sample the green environment half (${reflected.r}, ${reflected.g})`)
-  assert.ok(refracted.r > refracted.g + 15, `refraction should sample the red environment half (${refracted.r}, ${refracted.g})`)
+  const legacyEnvMapOptions = (envMap) => ({
+    color: 0xffffff,
+    envMap,
+    combine: THREE.MixOperation,
+    reflectivity: 1,
+    refractionRatio: 0.5,
+    side: THREE.DoubleSide,
+  })
+  const cases = [
+    ['Basic', (envMap) => new THREE.MeshBasicMaterial(legacyEnvMapOptions(envMap))],
+    ['Lambert', (envMap) => new THREE.MeshLambertMaterial(legacyEnvMapOptions(envMap))],
+    ['Phong', (envMap) => new THREE.MeshPhongMaterial(legacyEnvMapOptions(envMap))],
+  ]
+
+  for (const [name, makeMaterial] of cases) {
+    const reflected = renderLegacyEnvironmentMapping(makeMaterial, THREE.EquirectangularReflectionMapping)
+    const refracted = renderLegacyEnvironmentMapping(makeMaterial, THREE.EquirectangularRefractionMapping)
+    assert.ok(reflected.g > reflected.r + 15, `${name} reflection should sample the green environment half (${reflected.r}, ${reflected.g})`)
+    assert.ok(refracted.r > refracted.g + 15, `${name} refraction should sample the red environment half (${refracted.r}, ${refracted.g})`)
+  }
 })
 
 test('material envMap colorSpace controls LDR IBL decode', () => {
@@ -4501,13 +4510,13 @@ test('unsupported material envMap inputs fail clearly', () => {
     scene.background = new THREE.Color(0, 0, 0)
     scene.add(new THREE.Mesh(
       new THREE.SphereGeometry(1, 16, 16),
-      new THREE.MeshPhongMaterial({ color: 0xffffff, envMap: refractionEnvMap }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, envMap: refractionEnvMap }),
     ))
 
     assert.throws(
       () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
-      /refraction mappings are only supported for MeshBasicMaterial/i,
-      'MeshPhongMaterial refraction envMap',
+      /refraction mappings are only supported for MeshBasicMaterial, MeshLambertMaterial, and MeshPhongMaterial/i,
+      'MeshStandardMaterial refraction envMap',
     )
   }
 

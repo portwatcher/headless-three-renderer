@@ -1475,7 +1475,12 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   if legacy_material_env {
     let combine = u32(uniforms.env_map_params.x + 0.5);
     if combine != 0u || abs(legacy_env_reflectivity - 1.0) > 0.0001 {
-      let legacy_env_color = textureSampleLevel(t_prefilter, s_ibl, reflect(-V, N), 0.0).rgb * uniforms.ibl_params.x;
+      let legacy_env_mode = u32(uniforms.env_map_params.z + 0.5);
+      var legacy_env_dir = reflect(-V, N);
+      if legacy_env_mode == 2u {
+        legacy_env_dir = refract(-V, N, uniforms.env_map_params.w);
+      }
+      let legacy_env_color = textureSampleLevel(t_prefilter, s_ibl, legacy_env_dir, 0.0).rgb * uniforms.ibl_params.x;
       let legacy_strength = legacy_env_reflectivity * select(1.0, phong_specular_strength, use_phong);
       if combine == 2u {
         lo = lo + legacy_env_color * legacy_strength;
