@@ -36,6 +36,7 @@ export function createSceneCorpus() {
     meshDistanceMaterialWireframeCorpus(),
     meshNormalMaterialCorpus(),
     meshNormalMaterialNormalMapCorpus(),
+    meshNormalMaterialObjectSpaceNormalMapCorpus(),
     meshNormalMaterialBumpMapCorpus(),
     meshMatcapMaterialCorpus(),
     meshMatcapMaterialNormalMapCorpus(),
@@ -1819,6 +1820,76 @@ function meshNormalMaterialNormalMapCorpus() {
     validate() {
       if (!(mappedCenter.r > flatCenter.r + 40 && flatCenter.b > mappedCenter.b + 40)) {
         throw new Error(`normal-map corpus should tilt MeshNormalMaterial output, flat=${JSON.stringify(flatCenter)} mapped=${JSON.stringify(mappedCenter)}`)
+      }
+    },
+  }
+}
+
+function meshNormalMaterialObjectSpaceNormalMapCorpus() {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1, -1, 0,
+    1, -1, 0,
+    -1, 1, 0,
+    1, -1, 0,
+    1, 1, 0,
+    -1, 1, 0,
+  ]), 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ]), 3))
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0, 0,
+    0, 1,
+    1, 0,
+    0, 1,
+    1, 1,
+    1, 0,
+  ]), 2))
+
+  function makeScene(normalMapType) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      geometry,
+      new THREE.MeshNormalMaterial({
+        normalMap: solidTexture(255, 128, 128),
+        normalMapType,
+      }),
+    ))
+    return scene
+  }
+
+  const tangentScene = makeScene(THREE.TangentSpaceNormalMap)
+  const objectScene = makeScene(THREE.ObjectSpaceNormalMap)
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let tangentCenter = null
+  let objectCenter = null
+
+  return {
+    name: 'mesh-normal-material-object-space-normal-map',
+    scene: objectScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const tangent = renderer.render(tangentScene, camera, options)
+      tangentCenter = meanRegion(tangent, options.width, 32, 32, 64, 64)
+      const objectSpace = renderer.render(objectScene, camera, options)
+      objectCenter = meanRegion(objectSpace, options.width, 32, 32, 64, 64)
+      return objectSpace
+    },
+    validate() {
+      if (!(tangentCenter.g > tangentCenter.r + 35 && objectCenter.r > objectCenter.g + 35)) {
+        throw new Error(`object-space normal-map corpus should distinguish tangent/object normal interpretation, tangent=${JSON.stringify(tangentCenter)} object=${JSON.stringify(objectCenter)}`)
       }
     },
   }
