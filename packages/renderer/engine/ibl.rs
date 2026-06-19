@@ -246,19 +246,27 @@ pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
 }
 
 fn compute_ibl_uncached(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
-    let irradiance_faces = compute_irradiance(env_map, rotation);
-    let prefilter_faces = compute_prefiltered_env(env_map, rotation);
-    let brdf_lut = cached_brdf_lut();
+    thread::scope(|scope| {
+        let irradiance_faces = scope.spawn(|| compute_irradiance(env_map, rotation));
+        let prefilter_faces = scope.spawn(|| compute_prefiltered_env(env_map, rotation));
+        let brdf_lut = scope.spawn(cached_brdf_lut);
 
-    IblMaps {
-        irradiance_faces,
-        irradiance_size: IRRADIANCE_SIZE,
-        prefilter_faces,
-        prefilter_base_size: PREFILTER_BASE_SIZE,
-        prefilter_mip_levels: PREFILTER_MIP_LEVELS,
-        brdf_lut,
-        brdf_lut_size: BRDF_LUT_SIZE,
-    }
+        IblMaps {
+            irradiance_faces: irradiance_faces
+                .join()
+                .expect("IBL irradiance precompute worker panicked"),
+            irradiance_size: IRRADIANCE_SIZE,
+            prefilter_faces: prefilter_faces
+                .join()
+                .expect("IBL prefilter precompute worker panicked"),
+            prefilter_base_size: PREFILTER_BASE_SIZE,
+            prefilter_mip_levels: PREFILTER_MIP_LEVELS,
+            brdf_lut: brdf_lut
+                .join()
+                .expect("IBL BRDF LUT precompute worker panicked"),
+            brdf_lut_size: BRDF_LUT_SIZE,
+        }
+    })
 }
 
 fn cached_brdf_lut() -> Vec<u8> {
