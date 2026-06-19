@@ -21,6 +21,7 @@ import type {
   ThreeEulerLike,
   RenderSortFunction,
   RenderAnimationLoopCallback,
+  RendererParametersLike,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -59,6 +60,16 @@ const SupportedRendererToneMappings = new Set([
   AgXToneMapping,
   NeutralToneMapping,
 ])
+const SupportedRendererPowerPreferences = new Set(['default', 'high-performance', 'low-power'])
+const RendererBooleanParameters = [
+  'alpha',
+  'depth',
+  'stencil',
+  'antialias',
+  'premultipliedAlpha',
+  'preserveDrawingBuffer',
+  'failIfMajorPerformanceCaveat',
+] as const
 
 export {
   applyVrmAnimation,
@@ -118,6 +129,7 @@ export type {
   RenderTargetLike,
   RenderObjectIdEntry,
   RenderAnimationLoopCallback,
+  RendererParametersLike,
   RenderSortFunction,
   RenderSortItem,
   PostProcessingOptions,
@@ -241,7 +253,8 @@ export class Renderer {
   readonly shadowMap = new RendererShadowMapState()
   readonly xr = new RendererXrState()
 
-  constructor() {
+  constructor(parameters?: RendererParametersLike) {
+    assertRendererParametersLike(parameters, 'Renderer parameters')
     this.native = new native.NativeRenderer()
   }
 
@@ -2405,6 +2418,57 @@ function rendererStateBoolean(value: unknown, label: string): boolean {
     throw new TypeError(`${label} must be a boolean.`)
   }
   return value
+}
+
+function assertRendererParametersLike(value: RendererParametersLike | undefined, label: string): void {
+  if (value === undefined) return
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object when provided.`)
+  }
+  const parameters = value as Record<string, unknown>
+  for (const name of RendererBooleanParameters) {
+    if (parameters[name] !== undefined) {
+      rendererStateBoolean(parameters[name], `${label}.${name}`)
+    }
+  }
+  if (parameters.powerPreference !== undefined) {
+    rendererStatePowerPreference(parameters.powerPreference, `${label}.powerPreference`)
+  }
+  assertRendererContextParameterAbsent(parameters, 'canvas', label)
+  assertRendererContextParameterAbsent(parameters, 'context', label)
+  assertRendererUnsupportedDepthParameterFalse(parameters, 'logarithmicDepthBuffer', label)
+  assertRendererUnsupportedDepthParameterFalse(parameters, 'reverseDepthBuffer', label)
+}
+
+function rendererStatePowerPreference(value: unknown, label: string): void {
+  if (typeof value !== 'string') {
+    throw new TypeError(`${label} must be a WebGL powerPreference string.`)
+  }
+  if (!SupportedRendererPowerPreferences.has(value)) {
+    throw new TypeError(`${label} "${value}" is not supported. Use "default", "high-performance", or "low-power".`)
+  }
+}
+
+function assertRendererContextParameterAbsent(
+  parameters: Record<string, unknown>,
+  name: 'canvas' | 'context',
+  label: string,
+): void {
+  if (parameters[name] === undefined || parameters[name] === null) return
+  throw new Error(
+    `${label}.${name} is not supported by @headless-three/renderer because it renders offscreen through wgpu instead of a browser WebGL context.`,
+  )
+}
+
+function assertRendererUnsupportedDepthParameterFalse(
+  parameters: Record<string, unknown>,
+  name: 'logarithmicDepthBuffer' | 'reverseDepthBuffer',
+  label: string,
+): void {
+  if (parameters[name] === undefined) return
+  const enabled = rendererStateBoolean(parameters[name], `${label}.${name}`)
+  if (!enabled) return
+  throw new Error(`${label}.${name} true is not supported by @headless-three/renderer yet.`)
 }
 
 function rendererStateShadowMapType(value: unknown): number {

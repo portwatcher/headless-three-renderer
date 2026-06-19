@@ -7,6 +7,21 @@ export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'l
 export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal'
 export type RenderAnimationLoopCallback = (time: number, frame?: unknown) => void
 
+export interface RendererParametersLike {
+  canvas?: unknown
+  context?: unknown
+  alpha?: boolean
+  depth?: boolean
+  stencil?: boolean
+  antialias?: boolean
+  premultipliedAlpha?: boolean
+  preserveDrawingBuffer?: boolean
+  powerPreference?: 'default' | 'high-performance' | 'low-power'
+  failIfMajorPerformanceCaveat?: boolean
+  logarithmicDepthBuffer?: boolean
+  reverseDepthBuffer?: boolean
+}
+
 export interface ThreeColorLike {
   r: number
   g: number

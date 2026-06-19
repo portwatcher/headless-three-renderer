@@ -28816,6 +28816,63 @@ test('Renderer clear color state applies as background fallback', () => {
   assert.ok(Math.abs(optionBackground.a - 191) <= 1, `options.background alpha should override Renderer clear alpha (${optionBackground.a})`)
 })
 
+test('Renderer constructor validates WebGLRenderer-compatible parameters', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+
+  const renderer = new Renderer({
+    alpha: true,
+    depth: true,
+    stencil: false,
+    antialias: true,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: true,
+    powerPreference: 'high-performance',
+    failIfMajorPerformanceCaveat: false,
+    logarithmicDepthBuffer: false,
+    reverseDepthBuffer: false,
+  })
+  assert.equal(renderer.reversedDepthBuffer, false)
+
+  const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `constructor compatibility parameters should preserve normal rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => new Renderer(null),
+    /Renderer parameters must be an object when provided/i,
+  )
+  assert.throws(
+    () => new Renderer({ antialias: 'yes' }),
+    /Renderer parameters\.antialias must be a boolean/i,
+  )
+  assert.throws(
+    () => new Renderer({ powerPreference: 'maximum-performance' }),
+    /Renderer parameters\.powerPreference "maximum-performance" is not supported/i,
+  )
+  assert.throws(
+    () => new Renderer({ canvas: {} }),
+    /Renderer parameters\.canvas is not supported/i,
+  )
+  assert.throws(
+    () => new Renderer({ context: {} }),
+    /Renderer parameters\.context is not supported/i,
+  )
+  assert.throws(
+    () => new Renderer({ logarithmicDepthBuffer: true }),
+    /Renderer parameters\.logarithmicDepthBuffer true is not supported/i,
+  )
+  assert.throws(
+    () => new Renderer({ reverseDepthBuffer: true }),
+    /Renderer parameters\.reverseDepthBuffer true is not supported/i,
+  )
+})
+
 test('Renderer clear methods are no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
