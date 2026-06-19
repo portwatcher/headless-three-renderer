@@ -15,6 +15,7 @@ export function createSceneCorpus() {
     signedRawTextureCorpus(),
     equirectangularBackgroundCorpus(),
     cubeBackgroundTextureCorpus(),
+    cubeUvBackgroundTextureCorpus(),
     arrayCameraViewportCorpus(),
     cubeCameraCaptureCorpus(),
     cubeCameraUpdateCorpus(),
@@ -139,6 +140,17 @@ function cubeUvGreenCubeTexture() {
   ])
   texture.mapping = THREE.CubeUVReflectionMapping
   return texture
+}
+
+function coloredCubeBackgroundTexture() {
+  return cubeTexture([
+    [48, 80, 255],
+    [255, 225, 72],
+    [255, 64, 220],
+    [32, 210, 220],
+    [32, 200, 96],
+    [255, 48, 32],
+  ])
 }
 
 function spriteMapTexture() {
@@ -1929,14 +1941,7 @@ function equirectangularBackgroundCorpus() {
 
 function cubeBackgroundTextureCorpus() {
   const scene = new THREE.Scene()
-  scene.background = cubeTexture([
-    [48, 80, 255],
-    [255, 225, 72],
-    [255, 64, 220],
-    [32, 210, 220],
-    [32, 200, 96],
-    [255, 48, 32],
-  ])
+  scene.background = coloredCubeBackgroundTexture()
   scene.background.magFilter = THREE.NearestFilter
   scene.background.minFilter = THREE.NearestFilter
   scene.backgroundRotation = new THREE.Euler(0, Math.PI, 0)
@@ -1953,6 +1958,31 @@ function cubeBackgroundTextureCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
         throw new Error(`cube background rotation corpus should sample the green face, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function cubeUvBackgroundTextureCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = coloredCubeBackgroundTexture()
+  scene.background.mapping = THREE.CubeUVReflectionMapping
+  scene.background.magFilter = THREE.NearestFilter
+  scene.background.minFilter = THREE.NearestFilter
+  scene.backgroundRotation = new THREE.Euler(0, Math.PI, 0)
+
+  return {
+    name: 'cubeuv-cube-background-texture',
+    scene,
+    camera: makeCamera([0, 0, 0], [0, 0, -1]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
+        throw new Error(`CubeUV cube background corpus should sample the green face, got ${JSON.stringify(center)}`)
       }
     },
   }
