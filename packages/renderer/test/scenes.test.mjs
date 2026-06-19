@@ -29099,6 +29099,33 @@ test('Renderer resource init hooks are validated no-op compatibility hooks', () 
   )
 })
 
+test('Renderer framebuffer and texture copy APIs fail clearly', () => {
+  const renderer = new Renderer()
+  const source = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
+  const destination = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
+
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(source),
+    /Renderer\.copyFramebufferToTexture\(\).*not supported.*readRenderTargetPixels/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, destination),
+    /Renderer\.copyTextureToTexture\(\).*not supported.*Copy readable texture data on the CPU/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(null),
+    /Renderer\.copyFramebufferToTexture texture must be a texture-like object/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(null, destination),
+    /Renderer\.copyTextureToTexture source texture must be a texture-like object/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, null),
+    /Renderer\.copyTextureToTexture destination texture must be a texture-like object/i,
+  )
+})
+
 test('Renderer clear methods are no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()

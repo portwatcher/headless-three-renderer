@@ -382,6 +382,28 @@ export class Renderer {
     assertThreeTextureLike(texture, 'Renderer.initTexture texture')
   }
 
+  copyFramebufferToTexture(texture: ThreeTextureLike, _position: unknown = null, _level = 0): never {
+    assertThreeTextureLike(texture, 'Renderer.copyFramebufferToTexture texture')
+    throw new Error(
+      'Renderer.copyFramebufferToTexture() is not supported by @headless-three/renderer because there is no persistent browser framebuffer to copy. Render into a target and use Renderer.readRenderTargetPixels() for CPU readback.',
+    )
+  }
+
+  copyTextureToTexture(
+    srcTexture: ThreeTextureLike,
+    dstTexture: ThreeTextureLike,
+    _srcRegion: unknown = null,
+    _dstPosition: unknown = null,
+    _srcLevel = 0,
+    _dstLevel = 0,
+  ): never {
+    assertThreeTextureLike(srcTexture, 'Renderer.copyTextureToTexture source texture')
+    assertThreeTextureLike(dstTexture, 'Renderer.copyTextureToTexture destination texture')
+    throw new Error(
+      'Renderer.copyTextureToTexture() is not supported by @headless-three/renderer because GPU texture-to-texture copies are outside the scene-oriented API. Copy readable texture data on the CPU before rendering, or render into a target and use Renderer.readRenderTargetPixels() for CPU readback.',
+    )
+  }
+
   setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
     if (callback !== null && typeof callback !== 'function') {
       throw new TypeError('Renderer.setAnimationLoop callback must be a function or null.')
