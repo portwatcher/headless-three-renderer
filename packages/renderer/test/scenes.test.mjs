@@ -13322,6 +13322,124 @@ test('malformed custom shadow material containers fail clearly', () => {
     ),
     /Object3D\.customDistanceMaterial must be a material-like object/i,
   )
+
+  const invalidDepthMaterial = new THREE.MeshDepthMaterial()
+  invalidDepthMaterial.visible = 'yes'
+  assert.throws(
+    () => renderRgba(
+      makeScene('customDepthMaterial', invalidDepthMaterial, directional),
+      makeCamera(),
+      { width: 64, height: 64 },
+    ),
+    /Object3D\.customDepthMaterial\.visible must be a boolean/i,
+  )
+
+  const invalidDistanceMaterial = new THREE.MeshDistanceMaterial()
+  invalidDistanceMaterial.visible = 'yes'
+  assert.throws(
+    () => renderRgba(
+      makeScene('customDistanceMaterial', invalidDistanceMaterial, point),
+      makeCamera(),
+      { width: 64, height: 64 },
+    ),
+    /Object3D\.customDistanceMaterial\.visible must be a boolean/i,
+  )
+})
+
+test('custom shadow material visibility controls mesh shadow casters', () => {
+  function renderDirectionalCustomDepthShadow(visible) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    caster.customDepthMaterial = new THREE.MeshDepthMaterial()
+    caster.customDepthMaterial.visible = visible
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return mean.r + mean.g + mean.b
+  }
+
+  function renderPointCustomDistanceShadow(visible) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 2.5, 2.5),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.25
+    caster.castShadow = true
+    caster.customDistanceMaterial = new THREE.MeshDistanceMaterial()
+    caster.customDistanceMaterial.visible = visible
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    const mean = meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
+    return mean.r + mean.g + mean.b
+  }
+
+  const visibleDepthLum = renderDirectionalCustomDepthShadow(true)
+  const hiddenDepthLum = renderDirectionalCustomDepthShadow(false)
+  assert.ok(
+    hiddenDepthLum > visibleDepthLum + 20,
+    `hidden customDepthMaterial should suppress the caster shadow (${hiddenDepthLum} vs ${visibleDepthLum})`,
+  )
+
+  const visibleDistanceLum = renderPointCustomDistanceShadow(true)
+  const hiddenDistanceLum = renderPointCustomDistanceShadow(false)
+  assert.ok(
+    hiddenDistanceLum > visibleDistanceLum + 20,
+    `hidden customDistanceMaterial should suppress the caster shadow (${hiddenDistanceLum} vs ${visibleDistanceLum})`,
+  )
 })
 
 test('custom shadow material wireframes cast thinner shadows than filled custom casters', () => {

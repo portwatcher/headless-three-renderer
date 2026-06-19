@@ -638,10 +638,12 @@ function customShadowMaterialForMode(
 ): ThreeMaterialLike | undefined {
   if (mode === 'depth') {
     assertMaterialLike(object.customDepthMaterial, 'Object3D.customDepthMaterial')
+    optionalSceneBoolean(object.customDepthMaterial?.visible, 'Object3D.customDepthMaterial.visible')
     return object.customDepthMaterial
   }
   if (mode === 'distance') {
     assertMaterialLike(object.customDistanceMaterial, 'Object3D.customDistanceMaterial')
+    optionalSceneBoolean(object.customDistanceMaterial?.visible, 'Object3D.customDistanceMaterial.visible')
     return object.customDistanceMaterial
   }
   return undefined
