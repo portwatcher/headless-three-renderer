@@ -212,10 +212,10 @@ test('large scene budget renders many meshes, textures, and supported lights', (
     metalness: i % 2 === 0 ? 0.05 : 0.18,
   }))
 
-  for (let row = 0; row < 6; row += 1) {
+  for (let row = 0; row < 8; row += 1) {
     for (let col = 0; col < 8; col += 1) {
       const mesh = new THREE.Mesh(geometry, materials[(row * 8 + col) % materials.length])
-      mesh.position.set((col - 3.5) * 0.24, (row - 2.5) * 0.22, Math.sin(row * 0.8 + col * 0.45) * 0.2)
+      mesh.position.set((col - 3.5) * 0.24, (row - 3.5) * 0.2, Math.sin(row * 0.8 + col * 0.45) * 0.2)
       mesh.rotation.set(row * 0.07, col * 0.05, (row + col) * 0.03)
       scene.add(mesh)
     }
