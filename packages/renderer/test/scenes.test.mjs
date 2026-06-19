@@ -18051,6 +18051,24 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     /options\.target must be a target-like object/i,
   )
 
+  const renderer = new Renderer()
+  assert.throws(
+    () => renderer.setRenderTarget('bad'),
+    /Renderer\.setRenderTarget target must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTarget({}, 6),
+    /Renderer\.setRenderTarget activeCubeFace must be an integer from 0 to 5/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTarget({}, 0, -1),
+    /Renderer\.setRenderTarget activeMipmapLevel must be a non-negative integer/i,
+  )
+  assert.throws(
+    () => renderer.setRenderTarget({ texture: [{}, {}] }),
+    /Multiple render target color attachments.*not supported/i,
+  )
+
   const targetCases = [
     [{ image: 'bad' }, /target\.image must be an image-like object/i, 'target image container'],
     [{ texture: 'bad' }, /target\.texture must be a texture-like object/i, 'color texture container'],
