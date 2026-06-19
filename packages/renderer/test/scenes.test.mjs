@@ -1818,6 +1818,49 @@ test('ArrayCamera object-id target merges sub-camera metadata', () => {
   assert.equal(target.objectIdMap[String(greenEncoded)].id, green.id)
 })
 
+test('ArrayCamera supports auxiliary MRT-shaped target attachments', () => {
+  const scene = makeLayeredSplitScene()
+  const arrayCamera = makeLayeredArrayCamera()
+  const [red, green] = scene.children
+  const target = {
+    textures: [
+      {},
+      { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
+      { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
+      { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+    ],
+  }
+
+  renderToTarget(scene, arrayCamera, target, {
+    width: 64,
+    height: 64,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  const colorLeft = meanRegion(target.textures[0].image.data, 64, 64, 8, 20, 24, 44)
+  const colorRight = meanRegion(target.textures[0].image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(colorLeft.r > colorLeft.g + 80, `primary ArrayCamera attachment left viewport should render red (${colorLeft.r}, ${colorLeft.g})`)
+  assert.ok(colorRight.g > colorRight.r + 80, `primary ArrayCamera attachment right viewport should render green (${colorRight.g}, ${colorRight.r})`)
+
+  const maskLeft = meanRegion(target.textures[1].image.data, 64, 64, 8, 20, 24, 44)
+  const maskRight = meanRegion(target.textures[1].image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(maskLeft.r > 250 && maskRight.r > 250, `mask attachment should compose both viewports (${maskLeft.r}, ${maskRight.r})`)
+
+  const objectIdLeft = meanRegion(target.textures[2].image.data, 64, 64, 8, 20, 24, 44)
+  const objectIdRight = meanRegion(target.textures[2].image.data, 64, 64, 40, 20, 56, 44)
+  const redEncoded = red.id + 1
+  const greenEncoded = green.id + 1
+  assertRgbClose(objectIdLeft, objectIdBytes(redEncoded), 'left auxiliary ArrayCamera object id')
+  assertRgbClose(objectIdRight, objectIdBytes(greenEncoded), 'right auxiliary ArrayCamera object id')
+  assert.equal(target.objectIdEntries.length, 2)
+  assert.equal(target.objectIdMap[String(redEncoded)].id, red.id)
+  assert.equal(target.objectIdMap[String(greenEncoded)].id, green.id)
+
+  const normalLeft = meanRegion(target.textures[3].image.data, 64, 64, 8, 20, 24, 44)
+  const normalRight = meanRegion(target.textures[3].image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(normalLeft.b > 250 && normalRight.b > 250, `normal attachment should compose both viewports (${normalLeft.b}, ${normalRight.b})`)
+})
+
 test('malformed ArrayCamera sub-camera containers fail clearly', () => {
   const scene = makeLayeredSplitScene()
   const arrayCamera = makeLayeredArrayCamera()

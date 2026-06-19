@@ -217,7 +217,6 @@ export class Renderer {
     if (renderOptions.target) assertNonCubeCameraRenderTargetTextures(renderOptions.target)
 
     if (isArrayCamera(camera)) {
-      assertNoAuxiliaryTargetAttachments(renderOptions.target, 'THREE.ArrayCamera')
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
@@ -225,7 +224,24 @@ export class Renderer {
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
       if (renderOptions.target) {
-        writeRenderTarget(renderOptions.target, buffer, width, height, objectIdEntries, depthData)
+        const auxiliary = renderArrayCameraAuxiliaryTargetAttachments(
+          scene,
+          camera,
+          renderOptions.target,
+          renderOptions,
+          buffer,
+          objectIdEntries,
+          (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+        )
+        writeRenderTarget(
+          renderOptions.target,
+          buffer,
+          width,
+          height,
+          auxiliary.objectIdEntries,
+          depthData,
+          auxiliary.attachments,
+        )
       }
       return buffer
     }
@@ -238,7 +254,7 @@ export class Renderer {
         nativeCamera,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      const auxiliary = renderAuxiliaryTargetAttachments(
+      const auxiliary = renderRegularCameraAuxiliaryTargetAttachments(
         scene,
         camera,
         renderOptions.target,
@@ -284,14 +300,30 @@ export class Renderer {
     assertNonCubeCameraRenderTargetTextures(target)
 
     if (isArrayCamera(camera)) {
-      assertNoAuxiliaryTargetAttachments(target, 'THREE.ArrayCamera')
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
         targetOptions,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      return writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
+      const auxiliary = renderArrayCameraAuxiliaryTargetAttachments(
+        scene,
+        camera,
+        target,
+        targetOptions,
+        buffer,
+        objectIdEntries,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      return writeRenderTarget(
+        target,
+        buffer,
+        width,
+        height,
+        auxiliary.objectIdEntries,
+        depthData,
+        auxiliary.attachments,
+      )
     }
 
     const { buffer, nativeScene, nativeCamera, objectIdEntries } = this.renderNative(scene, camera, targetOptions)
@@ -301,7 +333,7 @@ export class Renderer {
       nativeCamera,
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
-    const auxiliary = renderAuxiliaryTargetAttachments(
+    const auxiliary = renderRegularCameraAuxiliaryTargetAttachments(
       scene,
       camera,
       target,
@@ -342,14 +374,30 @@ export class Renderer {
     assertNonCubeCameraRenderTargetTextures(target)
 
     if (isArrayCamera(camera)) {
-      assertNoAuxiliaryTargetAttachments(target, 'THREE.ArrayCamera')
       const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(
         scene,
         camera,
         targetOptions,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
+      const auxiliary = renderArrayCameraAuxiliaryTargetAttachments(
+        scene,
+        camera,
+        target,
+        targetOptions,
+        buffer,
+        objectIdEntries,
+        (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
+      )
+      writeRenderTarget(
+        target,
+        buffer,
+        width,
+        height,
+        auxiliary.objectIdEntries,
+        depthData,
+        auxiliary.attachments,
+      )
       return buffer
     }
 
@@ -360,7 +408,7 @@ export class Renderer {
       nativeCamera,
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
-    const auxiliary = renderAuxiliaryTargetAttachments(
+    const auxiliary = renderRegularCameraAuxiliaryTargetAttachments(
       scene,
       camera,
       target,
@@ -461,10 +509,26 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike,
   if (options.target) assertNonCubeCameraRenderTargetTextures(options.target)
 
   if (isArrayCamera(camera)) {
-    assertNoAuxiliaryTargetAttachments(options.target, 'THREE.ArrayCamera')
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, options, native.renderNative)
     if (options.target) {
-      writeRenderTarget(options.target, buffer, width, height, objectIdEntries, depthData)
+      const auxiliary = renderArrayCameraAuxiliaryTargetAttachments(
+        scene,
+        camera,
+        options.target,
+        options,
+        buffer,
+        objectIdEntries,
+        native.renderNative,
+      )
+      writeRenderTarget(
+        options.target,
+        buffer,
+        width,
+        height,
+        auxiliary.objectIdEntries,
+        depthData,
+        auxiliary.attachments,
+      )
     }
     return buffer
   }
@@ -473,7 +537,7 @@ export function render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike,
   const buffer = native.renderNative(nativeScene, nativeCamera)
   if (options.target) {
     const depthData = renderTargetDepthBuffer(options.target, nativeScene, nativeCamera, native.renderNative)
-    const auxiliary = renderAuxiliaryTargetAttachments(
+    const auxiliary = renderRegularCameraAuxiliaryTargetAttachments(
       scene,
       camera,
       options.target,
@@ -514,15 +578,31 @@ export function renderToTarget(
   assertNonCubeCameraRenderTargetTextures(target)
 
   if (isArrayCamera(camera)) {
-    assertNoAuxiliaryTargetAttachments(target, 'THREE.ArrayCamera')
     const { buffer, width, height, objectIdEntries, depthData } = renderArrayCamera(scene, camera, targetOptions, native.renderNative)
-    return writeRenderTarget(target, buffer, width, height, objectIdEntries, depthData)
+    const auxiliary = renderArrayCameraAuxiliaryTargetAttachments(
+      scene,
+      camera,
+      target,
+      targetOptions,
+      buffer,
+      objectIdEntries,
+      native.renderNative,
+    )
+    return writeRenderTarget(
+      target,
+      buffer,
+      width,
+      height,
+      auxiliary.objectIdEntries,
+      depthData,
+      auxiliary.attachments,
+    )
   }
 
   const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, targetOptions)
   const buffer = native.renderNative(nativeScene, nativeCamera)
   const depthData = renderTargetDepthBuffer(target, nativeScene, nativeCamera, native.renderNative)
-  const auxiliary = renderAuxiliaryTargetAttachments(
+  const auxiliary = renderRegularCameraAuxiliaryTargetAttachments(
     scene,
     camera,
     target,
@@ -857,13 +937,11 @@ function renderTargetDepthBuffer(
 }
 
 function renderAuxiliaryTargetAttachments(
-  scene: ThreeSceneRootLike,
-  camera: ThreeCameraLike,
   target: RenderTargetLike | undefined,
   options: RenderOptions,
   primaryData: Buffer,
   primaryObjectIdEntries: RenderObjectIdEntry[] | undefined,
-  renderNativeScene: (scene: NativeRenderScene, camera: NativeCamera) => Buffer,
+  renderAttachment: (mode: RenderMode) => { data: Buffer; objectIdEntries?: RenderObjectIdEntry[] },
 ): { attachments?: RenderTargetAttachmentData[]; objectIdEntries?: RenderObjectIdEntry[] } {
   if (!target) return { objectIdEntries: primaryObjectIdEntries }
   const colorTextures = renderTargetColorTextures(target)
@@ -882,22 +960,74 @@ function renderAuxiliaryTargetAttachments(
       continue
     }
 
-    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, {
-      ...options,
-      renderMode: mode,
-      format: 'rgba',
-    })
-    attachments.push({ texture, data: renderNativeScene(nativeScene, nativeCamera) })
-    if (mode === 'object-id') targetObjectIdEntries = objectIdEntries
+    const rendered = renderAttachment(mode)
+    attachments.push({ texture, data: rendered.data })
+    if (mode === 'object-id') targetObjectIdEntries = rendered.objectIdEntries
   }
 
   return { attachments, objectIdEntries: targetObjectIdEntries }
 }
 
+function renderRegularCameraAuxiliaryTargetAttachments(
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  target: RenderTargetLike | undefined,
+  options: RenderOptions,
+  primaryData: Buffer,
+  primaryObjectIdEntries: RenderObjectIdEntry[] | undefined,
+  renderNativeScene: (scene: NativeRenderScene, camera: NativeCamera) => Buffer,
+): { attachments?: RenderTargetAttachmentData[]; objectIdEntries?: RenderObjectIdEntry[] } {
+  return renderAuxiliaryTargetAttachments(
+    target,
+    options,
+    primaryData,
+    primaryObjectIdEntries,
+    (mode) => {
+      const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, {
+        ...options,
+        renderMode: mode,
+        format: 'rgba',
+      })
+      return {
+        data: renderNativeScene(nativeScene, nativeCamera),
+        objectIdEntries,
+      }
+    },
+  )
+}
+
+function renderArrayCameraAuxiliaryTargetAttachments(
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  target: RenderTargetLike | undefined,
+  options: RenderOptions,
+  primaryData: Buffer,
+  primaryObjectIdEntries: RenderObjectIdEntry[] | undefined,
+  renderNativeScene: RenderNativeScene,
+): { attachments?: RenderTargetAttachmentData[]; objectIdEntries?: RenderObjectIdEntry[] } {
+  return renderAuxiliaryTargetAttachments(
+    target,
+    options,
+    primaryData,
+    primaryObjectIdEntries,
+    (mode) => {
+      const rendered = renderArrayCamera(scene, camera, {
+        ...options,
+        renderMode: mode,
+        format: 'rgba',
+      }, renderNativeScene)
+      return {
+        data: rendered.buffer,
+        objectIdEntries: rendered.objectIdEntries,
+      }
+    },
+  )
+}
+
 function assertNoAuxiliaryTargetAttachments(target: RenderTargetLike | undefined, cameraLabel: string): void {
   if (!target || renderTargetColorTextures(target).length <= 1) return
   throw new Error(
-    `Auxiliary render-mode target attachments are not supported with ${cameraLabel} yet. Render regular-camera auxiliary targets or run separate passes for composed camera outputs.`,
+    `Auxiliary render-mode target attachments are not supported with ${cameraLabel} yet. Render regular-camera or ArrayCamera auxiliary targets, or run separate passes for CubeCamera output.`,
   )
 }
 
