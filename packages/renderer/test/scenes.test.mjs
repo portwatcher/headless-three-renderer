@@ -10845,11 +10845,16 @@ test('Points customDistanceMaterial alphaMaps sample selected geometry UV channe
     return alphaMap
   }
 
-  function pointGeometry(position) {
+  function pointGeometry(position, channel) {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
     geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
-    geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([0.25, 0.5]), 2))
+    for (const index of [1, 2, 3]) {
+      geometry.setAttribute(`uv${index}`, new THREE.BufferAttribute(new Float32Array([
+        index === channel ? 0.25 : 0.75,
+        0.5,
+      ]), 2))
+    }
     return geometry
   }
 
@@ -10883,7 +10888,7 @@ test('Points customDistanceMaterial alphaMaps sample selected geometry UV channe
     scene.background = new THREE.Color(1, 1, 1)
     addReceiver(scene)
 
-    const points = new THREE.Points(pointGeometry([0, 2.2, 1.8]), pointsMaterial(channel, inheritFromSource))
+    const points = new THREE.Points(pointGeometry([0, 2.2, 1.8], channel), pointsMaterial(channel, inheritFromSource))
     points.castShadow = true
     points.customDistanceMaterial = inheritFromSource
       ? new THREE.MeshDistanceMaterial()
@@ -10911,13 +10916,15 @@ test('Points customDistanceMaterial alphaMaps sample selected geometry UV channe
   for (const inheritFromSource of [false, true]) {
     const label = inheritFromSource ? 'source material' : 'custom shadow material'
     const primaryDistance = renderPointCustomDistancePoint(0, inheritFromSource)
-    const secondaryDistance = renderPointCustomDistancePoint(1, inheritFromSource)
     const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
-    const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
-    assert.ok(
-      secondaryDistanceLum > primaryDistanceLum + 10,
-      `${label} point alphaMap channel=1 should sample transparent uv1 and remove the customDistanceMaterial caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
-    )
+    for (const channel of [1, 2, 3]) {
+      const selectedDistance = renderPointCustomDistancePoint(channel, inheritFromSource)
+      const selectedDistanceLum = selectedDistance.r + selectedDistance.g + selectedDistance.b
+      assert.ok(
+        selectedDistanceLum > primaryDistanceLum + 10,
+        `${label} point alphaMap channel=${channel} should sample transparent uv${channel} and remove the customDistanceMaterial caster shadow (${selectedDistanceLum} vs ${primaryDistanceLum})`,
+      )
+    }
   }
 })
 
@@ -10933,11 +10940,16 @@ test('Points customDistanceMaterial base maps sample selected geometry UV channe
     return map
   }
 
-  function pointGeometry(position) {
+  function pointGeometry(position, channel) {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
     geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0.75, 0.5]), 2))
-    geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([0.25, 0.5]), 2))
+    for (const index of [1, 2, 3]) {
+      geometry.setAttribute(`uv${index}`, new THREE.BufferAttribute(new Float32Array([
+        index === channel ? 0.25 : 0.75,
+        0.5,
+      ]), 2))
+    }
     return geometry
   }
 
@@ -10971,7 +10983,7 @@ test('Points customDistanceMaterial base maps sample selected geometry UV channe
     scene.background = new THREE.Color(1, 1, 1)
     addReceiver(scene)
 
-    const points = new THREE.Points(pointGeometry([0, 2.2, 1.8]), pointsMaterial(channel, inheritFromSource))
+    const points = new THREE.Points(pointGeometry([0, 2.2, 1.8], channel), pointsMaterial(channel, inheritFromSource))
     points.castShadow = true
     points.customDistanceMaterial = inheritFromSource
       ? new THREE.MeshDistanceMaterial()
@@ -10999,13 +11011,15 @@ test('Points customDistanceMaterial base maps sample selected geometry UV channe
   for (const inheritFromSource of [false, true]) {
     const label = inheritFromSource ? 'source material' : 'custom shadow material'
     const primaryDistance = renderPointCustomDistancePoint(0, inheritFromSource)
-    const secondaryDistance = renderPointCustomDistancePoint(1, inheritFromSource)
     const primaryDistanceLum = primaryDistance.r + primaryDistance.g + primaryDistance.b
-    const secondaryDistanceLum = secondaryDistance.r + secondaryDistance.g + secondaryDistance.b
-    assert.ok(
-      secondaryDistanceLum > primaryDistanceLum + 10,
-      `${label} point map channel=1 should sample transparent uv1 and remove the customDistanceMaterial caster shadow (${secondaryDistanceLum} vs ${primaryDistanceLum})`,
-    )
+    for (const channel of [1, 2, 3]) {
+      const selectedDistance = renderPointCustomDistancePoint(channel, inheritFromSource)
+      const selectedDistanceLum = selectedDistance.r + selectedDistance.g + selectedDistance.b
+      assert.ok(
+        selectedDistanceLum > primaryDistanceLum + 10,
+        `${label} point map channel=${channel} should sample transparent uv${channel} and remove the customDistanceMaterial caster shadow (${selectedDistanceLum} vs ${primaryDistanceLum})`,
+      )
+    }
   }
 })
 
