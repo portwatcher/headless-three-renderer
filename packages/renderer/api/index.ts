@@ -110,6 +110,7 @@ export class Renderer {
   private currentViewport: PixelRect | null = null
   private currentScissor: PixelRect | null = null
   private currentScissorTest = false
+  private pixelRatioValue = 1
   private autoClearValue = true
   private autoClearColorValue = true
   private autoClearDepthValue = true
@@ -202,6 +203,14 @@ export class Renderer {
 
   setSize(width: number, height: number, _updateStyle = true): void {
     this.currentSize = rendererStateSize(width, height, 'Renderer.setSize')
+  }
+
+  setPixelRatio(value: number): void {
+    this.pixelRatioValue = rendererStatePixelRatio(value, 'Renderer.setPixelRatio')
+  }
+
+  getPixelRatio(): number {
+    return this.pixelRatioValue
   }
 
   getSize(): RenderSizeLike | null
@@ -2134,6 +2143,16 @@ function rendererStateSizeDimension(value: unknown, label: string): number {
   }
   if (!Number.isInteger(value) || value <= 0) {
     throw new TypeError(`${label} must be a positive integer.`)
+  }
+  return value
+}
+
+function rendererStatePixelRatio(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} value must be a finite number.`)
+  }
+  if (value <= 0) {
+    throw new TypeError(`${label} value must be greater than 0.`)
   }
   return value
 }

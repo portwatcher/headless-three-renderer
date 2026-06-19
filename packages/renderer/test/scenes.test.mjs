@@ -28050,6 +28050,41 @@ test('Renderer size state applies as render fallback', () => {
   assert.equal(cubeTarget.height, 16)
 })
 
+test('Renderer pixel ratio is validated compatibility state', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer.getPixelRatio(), 1)
+  renderer.setPixelRatio(2)
+  assert.equal(renderer.getPixelRatio(), 2)
+
+  renderer.setSize(24, 16)
+  const rgba = renderer.render(scene, camera, { format: 'rgba' })
+  assert.equal(rgba.length, 24 * 16 * 4)
+  assert.deepEqual(renderer.getSize(), { width: 24, height: 16 })
+
+  const mean = meanRegion(rgba, 24, 16, 7, 5, 17, 11)
+  assert.ok(mean.r > mean.b + 80, `Renderer pixel ratio state should preserve output-pixel size fallback (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => renderer.setPixelRatio('2'),
+    /Renderer\.setPixelRatio value must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.setPixelRatio(0),
+    /Renderer\.setPixelRatio value must be greater than 0/i,
+  )
+})
+
 test('render options viewport confines draws to an output rectangle', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
