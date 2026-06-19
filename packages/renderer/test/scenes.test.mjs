@@ -2075,6 +2075,9 @@ test('CubeCamera.update works with Renderer render-target state', () => {
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
   const renderer = new Renderer()
   assert.equal(renderer.xr.enabled, false)
+  assert.equal(renderer.xr.isPresenting, false)
+  assert.equal(renderer.xr.getSession(), null)
+  assert.equal(renderer.xr.getReferenceSpace(), null)
   assert.throws(
     () => { renderer.xr.enabled = 'yes' },
     /Renderer\.xr\.enabled must be a boolean/i,

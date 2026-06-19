@@ -227,12 +227,22 @@ class RendererInfoState {
 class RendererXrState {
   private enabledValue = false
 
+  readonly isPresenting = false
+
   get enabled(): boolean {
     return this.enabledValue
   }
 
   set enabled(value: boolean) {
     this.enabledValue = rendererStateBoolean(value, 'Renderer.xr.enabled')
+  }
+
+  getSession(): null {
+    return null
+  }
+
+  getReferenceSpace(): null {
+    return null
   }
 }
 
