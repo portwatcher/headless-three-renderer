@@ -29167,6 +29167,41 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   )
 })
 
+test('Renderer debug state is inert validated compatibility state', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  assert.equal(renderer.debug.checkShaderErrors, true)
+  assert.equal(renderer.debug.onShaderError, null)
+
+  renderer.debug.checkShaderErrors = false
+  const onShaderError = () => {}
+  renderer.debug.onShaderError = onShaderError
+  assert.equal(renderer.debug.checkShaderErrors, false)
+  assert.equal(renderer.debug.onShaderError, onShaderError)
+  renderer.debug.onShaderError = null
+  assert.equal(renderer.debug.onShaderError, null)
+
+  const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `debug compatibility state should not alter rendering (${mean.r} vs ${mean.b})`)
+
+  assert.throws(
+    () => { renderer.debug.checkShaderErrors = 'no' },
+    /Renderer\.debug\.checkShaderErrors must be a boolean/i,
+  )
+  assert.throws(
+    () => { renderer.debug.onShaderError = 'log' },
+    /Renderer\.debug\.onShaderError must be a function or null/i,
+  )
+})
+
 test('Renderer compile hooks are validated no-op compatibility hooks', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

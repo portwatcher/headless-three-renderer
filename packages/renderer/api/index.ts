@@ -236,6 +236,30 @@ class RendererXrState {
   }
 }
 
+class RendererDebugState {
+  private checkShaderErrorsValue = true
+  private onShaderErrorValue: ((...args: unknown[]) => void) | null = null
+
+  get checkShaderErrors(): boolean {
+    return this.checkShaderErrorsValue
+  }
+
+  set checkShaderErrors(value: boolean) {
+    this.checkShaderErrorsValue = rendererStateBoolean(value, 'Renderer.debug.checkShaderErrors')
+  }
+
+  get onShaderError(): ((...args: unknown[]) => void) | null {
+    return this.onShaderErrorValue
+  }
+
+  set onShaderError(value: ((...args: unknown[]) => void) | null) {
+    if (value !== null && typeof value !== 'function') {
+      throw new TypeError('Renderer.debug.onShaderError must be a function or null.')
+    }
+    this.onShaderErrorValue = value
+  }
+}
+
 class RendererExtensionsState {
   has(name: string): boolean {
     assertWebGlExtensionName(name, 'Renderer.extensions.has name')
@@ -506,6 +530,7 @@ export class Renderer {
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
+  readonly debug = new RendererDebugState()
   readonly extensions = new RendererExtensionsState()
   readonly info = new RendererInfoState()
   readonly properties = new RendererPropertiesState()
