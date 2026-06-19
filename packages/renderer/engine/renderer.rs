@@ -171,6 +171,7 @@ pub struct GpuRenderer {
     post_uniform_buffer: Mutex<Option<wgpu::Buffer>>,
     scene_color_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
     post_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
+    readback_buffer_cache: Mutex<HashMap<ReadbackBufferKey, wgpu::Buffer>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
@@ -242,6 +243,11 @@ struct CachedBackgroundBindGroup {
 struct ScratchTextureKey {
     width: u32,
     height: u32,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct ReadbackBufferKey {
+    size: u64,
 }
 
 struct AoPhysicalBindGroupResources {
@@ -452,6 +458,12 @@ impl ScratchTextureKey {
             width: size.width,
             height: size.height,
         }
+    }
+}
+
+impl ReadbackBufferKey {
+    fn from_size(size: u64) -> Self {
+        Self { size }
     }
 }
 
@@ -2032,6 +2044,7 @@ impl GpuRenderer {
             post_uniform_buffer: Mutex::new(None),
             scene_color_texture_cache: Mutex::new(HashMap::new()),
             post_texture_cache: Mutex::new(HashMap::new()),
+            readback_buffer_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
@@ -2149,12 +2162,8 @@ impl GpuRenderer {
             );
         }
 
-        let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("headless-three-renderer readback buffer"),
-            size: output_buffer_size,
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
+        let (output_buffer, readback_buffer_guard) =
+            self.cached_readback_buffer(output_buffer_size);
 
         let mut encoder = self
             .device
@@ -2474,6 +2483,7 @@ impl GpuRenderer {
         drop(post_uniform_buffer_guard);
         drop(post_texture_guard);
         drop(scene_color_texture_guard);
+        drop(readback_buffer_guard);
 
         Ok(rgba)
     }
@@ -2510,6 +2520,34 @@ impl GpuRenderer {
         };
 
         (texture, guard)
+    }
+
+    fn cached_readback_buffer(
+        &self,
+        size: u64,
+    ) -> (
+        wgpu::Buffer,
+        MutexGuard<'_, HashMap<ReadbackBufferKey, wgpu::Buffer>>,
+    ) {
+        let key = ReadbackBufferKey::from_size(size);
+        let mut guard = self
+            .readback_buffer_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let buffer = if let Some(buffer) = guard.get(&key) {
+            buffer.clone()
+        } else {
+            let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("headless-three-renderer readback buffer"),
+                size,
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                mapped_at_creation: false,
+            });
+            guard.insert(key, buffer.clone());
+            buffer
+        };
+
+        (buffer, guard)
     }
 
     /// Render the scene's shadow casters into a shared depth-only texture array
