@@ -20159,6 +20159,75 @@ test('Renderer.setRenderTarget state populates FloatType depthTexture', () => {
   assert.equal(renderer.getRenderTarget(), null)
 })
 
+test('Renderer.setRenderTarget state populates half-float and packed depth textures', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const near = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  near.position.set(-0.7, 0, 1)
+
+  const far = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+  )
+  far.position.set(0.7, 0, -3)
+  scene.add(near, far)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const cases = [
+    {
+      label: 'HalfFloatType',
+      depthTexture: { type: THREE.HalfFloatType, source: { data: {} } },
+      assertData(depthTexture) {
+        assert.ok(depthTexture.image.data instanceof Uint16Array, 'HalfFloatType depthTexture should receive Uint16Array half-float data')
+        const leftDepth = halfFloatToNumber(Math.round(meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)))
+        const rightDepth = halfFloatToNumber(Math.round(meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)))
+        assert.ok(leftDepth > rightDepth + 0.3, `active target near half-float depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+        assert.ok(leftDepth <= 1 && rightDepth >= 0, `active target half-float depth values should be normalized (${leftDepth}, ${rightDepth})`)
+      },
+    },
+    {
+      label: 'UnsignedInt248Type',
+      depthTexture: { type: THREE.UnsignedInt248Type, format: THREE.DepthStencilFormat, source: { data: {} } },
+      assertData(depthTexture) {
+        assert.ok(depthTexture.image.data instanceof Uint32Array, 'UnsignedInt248Type depthTexture should receive Uint32Array data')
+        for (let i = 0; i < depthTexture.image.data.length; i += 197) {
+          assert.equal(depthTexture.image.data[i] & 0xff, 0, `stencil byte should be zero at ${i}`)
+        }
+        const leftDepth24 = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38) / 0x100
+        const rightDepth24 = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38) / 0x100
+        assert.ok(leftDepth24 > rightDepth24 + 1_000_000, `active target near depth24 should be greater than far depth (${leftDepth24} vs ${rightDepth24})`)
+        assert.ok(leftDepth24 <= 0xffffff && rightDepth24 >= 0, `active target depth24 values should be normalized (${leftDepth24}, ${rightDepth24})`)
+      },
+    },
+  ]
+
+  for (const { label, depthTexture, assertData } of cases) {
+    const target = { texture: {}, depthTexture }
+    renderer.setRenderTarget(target)
+    const returned = renderer.render(scene, camera, { width: 64, height: 64 })
+
+    assert.equal(returned, target.data, `${label} active target render should return target.data`)
+    assert.strictEqual(renderer.getRenderTarget(), target, `${label} should remain the active target`)
+    assert.equal(target.texture.image.data, target.data, `${label} color texture should receive target.data`)
+    assert.equal(depthTexture.image.data.length, 64 * 64, `${label} depthTexture should receive scalar data`)
+    assert.equal(depthTexture.source.data.data, depthTexture.image.data, `${label} source should reference depth data`)
+    assert.equal(depthTexture.source.data.width, 64, `${label} source should receive width`)
+    assert.equal(depthTexture.source.data.height, 64, `${label} source should receive height`)
+    assertData(depthTexture)
+  }
+
+  renderer.setRenderTarget(null)
+  assert.equal(renderer.getRenderTarget(), null)
+})
+
 test('renderToTarget populates FloatType depthTexture with normalized scalar depth', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
