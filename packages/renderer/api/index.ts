@@ -973,6 +973,12 @@ export class Renderer {
     )
   }
 
+  renderObject(): never {
+    throw new Error(
+      'Renderer.renderObject() is not supported by @headless-three/renderer because it does not expose renderer-internal render-object dispatch or direct material program dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
+    )
+  }
+
   initRenderTarget(target: RenderTargetLike): void {
     assertRenderTargetLike(target, 'Renderer.initRenderTarget target')
     validateUnsupportedRenderTargetOptions(target)

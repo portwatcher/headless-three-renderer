@@ -30453,6 +30453,10 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
     () => renderer.renderBufferDirect(),
     /Renderer\.renderBufferDirect\(\) is not supported.*WebGL buffer binding.*Renderer\.render\(\) or renderToTarget\(\)/i,
   )
+  assert.throws(
+    () => renderer.renderObject(),
+    /Renderer\.renderObject\(\) is not supported.*render-object dispatch.*Renderer\.render\(\) or renderToTarget\(\)/i,
+  )
 })
 
 test('Renderer resource init hooks are validated no-op compatibility hooks', () => {
