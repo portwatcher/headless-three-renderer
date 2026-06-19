@@ -9448,8 +9448,8 @@ test('LineBasicMaterial and LineDashedMaterial cutouts affect spot and point sha
   }
 })
 
-test('LineBasicMaterial alphaToCoverage approximates shadow caster cutouts', () => {
-  function renderLineAlphaCoverageShadow(alphaToCoverage) {
+test('LineBasicMaterial and LineDashedMaterial alphaToCoverage approximates shadow caster cutouts', () => {
+  function renderLineAlphaCoverageShadow(materialKind, alphaToCoverage) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -9461,7 +9461,14 @@ test('LineBasicMaterial alphaToCoverage approximates shadow caster cutouts', () 
     receiver.receiveShadow = true
     scene.add(receiver)
 
-    const material = new THREE.LineBasicMaterial({ color: 0xffffff })
+    const material = materialKind === 'dashed'
+      ? new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+      : new THREE.LineBasicMaterial({ color: 0xffffff })
     material.alphaMap = solidTexture(255, 0, 255)
     material.alphaToCoverage = alphaToCoverage
     material.colorWrite = false
@@ -9475,6 +9482,7 @@ test('LineBasicMaterial alphaToCoverage approximates shadow caster cutouts', () 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const line = new THREE.LineSegments(geometry, material)
+    if (materialKind === 'dashed') line.computeLineDistances()
     line.castShadow = true
     scene.add(line)
 
@@ -9498,11 +9506,13 @@ test('LineBasicMaterial alphaToCoverage approximates shadow caster cutouts', () 
     return meanRgba(renderRgba(scene, camera, { width: 96, height: 96 }))
   }
 
-  const fullShadow = renderLineAlphaCoverageShadow(false)
-  const cutoutShadow = renderLineAlphaCoverageShadow(true)
-  const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
-  const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
-  assert.ok(cutoutLum > fullLum + 2, `line alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
+  for (const materialKind of ['basic', 'dashed']) {
+    const fullShadow = renderLineAlphaCoverageShadow(materialKind, false)
+    const cutoutShadow = renderLineAlphaCoverageShadow(materialKind, true)
+    const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+    const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
+    assert.ok(cutoutLum > fullLum + 2, `${materialKind} line alphaToCoverage shadow cutoff should let more receiver light through (${cutoutLum} vs ${fullLum})`)
+  }
 })
 
 test('LineBasicMaterial and LineDashedMaterial alphaHash approximate shadow caster opacity cutouts', () => {
@@ -9576,14 +9586,22 @@ test('LineBasicMaterial and LineDashedMaterial alphaHash approximate shadow cast
   }
 })
 
-test('LineBasicMaterial alphaHash and alphaToCoverage affect spot and point shadows', () => {
-  function makeLineSegments(cutoutKind, enabled) {
-    const material = new THREE.LineBasicMaterial({
+test('LineBasicMaterial and LineDashedMaterial alphaHash and alphaToCoverage affect spot and point shadows', () => {
+  function makeLineSegments(materialKind, cutoutKind, enabled) {
+    const materialProps = {
       color: 0xffffff,
       linewidth: 6,
       opacity: cutoutKind === 'alphaHash' && enabled ? 0.35 : 1,
       alphaHash: cutoutKind === 'alphaHash' ? enabled : false,
-    })
+    }
+    const material = materialKind === 'dashed'
+      ? new THREE.LineDashedMaterial({
+        ...materialProps,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+      : new THREE.LineBasicMaterial(materialProps)
     if (cutoutKind === 'alphaToCoverage') {
       material.alphaMap = solidTexture(255, 0, 255)
       material.alphaToCoverage = enabled
@@ -9599,11 +9617,12 @@ test('LineBasicMaterial alphaHash and alphaToCoverage affect spot and point shad
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     const line = new THREE.LineSegments(geometry, material)
+    if (materialKind === 'dashed') line.computeLineDistances()
     line.castShadow = true
     return line
   }
 
-  function renderLineOpacityShadow(lightKind, cutoutKind, enabled) {
+  function renderLineOpacityShadow(lightKind, materialKind, cutoutKind, enabled) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
 
@@ -9614,7 +9633,7 @@ test('LineBasicMaterial alphaHash and alphaToCoverage affect spot and point shad
     receiver.rotation.x = -Math.PI / 2
     receiver.receiveShadow = true
     scene.add(receiver)
-    scene.add(makeLineSegments(cutoutKind, enabled))
+    scene.add(makeLineSegments(materialKind, cutoutKind, enabled))
 
     if (lightKind === 'spot') {
       const light = new THREE.SpotLight(0xffffff, 4, 20, Math.PI / 4, 0.2, 2)
@@ -9644,12 +9663,14 @@ test('LineBasicMaterial alphaHash and alphaToCoverage affect spot and point shad
   }
 
   for (const lightKind of ['spot', 'point']) {
-    for (const cutoutKind of ['alphaHash', 'alphaToCoverage']) {
-      const fullShadow = renderLineOpacityShadow(lightKind, cutoutKind, false)
-      const cutoutShadow = renderLineOpacityShadow(lightKind, cutoutKind, true)
-      const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
-      const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
-      assert.ok(cutoutLum > fullLum + 4, `${lightKind} ${cutoutKind} should lighten the line caster shadow (${cutoutLum} vs ${fullLum})`)
+    for (const materialKind of ['basic', 'dashed']) {
+      for (const cutoutKind of ['alphaHash', 'alphaToCoverage']) {
+        const fullShadow = renderLineOpacityShadow(lightKind, materialKind, cutoutKind, false)
+        const cutoutShadow = renderLineOpacityShadow(lightKind, materialKind, cutoutKind, true)
+        const fullLum = fullShadow.r + fullShadow.g + fullShadow.b
+        const cutoutLum = cutoutShadow.r + cutoutShadow.g + cutoutShadow.b
+        assert.ok(cutoutLum > fullLum + 4, `${lightKind} ${materialKind} ${cutoutKind} should lighten the line caster shadow (${cutoutLum} vs ${fullLum})`)
+      }
     }
   }
 })
