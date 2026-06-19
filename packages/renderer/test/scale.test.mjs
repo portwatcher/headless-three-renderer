@@ -313,15 +313,15 @@ test('texture-heavy scene budget renders many unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 10
-  const rows = 10
-  const geometry = new THREE.PlaneGeometry(0.15, 0.15)
+  const columns = 11
+  const rows = 11
+  const geometry = new THREE.PlaneGeometry(0.13, 0.13)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
       const index = row * columns + col
       const material = new THREE.MeshBasicMaterial({ map: makeTexture(index) })
       const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.set((col - (columns - 1) / 2) * 0.18, (row - (rows - 1) / 2) * 0.18, 0)
+      mesh.position.set((col - (columns - 1) / 2) * 0.15, (row - (rows - 1) / 2) * 0.15, 0)
       scene.add(mesh)
     }
   }
