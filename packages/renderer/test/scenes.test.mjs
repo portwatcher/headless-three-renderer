@@ -16539,6 +16539,57 @@ test('LightProbe contributes diffuse lighting across lit material models', () =>
   }
 })
 
+test('LightProbe combines with scene environment across lit material models', () => {
+  function makeGreenEnvironment() {
+    const texture = solidTexture(0, 255, 0)
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  function makeRedProbe() {
+    const probe = new THREE.LightProbe(undefined, 1.5)
+    for (const coefficient of probe.sh.coefficients) {
+      coefficient.set(0, 0, 0)
+    }
+    probe.sh.coefficients[0].set(1, 0, 0)
+    return probe
+  }
+
+  function renderMaterial(material, { environment = false, probe = false } = {}) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (environment) {
+      scene.environment = makeGreenEnvironment()
+      scene.environmentIntensity = 2.5
+    }
+    if (probe) {
+      scene.add(makeRedProbe())
+    }
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const cases = [
+    ['Standard', () => new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })],
+    ['Physical', () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })],
+    ['Lambert', () => new THREE.MeshLambertMaterial({ color: 0xffffff })],
+    ['Phong', () => new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 20 })],
+    ['Toon', () => new THREE.MeshToonMaterial({ color: 0xffffff })],
+  ]
+
+  for (const [name, makeMaterial] of cases) {
+    const environmentOnly = renderMaterial(makeMaterial(), { environment: true })
+    const probeOnly = renderMaterial(makeMaterial(), { probe: true })
+    const combined = renderMaterial(makeMaterial(), { environment: true, probe: true })
+    assert.ok(combined.r > environmentOnly.r + 10, `${name} combined LightProbe/environment should add red probe diffuse lighting (${combined.r} vs ${environmentOnly.r})`)
+    assert.ok(combined.g > probeOnly.g + 80, `${name} combined LightProbe/environment should keep green environment lighting (${combined.g} vs ${probeOnly.g})`)
+  }
+})
+
 test('RectAreaLight approximates finite one-sided area lighting', () => {
   function renderRectArea(width, height, targetZ) {
     const scene = new THREE.Scene()
