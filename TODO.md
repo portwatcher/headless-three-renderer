@@ -112,7 +112,7 @@ Treat the goal as achieved only when a published compatibility matrix and golden
 
 | Task | Impact | Notes |
 |---|---:|---|
-| Persistent resource cache | High | Reuse GPU buffers, textures, pipelines, IBL maps, and bind groups across renders. |
+| Persistent resource cache | High | Renderer instances reuse the wgpu device, compiled base pipelines, default textures/bind groups, and cached non-default sampler handles across renders. Remaining work is reusing mesh buffers, uploaded textures, custom material/state pipelines, IBL maps, and per-resource bind groups across renders. |
 | Incremental scene updates | High | Avoid rebuilding every mesh/material/texture for animation frames. |
 | GPU skinning/morphing path | Medium | CPU baking is simple and correct enough for stills, with invalid skinning matrix values, morph target influence values, and morph mode flags failing clearly, but expensive for dense animated characters. |
 | Large scene memory budget tests | Medium | Scale regression tests render 400 separate mesh objects, a mixed 48-mesh raw-texture/light scene, 2,500 `InstancedMesh` instances, many unique raw and encoded textures, load generated NodePerformanceTest-shaped glTF graphs with 10k nodes/meshes/materials/texture definitions, and cover the supported 64-light budget in CI; direct conformance covers clear failure for scenes with more than 64 visible non-ambient lights; and platform-specific scale budget notes are documented. Remaining work is larger render-time memory ceilings. |

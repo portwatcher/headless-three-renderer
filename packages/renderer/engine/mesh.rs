@@ -202,7 +202,7 @@ pub struct PreparedPhysicalMaps {
     pub specular_sampler: TextureSamplerSettings,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TextureSamplerSettings {
     pub wrap_s: WrapMode,
     pub wrap_t: WrapMode,
@@ -507,7 +507,7 @@ pub struct PreparedTexture {
     pub anisotropy: u16,
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum WrapMode {
     #[default]
     ClampToEdge,
@@ -533,7 +533,7 @@ impl WrapMode {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TextureFilter {
     Nearest,
     #[default]
@@ -565,7 +565,7 @@ impl TextureFilter {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum MipmapFilter {
     #[default]
     None,

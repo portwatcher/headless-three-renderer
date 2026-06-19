@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use anyhow::{Context, Result, anyhow, bail};
 use bytemuck::{Pod, Zeroable};
 use glam::Mat4;
@@ -155,6 +158,7 @@ pub struct GpuRenderer {
     shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
     line_shadow_pipelines: [wgpu::RenderPipeline; MAX_SHADOW_LAYERS],
     sampler: wgpu::Sampler,
+    sampler_cache: Mutex<HashMap<SamplerKey, wgpu::Sampler>>,
     shadow_sampler: wgpu::Sampler,
     _default_texture: wgpu::Texture,
     _default_normal_map_texture: wgpu::Texture,
@@ -204,6 +208,64 @@ struct GpuBackground {
     bind_group: wgpu::BindGroup,
     _texture: wgpu::Texture,
     _uniform_buffer: wgpu::Buffer,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+struct SamplerKey {
+    wrap_s: WrapMode,
+    wrap_t: WrapMode,
+    mag_filter: TextureFilter,
+    min_filter: TextureFilter,
+    mipmap_filter: MipmapFilter,
+    mip_lod_enabled: bool,
+    anisotropy_clamp: u16,
+}
+
+impl SamplerKey {
+    fn new(
+        wrap_s: WrapMode,
+        wrap_t: WrapMode,
+        mag_filter: TextureFilter,
+        min_filter: TextureFilter,
+        mipmap_mode: MipmapFilter,
+        anisotropy: u16,
+    ) -> Self {
+        let anisotropy_clamp =
+            if mag_filter == TextureFilter::Linear && min_filter == TextureFilter::Linear {
+                anisotropy.clamp(1, 16)
+            } else {
+                1
+            };
+        let mipmap_filter = if anisotropy_clamp > 1 {
+            MipmapFilter::Linear
+        } else {
+            mipmap_mode
+        };
+        let mip_lod_enabled = mipmap_mode != MipmapFilter::None || anisotropy_clamp > 1;
+        Self {
+            wrap_s,
+            wrap_t,
+            mag_filter,
+            min_filter,
+            mipmap_filter,
+            mip_lod_enabled,
+            anisotropy_clamp,
+        }
+    }
+
+    fn is_default(self) -> bool {
+        self.wrap_s == WrapMode::ClampToEdge
+            && self.wrap_t == WrapMode::ClampToEdge
+            && self.mag_filter == TextureFilter::Linear
+            && self.min_filter == TextureFilter::Linear
+            && self.mipmap_filter == MipmapFilter::None
+            && !self.mip_lod_enabled
+            && self.anisotropy_clamp <= 1
+    }
+
+    fn lod_max_clamp(self) -> f32 {
+        if self.mip_lod_enabled { 32.0 } else { 0.0 }
+    }
 }
 
 impl GpuRenderer {
@@ -1465,6 +1527,7 @@ impl GpuRenderer {
             shadow_pipelines,
             line_shadow_pipelines,
             sampler,
+            sampler_cache: Mutex::new(HashMap::new()),
             shadow_sampler,
             _default_texture: default_texture,
             _default_normal_map_texture: default_normal_map,
@@ -2075,43 +2138,47 @@ impl GpuRenderer {
         mipmap_mode: MipmapFilter,
         anisotropy: u16,
     ) -> wgpu::Sampler {
-        if wrap_s == WrapMode::ClampToEdge
-            && wrap_t == WrapMode::ClampToEdge
-            && mag_filter == TextureFilter::Linear
-            && min_filter == TextureFilter::Linear
-            && mipmap_mode == MipmapFilter::None
-            && anisotropy <= 1
-        {
+        let key = SamplerKey::new(
+            wrap_s,
+            wrap_t,
+            mag_filter,
+            min_filter,
+            mipmap_mode,
+            anisotropy,
+        );
+        if key.is_default() {
             return self.sampler.clone();
         }
-        let anisotropy_clamp =
-            if mag_filter == TextureFilter::Linear && min_filter == TextureFilter::Linear {
-                anisotropy.clamp(1, 16)
-            } else {
-                1
-            };
-        let mipmap_filter = if anisotropy_clamp > 1 {
-            wgpu::MipmapFilterMode::Linear
-        } else {
-            mipmap_mode.to_mipmap_filter_mode()
-        };
-        let lod_max_clamp = if mipmap_mode == MipmapFilter::None && anisotropy_clamp <= 1 {
-            0.0
-        } else {
-            32.0
-        };
-        self.device.create_sampler(&wgpu::SamplerDescriptor {
+
+        if let Some(sampler) = self
+            .sampler_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return sampler;
+        }
+
+        let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("headless-three-renderer per-mesh sampler"),
-            address_mode_u: wrap_s.to_address_mode(),
-            address_mode_v: wrap_t.to_address_mode(),
+            address_mode_u: key.wrap_s.to_address_mode(),
+            address_mode_v: key.wrap_t.to_address_mode(),
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: mag_filter.to_filter_mode(),
-            min_filter: min_filter.to_filter_mode(),
-            mipmap_filter,
-            lod_max_clamp,
-            anisotropy_clamp,
+            mag_filter: key.mag_filter.to_filter_mode(),
+            min_filter: key.min_filter.to_filter_mode(),
+            mipmap_filter: key.mipmap_filter.to_mipmap_filter_mode(),
+            lod_max_clamp: key.lod_max_clamp(),
+            anisotropy_clamp: key.anisotropy_clamp,
             ..Default::default()
-        })
+        });
+
+        self.sampler_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| sampler.clone())
+            .clone()
     }
 
     fn sampler_for_settings(&self, settings: TextureSamplerSettings) -> wgpu::Sampler {
@@ -4397,8 +4464,8 @@ fn create_cubemap_with_mips(
 
 #[cfg(test)]
 mod tests {
-    use super::{downsample_rgba_mip, texture_mip_level_count};
-    use crate::mesh::MipmapFilter;
+    use super::{SamplerKey, downsample_rgba_mip, texture_mip_level_count};
+    use crate::mesh::{MipmapFilter, TextureFilter, WrapMode};
 
     #[test]
     fn mip_level_count_tracks_min_filter_mode() {
@@ -4434,5 +4501,43 @@ mod tests {
         let (mip, width, height) = downsample_rgba_mip(&rgba, 5, 1);
         assert_eq!((width, height), (2, 1));
         assert_eq!(mip, vec![30, 0, 0, 255, 180, 0, 0, 255]);
+    }
+
+    #[test]
+    fn sampler_key_normalizes_effective_sampler_descriptor() {
+        let default = SamplerKey::new(
+            WrapMode::ClampToEdge,
+            WrapMode::ClampToEdge,
+            TextureFilter::Linear,
+            TextureFilter::Linear,
+            MipmapFilter::None,
+            1,
+        );
+        assert!(default.is_default());
+        assert_eq!(default.lod_max_clamp(), 0.0);
+
+        let anisotropic = SamplerKey::new(
+            WrapMode::Repeat,
+            WrapMode::MirrorRepeat,
+            TextureFilter::Linear,
+            TextureFilter::Linear,
+            MipmapFilter::None,
+            32,
+        );
+        assert_eq!(anisotropic.anisotropy_clamp, 16);
+        assert_eq!(anisotropic.mipmap_filter, MipmapFilter::Linear);
+        assert_eq!(anisotropic.lod_max_clamp(), 32.0);
+
+        let nearest = SamplerKey::new(
+            WrapMode::Repeat,
+            WrapMode::ClampToEdge,
+            TextureFilter::Nearest,
+            TextureFilter::Linear,
+            MipmapFilter::Linear,
+            8,
+        );
+        assert_eq!(nearest.anisotropy_clamp, 1);
+        assert_eq!(nearest.mipmap_filter, MipmapFilter::Linear);
+        assert_eq!(nearest.lod_max_clamp(), 32.0);
     }
 }
