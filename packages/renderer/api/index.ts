@@ -295,6 +295,28 @@ class RendererDomElementState {
   }
 }
 
+class RendererDepthBufferState {
+  getReversed(): boolean {
+    return false
+  }
+}
+
+class RendererStateBuffersState {
+  readonly depth = new RendererDepthBufferState()
+}
+
+class RendererState {
+  readonly buffers = new RendererStateBuffersState()
+
+  reset(): void {
+    // Native render state is rebuilt for each pass.
+  }
+
+  unbindTexture(): void {
+    // Texture binding is not exposed by the wgpu-backed adapter.
+  }
+}
+
 class RendererExtensionsState {
   has(name: string): boolean {
     assertWebGlExtensionName(name, 'Renderer.extensions.has name')
@@ -580,6 +602,7 @@ export class Renderer {
   readonly renderLists = new RendererRenderListsState()
   readonly reversedDepthBuffer = false
   readonly shadowMap = new RendererShadowMapState()
+  readonly state = new RendererState()
   readonly xr = new RendererXrState()
 
   constructor(parameters?: RendererParametersLike) {

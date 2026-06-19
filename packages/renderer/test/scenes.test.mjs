@@ -29458,6 +29458,9 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
   assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
   assert.equal(renderer.extensions.init(), undefined)
+  assert.equal(renderer.state.buffers.depth.getReversed(), false)
+  assert.equal(renderer.state.reset(), undefined)
+  assert.equal(renderer.state.unbindTexture(), undefined)
 
   const object = {}
   assert.equal(renderer.properties.has(object), false)
