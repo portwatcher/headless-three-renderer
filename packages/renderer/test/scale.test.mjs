@@ -315,8 +315,8 @@ test('texture-heavy scene budget renders many unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 11
-  const rows = 11
+  const columns = 12
+  const rows = 12
   const geometry = new THREE.PlaneGeometry(0.13, 0.13)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
@@ -344,8 +344,8 @@ test('encoded texture budget renders many unique PNG buffer maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
 
-  const columns = 9
-  const rows = 9
+  const columns = 10
+  const rows = 10
   const geometry = new THREE.PlaneGeometry(0.14, 0.14)
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < columns; col += 1) {
