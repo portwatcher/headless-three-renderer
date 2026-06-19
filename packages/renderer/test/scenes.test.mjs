@@ -2040,6 +2040,33 @@ test('CubeCamera renders cube target faces', () => {
   assert.strictEqual(cubeTarget.depthTexture.source.data, cubeTarget.depthTexture.image)
   const depthPx = meanScalarRegion(cubeTarget.depthTexture.image[0].data, 32, 32, 12, 12, 20, 20)
   assert.ok(depthPx > 0 && depthPx <= 1, `cube depth face should contain normalized depth (${depthPx})`)
+
+  const renderer = new Renderer()
+  const positiveFace = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(cubeTarget, 0, 0, 32, 32, positiveFace, 0)
+  assert.deepEqual(positiveFace, Buffer.from(cubeTarget.texture.image[0].data))
+
+  const negativeFaceRect = Buffer.alloc(8 * 4 * 4)
+  renderer.readRenderTargetPixels(cubeTarget, 12, 12, 8, 4, negativeFaceRect, 1)
+  const expectedNegativeFaceRect = Buffer.alloc(negativeFaceRect.length)
+  const negativeFace = Buffer.from(cubeTarget.texture.image[1].data)
+  for (let row = 0; row < 4; row += 1) {
+    const sourceStart = (((12 + row) * 32) + 12) * 4
+    negativeFace.copy(expectedNegativeFaceRect, row * 8 * 4, sourceStart, sourceStart + 8 * 4)
+  }
+  assert.deepEqual(negativeFaceRect, expectedNegativeFaceRect)
+  assert.throws(
+    () => renderer.readRenderTargetPixels(
+      { texture: { image: [{ data: Buffer.alloc(4), width: 1, height: 1 }] } },
+      0,
+      0,
+      1,
+      1,
+      Buffer.alloc(4),
+      1,
+    ),
+    /target has no readable color data/i,
+  )
 })
 
 test('CubeCamera.update works with Renderer render-target state', () => {
@@ -2142,6 +2169,16 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
   const colorCopyNx = meanRegion(cubeTarget.textures[1].image[1].data, 32, 32, 12, 12, 20, 20)
   assert.ok(colorCopyPx.r > colorCopyPx.g + 80 && colorCopyPx.r > colorCopyPx.b + 80, `secondary +X cube color attachment should capture red (${colorCopyPx.r}, ${colorCopyPx.g}, ${colorCopyPx.b})`)
   assert.ok(colorCopyNx.g > colorCopyNx.r + 60 && colorCopyNx.g > colorCopyNx.b + 60, `secondary -X cube color attachment should capture green (${colorCopyNx.r}, ${colorCopyNx.g}, ${colorCopyNx.b})`)
+
+  const colorCopyReadback = Buffer.alloc(8 * 4 * 4)
+  new Renderer().readRenderTargetPixels(cubeTarget, 12, 12, 8, 4, colorCopyReadback, 1, 1)
+  const expectedColorCopyReadback = Buffer.alloc(colorCopyReadback.length)
+  const colorCopySource = Buffer.from(cubeTarget.textures[1].image[1].data)
+  for (let row = 0; row < 4; row += 1) {
+    const sourceStart = (((12 + row) * 32) + 12) * 4
+    colorCopySource.copy(expectedColorCopyReadback, row * 8 * 4, sourceStart, sourceStart + 8 * 4)
+  }
+  assert.deepEqual(colorCopyReadback, expectedColorCopyReadback)
 
   const maskPx = meanRegion(cubeTarget.textures[2].image[0].data, 32, 32, 12, 12, 20, 20)
   const maskNx = meanRegion(cubeTarget.textures[2].image[1].data, 32, 32, 12, 12, 20, 20)

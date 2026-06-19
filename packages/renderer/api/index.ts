@@ -3458,8 +3458,7 @@ function renderTargetReadbackImage(
   textureIndex: number,
 ): RenderTargetImageLike | undefined {
   if (activeCubeFaceIndex !== undefined) {
-    const face = renderTargetTextureFaceImage(texture, activeCubeFaceIndex)
-    if (face) return face
+    return renderTargetTextureFaceImage(texture, activeCubeFaceIndex)
   }
   if (texture) {
     const image = Array.isArray(texture.image) ? texture.image[0] : texture.image
