@@ -18609,6 +18609,27 @@ test('MSAA sampleCount 4 resolves antialiased color output and render targets', 
       `${label} 4x MSAA should add resolved target edge coverage (${targetCoverage} vs ${singleCoverage})`,
     )
   }
+
+  const renderer = new Renderer()
+  for (const [label, target] of [
+    ['Renderer.setRenderTarget target.samples', { texture: {}, samples: 4 }],
+    ['Renderer.setRenderTarget target.sampleCount', { texture: {}, sampleCount: 4 }],
+  ]) {
+    renderer.setRenderTarget(target)
+    const returned = renderer.render(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+    assert.equal(returned, target.data, `${label} should return target.data`)
+    assert.equal(target.texture.image.data, target.data, `${label} texture should reference target data`)
+    const targetCoverage = intermediateCoverage(target.data)
+    assert.ok(
+      targetCoverage > singleCoverage + 20,
+      `${label} 4x MSAA should add resolved target edge coverage (${targetCoverage} vs ${singleCoverage})`,
+    )
+  }
+  renderer.setRenderTarget(null)
 })
 
 test('unsupported render target MRT and invalid MSAA requests fail clearly', () => {
