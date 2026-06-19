@@ -1,4 +1,5 @@
 use std::sync::OnceLock;
+use std::thread;
 
 use anyhow::{Context, Result};
 
@@ -206,23 +207,36 @@ fn rotate_direction(rotation: RotationColumns, dir: [f32; 3]) -> [f32; 3] {
 
 fn compute_irradiance(env_map: &EnvMap, rotation: RotationColumns) -> Vec<Vec<u8>> {
     let size = IRRADIANCE_SIZE;
-    let mut faces = Vec::with_capacity(6);
-    for face in 0..6 {
-        let mut rgba = vec![0u8; (size * size * 4) as usize];
-        for y in 0..size {
-            for x in 0..size {
-                let dir = cube_dir(face, x, y, size);
-                let color = convolve_diffuse(env_map, dir, rotation);
-                let idx = ((y * size + x) * 4) as usize;
-                rgba[idx] = linear_to_srgb8(color[0]);
-                rgba[idx + 1] = linear_to_srgb8(color[1]);
-                rgba[idx + 2] = linear_to_srgb8(color[2]);
-                rgba[idx + 3] = 255;
-            }
+    thread::scope(|scope| {
+        let handles = (0..6)
+            .map(|face| scope.spawn(move || compute_irradiance_face(env_map, rotation, face, size)))
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().expect("IBL irradiance worker panicked"))
+            .collect()
+    })
+}
+
+fn compute_irradiance_face(
+    env_map: &EnvMap,
+    rotation: RotationColumns,
+    face: u32,
+    size: u32,
+) -> Vec<u8> {
+    let mut rgba = vec![0u8; (size * size * 4) as usize];
+    for y in 0..size {
+        for x in 0..size {
+            let dir = cube_dir(face, x, y, size);
+            let color = convolve_diffuse(env_map, dir, rotation);
+            let idx = ((y * size + x) * 4) as usize;
+            rgba[idx] = linear_to_srgb8(color[0]);
+            rgba[idx + 1] = linear_to_srgb8(color[1]);
+            rgba[idx + 2] = linear_to_srgb8(color[2]);
+            rgba[idx + 3] = 255;
         }
-        faces.push(rgba);
     }
-    faces
+    rgba
 }
 
 fn convolve_diffuse(env_map: &EnvMap, normal: [f32; 3], rotation: RotationColumns) -> [f32; 3] {
@@ -268,23 +282,44 @@ fn compute_prefiltered_env(env_map: &EnvMap, rotation: RotationColumns) -> Vec<V
     for mip in 0..PREFILTER_MIP_LEVELS {
         let roughness = mip as f32 / (PREFILTER_MIP_LEVELS - 1).max(1) as f32;
         let size = (PREFILTER_BASE_SIZE >> mip).max(1);
-        for face in 0..6 {
-            let mut rgba = vec![0u8; (size * size * 4) as usize];
-            for y in 0..size {
-                for x in 0..size {
-                    let dir = cube_dir(face, x, y, size);
-                    let color = prefilter_env_sample(env_map, dir, roughness, rotation);
-                    let idx = ((y * size + x) * 4) as usize;
-                    rgba[idx] = linear_to_srgb8(color[0]);
-                    rgba[idx + 1] = linear_to_srgb8(color[1]);
-                    rgba[idx + 2] = linear_to_srgb8(color[2]);
-                    rgba[idx + 3] = 255;
-                }
-            }
-            all_faces.push(rgba);
-        }
+        let mip_faces = thread::scope(|scope| {
+            let handles = (0..6)
+                .map(|face| {
+                    scope.spawn(move || {
+                        compute_prefiltered_face(env_map, rotation, face, size, roughness)
+                    })
+                })
+                .collect::<Vec<_>>();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().expect("IBL prefilter worker panicked"))
+                .collect::<Vec<_>>()
+        });
+        all_faces.extend(mip_faces);
     }
     all_faces
+}
+
+fn compute_prefiltered_face(
+    env_map: &EnvMap,
+    rotation: RotationColumns,
+    face: u32,
+    size: u32,
+    roughness: f32,
+) -> Vec<u8> {
+    let mut rgba = vec![0u8; (size * size * 4) as usize];
+    for y in 0..size {
+        for x in 0..size {
+            let dir = cube_dir(face, x, y, size);
+            let color = prefilter_env_sample(env_map, dir, roughness, rotation);
+            let idx = ((y * size + x) * 4) as usize;
+            rgba[idx] = linear_to_srgb8(color[0]);
+            rgba[idx + 1] = linear_to_srgb8(color[1]);
+            rgba[idx + 2] = linear_to_srgb8(color[2]);
+            rgba[idx + 3] = 255;
+        }
+    }
+    rgba
 }
 
 fn prefilter_env_sample(
