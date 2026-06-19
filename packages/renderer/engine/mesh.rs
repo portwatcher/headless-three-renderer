@@ -1,3 +1,5 @@
+use std::thread;
+
 use anyhow::{Context, Result, bail};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
@@ -6,6 +8,7 @@ use crate::types::SceneMesh;
 use crate::util::{clamp01, color_to_f32, finite_f32, parse_color, parse_transform};
 
 pub const MAX_CLIPPING_PLANES: usize = 8;
+const PARALLEL_MESH_PREPARE_THRESHOLD: usize = 8;
 
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -592,10 +595,58 @@ impl MipmapFilter {
 
 pub fn prepare_meshes(scene: &crate::types::RenderScene) -> Result<Vec<PreparedMesh>> {
     if let Some(meshes) = scene.meshes.as_deref() {
-        meshes.iter().enumerate().map(prepare_mesh).collect()
+        prepare_mesh_slice(meshes)
     } else {
         Ok(Vec::new())
     }
+}
+
+fn prepare_mesh_slice(meshes: &[SceneMesh]) -> Result<Vec<PreparedMesh>> {
+    if meshes.len() < PARALLEL_MESH_PREPARE_THRESHOLD {
+        return meshes.iter().enumerate().map(prepare_mesh).collect();
+    }
+
+    let worker_count = thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+        .min(meshes.len());
+    if worker_count <= 1 {
+        return meshes.iter().enumerate().map(prepare_mesh).collect();
+    }
+
+    let chunk_size = meshes.len().div_ceil(worker_count);
+    let mut chunks = thread::scope(|scope| {
+        let handles = (0..worker_count)
+            .filter_map(|worker_index| {
+                let start = worker_index * chunk_size;
+                if start >= meshes.len() {
+                    return None;
+                }
+                let end = (start + chunk_size).min(meshes.len());
+                Some(scope.spawn(move || {
+                    let results = meshes[start..end]
+                        .iter()
+                        .enumerate()
+                        .map(|(offset, mesh)| prepare_mesh((start + offset, mesh)))
+                        .collect::<Vec<_>>();
+                    (start, results)
+                }))
+            })
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().expect("mesh preparation worker panicked"))
+            .collect::<Vec<_>>()
+    });
+    chunks.sort_by_key(|(start, _)| *start);
+
+    let mut prepared = Vec::with_capacity(meshes.len());
+    for (_, results) in chunks {
+        for result in results {
+            prepared.push(result?);
+        }
+    }
+    Ok(prepared)
 }
 
 pub fn texture_anisotropy(value: Option<f64>) -> u16 {

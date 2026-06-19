@@ -141,6 +141,29 @@ mod tests {
     }
 
     #[test]
+    fn prepares_many_meshes_in_source_order() {
+        let meshes = (0..12)
+            .map(|index| SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 0.04, 0.0, 0.0, 0.0, 0.04, 0.0],
+                color: Some(vec![index as f64 / 12.0, 0.2, 0.6, 1.0]),
+                sort_index: Some(index),
+                ..SceneMesh::default()
+            })
+            .collect();
+        let scene = RenderScene {
+            meshes: Some(meshes),
+            ..RenderScene::default()
+        };
+
+        let prepared = prepare_meshes(&scene).unwrap();
+        assert_eq!(prepared.len(), 12);
+        for (index, mesh) in prepared.iter().enumerate() {
+            assert_eq!(mesh.sort_index, index as u32);
+            assert!((mesh.base_color[0] - index as f32 / 12.0).abs() < 0.0001);
+        }
+    }
+
+    #[test]
     fn accepts_mesh_with_uvs() {
         let scene = RenderScene {
             meshes: Some(vec![SceneMesh {
