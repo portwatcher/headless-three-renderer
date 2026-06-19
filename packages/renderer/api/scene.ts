@@ -339,8 +339,8 @@ function appendMesh(
         instancedGeometryCount,
         instancedPositionOffset,
       )
-      const expandedNormals = normals
-        ? expandVec3ValuesForInstances(normals, 0, position.count, instancedGeometryCount)
+      const expandedNormals = normalAttribute && normals
+        ? expandNormalValuesForInstances(normalAttribute, normals, 0, position.count, instancedGeometryCount)
         : undefined
       const expandedUvs = uvStreams.uvs
         ? expandUvChannelForInstances(uvStreams.uvs, 0, position.count, instancedGeometryCount)
@@ -396,8 +396,8 @@ function appendMesh(
         instancedGeometryCount,
         instancedPositionOffset,
       )
-      const expandedGroupNormals = normals
-        ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
+      const expandedGroupNormals = normalAttribute && normals
+        ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupUvs = uvStreams.uvs
         ? expandUvChannelForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
@@ -459,6 +459,7 @@ function appendMesh(
         materialContext,
         positions,
         normals,
+        normalAttribute,
         uvs,
         uvChannels,
         vertexColors,
@@ -485,6 +486,7 @@ function appendShadowOnlyMeshGroup(
   materialContext: MaterialExtractionContext,
   positions: number[],
   normals: number[] | null,
+  normalAttribute: ThreeBufferAttributeLike | undefined,
   uvs: number[] | null,
   uvChannels: Array<UvChannel | null>,
   vertexColors: ThreeBufferAttributeLike | undefined,
@@ -521,8 +523,8 @@ function appendShadowOnlyMeshGroup(
       instancedGeometryCount,
       instancedPositionOffset,
     )
-    const expandedNormals = normals
-      ? expandVec3ValuesForInstances(normals, 0, vertexCount, instancedGeometryCount)
+    const expandedNormals = normalAttribute && normals
+      ? expandNormalValuesForInstances(normalAttribute, normals, 0, vertexCount, instancedGeometryCount)
       : undefined
     const expandedUvs = uvStreams.uvs
       ? expandUvChannelForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
@@ -580,8 +582,8 @@ function appendShadowOnlyMeshGroup(
     instancedGeometryCount,
     instancedPositionOffset,
   )
-  const expandedGroupNormals = normals
-    ? expandVec3ValuesForInstances(normals, group.start, group.count, instancedGeometryCount)
+  const expandedGroupNormals = normalAttribute && normals
+    ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupUvs = uvStreams.uvs
     ? expandUvChannelForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
@@ -2144,6 +2146,34 @@ function expandVec2ValuesForInstances(values: number[], start: number, count: nu
     for (let vertex = start; vertex < start + count; vertex += 1) {
       out[dst++] = values[vertex * 2]
       out[dst++] = values[vertex * 2 + 1]
+    }
+  }
+  return out
+}
+
+function expandNormalValuesForInstances(
+  attribute: ThreeBufferAttributeLike,
+  values: number[],
+  start: number,
+  count: number,
+  instanceCount: number,
+  label = 'geometry.attributes.normal',
+): number[] {
+  if (!isInstancedAttribute(attribute)) {
+    return expandVec3ValuesForInstances(values, start, count, instanceCount)
+  }
+
+  const out = new Array<number>(count * instanceCount * 3)
+  let dst = 0
+  for (let instance = 0; instance < instanceCount; instance += 1) {
+    const sourceIndex = instancedAttributeIndex(attribute, instance, label)
+    const nx = attributeComponent(attribute, sourceIndex, 0, label)
+    const ny = attributeComponent(attribute, sourceIndex, 1, label)
+    const nz = attributeComponent(attribute, sourceIndex, 2, label)
+    for (let vertex = 0; vertex < count; vertex += 1) {
+      out[dst++] = nx
+      out[dst++] = ny
+      out[dst++] = nz
     }
   }
   return out

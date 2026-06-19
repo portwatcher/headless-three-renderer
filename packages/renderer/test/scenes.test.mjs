@@ -7215,6 +7215,52 @@ test('InstancedBufferGeometry default instanceCount expands per-instance offsets
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `instance colors should avoid blue contribution (${mean.b})`)
 })
 
+test('InstancedBufferGeometry expands instanced mesh normal attributes', () => {
+  const base = new THREE.PlaneGeometry(0.24, 0.45)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.instanceCount = 4
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([
+      -0.6, 0, 0,
+      -0.2, 0, 0,
+      0.2, 0, 0,
+      0.6, 0, 0,
+    ]),
+    3,
+  ))
+
+  const normals = new THREE.InstancedBufferAttribute(
+    new Float32Array([
+      1, 0, 0,
+      0, 1, 0,
+    ]),
+    3,
+  )
+  normals.meshPerAttribute = 2
+  geometry.setAttribute('normal', normals)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshNormalMaterial()))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 128, height: 64 })
+  const first = meanRegion(rgba, 128, 64, 20, 28, 28, 36)
+  const second = meanRegion(rgba, 128, 64, 45, 28, 53, 36)
+  const third = meanRegion(rgba, 128, 64, 75, 28, 83, 36)
+  const fourth = meanRegion(rgba, 128, 64, 100, 28, 108, 36)
+  assert.ok(first.r > first.g + 40, `first repeated instanced normal should render red-biased normal color (${first.r} vs ${first.g})`)
+  assert.ok(second.r > second.g + 40, `second repeated instanced normal should render red-biased normal color (${second.r} vs ${second.g})`)
+  assert.ok(third.g > third.r + 40, `third repeated instanced normal should render green-biased normal color (${third.g} vs ${third.r})`)
+  assert.ok(fourth.g > fourth.r + 40, `fourth repeated instanced normal should render green-biased normal color (${fourth.g} vs ${fourth.r})`)
+})
+
 test('normalized integer vertex colors render at full intensity', () => {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
