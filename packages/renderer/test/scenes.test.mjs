@@ -1236,6 +1236,38 @@ test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   assert.ok(uncullable.r > 200, `perObjectFrustumCulled=false should render the oversized batch draw (${uncullable.r})`)
 })
 
+test('BatchedMesh object frustum culling computes aggregate bounds with per-object culling disabled', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderBatched(frustumCulled) {
+    const source = new THREE.PlaneGeometry(2, 2)
+    source.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+    const batched = new THREE.BatchedMesh(
+      1,
+      source.getAttribute('position').count,
+      source.index.count,
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    const geometryId = batched.addGeometry(source)
+    const instanceId = batched.addInstance(geometryId)
+    batched.setMatrixAt(instanceId, new THREE.Matrix4())
+    batched.perObjectFrustumCulled = false
+    batched.frustumCulled = frustumCulled
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(batched)
+    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  }
+
+  const topLevelCulled = renderBatched(true)
+  const uncullable = renderBatched(false)
+  assert.ok(topLevelCulled.r < 5 && topLevelCulled.g < 5 && topLevelCulled.b < 5, `BatchedMesh aggregate bounds should cull before per-object expansion (${topLevelCulled.r}, ${topLevelCulled.g}, ${topLevelCulled.b})`)
+  assert.ok(uncullable.r > 100, `frustumCulled=false should bypass aggregate BatchedMesh culling (${uncullable.r})`)
+})
+
 test('renderable object frustum culling honors geometry bounds and frustumCulled opt-out', () => {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)

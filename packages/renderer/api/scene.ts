@@ -2969,8 +2969,9 @@ function renderableMatrixWorldLabel(object: ThreeObject3DLike): string {
 }
 
 function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, number, number]; radius: number } | null {
-  if (object.isBatchedMesh === true && object.boundingSphere == null) {
-    return null
+  if (object.isBatchedMesh === true) {
+    if (object.boundingSphere != null) return sphereLike(object.boundingSphere, 'object.boundingSphere')
+    return batchedMeshBoundingSphere(object)
   }
 
   if (object.boundingSphere !== undefined) {
@@ -2995,6 +2996,76 @@ function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, num
   return geometry.boundingSphere == null
     ? null
     : sphereLike(geometry.boundingSphere, 'geometry.boundingSphere')
+}
+
+function batchedMeshBoundingSphere(
+  object: ThreeObject3DLike,
+): { center: [number, number, number]; radius: number } | null {
+  const geometry = object.geometry
+  if (!geometry) return null
+  const instanceInfo = object._instanceInfo
+  if (!Array.isArray(instanceInfo)) {
+    throw new Error(
+      'THREE.BatchedMesh instance table is not readable. Use a real THREE.BatchedMesh or expand the batch to ordinary Mesh or InstancedMesh objects before rendering.',
+    )
+  }
+
+  let bounds: { center: [number, number, number]; radius: number } | null = null
+  for (let instanceId = 0; instanceId < instanceInfo.length; instanceId += 1) {
+    const info = instanceInfo[instanceId]
+    if (!info || typeof info !== 'object') {
+      throw new TypeError(`THREE.BatchedMesh._instanceInfo[${instanceId}] must be an object.`)
+    }
+    if (!batchedOptionalBoolean(info.active, `THREE.BatchedMesh._instanceInfo[${instanceId}].active`, true)) continue
+    batchedOptionalBoolean(info.visible, `THREE.BatchedMesh._instanceInfo[${instanceId}].visible`, true)
+
+    const geometryId = batchedNonNegativeInteger(
+      info.geometryIndex,
+      `THREE.BatchedMesh._instanceInfo[${instanceId}].geometryIndex`,
+    )
+    const range = batchedGeometryRange(object, geometry, geometryId)
+    if (range.count === 0) continue
+
+    const sphere = batchedGeometryBoundingSphere(object, geometry, geometryId, range)
+    if (!sphere) continue
+    bounds = unionSpheres(bounds, transformSphere(sphere, batchedInstanceMatrix(object, instanceId)))
+  }
+  return bounds
+}
+
+function transformSphere(
+  sphere: { center: [number, number, number]; radius: number },
+  transform: ArrayLike<number>,
+): { center: [number, number, number]; radius: number } {
+  const center = transformPoint(transform, sphere.center)
+  const scale = Math.max(columnLength3(transform, 0), columnLength3(transform, 4), columnLength3(transform, 8))
+  return { center, radius: sphere.radius * scale }
+}
+
+function unionSpheres(
+  a: { center: [number, number, number]; radius: number } | null,
+  b: { center: [number, number, number]; radius: number },
+): { center: [number, number, number]; radius: number } {
+  if (!a) return { center: [...b.center], radius: b.radius }
+  const dx = b.center[0] - a.center[0]
+  const dy = b.center[1] - a.center[1]
+  const dz = b.center[2] - a.center[2]
+  const distance = Math.hypot(dx, dy, dz)
+  if (distance <= Math.abs(a.radius - b.radius)) {
+    return a.radius >= b.radius ? a : { center: [...b.center], radius: b.radius }
+  }
+  if (distance === 0) return { center: [...a.center], radius: Math.max(a.radius, b.radius) }
+
+  const radius = (distance + a.radius + b.radius) * 0.5
+  const centerShift = (radius - a.radius) / distance
+  return {
+    center: [
+      a.center[0] + dx * centerShift,
+      a.center[1] + dy * centerShift,
+      a.center[2] + dz * centerShift,
+    ],
+    radius,
+  }
 }
 
 function instancedMeshBoundingSphere(object: ThreeObject3DLike): { center: [number, number, number]; radius: number } {
