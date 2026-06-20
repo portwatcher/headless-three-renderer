@@ -440,6 +440,46 @@ test('instanced mesh budget renders 7,056 transformed colored instances', () => 
   assert.ok(mean.r > 40 && mean.g > 40 && mean.b > 40, `instanced colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('points billboard budget renders 4,096 colored points', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 64
+  const count = columns * rows
+  const positions = new Float32Array(count * 3)
+  const colors = new Float32Array(count * 3)
+  for (let index = 0; index < count; index += 1) {
+    const col = index % columns
+    const row = Math.floor(index / columns)
+    positions[index * 3] = (col / (columns - 1) - 0.5) * 1.9
+    positions[index * 3 + 1] = (row / (rows - 1) - 0.5) * 1.9
+    positions[index * 3 + 2] = Math.sin(col * 0.23 + row * 0.17) * 0.02
+    colors[index * 3] = 0.2 + 0.8 * (col / (columns - 1))
+    colors[index * 3 + 1] = 0.2 + 0.8 * (row / (rows - 1))
+    colors[index * 3 + 2] = 0.35 + 0.65 * ((col + row) / (columns + rows - 2))
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  scene.add(new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.55, `point billboard scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `point colors should survive billboard expansion (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('texture-heavy scene budget renders 225 unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)

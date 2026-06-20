@@ -12,6 +12,7 @@ target platform and GPU backend.
 | Nested scene graph traversal | 2,048 transform groups and 256 meshes | A 16 x 16 grid renders visible meshes below eight-level `Object3D` transform chains to exercise hierarchy traversal and world-matrix propagation. |
 | Mixed mesh/texture/light scene | 144 meshes | A 12 x 12 grid of transformed box meshes renders with ten unique raw textures and supported punctual lights. |
 | Instanced mesh expansion | 7,056 instances | A single `InstancedMesh` renders an 84 x 84 grid with per-instance matrices and colors. |
+| Points billboard expansion | 4,096 points | A single `Points` object renders a 64 x 64 grid with per-point colors through CPU billboard expansion. |
 | Unique material textures | 225 maps | A texture-heavy scene renders a 15 x 15 grid where every plane has a unique `DataTexture`. |
 | Unique encoded material textures | 169 maps | An encoded-texture scene renders a 13 x 13 grid where every plane has a unique PNG buffer texture. |
 | Raw material texture resolution | 512 x 512 RGBA | A single mapped plane renders a 512 x 512 `DataTexture` to exercise larger decoded texture upload, sampling, and native binding paths. |
