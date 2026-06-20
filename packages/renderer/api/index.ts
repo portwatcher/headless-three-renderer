@@ -2053,12 +2053,25 @@ export class Renderer {
     y: number,
     width: number,
     height: number,
-    buffer: NonNullable<RenderTargetImageLike['data']>,
+    buffer?: NonNullable<RenderTargetImageLike['data']>,
     activeCubeFaceIndex?: number,
     textureIndex = 0,
   ): Promise<NonNullable<RenderTargetImageLike['data']>> {
-    this.readRenderTargetPixels(target, x, y, width, height, buffer, activeCubeFaceIndex, textureIndex)
-    return buffer
+    const readback = renderTargetReadbackSource(
+      target,
+      activeCubeFaceIndex,
+      textureIndex,
+      'Renderer.readRenderTargetPixelsAsync',
+    )
+    const rect = readbackRect(x, y, width, height, 'Renderer.readRenderTargetPixelsAsync')
+    if (rect.x + rect.width > readback.width || rect.y + rect.height > readback.height) {
+      throw new Error('Renderer.readRenderTargetPixelsAsync requested read bounds are out of range.')
+    }
+    const output = buffer === undefined
+      ? createRenderTargetReadbackBuffer(readback.data, rect.width * rect.height * readback.channels)
+      : buffer
+    copyRenderTargetReadbackPixels(readback, x, y, width, height, output, 'Renderer.readRenderTargetPixelsAsync')
+    return output
   }
 
   private renderCurrentRenderTarget(
@@ -5615,6 +5628,15 @@ function assertRenderTargetReadbackBuffer(
   if (candidate.length < minimumLength) {
     throw new Error(`${label} buffer length is too small for the requested read.`)
   }
+}
+
+function createRenderTargetReadbackBuffer(
+  source: NonNullable<RenderTargetImageLike['data']>,
+  length: number,
+): NonNullable<RenderTargetImageLike['data']> {
+  if (Buffer.isBuffer(source)) return Buffer.alloc(length)
+  const TypedArrayConstructor = source.constructor as new (length: number) => Exclude<NonNullable<RenderTargetImageLike['data']>, Buffer>
+  return new TypedArrayConstructor(length)
 }
 
 function writeRenderTargetTexture(

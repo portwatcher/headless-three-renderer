@@ -21978,6 +21978,10 @@ test('Renderer readRenderTargetPixels reads stored target color data', async () 
   assert.strictEqual(returned, asyncBuffer)
   assert.deepEqual(Buffer.from(asyncBuffer), target.data)
 
+  const allocatedAsync = await renderer.readRenderTargetPixelsAsync(target, 2, 1, 4, 3)
+  assert.ok(Buffer.isBuffer(allocatedAsync), 'async readback without a buffer should allocate a Buffer for Buffer-backed targets')
+  assert.deepEqual(allocatedAsync, expectedRect)
+
   const mrtTarget = {
     isWebGLMultipleRenderTargets: true,
     textures: [
@@ -21994,6 +21998,10 @@ test('Renderer readRenderTargetPixels reads stored target color data', async () 
   const typedBuffer = new Float32Array(16 * 8 * 2)
   renderer.readRenderTargetPixels(mrtTarget, 0, 0, 16, 8, typedBuffer, undefined, 1)
   assert.deepEqual([...typedBuffer], [...typedAttachment])
+
+  const allocatedTyped = await renderer.readRenderTargetPixelsAsync(mrtTarget, 0, 0, 16, 8, undefined, undefined, 1)
+  assert.ok(allocatedTyped instanceof Float32Array, 'async MRT readback should allocate the attachment typed-array class')
+  assert.deepEqual([...allocatedTyped], [...typedAttachment])
 
   assert.throws(
     () => renderer.readRenderTargetPixels('target', 0, 0, 1, 1, Buffer.alloc(4)),
@@ -22021,6 +22029,10 @@ test('Renderer readRenderTargetPixels reads stored target color data', async () 
   )
   await assert.rejects(
     () => renderer.readRenderTargetPixelsAsync(target, 0, 0, 1, 1, {}),
+    /buffer must be a mutable typed array or Buffer/i,
+  )
+  await assert.rejects(
+    () => renderer.readRenderTargetPixelsAsync(target, 0, 0, 1, 1, null),
     /buffer must be a mutable typed array or Buffer/i,
   )
 })
