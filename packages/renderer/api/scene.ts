@@ -132,6 +132,7 @@ export interface SceneExtractionCache {
   instancedPositionExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedPositionExpansion>>
   instancedNormalExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedNormalExpansion>>
   instancedUvExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedUvExpansion>>
+  instancedColorExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedColorExpansion>>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
   texturePayloads: TextureExtractionCache
@@ -166,6 +167,11 @@ interface CachedInstancedNormalExpansion {
 interface CachedInstancedUvExpansion {
   signature: InstancedUvExpansionSignature
   uvs: number[]
+}
+
+interface CachedInstancedColorExpansion {
+  signature: InstancedColorExpansionSignature
+  colors: number[]
 }
 
 interface CachedBatchedGeometryView {
@@ -355,6 +361,17 @@ interface InstancedUvExpansionSignature {
   instanceCount: number
 }
 
+interface InstancedColorExpansionSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  materialColor: Color4
+  start: number
+  count: number
+  instanceCount: number
+  color: AttributeSignature
+  label: string
+}
+
 interface AttributeSignature {
   ref?: ThreeBufferAttributeLike
   version?: number
@@ -418,6 +435,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     instancedPositionExpansions: new WeakMap(),
     instancedNormalExpansions: new WeakMap(),
     instancedUvExpansions: new WeakMap(),
+    instancedColorExpansions: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
     texturePayloads: new WeakMap(),
@@ -684,7 +702,7 @@ function appendMesh(
           normals: expandedNormals,
           color,
           colors: useVertexColors
-            ? expandColorAttributeForInstances(vertexColors!, color, 0, position.count, instancedGeometryCount)
+            ? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, 0, position.count, instancedGeometryCount)
             : undefined,
           uvs: expandedUvs,
           uvs2: expandedSecondaryUvs,
@@ -747,7 +765,7 @@ function appendMesh(
           normals: expandedGroupNormals,
           color,
           colors: useVertexColors
-            ? expandColorAttributeForInstances(vertexColors!, color, group.start, group.count, instancedGeometryCount)
+            ? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, group.start, group.count, instancedGeometryCount)
             : undefined,
           uvs: expandedGroupUvs,
           uvs2: expandedGroupSecondaryUvs,
@@ -1118,7 +1136,7 @@ function appendShadowOnlyMeshGroup(
         normals: expandedNormals,
         color,
         colors: useVertexColors
-          ? expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
+          ? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, 0, vertexCount, instancedGeometryCount)
           : undefined,
         uvs: expandedUvs,
         uvs2: expandedSecondaryUvs,
@@ -1185,7 +1203,7 @@ function appendShadowOnlyMeshGroup(
       normals: expandedGroupNormals,
       color,
       colors: useVertexColors
-        ? expandColorAttributeForInstances(vertexColors!, color, group.start, group.count, instancedGeometryCount)
+        ? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, group.start, group.count, instancedGeometryCount)
         : undefined,
       uvs: expandedGroupUvs,
       uvs2: expandedGroupSecondaryUvs,
@@ -2369,7 +2387,7 @@ function appendLineOrPoints(
             outputPositions,
             outputUvs,
             outputSecondaryUvs,
-            useVertexColors ? outputColors ?? expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount) : undefined,
+            useVertexColors ? outputColors ?? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, 0, vertexCount, instancedGeometryCount) : undefined,
             indices,
             transform,
             camera,
@@ -2391,7 +2409,7 @@ function appendLineOrPoints(
     }
 
     if (useVertexColors && material?.isLineDashedMaterial !== true && !thickLine) {
-      outputColors = expandColorAttributeForInstances(vertexColors!, color, 0, vertexCount, instancedGeometryCount)
+      outputColors = expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, 0, vertexCount, instancedGeometryCount)
     }
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
     if (thickCenter && camera) {
@@ -3708,6 +3726,86 @@ function expandColorAttributeForInstances(
     }
   }
   return out
+}
+
+function expandColorAttributeForInstancesWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  attribute: ThreeBufferAttributeLike,
+  materialColor: Color4,
+  start: number,
+  count: number,
+  instanceCount: number,
+  label = 'geometry.attributes.color',
+): number[] {
+  if (instanceCount <= 1 && !isInstancedAttribute(attribute)) {
+    return expandColorAttributeForInstances(attribute, materialColor, start, count, instanceCount, label)
+  }
+
+  const signature = instancedColorExpansionSignature(
+    geometry,
+    attribute,
+    materialColor,
+    start,
+    count,
+    instanceCount,
+    label,
+  )
+  if (!cache || !signature.cacheable) {
+    return expandColorAttributeForInstances(attribute, materialColor, start, count, instanceCount, label)
+  }
+
+  const key = `${label}:${start}:${count}:${instanceCount}`
+  let geometryCache = cache.instancedColorExpansions.get(geometry)
+  const cached = geometryCache?.get(key)
+  if (cached && sameInstancedColorExpansionSignature(cached.signature, signature)) {
+    return cached.colors
+  }
+
+  const colors = expandColorAttributeForInstances(attribute, materialColor, start, count, instanceCount, label)
+  if (!geometryCache) {
+    geometryCache = new Map()
+    cache.instancedColorExpansions.set(geometry, geometryCache)
+  }
+  geometryCache.set(key, { signature, colors })
+  return colors
+}
+
+function instancedColorExpansionSignature(
+  geometry: ThreeBufferGeometryLike,
+  attribute: ThreeBufferAttributeLike,
+  materialColor: Color4,
+  start: number,
+  count: number,
+  instanceCount: number,
+  label: string,
+): InstancedColorExpansionSignature {
+  const signature: InstancedColorExpansionSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    materialColor: materialColor.slice() as Color4,
+    start,
+    count,
+    instanceCount,
+    color: attributeSignature(attribute),
+    label,
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.color)
+  return signature
+}
+
+function sameInstancedColorExpansionSignature(
+  a: InstancedColorExpansionSignature,
+  b: InstancedColorExpansionSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && sameNumberArray(a.materialColor, b.materialColor)
+    && a.start === b.start
+    && a.count === b.count
+    && a.instanceCount === b.instanceCount
+    && sameAttributeSignature(a.color, b.color)
+    && a.label === b.label
 }
 
 function expandIndicesForInstances(indices: number[], vertexCount: number, instanceCount: number): number[] {
