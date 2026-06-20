@@ -1303,6 +1303,10 @@ export class Renderer {
     this.native = new native.NativeRenderer()
   }
 
+  async init(): Promise<this> {
+    return this
+  }
+
   get coordinateSystem(): number {
     return WEBGL_COORDINATE_SYSTEM
   }
@@ -1636,6 +1640,10 @@ export class Renderer {
       throw new TypeError('Renderer.setAnimationLoop callback must be a function or null.')
     }
     this.animationLoop = callback
+  }
+
+  getAnimationLoop(): RenderAnimationLoopCallback | null {
+    return this.animationLoop
   }
 
   getContext(): never {

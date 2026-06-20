@@ -31911,6 +31911,7 @@ test('Renderer resource init hooks are validated no-op compatibility hooks', asy
   const target = { texture: {} }
   const texture = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
 
+  assert.equal(await renderer.init(), renderer)
   assert.equal(renderer.initRenderTarget(target), undefined)
   assert.equal(renderer.initTexture(texture), undefined)
   assert.equal(renderer.hasInitialized(), true)
@@ -32519,10 +32520,12 @@ test('Renderer setAnimationLoop is an inert validated compatibility hook', () =>
   let calls = 0
 
   renderer.setAnimationLoop(() => { calls += 1 })
+  assert.equal(typeof renderer.getAnimationLoop(), 'function')
   renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
   assert.equal(calls, 0)
 
   renderer.setAnimationLoop(null)
+  assert.equal(renderer.getAnimationLoop(), null)
   renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
   assert.equal(calls, 0)
 
