@@ -13,7 +13,11 @@ export function objectLayersMatchCamera(
   layerMask(cameraLayers, 'camera.layers')
   layerMask(objectLayers, 'object.layers')
   if (typeof objectLayers?.test === 'function') {
-    return objectLayers.test(cameraLayers)
+    const result = objectLayers.test(cameraLayers)
+    if (typeof result !== 'boolean') {
+      throw new TypeError('object.layers.test(camera.layers) must return a boolean.')
+    }
+    return result
   }
 
   return (layerMask(objectLayers, 'object.layers') & layerMask(cameraLayers, 'camera.layers')) !== 0

@@ -7448,6 +7448,15 @@ test('invalid layer containers and masks fail clearly', () => {
     /camera\.layers\.mask must be a finite number/i,
   )
 
+  const badTestScene = new THREE.Scene()
+  const objectWithBadTest = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial())
+  objectWithBadTest.layers = { mask: 1, test: () => 'yes' }
+  badTestScene.add(objectWithBadTest)
+  assert.throws(
+    () => renderRgba(badTestScene, camera, { width: 32, height: 32 }),
+    /object\.layers\.test\(camera\.layers\) must return a boolean/i,
+  )
+
   const lightScene = new THREE.Scene()
   const light = new THREE.DirectionalLight(0xffffff, 1)
   light.layers.mask = 'bright'
@@ -7455,6 +7464,15 @@ test('invalid layer containers and masks fail clearly', () => {
   assert.throws(
     () => extractLights(lightScene, camera),
     /object\.layers\.mask must be a finite number/i,
+  )
+
+  const lightTestScene = new THREE.Scene()
+  const lightWithBadTest = new THREE.DirectionalLight(0xffffff, 1)
+  lightWithBadTest.layers = { mask: 1, test: () => 1 }
+  lightTestScene.add(lightWithBadTest)
+  assert.throws(
+    () => extractLights(lightTestScene, camera),
+    /object\.layers\.test\(camera\.layers\) must return a boolean/i,
   )
 
   const ambientScene = new THREE.Scene()
