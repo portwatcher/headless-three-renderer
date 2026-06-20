@@ -23375,6 +23375,59 @@ test('reusable renderer reuses cached material texture payload until texture ver
   assert.ok(textureReads > readsAfterFirstRender, 'texture version changes should invalidate cached texture payload extraction')
 })
 
+test('reusable renderer reuses cached base texture sampler state until texture state changes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const texture = rgbaTexture([255, 255, 255, 255], 1, 1)
+  texture.rotation = 0.37
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000, map: texture })
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const originalCos = Math.cos
+  let rotationCosCalls = 0
+  Math.cos = (value) => {
+    if (value === texture.rotation) {
+      rotationCosCalls += 1
+    }
+    return originalCos(value)
+  }
+  try {
+    const first = renderer.render(scene, camera, options)
+    const firstCenter = meanRegion(first, 64, 64, 24, 24, 40, 40)
+    const callsAfterFirstRender = rotationCosCalls
+    assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial mapped material should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+    assert.ok(callsAfterFirstRender > 0, 'initial render should compute texture transform state')
+
+    material.color.set(0x00ff00)
+    const second = renderer.render(scene, camera, options)
+    const secondCenter = meanRegion(second, 64, 64, 24, 24, 40, 40)
+    assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while base texture state is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
+    assert.equal(rotationCosCalls, callsAfterFirstRender, 'material-only animation should reuse cached base texture sampler state')
+
+    texture.rotation = 0.61
+    renderer.render(scene, camera, options)
+    assert.ok(rotationCosCalls > callsAfterFirstRender, 'texture transform changes should invalidate cached base texture sampler state')
+  } finally {
+    Math.cos = originalCos
+  }
+})
+
 test('reusable renderer reuses cached CSS material color extraction until color changes', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

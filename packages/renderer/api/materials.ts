@@ -175,10 +175,12 @@ export interface MaterialExtractionContext {
   materialEnvironmentMaps?: WeakSet<ThreeMaterialLike>
   textureCache?: TextureExtractionCache
   materialColorCache?: MaterialColorExtractionCache
+  textureStateCache?: TextureStateExtractionCache
 }
 
 export type TextureExtractionCache = WeakMap<ThreeTextureLike, unknown>
 export type MaterialColorExtractionCache = WeakMap<ThreeMaterialLike, unknown>
+export type TextureStateExtractionCache = WeakMap<ThreeTextureLike, unknown>
 
 export interface EnvironmentMapResolution {
   envMap: EnvironmentMapInfo | null
@@ -1986,17 +1988,177 @@ export function extractTextureData(
   if (!base) return null
 
   const map = slot as ThreeTextureLike | null | undefined
-  return {
-    ...base,
-    wrapS: material?.isMeshMatcapMaterial ? undefined : wrapModeToString(map?.wrapS),
-    wrapT: material?.isMeshMatcapMaterial ? undefined : wrapModeToString(map?.wrapT),
+  const state = textureSamplerState(map, label, context, {
+    includeWrap: material?.isMeshMatcapMaterial !== true,
+    includeTransform: material?.isMeshMatcapMaterial !== true,
+    includeUvChannel: material?.isMeshMatcapMaterial !== true,
+  })
+  return { ...base, ...state }
+}
+
+interface CachedTextureStateExtraction {
+  signature: TextureStateSignature
+  state: TextureSamplerState
+}
+
+interface TextureSamplerState {
+  wrapS?: string
+  wrapT?: string
+  magFilter?: string
+  minFilter?: string
+  anisotropy?: number
+  transform?: number[]
+  colorSpace?: string
+  usesUv2?: boolean
+}
+
+interface TextureStateOptions {
+  includeWrap?: boolean
+  includeTransform?: boolean
+  includeUvChannel?: boolean
+}
+
+interface TextureStateSignature {
+  includeWrap?: boolean
+  includeTransform?: boolean
+  includeUvChannel?: boolean
+  wrapS?: unknown
+  wrapT?: unknown
+  magFilter?: unknown
+  minFilter?: unknown
+  generateMipmaps?: unknown
+  mipmaps?: unknown
+  mipmapCount?: number
+  anisotropy?: unknown
+  colorSpace?: unknown
+  encoding?: unknown
+  channel?: unknown
+  flipY?: unknown
+  matrixAutoUpdate?: unknown
+  matrix?: unknown
+  matrixElements?: unknown
+  matrixValues?: unknown[]
+  offset?: unknown
+  offsetX?: unknown
+  offsetY?: unknown
+  repeat?: unknown
+  repeatX?: unknown
+  repeatY?: unknown
+  rotation?: unknown
+  center?: unknown
+  centerX?: unknown
+  centerY?: unknown
+}
+
+function textureSamplerState(
+  map: ThreeTextureLike | null | undefined,
+  label: string,
+  context: MaterialExtractionContext,
+  options: TextureStateOptions = {},
+): TextureSamplerState {
+  const signature = map && context.textureStateCache
+    ? textureStateSignature(map, options)
+    : null
+  if (map && signature) {
+    const cached = context.textureStateCache?.get(map) as CachedTextureStateExtraction | undefined
+    if (cached && sameTextureStateSignature(cached.signature, signature)) {
+      return copyTextureSamplerState(cached.state)
+    }
+  }
+
+  const state: TextureSamplerState = {
+    wrapS: options.includeWrap === false ? undefined : wrapModeToString(map?.wrapS),
+    wrapT: options.includeWrap === false ? undefined : wrapModeToString(map?.wrapT),
     magFilter: filterModeToString(map?.magFilter),
     minFilter: minFilterModeToString(map),
     anisotropy: textureAnisotropy(map, label),
-    transform: material?.isMeshMatcapMaterial ? undefined : textureTransform(map, label),
+    transform: options.includeTransform === false ? undefined : textureTransform(map, label),
     colorSpace: textureColorSpace(map),
-    usesUv2: material?.isMeshMatcapMaterial ? false : textureUvChannel(map) > 0,
+    usesUv2: options.includeUvChannel === false ? false : textureUvChannel(map) > 0,
   }
+  if (map && signature) {
+    context.textureStateCache?.set(map, { signature, state: copyTextureSamplerState(state) })
+  }
+  return state
+}
+
+function textureStateSignature(
+  texture: ThreeTextureLike,
+  options: TextureStateOptions,
+): TextureStateSignature {
+  const mipmaps = texture.mipmaps
+  const matrix = texture.matrix
+  const matrixElements = matrix?.elements
+  return {
+    includeWrap: options.includeWrap,
+    includeTransform: options.includeTransform,
+    includeUvChannel: options.includeUvChannel,
+    wrapS: texture.wrapS,
+    wrapT: texture.wrapT,
+    magFilter: texture.magFilter,
+    minFilter: texture.minFilter,
+    generateMipmaps: texture.generateMipmaps,
+    mipmaps,
+    mipmapCount: Array.isArray(mipmaps) ? mipmaps.length : undefined,
+    anisotropy: texture.anisotropy,
+    colorSpace: texture.colorSpace,
+    encoding: texture.encoding,
+    channel: texture.channel,
+    flipY: texture.flipY,
+    matrixAutoUpdate: texture.matrixAutoUpdate,
+    matrix,
+    matrixElements,
+    matrixValues: matrixElements ? Array.from(matrixElements as ArrayLike<unknown>) : undefined,
+    offset: texture.offset,
+    offsetX: texture.offset?.x,
+    offsetY: texture.offset?.y,
+    repeat: texture.repeat,
+    repeatX: texture.repeat?.x,
+    repeatY: texture.repeat?.y,
+    rotation: texture.rotation,
+    center: texture.center,
+    centerX: texture.center?.x,
+    centerY: texture.center?.y,
+  }
+}
+
+function copyTextureSamplerState(state: TextureSamplerState): TextureSamplerState {
+  return {
+    ...state,
+    transform: state.transform ? state.transform.slice() : undefined,
+  }
+}
+
+function sameTextureStateSignature(a: TextureStateSignature, b: TextureStateSignature): boolean {
+  return a.includeWrap === b.includeWrap
+    && a.includeTransform === b.includeTransform
+    && a.includeUvChannel === b.includeUvChannel
+    && a.wrapS === b.wrapS
+    && a.wrapT === b.wrapT
+    && a.magFilter === b.magFilter
+    && a.minFilter === b.minFilter
+    && a.generateMipmaps === b.generateMipmaps
+    && a.mipmaps === b.mipmaps
+    && a.mipmapCount === b.mipmapCount
+    && a.anisotropy === b.anisotropy
+    && a.colorSpace === b.colorSpace
+    && a.encoding === b.encoding
+    && a.channel === b.channel
+    && a.flipY === b.flipY
+    && a.matrixAutoUpdate === b.matrixAutoUpdate
+    && a.matrix === b.matrix
+    && a.matrixElements === b.matrixElements
+    && sameUnknownArray(a.matrixValues, b.matrixValues)
+    && a.offset === b.offset
+    && a.offsetX === b.offsetX
+    && a.offsetY === b.offsetY
+    && a.repeat === b.repeat
+    && a.repeatX === b.repeatX
+    && a.repeatY === b.repeatY
+    && a.rotation === b.rotation
+    && a.center === b.center
+    && a.centerX === b.centerX
+    && a.centerY === b.centerY
 }
 
 export function extractBackgroundTexture(
