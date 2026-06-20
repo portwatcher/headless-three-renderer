@@ -2227,7 +2227,7 @@ test('malformed ArrayCamera sub-camera containers fail clearly', () => {
   )
 })
 
-test('CubeCamera renders cube target faces', () => {
+test('CubeCamera renders cube target faces', async () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
@@ -2273,6 +2273,15 @@ test('CubeCamera renders cube target faces', () => {
     negativeFace.copy(expectedNegativeFaceRect, row * 8 * 4, sourceStart, sourceStart + 8 * 4)
   }
   assert.deepEqual(negativeFaceRect, expectedNegativeFaceRect)
+
+  const asyncPositiveFace = await renderer.readRenderTargetPixelsAsync(cubeTarget, 0, 0, 32, 32, undefined, 0)
+  assert.ok(Buffer.isBuffer(asyncPositiveFace), 'async cube-face readback should allocate a Buffer for Buffer-backed cube faces')
+  assert.deepEqual(asyncPositiveFace, Buffer.from(cubeTarget.texture.image[0].data))
+
+  const asyncCommonFaceRect = await renderer.readRenderTargetPixelsAsync(cubeTarget, 12, 12, 8, 4, 0, 1)
+  assert.ok(Buffer.isBuffer(asyncCommonFaceRect), 'common async cube-face readback should allocate a Buffer')
+  assert.deepEqual(asyncCommonFaceRect, expectedNegativeFaceRect)
+
   assert.throws(
     () => renderer.readRenderTargetPixels(
       { texture: { image: [{ data: Buffer.alloc(4), width: 1, height: 1 }] } },
