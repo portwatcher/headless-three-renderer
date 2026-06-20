@@ -1623,6 +1623,7 @@ class RendererCapabilitiesState {
   readonly precision = 'highp'
   readonly logarithmicDepthBuffer = false
   readonly reversedDepthBuffer = false
+  readonly reverseDepthBuffer = false
   readonly vertexTextures = false
   readonly floatFragmentTextures = false
   readonly floatVertexTextures = false

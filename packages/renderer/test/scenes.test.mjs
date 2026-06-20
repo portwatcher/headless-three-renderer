@@ -33379,6 +33379,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.capabilities.precision, 'highp')
   assert.equal(renderer.capabilities.logarithmicDepthBuffer, false)
   assert.equal(renderer.capabilities.reversedDepthBuffer, false)
+  assert.equal(renderer.capabilities.reverseDepthBuffer, false)
   assert.equal(renderer.capabilities.vertexTextures, false)
   assert.equal(renderer.capabilities.floatFragmentTextures, false)
   assert.equal(renderer.capabilities.floatVertexTextures, false)
