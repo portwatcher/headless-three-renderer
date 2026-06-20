@@ -952,34 +952,36 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         ),
     });
 
-    let metallic = clamp01(mesh.metallic.unwrap_or(0.0)) as f32;
-    let roughness = clamp01(mesh.roughness.unwrap_or(1.0)) as f32;
-    let clearcoat = clamp01(mesh.clearcoat.unwrap_or(0.0)) as f32;
-    let clearcoat_roughness = clamp01(mesh.clearcoat_roughness.unwrap_or(0.0)) as f32;
-    let clearcoat_normal_scale = match mesh.clearcoat_normal_scale.as_deref() {
-        Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
-        _ => [1.0, 1.0],
-    };
+    let metallic = finite_clamp01(mesh.metallic.unwrap_or(0.0), "mesh metallic")?;
+    let roughness = finite_clamp01(mesh.roughness.unwrap_or(1.0), "mesh roughness")?;
+    let clearcoat = finite_clamp01(mesh.clearcoat.unwrap_or(0.0), "mesh clearcoat")?;
+    let clearcoat_roughness = finite_clamp01(
+        mesh.clearcoat_roughness.unwrap_or(0.0),
+        "mesh clearcoatRoughness",
+    )?;
+    let clearcoat_normal_scale = parse_optional_vec2(
+        mesh.clearcoat_normal_scale.as_deref(),
+        [1.0, 1.0],
+        "mesh clearcoatNormalScale",
+    )?;
     let clearcoat_normal_scale = if side == MeshSide::Back {
         [-clearcoat_normal_scale[0], -clearcoat_normal_scale[1]]
     } else {
         clearcoat_normal_scale
     };
-    let sheen_color = match mesh.sheen_color.as_deref() {
-        Some(s) if s.len() == 3 => [
-            clamp01(s[0]) as f32,
-            clamp01(s[1]) as f32,
-            clamp01(s[2]) as f32,
-        ],
-        _ => [0.0, 0.0, 0.0],
-    };
-    let sheen_roughness = clamp01(mesh.sheen_roughness.unwrap_or(1.0)).max(0.0001) as f32;
-    let anisotropy = clamp01(mesh.anisotropy.unwrap_or(0.0)) as f32;
+    let sheen_color = parse_optional_clamped_color3(
+        mesh.sheen_color.as_deref(),
+        [0.0, 0.0, 0.0],
+        "mesh sheenColor",
+    )?;
+    let sheen_roughness =
+        finite_clamp01(mesh.sheen_roughness.unwrap_or(1.0), "mesh sheenRoughness")?.max(0.0001);
+    let anisotropy = finite_clamp01(mesh.anisotropy.unwrap_or(0.0), "mesh anisotropy")?;
     let anisotropy_rotation = finite_f32(
         mesh.anisotropy_rotation.unwrap_or(0.0),
         "mesh anisotropyRotation",
     )?;
-    let iridescence = clamp01(mesh.iridescence.unwrap_or(0.0)) as f32;
+    let iridescence = finite_clamp01(mesh.iridescence.unwrap_or(0.0), "mesh iridescence")?;
     let iridescence_ior =
         finite_f32(mesh.iridescence_ior.unwrap_or(1.3), "mesh iridescenceIor")?.clamp(1.0, 2.333);
     let iridescence_thickness_min = mesh
@@ -994,33 +996,31 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         .transpose()?
         .unwrap_or(400.0)
         .max(iridescence_thickness_min);
-    let transmission = clamp01(mesh.transmission.unwrap_or(0.0)) as f32;
+    let transmission = finite_clamp01(mesh.transmission.unwrap_or(0.0), "mesh transmission")?;
     let dispersion = finite_f32(mesh.dispersion.unwrap_or(0.0), "mesh dispersion")?.max(0.0);
-    let ior = mesh.ior.unwrap_or(1.5).clamp(1.0, 2.333) as f32;
-    let thickness = mesh.thickness.unwrap_or(0.0).max(0.0) as f32;
+    let ior = finite_f32(mesh.ior.unwrap_or(1.5), "mesh ior")?.clamp(1.0, 2.333);
+    let thickness = finite_f32(mesh.thickness.unwrap_or(0.0), "mesh thickness")?.max(0.0);
     let attenuation_distance = mesh
         .attenuation_distance
+        .map(|value| finite_f32(value, "mesh attenuationDistance"))
+        .transpose()?
         .unwrap_or(1.0e20)
         .max(0.0)
-        .min(1.0e20) as f32;
-    let attenuation_color = match mesh.attenuation_color.as_deref() {
-        Some(c) if c.len() == 3 => [
-            clamp01(c[0]) as f32,
-            clamp01(c[1]) as f32,
-            clamp01(c[2]) as f32,
-        ],
-        _ => [1.0, 1.0, 1.0],
-    };
-    let physical_specular_color = match mesh.physical_specular_color.as_deref() {
-        Some(c) if c.len() == 3 => [
-            clamp01(c[0]) as f32,
-            clamp01(c[1]) as f32,
-            clamp01(c[2]) as f32,
-        ],
-        _ => [1.0, 1.0, 1.0],
-    };
-    let physical_specular_intensity =
-        clamp01(mesh.physical_specular_intensity.unwrap_or(1.0)) as f32;
+        .min(1.0e20);
+    let attenuation_color = parse_optional_clamped_color3(
+        mesh.attenuation_color.as_deref(),
+        [1.0, 1.0, 1.0],
+        "mesh attenuationColor",
+    )?;
+    let physical_specular_color = parse_optional_clamped_color3(
+        mesh.physical_specular_color.as_deref(),
+        [1.0, 1.0, 1.0],
+        "mesh specularColor",
+    )?;
+    let physical_specular_intensity = finite_clamp01(
+        mesh.physical_specular_intensity.unwrap_or(1.0),
+        "mesh specularIntensity",
+    )?;
     let distance_reference_position = parse_optional_vec3(
         mesh.distance_reference_position.as_deref(),
         &format!("scene.meshes[{mesh_index}].distanceReferencePosition"),
@@ -1033,14 +1033,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         .distance_far
         .map(|value| finite_f32(value, "mesh distanceFar"))
         .transpose()?;
-    let specular_color = match mesh.specular_color.as_deref() {
-        Some(c) if c.len() == 3 => [
-            clamp01(c[0]) as f32,
-            clamp01(c[1]) as f32,
-            clamp01(c[2]) as f32,
-        ],
-        _ => [17.0 / 255.0, 17.0 / 255.0, 17.0 / 255.0],
-    };
+    let specular_color = parse_optional_clamped_color3(
+        mesh.specular_color.as_deref(),
+        [17.0 / 255.0, 17.0 / 255.0, 17.0 / 255.0],
+        "mesh specular",
+    )?;
     let shininess = finite_f32(mesh.shininess.unwrap_or(30.0), "mesh shininess")?.max(0.0001);
 
     if let Some(displacement_map) = displacement_map.as_ref() {
@@ -1068,17 +1065,19 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         compute_tangents(&mut vertices, mesh.indices.as_deref());
     }
 
-    let emissive_intensity = mesh.emissive_intensity.unwrap_or(1.0) as f32;
-    let emissive = match mesh.emissive.as_deref() {
-        Some(e) if e.len() == 3 => [
-            clamp01(e[0]) as f32 * emissive_intensity,
-            clamp01(e[1]) as f32 * emissive_intensity,
-            clamp01(e[2]) as f32 * emissive_intensity,
-        ],
-        _ => [0.0, 0.0, 0.0],
-    };
+    let emissive_intensity = finite_f32(
+        mesh.emissive_intensity.unwrap_or(1.0),
+        "mesh emissiveIntensity",
+    )?;
+    let emissive_color =
+        parse_optional_clamped_color3(mesh.emissive.as_deref(), [0.0, 0.0, 0.0], "mesh emissive")?;
+    let emissive = [
+        emissive_color[0] * emissive_intensity,
+        emissive_color[1] * emissive_intensity,
+        emissive_color[2] * emissive_intensity,
+    ];
 
-    let alpha_test = clamp01(mesh.alpha_test.unwrap_or(0.0)) as f32;
+    let alpha_test = finite_clamp01(mesh.alpha_test.unwrap_or(0.0), "mesh alphaTest")?;
     let alpha_hash = mesh.alpha_hash.unwrap_or(false);
     let alpha_to_coverage = mesh.alpha_to_coverage.unwrap_or(false);
     let premultiplied_alpha = mesh.premultiplied_alpha.unwrap_or(false);
@@ -1354,6 +1353,38 @@ fn parse_optional_vec3(values: Option<&[f64]>, field: &str) -> Result<Option<[f3
     ]))
 }
 
+fn parse_optional_vec2(values: Option<&[f64]>, default: [f32; 2], field: &str) -> Result<[f32; 2]> {
+    let Some(values) = values else {
+        return Ok(default);
+    };
+    if values.len() != 2 {
+        bail!("{field} must be an array of 2 numbers");
+    }
+    Ok([finite_f32(values[0], field)?, finite_f32(values[1], field)?])
+}
+
+fn parse_optional_clamped_color3(
+    values: Option<&[f64]>,
+    default: [f32; 3],
+    field: &str,
+) -> Result<[f32; 3]> {
+    let Some(values) = values else {
+        return Ok(default);
+    };
+    if values.len() != 3 {
+        bail!("{field} must be an array of 3 numbers");
+    }
+    Ok([
+        finite_clamp01(values[0], field)?,
+        finite_clamp01(values[1], field)?,
+        finite_clamp01(values[2], field)?,
+    ])
+}
+
+fn finite_clamp01(value: f64, field: &str) -> Result<f32> {
+    Ok(finite_f32(value, field)?.clamp(0.0, 1.0))
+}
+
 fn parse_clipping_planes(
     values: Option<&[f64]>,
     union_count: Option<u32>,
@@ -1436,7 +1467,7 @@ fn parse_custom_blend_state(
         [0.0, 0.0, 0.0, 1.0],
         &format!("scene.meshes[{mesh_index}].blendColor"),
     )?;
-    let blend_alpha = clamp01(mesh.blend_alpha.unwrap_or(0.0)) as f32;
+    let blend_alpha = finite_clamp01(mesh.blend_alpha.unwrap_or(0.0), "mesh blendAlpha")?;
 
     Ok(Some(CustomBlendState {
         color_equation,
@@ -1911,10 +1942,11 @@ fn prepare_common_texture_inputs(
                 mesh.normal_map_type.as_deref(),
                 mesh_index,
             )?,
-            normal_scale: match mesh.normal_scale.as_deref() {
-                Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
-                _ => [1.0, 1.0],
-            },
+            normal_scale: parse_optional_vec2(
+                mesh.normal_scale.as_deref(),
+                [1.0, 1.0],
+                "mesh normalScale",
+            )?,
             bump_scale: finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?,
             displacement_scale: finite_f32(
                 mesh.displacement_scale.unwrap_or(1.0),
@@ -1924,7 +1956,10 @@ fn prepare_common_texture_inputs(
                 mesh.displacement_bias.unwrap_or(0.0),
                 "mesh displacementBias",
             )?,
-            ao_map_intensity: clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32,
+            ao_map_intensity: finite_clamp01(
+                mesh.ao_map_intensity.unwrap_or(1.0),
+                "mesh aoMapIntensity",
+            )?,
             light_map_intensity: finite_f32(
                 mesh.light_map_intensity.unwrap_or(1.0),
                 "mesh lightMapIntensity",
@@ -2073,10 +2108,8 @@ fn prepare_common_texture_inputs(
         }
         let normal_map_type =
             NormalMapType::from_str_opt(mesh.normal_map_type.as_deref(), mesh_index)?;
-        let normal_scale = match mesh.normal_scale.as_deref() {
-            Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
-            _ => [1.0, 1.0],
-        };
+        let normal_scale =
+            parse_optional_vec2(mesh.normal_scale.as_deref(), [1.0, 1.0], "mesh normalScale")?;
         let mut bump_map = join_texture_worker(bump_map, "bump map worker")?;
         if matches!(mesh.bump_map_color_space.as_deref(), Some("srgb")) {
             if let Some(texture) = bump_map.as_mut() {
@@ -2102,7 +2135,8 @@ fn prepare_common_texture_inputs(
         let specular_map = join_texture_worker(specular_map, "specular map worker")?;
         let emissive_map = join_texture_worker(emissive_map, "emissive map worker")?;
         let ao_map = join_texture_worker(ao_map, "ao map worker")?;
-        let ao_map_intensity = clamp01(mesh.ao_map_intensity.unwrap_or(1.0)) as f32;
+        let ao_map_intensity =
+            finite_clamp01(mesh.ao_map_intensity.unwrap_or(1.0), "mesh aoMapIntensity")?;
         let light_map = join_texture_worker(light_map, "light map worker")?;
         let light_map_intensity = finite_f32(
             mesh.light_map_intensity.unwrap_or(1.0),

@@ -181,6 +181,117 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_finite_material_scalar_inputs() {
+        let cases: Vec<(&str, Box<dyn Fn(&mut SceneMesh)>)> = vec![
+            ("metallic", Box::new(|mesh| mesh.metallic = Some(f64::NAN))),
+            (
+                "roughness",
+                Box::new(|mesh| mesh.roughness = Some(f64::INFINITY)),
+            ),
+            (
+                "clearcoat",
+                Box::new(|mesh| mesh.clearcoat = Some(f64::NEG_INFINITY)),
+            ),
+            (
+                "clearcoatNormalScale",
+                Box::new(|mesh| mesh.clearcoat_normal_scale = Some(vec![1.0, f64::NAN])),
+            ),
+            (
+                "sheenColor",
+                Box::new(|mesh| mesh.sheen_color = Some(vec![0.5, f64::NAN, 0.5])),
+            ),
+            (
+                "sheenRoughness",
+                Box::new(|mesh| mesh.sheen_roughness = Some(f64::INFINITY)),
+            ),
+            (
+                "anisotropy",
+                Box::new(|mesh| mesh.anisotropy = Some(f64::NAN)),
+            ),
+            (
+                "iridescence",
+                Box::new(|mesh| mesh.iridescence = Some(f64::INFINITY)),
+            ),
+            (
+                "transmission",
+                Box::new(|mesh| mesh.transmission = Some(f64::NAN)),
+            ),
+            ("ior", Box::new(|mesh| mesh.ior = Some(f64::INFINITY))),
+            (
+                "thickness",
+                Box::new(|mesh| mesh.thickness = Some(f64::NAN)),
+            ),
+            (
+                "attenuationDistance",
+                Box::new(|mesh| mesh.attenuation_distance = Some(f64::INFINITY)),
+            ),
+            (
+                "attenuationColor",
+                Box::new(|mesh| mesh.attenuation_color = Some(vec![1.0, f64::NAN, 1.0])),
+            ),
+            (
+                "physicalSpecularColor",
+                Box::new(|mesh| mesh.physical_specular_color = Some(vec![1.0, 1.0, f64::NAN])),
+            ),
+            (
+                "physicalSpecularIntensity",
+                Box::new(|mesh| mesh.physical_specular_intensity = Some(f64::NAN)),
+            ),
+            (
+                "specularColor",
+                Box::new(|mesh| mesh.specular_color = Some(vec![f64::NAN, 0.0, 0.0])),
+            ),
+            (
+                "emissiveIntensity",
+                Box::new(|mesh| mesh.emissive_intensity = Some(f64::INFINITY)),
+            ),
+            (
+                "emissive",
+                Box::new(|mesh| mesh.emissive = Some(vec![0.0, f64::NAN, 0.0])),
+            ),
+            (
+                "alphaTest",
+                Box::new(|mesh| mesh.alpha_test = Some(f64::NAN)),
+            ),
+            (
+                "normalScale",
+                Box::new(|mesh| mesh.normal_scale = Some(vec![f64::NAN, 1.0])),
+            ),
+            (
+                "aoMapIntensity",
+                Box::new(|mesh| mesh.ao_map_intensity = Some(f64::INFINITY)),
+            ),
+            (
+                "blendAlpha",
+                Box::new(|mesh| {
+                    mesh.blending = Some("custom".into());
+                    mesh.blend_alpha = Some(f64::NAN);
+                }),
+            ),
+        ];
+
+        for (label, mutate) in cases {
+            let mut mesh = SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                ..SceneMesh::default()
+            };
+            mutate(&mut mesh);
+            let scene = RenderScene {
+                meshes: Some(vec![mesh]),
+                ..RenderScene::default()
+            };
+            let error = match prepare_meshes(&scene) {
+                Ok(_) => panic!("{label} should fail"),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains("must contain finite f32-compatible numbers"),
+                "{label} should fail with a finite scalar error, got: {error}",
+            );
+        }
+    }
+
+    #[test]
     fn rejects_bad_uv_length() {
         let scene = RenderScene {
             meshes: Some(vec![SceneMesh {
