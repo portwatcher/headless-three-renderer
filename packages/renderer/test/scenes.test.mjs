@@ -31103,6 +31103,8 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.state.buffers.color.setLocked(true), undefined)
   assert.equal(renderer.state.buffers.color.setClear(0.1, 0.2, 0.3, 0.4, true), undefined)
   assert.equal(renderer.state.buffers.depth.getReversed(), false)
+  assert.equal(renderer.state.buffers.depth.setReversed(false), undefined)
+  assert.equal(renderer.state.buffers.depth.getReversed(), false)
   assert.equal(renderer.state.buffers.depth.setTest(true), undefined)
   assert.equal(renderer.state.buffers.depth.setMask(true), undefined)
   assert.equal(renderer.state.buffers.depth.setFunc(THREE.LessEqualDepth), undefined)
@@ -31147,6 +31149,14 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.throws(
     () => renderer.state.buffers.depth.setFunc('less'),
     /Renderer\.state\.buffers\.depth\.setFunc func must be a finite integer/i,
+  )
+  assert.throws(
+    () => renderer.state.buffers.depth.setReversed(0),
+    /Renderer\.state\.buffers\.depth\.setReversed reversed must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.buffers.depth.setReversed(true),
+    /Renderer\.state\.buffers\.depth\.setReversed\(true\) is not supported.*reversed depth buffers/i,
   )
   assert.throws(
     () => renderer.state.buffers.stencil.setTest(1),

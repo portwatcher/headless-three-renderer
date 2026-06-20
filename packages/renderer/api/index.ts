@@ -678,6 +678,15 @@ class RendererDepthBufferState {
     return false
   }
 
+  setReversed(reversed: unknown): void {
+    const enabled = rendererStateBoolean(reversed, 'Renderer.state.buffers.depth.setReversed reversed')
+    if (enabled) {
+      throw new Error(
+        'Renderer.state.buffers.depth.setReversed(true) is not supported by @headless-three/renderer because reversed depth buffers are not implemented. Keep reversedDepthBuffer disabled.',
+      )
+    }
+  }
+
   setTest(depthTest: unknown): void {
     rendererStateBoolean(depthTest, 'Renderer.state.buffers.depth.setTest test')
   }
