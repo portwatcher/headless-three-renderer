@@ -33860,6 +33860,48 @@ test('Renderer copyTextureToTexture copies readable raw texture data on the CPU'
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after CPU copy')
 })
 
+test('Renderer copyTextureToTexture copies readable texture source.data on the CPU', () => {
+  const renderer = new Renderer()
+  const source = new THREE.Texture()
+  source.source = {
+    data: {
+      data: new Uint8Array([
+        11, 21, 31, 255,
+        41, 51, 61, 255,
+        71, 81, 91, 255,
+        101, 111, 121, 255,
+      ]),
+      width: 2,
+      height: 2,
+    },
+  }
+
+  const destinationData = new Uint8Array(3 * 2 * 4)
+  destinationData.fill(3)
+  const destination = new THREE.Texture()
+  destination.source = {
+    data: {
+      data: destinationData,
+      width: 3,
+      height: 2,
+    },
+  }
+  const initialVersion = destination.version
+
+  renderer.copyTextureToTexture(source, destination, { x: 0, y: 1, width: 2, height: 1 }, { x: 1, y: 0 })
+
+  function pixel(x, y) {
+    const width = destination.source.data.width
+    const offset = (y * width + x) * 4
+    return Array.from(destination.source.data.data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(pixel(1, 0), [71, 81, 91, 255])
+  assert.deepEqual(pixel(2, 0), [101, 111, 121, 255])
+  assert.deepEqual(pixel(0, 0), [3, 3, 3, 3])
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after source.data CPU copy')
+})
+
 test('Renderer copyTextureToTexture copies readable raw texture mip levels on the CPU', () => {
   const renderer = new Renderer()
   const source = new THREE.DataTexture(new Uint8Array(4 * 4 * 4).fill(1), 4, 4, THREE.RGBAFormat)
