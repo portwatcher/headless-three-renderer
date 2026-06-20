@@ -75,6 +75,7 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    physicalTransmissionDispersionCorpus(),
     multipleDirectionalShadowCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialFogOptOutCorpus(),
@@ -3605,6 +3606,73 @@ function physicalIblShadowCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(sphere.r > 200 && sphere.g > 210 && sphere.b > 220 && ground.r > 80 && ground.g > 80 && ground.b > 90 && corner.r === 10 && corner.g === 10 && corner.b === 13)) {
         throw new Error(`physical IBL shadow corpus should render a bright physical sphere and visible shadowed ground, got sphere=${JSON.stringify(sphere)} ground=${JSON.stringify(ground)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function physicalTransmissionDispersionCorpus() {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let normalOutput = null
+
+  function makeScene(dispersion) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const left = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    left.position.set(-0.8, 0, -0.2)
+    scene.add(left)
+
+    const right = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    right.position.set(0.8, 0, -0.2)
+    scene.add(right)
+
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(0.95, 48, 24),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness: 0.02,
+        transmission: 1,
+        thickness: 40,
+        ior: 2.2,
+        dispersion,
+      }),
+    ))
+    return scene
+  }
+
+  return {
+    name: 'physical-transmission-dispersion',
+    browserReference: false,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.15,
+    render(renderer) {
+      normalOutput = renderer.render(makeScene(0), camera, options)
+      return renderer.render(makeScene(10), camera, options)
+    },
+    validate(rgba, { width }) {
+      if (!normalOutput) {
+        throw new Error('physical dispersion corpus did not render the normal reference output')
+      }
+      const diff = meanAbsDiff(normalOutput, rgba)
+      const normalEdge = meanRegion(normalOutput, width, 42, 32, 54, 64)
+      const dispersedEdge = meanRegion(rgba, width, 42, 32, 54, 64)
+      const normalSeparation = Math.abs(normalEdge.r - normalEdge.b)
+      const dispersedSeparation = Math.abs(dispersedEdge.r - dispersedEdge.b)
+      if (!(diff > 8 && Math.abs(dispersedSeparation - normalSeparation) > 18)) {
+        throw new Error(`physical dispersion corpus should shift transmitted color channels, diff=${diff.toFixed(2)} normal=${JSON.stringify(normalEdge)} dispersed=${JSON.stringify(dispersedEdge)}`)
       }
     },
   }
