@@ -1754,6 +1754,10 @@ export class Renderer {
     // Native render state is rebuilt for each pass, so there is no persistent GL state to reset.
   }
 
+  resetGLState(): void {
+    this.resetState()
+  }
+
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer {
     validateThreeSceneRoot(scene)
     validateTopLevelRenderCamera(camera)

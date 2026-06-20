@@ -31153,6 +31153,7 @@ test('Renderer resetState is a no-op compatibility hook', () => {
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace
   renderer.localClippingEnabled = false
   renderer.resetState()
+  renderer.resetGLState()
 
   assert.equal(renderer.outputColorSpace, THREE.LinearSRGBColorSpace)
   assert.equal(renderer.localClippingEnabled, false)
