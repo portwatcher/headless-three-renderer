@@ -107,11 +107,26 @@ interface TextureUvStreams {
 
 export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
+  batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
 }
 
 interface CachedMeshGeometryExtraction {
   signature: MeshGeometrySignature
   extraction: MeshGeometryExtraction
+}
+
+interface CachedBatchedGeometryView {
+  signature: BatchedGeometryViewSignature
+  view: ThreeBufferGeometryLike
+}
+
+interface BatchedGeometryViewSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  rangeStart: number
+  rangeCount: number
+  position: AttributeSignature
+  index: AttributeSignature
 }
 
 interface MeshGeometryExtraction {
@@ -200,7 +215,10 @@ type SortKeyOverride = Partial<MeshSortInfo['keys']>
 const MAX_POINT_SPRITE_SIZE = 64
 
 export function createSceneExtractionCache(): SceneExtractionCache {
-  return { meshGeometry: new WeakMap() }
+  return {
+    meshGeometry: new WeakMap(),
+    batchedGeometryViews: new WeakMap(),
+  }
 }
 
 export function flattenScene(
@@ -298,7 +316,7 @@ function appendBatchedMesh(
 
   for (let drawOrder = 0; drawOrder < draws.length; drawOrder += 1) {
     const draw = draws[drawOrder]
-    const geometryView = batchedGeometryView(geometry, draw.range)
+    const geometryView = batchedGeometryView(geometry, draw.range, cache)
     const objectView = Object.create(object) as ThreeObject3DLike
     objectView.geometry = geometryView
     objectView.isInstancedMesh = false
@@ -3434,11 +3452,75 @@ function sphereLike(
 function batchedGeometryView(
   geometry: ThreeBufferGeometryLike,
   range: { start: number; count: number },
+  cache?: SceneExtractionCache,
 ): ThreeBufferGeometryLike {
-  const view = Object.create(geometry) as ThreeBufferGeometryLike
+  const signature = batchedGeometryViewSignature(geometry, range)
+  if (cache && signature.cacheable) {
+    let views = cache.batchedGeometryViews.get(geometry)
+    if (!views) {
+      views = new Map()
+      cache.batchedGeometryViews.set(geometry, views)
+    }
+    const key = batchedGeometryViewKey(range)
+    const cached = views.get(key)
+    if (cached && sameBatchedGeometryViewSignature(cached.signature, signature)) {
+      return cached.view
+    }
+    const view = cached?.view ?? createBatchedGeometryView(geometry)
+    updateBatchedGeometryView(view, geometry, range)
+    views.set(key, { signature, view })
+    return view
+  }
+
+  const view = createBatchedGeometryView(geometry)
+  updateBatchedGeometryView(view, geometry, range)
+  return view
+}
+
+function createBatchedGeometryView(geometry: ThreeBufferGeometryLike): ThreeBufferGeometryLike {
+  return Object.create(geometry) as ThreeBufferGeometryLike
+}
+
+function updateBatchedGeometryView(
+  view: ThreeBufferGeometryLike,
+  geometry: ThreeBufferGeometryLike,
+  range: { start: number; count: number },
+): void {
   view.drawRange = { start: range.start, count: range.count }
   view.boundingSphere = batchedGeometryRangeBoundingSphere(geometry, range)
-  return view
+}
+
+function batchedGeometryViewSignature(
+  geometry: ThreeBufferGeometryLike,
+  range: { start: number; count: number },
+): BatchedGeometryViewSignature {
+  const signature: BatchedGeometryViewSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    rangeStart: range.start,
+    rangeCount: range.count,
+    position: attributeSignature(getAttribute(geometry, 'position')),
+    index: attributeSignature(geometry.index),
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.position)
+    && attributeSignatureCacheable(signature.index)
+  return signature
+}
+
+function sameBatchedGeometryViewSignature(
+  a: BatchedGeometryViewSignature,
+  b: BatchedGeometryViewSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && a.rangeStart === b.rangeStart
+    && a.rangeCount === b.rangeCount
+    && sameAttributeSignature(a.position, b.position)
+    && sameAttributeSignature(a.index, b.index)
+}
+
+function batchedGeometryViewKey(range: { start: number; count: number }): string {
+  return `${range.start}:${range.count}`
 }
 
 function batchedGeometryRangeBoundingSphere(

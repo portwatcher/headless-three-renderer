@@ -23444,6 +23444,66 @@ test('reusable renderer reuses cached static line and point geometry until attri
   assert.equal(lineReads(), lineReadsAfterLineUpdate, 'point invalidation should not force unrelated line geometry extraction')
 })
 
+test('reusable renderer reuses cached BatchedMesh geometry views until packed attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.55, 0.55)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  const batched = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count,
+    source.index.count,
+    material,
+  )
+  const geometryId = batched.addGeometry(source)
+  const instanceId = batched.addInstance(geometryId)
+  batched.setMatrixAt(instanceId, new THREE.Matrix4().makeTranslation(-0.35, 0, 0))
+  batched.frustumCulled = false
+  batched.perObjectFrustumCulled = false
+  batched.sortObjects = false
+  scene.add(batched)
+
+  const packedPosition = batched.geometry.getAttribute('position')
+  const originalGetX = packedPosition.getX.bind(packedPosition)
+  let positionReads = 0
+  packedPosition.getX = (index) => {
+    positionReads += 1
+    return originalGetX(index)
+  }
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const readsAfterFirstRender = positionReads
+  assert.ok(readsAfterFirstRender > 0, 'initial render should extract BatchedMesh packed geometry')
+
+  material.color.set(0x00ff00)
+  batched.setMatrixAt(instanceId, new THREE.Matrix4().makeTranslation(0.35, 0, 0))
+  renderer.render(scene, camera, options)
+  assert.equal(
+    positionReads,
+    readsAfterFirstRender,
+    'BatchedMesh transform/material animation should reuse cached packed geometry views',
+  )
+
+  packedPosition.array[0] += 0.05
+  packedPosition.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(positionReads > readsAfterFirstRender, 'packed attribute version changes should invalidate cached BatchedMesh views')
+})
+
 test('reusable renderer reflects mutated scene environment texture bytes', () => {
   const renderer = new Renderer()
   const data = new Uint8Array(2 * 2 * 4)
