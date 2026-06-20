@@ -102,7 +102,9 @@ const SupportedInstancedBufferGeometryAttributes = new Set([
   'uv3',
   'instanceOffset',
   'instancePosition',
+  'instanceScale',
   'offset',
+  'scale',
   'translate',
   'translation',
 ])
@@ -199,6 +201,7 @@ interface PointBillboardSignature {
   groupCount: number
   instancedGeometryCount: number
   instancedPositionOffset: AttributeSignature
+  instancedPositionScale: AttributeSignature
   transform: number[]
   cameraRight: [number, number, number]
   cameraUp: [number, number, number]
@@ -262,6 +265,7 @@ interface MeshGeometryExtraction {
   groups: GeometryGroup[]
   instancedGeometryCount: number
   instancedPositionOffset: InstancedAttributeRef | null
+  instancedPositionScale: InstancedAttributeRef | null
 }
 
 interface MeshGeometrySignature {
@@ -283,6 +287,8 @@ interface MeshGeometrySignature {
   uv3: AttributeSignature
   instancedPositionOffsetName?: string
   instancedPositionOffset: AttributeSignature
+  instancedPositionScaleName?: string
+  instancedPositionScale: AttributeSignature
   instancedAttributes: Array<{ name: string; signature: AttributeSignature }>
 }
 
@@ -517,6 +523,7 @@ function appendMesh(
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
   } = geometryExtraction
   let positions = geometryExtraction.positions
   let normals = geometryExtraction.normals
@@ -585,6 +592,7 @@ function appendMesh(
         position.count,
         instancedGeometryCount,
         instancedPositionOffset,
+        instancedPositionScale,
       )
       const expandedNormals = normalAttribute && normals
         ? expandNormalValuesForInstances(normalAttribute, normals, 0, position.count, instancedGeometryCount)
@@ -642,6 +650,7 @@ function appendMesh(
         group.count,
         instancedGeometryCount,
         instancedPositionOffset,
+        instancedPositionScale,
       )
       const expandedGroupNormals = normalAttribute && normals
         ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
@@ -714,6 +723,7 @@ function appendMesh(
         index,
         instancedGeometryCount,
         instancedPositionOffset,
+        instancedPositionScale,
         instances,
       )
     }
@@ -758,6 +768,7 @@ function readMeshGeometryExtraction(
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
+  const instancedPositionScale = instancedScaleAttribute(geometry)
 
   return {
     position,
@@ -772,6 +783,7 @@ function readMeshGeometryExtraction(
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
   }
 }
 
@@ -784,6 +796,7 @@ function meshGeometrySignature(
     .filter((entry): entry is [string, ThreeBufferAttributeLike] => isInstancedAttribute(entry[1]))
     .map(([name, attribute]) => ({ name, signature: attributeSignature(attribute) }))
   const instancedPositionOffset = namedInstancedOffsetAttribute(geometry)
+  const instancedPositionScale = namedInstancedScaleAttribute(geometry)
   const signature: MeshGeometrySignature = {
     cacheable: true,
     geometryVersion: geometry.version,
@@ -803,6 +816,8 @@ function meshGeometrySignature(
     uv3: attributeSignature(getAttribute(geometry, 'uv3')),
     instancedPositionOffsetName: instancedPositionOffset?.name,
     instancedPositionOffset: attributeSignature(instancedPositionOffset?.attribute),
+    instancedPositionScaleName: instancedPositionScale?.name,
+    instancedPositionScale: attributeSignature(instancedPositionScale?.attribute),
     instancedAttributes,
   }
   signature.cacheable = meshGeometrySignatureCacheable(signature)
@@ -820,6 +835,7 @@ function meshGeometrySignatureCacheable(signature: MeshGeometrySignature): boole
     signature.uv2,
     signature.uv3,
     signature.instancedPositionOffset,
+    signature.instancedPositionScale,
     ...signature.instancedAttributes.map(({ signature }) => signature),
   ].every(attributeSignatureCacheable)
 }
@@ -852,6 +868,17 @@ function namedInstancedOffsetAttribute(
   geometry: ThreeBufferGeometryLike,
 ): { name: string; attribute: ThreeBufferAttributeLike } | null {
   const names = ['instanceOffset', 'instancePosition', 'offset', 'translate', 'translation']
+  for (const name of names) {
+    const attribute = getAttribute(geometry, name)
+    if (isInstancedAttribute(attribute)) return { name, attribute }
+  }
+  return null
+}
+
+function namedInstancedScaleAttribute(
+  geometry: ThreeBufferGeometryLike,
+): { name: string; attribute: ThreeBufferAttributeLike } | null {
+  const names = ['instanceScale', 'scale']
   for (const name of names) {
     const attribute = getAttribute(geometry, name)
     if (isInstancedAttribute(attribute)) return { name, attribute }
@@ -899,6 +926,7 @@ function sameMeshGeometrySignature(a: MeshGeometrySignature, b: MeshGeometrySign
     && Object.is(a.drawRangeCount, b.drawRangeCount)
     && a.groups === b.groups
     && a.instancedPositionOffsetName === b.instancedPositionOffsetName
+    && a.instancedPositionScaleName === b.instancedPositionScaleName
     && sameAttributeSignature(a.position, b.position)
     && sameAttributeSignature(a.normal, b.normal)
     && sameAttributeSignature(a.color, b.color)
@@ -908,6 +936,7 @@ function sameMeshGeometrySignature(a: MeshGeometrySignature, b: MeshGeometrySign
     && sameAttributeSignature(a.uv2, b.uv2)
     && sameAttributeSignature(a.uv3, b.uv3)
     && sameAttributeSignature(a.instancedPositionOffset, b.instancedPositionOffset)
+    && sameAttributeSignature(a.instancedPositionScale, b.instancedPositionScale)
     && sameInstancedAttributeSignatures(a.instancedAttributes, b.instancedAttributes)
 }
 
@@ -958,6 +987,7 @@ function appendShadowOnlyMeshGroup(
   index: number[] | null,
   instancedGeometryCount: number,
   instancedPositionOffset: InstancedAttributeRef | null,
+  instancedPositionScale: InstancedAttributeRef | null,
   instances: MeshInstance[],
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
@@ -988,6 +1018,7 @@ function appendShadowOnlyMeshGroup(
       vertexCount,
       instancedGeometryCount,
       instancedPositionOffset,
+      instancedPositionScale,
     )
     const expandedNormals = normalAttribute && normals
       ? expandNormalValuesForInstances(normalAttribute, normals, 0, vertexCount, instancedGeometryCount)
@@ -1047,6 +1078,7 @@ function appendShadowOnlyMeshGroup(
     group.count,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
   )
   const expandedGroupNormals = normalAttribute && normals
     ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
@@ -1442,6 +1474,7 @@ function appendPoints(
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
   } = geometryExtraction
   const pointUvChannels = geometryExtraction.uvChannels
   const primaryPointUvs = geometryExtraction.uvs
@@ -1471,6 +1504,7 @@ function appendPoints(
       index ?? sourceIndex,
       instancedGeometryCount,
       instancedPositionOffset,
+      instancedPositionScale,
       transform,
       axes,
       camera,
@@ -1573,6 +1607,7 @@ function pointBillboardExpansion(
   index: number[] | null,
   instancedGeometryCount: number,
   instancedPositionOffset: InstancedAttributeRef | null,
+  instancedPositionScale: InstancedAttributeRef | null,
   transform: number[],
   axes: { right: [number, number, number]; up: [number, number, number] },
   camera: ThreeCameraLike | undefined,
@@ -1591,6 +1626,7 @@ function pointBillboardExpansion(
     index,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
     transform,
     axes,
     camera,
@@ -1617,6 +1653,7 @@ function pointBillboardExpansion(
     index,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
     transform,
     axes,
     camera,
@@ -1645,6 +1682,7 @@ function readPointBillboardExpansion(
   index: number[] | null,
   instancedGeometryCount: number,
   instancedPositionOffset: InstancedAttributeRef | null,
+  instancedPositionScale: InstancedAttributeRef | null,
   transform: number[],
   axes: { right: [number, number, number]; up: [number, number, number] },
   camera: ThreeCameraLike | undefined,
@@ -1681,15 +1719,16 @@ function readPointBillboardExpansion(
         attributeComponent(instancedPositionOffset.attribute, offsetIndex, 2, instancedPositionOffset.label),
       ]
       : [0, 0, 0]
+    const scale = instanceScaleComponents(instancedPositionScale, instance)
 
     for (let pointOffset = 0; pointOffset < points.length; pointOffset += 1) {
       const pointIndex = points[pointOffset]
       if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= position.count) continue
 
       const center = transformPoint(transform, [
-        positions[pointIndex * 3] + offset[0],
-        positions[pointIndex * 3 + 1] + offset[1],
-        positions[pointIndex * 3 + 2] + offset[2],
+        positions[pointIndex * 3] * scale[0] + offset[0],
+        positions[pointIndex * 3 + 1] * scale[1] + offset[1],
+        positions[pointIndex * 3 + 2] * scale[2] + offset[2],
       ])
       const worldSize = pointWorldSize(pointSize, center, sizeAttenuation, camera, viewportHeight)
       if (worldSize <= 0) continue
@@ -1736,6 +1775,7 @@ function pointBillboardSignature(
   index: number[] | null,
   instancedGeometryCount: number,
   instancedPositionOffset: InstancedAttributeRef | null,
+  instancedPositionScale: InstancedAttributeRef | null,
   transform: number[],
   axes: { right: [number, number, number]; up: [number, number, number] },
   camera: ThreeCameraLike | undefined,
@@ -1755,6 +1795,7 @@ function pointBillboardSignature(
     groupCount: group.count,
     instancedGeometryCount,
     instancedPositionOffset: attributeSignature(instancedPositionOffset?.attribute),
+    instancedPositionScale: attributeSignature(instancedPositionScale?.attribute),
     transform: transform.slice(0, 16),
     cameraRight: axes.right.slice() as [number, number, number],
     cameraUp: axes.up.slice() as [number, number, number],
@@ -1776,6 +1817,7 @@ function pointBillboardSignature(
 
 function pointBillboardSignatureCacheable(signature: PointBillboardSignature): boolean {
   return attributeSignatureCacheable(signature.instancedPositionOffset)
+    && attributeSignatureCacheable(signature.instancedPositionScale)
     && attributeSignatureCacheable(signature.uvs.attribute)
     && attributeSignatureCacheable(signature.uvs2.attribute)
     && attributeSignatureCacheable(signature.vertexColors)
@@ -1806,6 +1848,7 @@ function samePointBillboardSignature(a: PointBillboardSignature, b: PointBillboa
     && a.groupCount === b.groupCount
     && a.instancedGeometryCount === b.instancedGeometryCount
     && sameAttributeSignature(a.instancedPositionOffset, b.instancedPositionOffset)
+    && sameAttributeSignature(a.instancedPositionScale, b.instancedPositionScale)
     && sameNumberArray(a.transform, b.transform)
     && sameNumberArray(a.cameraRight, b.cameraRight)
     && sameNumberArray(a.cameraUp, b.cameraUp)
@@ -2124,6 +2167,7 @@ function appendLineOrPoints(
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
+    instancedPositionScale,
   } = geometryExtraction
   const vertexCount = position.count
   const indexAttr = index
@@ -2163,7 +2207,7 @@ function appendLineOrPoints(
       const source = sourceIndex
       if (material?.isLineDashedMaterial === true) {
         const lineDistance = getAttribute(geometry, 'lineDistance')
-        const dashed = instancedGeometryCount > 1 || instancedPositionOffset
+        const dashed = instancedGeometryCount > 1 || instancedPositionOffset || instancedPositionScale
           ? dashedLineAttributesForInstances(
             positions,
             uvStreams.uvs,
@@ -2178,6 +2222,7 @@ function appendLineOrPoints(
             material,
             instancedGeometryCount,
             instancedPositionOffset,
+            instancedPositionScale,
           )
           : dashedLineAttributesWithCache(
             cache,
@@ -2226,8 +2271,8 @@ function appendLineOrPoints(
       } else {
         indices = expandLineIndices(source, drawStart, drawEnd, object)
         if (indices.length < 2) continue
-        if (instancedGeometryCount > 1 || instancedPositionOffset) {
-          outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset)
+        if (instancedGeometryCount > 1 || instancedPositionOffset || instancedPositionScale) {
+          outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset, instancedPositionScale)
           outputUvs = uvStreams.uvs ? expandUvChannelForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
           outputSecondaryUvs = uvStreams.uvs2 ? expandUvChannelForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
           indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
@@ -2764,6 +2809,20 @@ function renderableObjectOutsideFrustum(
   return transformedSphereOutsideFrustum(camera, transform, sphere, extraRadius)
 }
 
+function validateInstancedMeshMatrices(object: ThreeObject3DLike): void {
+  const instanceMatrix = object.instanceMatrix
+  if (!instanceMatrix || instanceMatrix.count == null) return
+  const instanceMatrixCount = attributeCount(instanceMatrix, 'InstancedMesh.instanceMatrix')
+  const count = clampInteger(
+    integerCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrixCount),
+    0,
+    instanceMatrixCount,
+  )
+  for (let i = 0; i < count; i += 1) {
+    readMat4Attribute(instanceMatrix, i)
+  }
+}
+
 function renderableMatrixWorldLabel(object: ThreeObject3DLike): string {
   if (object.isBatchedMesh === true) return 'batchedMesh.matrixWorld'
   if (object.isMesh === true) return 'mesh.matrixWorld'
@@ -2778,11 +2837,16 @@ function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, num
 
   if (object.boundingSphere !== undefined) {
     if (object.boundingSphere == null && typeof object.computeBoundingSphere === 'function') {
+      if (object.isInstancedMesh === true) {
+        validateInstancedMeshMatrices(object)
+      }
       object.computeBoundingSphere()
     }
     return object.boundingSphere == null
       ? null
-      : sphereLike(object.boundingSphere, 'object.boundingSphere')
+      : object.isInstancedMesh === true
+        ? instancedMeshBoundingSphere(object)
+        : sphereLike(object.boundingSphere, 'object.boundingSphere')
   }
 
   const geometry = object.geometry
@@ -2793,6 +2857,15 @@ function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, num
   return geometry.boundingSphere == null
     ? null
     : sphereLike(geometry.boundingSphere, 'geometry.boundingSphere')
+}
+
+function instancedMeshBoundingSphere(object: ThreeObject3DLike): { center: [number, number, number]; radius: number } {
+  try {
+    return sphereLike(object.boundingSphere!, 'object.boundingSphere')
+  } catch (error) {
+    validateInstancedMeshMatrices(object)
+    throw error
+  }
 }
 
 function pointBillboardCullRadius(
@@ -3126,14 +3199,24 @@ function instancedOffsetAttribute(geometry: ThreeBufferGeometryLike): InstancedA
   return null
 }
 
+function instancedScaleAttribute(geometry: ThreeBufferGeometryLike): InstancedAttributeRef | null {
+  const names = ['instanceScale', 'scale']
+  for (const name of names) {
+    const attribute = getAttribute(geometry, name)
+    if (isInstancedAttribute(attribute)) return { attribute, label: `geometry.attributes.${name}` }
+  }
+  return null
+}
+
 function expandVec3ValuesForInstances(
   values: number[],
   start: number,
   count: number,
   instanceCount: number,
   offsetAttribute?: InstancedAttributeRef | null,
+  scaleAttribute?: InstancedAttributeRef | null,
 ): number[] {
-  if (instanceCount <= 1 && !offsetAttribute) {
+  if (instanceCount <= 1 && !offsetAttribute && !scaleAttribute) {
     return values.slice(start * 3, (start + count) * 3)
   }
   const out = new Array<number>(count * instanceCount * 3)
@@ -3145,13 +3228,31 @@ function expandVec3ValuesForInstances(
     const ox = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 0, offsetAttribute.label) : 0
     const oy = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 1, offsetAttribute.label) : 0
     const oz = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 2, offsetAttribute.label) : 0
+    const scale = instanceScaleComponents(scaleAttribute, instance)
     for (let vertex = start; vertex < start + count; vertex += 1) {
-      out[dst++] = values[vertex * 3] + ox
-      out[dst++] = values[vertex * 3 + 1] + oy
-      out[dst++] = values[vertex * 3 + 2] + oz
+      out[dst++] = values[vertex * 3] * scale[0] + ox
+      out[dst++] = values[vertex * 3 + 1] * scale[1] + oy
+      out[dst++] = values[vertex * 3 + 2] * scale[2] + oz
     }
   }
   return out
+}
+
+function instanceScaleComponents(
+  scaleAttribute: InstancedAttributeRef | null | undefined,
+  instance: number,
+): [number, number, number] {
+  if (!scaleAttribute) return [1, 1, 1]
+  const sourceIndex = instancedAttributeIndex(scaleAttribute.attribute, instance, scaleAttribute.label)
+  const itemSize = scaleAttribute.attribute.itemSize ?? 1
+  const sx = attributeComponent(scaleAttribute.attribute, sourceIndex, 0, scaleAttribute.label)
+  const sy = itemSize >= 2
+    ? attributeComponent(scaleAttribute.attribute, sourceIndex, 1, scaleAttribute.label)
+    : sx
+  const sz = itemSize >= 3
+    ? attributeComponent(scaleAttribute.attribute, sourceIndex, 2, scaleAttribute.label)
+    : sx
+  return [sx, sy, sz]
 }
 
 function expandVec2ValuesForInstances(values: number[], start: number, count: number, instanceCount: number): number[] {
@@ -3831,6 +3932,7 @@ function dashedLineAttributesForInstances(
   material: { dashSize?: number; gapSize?: number; scale?: number },
   instanceCount: number,
   offsetAttribute: InstancedAttributeRef | null,
+  scaleAttribute: InstancedAttributeRef | null,
 ): DashedLineExpansion {
   const out: DashedLineExpansion = {
     positions: [],
@@ -3845,8 +3947,10 @@ function dashedLineAttributesForInstances(
 
   for (let instance = 0; instance < instanceCount; instance += 1) {
     const instancePositions = offsetAttribute
-      ? offsetVec3ValuesForInstance(positions, offsetAttribute, instance)
-      : positions
+      ? transformVec3ValuesForInstance(positions, offsetAttribute, scaleAttribute, instance)
+      : scaleAttribute
+        ? transformVec3ValuesForInstance(positions, null, scaleAttribute, instance)
+        : positions
     const instanceUvs = uvValuesForInstance(uvChannel, vertexCount, instance)
     const instanceUvs2 = uvValuesForInstance(uvChannel2, vertexCount, instance)
     const instanceColors = vertexColors
@@ -3869,20 +3973,24 @@ function dashedLineAttributesForInstances(
   return out
 }
 
-function offsetVec3ValuesForInstance(
+function transformVec3ValuesForInstance(
   values: number[],
-  offsetAttribute: InstancedAttributeRef,
+  offsetAttribute: InstancedAttributeRef | null,
+  scaleAttribute: InstancedAttributeRef | null,
   instance: number,
 ): number[] {
-  const offsetIndex = instancedAttributeIndex(offsetAttribute.attribute, instance, offsetAttribute.label)
-  const ox = attributeComponent(offsetAttribute.attribute, offsetIndex, 0, offsetAttribute.label)
-  const oy = attributeComponent(offsetAttribute.attribute, offsetIndex, 1, offsetAttribute.label)
-  const oz = attributeComponent(offsetAttribute.attribute, offsetIndex, 2, offsetAttribute.label)
+  const offsetIndex = offsetAttribute
+    ? instancedAttributeIndex(offsetAttribute.attribute, instance, offsetAttribute.label)
+    : 0
+  const ox = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 0, offsetAttribute.label) : 0
+  const oy = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 1, offsetAttribute.label) : 0
+  const oz = offsetAttribute ? attributeComponent(offsetAttribute.attribute, offsetIndex, 2, offsetAttribute.label) : 0
+  const scale = instanceScaleComponents(scaleAttribute, instance)
   const out = new Array<number>(values.length)
   for (let i = 0; i < values.length; i += 3) {
-    out[i] = values[i] + ox
-    out[i + 1] = values[i + 1] + oy
-    out[i + 2] = values[i + 2] + oz
+    out[i] = values[i] * scale[0] + ox
+    out[i + 1] = values[i + 1] * scale[1] + oy
+    out[i + 2] = values[i + 2] * scale[2] + oz
   }
   return out
 }

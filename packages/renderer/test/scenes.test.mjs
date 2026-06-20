@@ -9483,6 +9483,103 @@ test('InstancedBufferGeometry default instanceCount expands per-instance offsets
   assert.ok(mean.b < Math.max(mean.r, mean.g) * 0.5, `instance colors should avoid blue contribution (${mean.b})`)
 })
 
+test('InstancedBufferGeometry expands per-instance scale attributes', () => {
+  const base = new THREE.PlaneGeometry(0.45, 0.45)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.45, 0, 0, 0.45, 0, 0]),
+    3,
+  ))
+  geometry.setAttribute('instanceScale', new THREE.InstancedBufferAttribute(
+    new Float32Array([
+      0.5, 0.5, 1,
+      1.55, 1.55, 1,
+    ]),
+    3,
+  ))
+  geometry.setAttribute('color', new THREE.InstancedBufferAttribute(
+    new Float32Array([1, 0, 0, 0, 1, 0]),
+    3,
+  ))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 128, height: 96 })
+  const redPixels = countRegionPixels(rgba, 128, 96, 0, 0, 128, 96, (r, g, b) => r > 140 && r > g + 60 && r > b + 60)
+  const greenPixels = countRegionPixels(rgba, 128, 96, 0, 0, 128, 96, (r, g, b) => g > 140 && g > r + 60 && g > b + 60)
+  assert.ok(redPixels > 80, `smaller red scaled instance should remain visible (${redPixels})`)
+  assert.ok(greenPixels > redPixels * 3, `larger green scaled instance should cover much more area (${greenPixels} vs ${redPixels})`)
+})
+
+test('InstancedBufferGeometry per-instance scale affects line and point CPU expansion', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const lineGeometry = new THREE.InstancedBufferGeometry()
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.2, 0, 0,
+    0.2, 0, 0,
+  ]), 3))
+  lineGeometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.45, 0.25, 0, 0.45, 0.25, 0]),
+    3,
+  ))
+  lineGeometry.setAttribute('scale', new THREE.InstancedBufferAttribute(
+    new Float32Array([
+      0.5, 1, 1,
+      2.0, 1, 1,
+    ]),
+    3,
+  ))
+  lineGeometry.setAttribute('color', new THREE.InstancedBufferAttribute(
+    new Float32Array([1, 0, 0, 0, 1, 0]),
+    3,
+  ))
+  const lineScene = new THREE.Scene()
+  lineScene.background = new THREE.Color(0, 0, 0)
+  lineScene.add(new THREE.LineSegments(
+    lineGeometry,
+    new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true, linewidth: 4 }),
+  ))
+  const lineRgba = renderRgba(lineScene, camera, { width: 128, height: 96 })
+  const redLinePixels = countRegionPixels(lineRgba, 128, 96, 0, 36, 64, 60, (r, g, b) => r > 140 && r > g + 60 && r > b + 60)
+  const greenLinePixels = countRegionPixels(lineRgba, 128, 96, 64, 36, 128, 60, (r, g, b) => g > 140 && g > r + 60 && g > b + 60)
+  assert.ok(redLinePixels > 0, `smaller red scaled line should remain visible (${redLinePixels})`)
+  assert.ok(greenLinePixels > redLinePixels * 2, `larger green scaled line should cover more pixels (${greenLinePixels} vs ${redLinePixels})`)
+
+  const pointGeometry = new THREE.InstancedBufferGeometry()
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0.45, 0, 0]), 3))
+  pointGeometry.setAttribute('instanceScale', new THREE.InstancedBufferAttribute(
+    new Float32Array([-1, 1]),
+    1,
+  ))
+  pointGeometry.setAttribute('color', new THREE.InstancedBufferAttribute(
+    new Float32Array([1, 0, 0, 0, 1, 0]),
+    3,
+  ))
+  const pointScene = new THREE.Scene()
+  pointScene.background = new THREE.Color(0, 0, 0)
+  pointScene.add(new THREE.Points(
+    pointGeometry,
+    new THREE.PointsMaterial({ color: 0xffffff, vertexColors: true, size: 16, sizeAttenuation: false }),
+  ))
+  const pointRgba = renderRgba(pointScene, camera, { width: 128, height: 96 })
+  const leftPoint = meanRegion(pointRgba, 128, 96, 28, 42, 42, 56)
+  const rightPoint = meanRegion(pointRgba, 128, 96, 86, 42, 100, 56)
+  assert.ok(leftPoint.r > leftPoint.g + 60, `negative scaled point should render red on the left (${leftPoint.r} vs ${leftPoint.g})`)
+  assert.ok(rightPoint.g > rightPoint.r + 60, `positive scaled point should render green on the right (${rightPoint.g} vs ${rightPoint.r})`)
+})
+
 test('InstancedBufferGeometry expands instanced mesh normal attributes', () => {
   const base = new THREE.PlaneGeometry(0.24, 0.45)
   const geometry = new THREE.InstancedBufferGeometry()
@@ -9892,6 +9989,19 @@ test('invalid instanced attributes fail clearly', () => {
   assert.throws(
     () => renderRgba(offsetScene, camera, { width: 64, height: 64 }),
     /geometry\.attributes\.instanceOffset\[0\]\.x must be a finite number/i,
+  )
+
+  const scaleGeometry = new THREE.InstancedBufferGeometry()
+  scaleGeometry.index = base.index
+  scaleGeometry.setAttribute('position', base.getAttribute('position'))
+  scaleGeometry.setAttribute('uv', base.getAttribute('uv'))
+  scaleGeometry.instanceCount = 1
+  scaleGeometry.setAttribute('instanceScale', new THREE.InstancedBufferAttribute(new Float32Array([Number.NaN]), 1))
+  const scaleScene = new THREE.Scene()
+  scaleScene.add(new THREE.Mesh(scaleGeometry, material))
+  assert.throws(
+    () => renderRgba(scaleScene, camera, { width: 64, height: 64 }),
+    /geometry\.attributes\.instanceScale\[0\]\.x must be a finite number/i,
   )
 
   const colorCountGeometry = new THREE.InstancedBufferGeometry()
