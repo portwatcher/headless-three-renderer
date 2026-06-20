@@ -1329,6 +1329,13 @@ export class Renderer {
     return false
   }
 
+  isOccluded(object: unknown): boolean {
+    if (object === null || typeof object !== 'object' || Array.isArray(object)) {
+      throw new TypeError('Renderer.isOccluded object must be an object-like value.')
+    }
+    return false
+  }
+
   getOutputBufferType(): number {
     return UnsignedByteType
   }

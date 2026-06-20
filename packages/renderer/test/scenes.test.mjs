@@ -31449,6 +31449,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.hasFeature('timestamp-query'), false)
   assert.equal(await renderer.hasFeatureAsync('timestamp-query'), false)
   assert.equal(renderer.hasCompatibility('float32-filterable'), false)
+  assert.equal(renderer.isOccluded(scene), false)
   assert.equal(renderer.capabilities.getMaxAnisotropy(), 0)
   assert.equal(renderer.capabilities.getMaxPrecision('highp'), 'highp')
   assert.equal(renderer.capabilities.getMaxPrecision('mediump'), 'mediump')
@@ -31661,6 +31662,10 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderer.hasCompatibility(null),
     /Renderer\.hasCompatibility name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.isOccluded([]),
+    /Renderer\.isOccluded object must be an object-like value/i,
   )
   assert.throws(
     () => renderer.capabilities.getMaxPrecision('ultrap'),
