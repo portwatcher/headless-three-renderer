@@ -33613,6 +33613,18 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   const cachedLightingNode = renderer.lighting.getNode(scene, camera)
   assert.equal(renderer.lighting.getNode(scene, camera), cachedLightingNode)
   assert.deepEqual(cachedLightingNode.getLights(), [])
+  assert.ok(renderer.lighting.weakMap instanceof WeakMap)
+  assert.equal(renderer.lighting.get([scene, camera]), cachedLightingNode)
+  const alternateCamera = makeCamera()
+  const manualLightingNode = renderer.lighting.createNode([scene, camera])
+  assert.strictEqual(renderer.lighting.set([scene, alternateCamera], manualLightingNode), renderer.lighting)
+  assert.equal(renderer.lighting.get([scene, alternateCamera]), manualLightingNode)
+  assert.equal(renderer.lighting.getNode(scene, alternateCamera), manualLightingNode)
+  assert.equal(renderer.lighting.delete([scene, alternateCamera]), true)
+  assert.equal(renderer.lighting.get([scene, alternateCamera]), undefined)
+  assert.notEqual(renderer.lighting.getNode(scene, alternateCamera), manualLightingNode)
+  assert.equal(renderer.lighting.delete([scene, alternateCamera]), true)
+  assert.equal(renderer.lighting.delete([scene, {}]), false)
   const quadLightingNode = renderer.lighting.getNode({ isQuadMesh: true }, null)
   assert.equal(renderer.lighting.getNode({ isQuadMesh: true }, undefined), quadLightingNode)
   assert.equal(quadLightingNode.isLightsNode, true)
@@ -34134,6 +34146,18 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderer.lighting.getNode(null, camera),
     /Renderer\.lighting\.getNode scene must be an object/i,
+  )
+  assert.throws(
+    () => renderer.lighting.get(scene),
+    /Renderer\.lighting\.get keys must be a non-empty array of objects/i,
+  )
+  assert.throws(
+    () => renderer.lighting.set([scene, null], {}),
+    /Renderer\.lighting\.set keys\[1\] must be an object/i,
+  )
+  assert.throws(
+    () => renderer.lighting.delete([]),
+    /Renderer\.lighting\.delete keys must be a non-empty array of objects/i,
   )
   await assert.rejects(
     () => renderer.backend.getArrayBufferAsync({ isStorageBufferAttribute: true }),

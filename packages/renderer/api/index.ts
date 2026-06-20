@@ -1345,26 +1345,55 @@ class RendererLightingNodeState {
 }
 
 class RendererLightingState {
-  private readonly nodes = new WeakMap<object, WeakMap<object, RendererLightingNodeState>>()
-  private readonly defaultLightsNode = new RendererLightingNodeState()
+  readonly weakMap = new WeakMap<object, WeakMap<object, unknown>>()
+  readonly defaultLightsNode = new RendererLightingNodeState()
 
   createNode(lights: unknown[] = []): RendererLightingNodeState {
     return new RendererLightingNodeState(lights)
+  }
+
+  get(keys: unknown): unknown {
+    const keyPath = assertWeakMapKeyArray(keys, 'Renderer.lighting.get keys')
+    let map: WeakMap<object, unknown> | undefined = this.weakMap
+    for (let i = 0; i < keyPath.length; i += 1) {
+      map = map.get(keyPath[i]) as WeakMap<object, unknown> | undefined
+      if (map === undefined) return undefined
+    }
+    return map.get(keyPath[keyPath.length - 1])
+  }
+
+  set(keys: unknown, value: unknown): this {
+    const keyPath = assertWeakMapKeyArray(keys, 'Renderer.lighting.set keys')
+    let map: WeakMap<object, unknown> = this.weakMap
+    for (const key of keyPath) {
+      if (!map.has(key)) {
+        map.set(key, new WeakMap<object, unknown>())
+      }
+      map = map.get(key) as WeakMap<object, unknown>
+    }
+    map.set(keyPath[keyPath.length - 1], value)
+    return this
+  }
+
+  delete(keys: unknown): boolean {
+    const keyPath = assertWeakMapKeyArray(keys, 'Renderer.lighting.delete keys')
+    let map: WeakMap<object, unknown> | undefined = this.weakMap
+    for (let i = 0; i < keyPath.length; i += 1) {
+      map = map.get(keyPath[i]) as WeakMap<object, unknown> | undefined
+      if (map === undefined) return false
+    }
+    return map.delete(keyPath[keyPath.length - 1])
   }
 
   getNode(scene: unknown, camera: unknown): RendererLightingNodeState {
     assertWeakMapKey(scene, 'Renderer.lighting.getNode scene')
     if ((scene as { isQuadMesh?: unknown }).isQuadMesh === true) return this.defaultLightsNode
     assertWeakMapKey(camera, 'Renderer.lighting.getNode camera')
-    let cameraMap = this.nodes.get(scene)
-    if (cameraMap === undefined) {
-      cameraMap = new WeakMap()
-      this.nodes.set(scene, cameraMap)
-    }
-    let node = cameraMap.get(camera)
+    const keys = [scene, camera]
+    let node = this.get(keys) as RendererLightingNodeState | undefined
     if (node === undefined) {
       node = this.createNode()
-      cameraMap.set(camera, node)
+      this.set(keys, node)
     }
     return node
   }
@@ -6609,6 +6638,16 @@ function assertWeakMapKey(value: unknown, label: string): asserts value is objec
   if (value == null || (typeof value !== 'object' && typeof value !== 'function')) {
     throw new TypeError(`${label} must be an object.`)
   }
+}
+
+function assertWeakMapKeyArray(value: unknown, label: string): object[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty array of objects.`)
+  }
+  for (let i = 0; i < value.length; i += 1) {
+    assertWeakMapKey(value[i], `${label}[${i}]`)
+  }
+  return value as object[]
 }
 
 function assertPropertyKey(value: unknown, label: string): asserts value is string {
