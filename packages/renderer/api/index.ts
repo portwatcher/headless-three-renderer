@@ -1791,7 +1791,7 @@ export class Renderer {
   setMRT(mrt: unknown = null): this {
     if (mrt !== null) {
       throw new Error(
-        'Renderer.setMRT() is not supported by @headless-three/renderer because arbitrary native MRT shader outputs are outside the scene-oriented API. Use target texture userData.headlessThreeRenderer.renderMode for the supported color, mask, object-id, and normal auxiliary outputs.',
+        'Renderer.setMRT() is not supported by @headless-three/renderer because arbitrary native MRT shader outputs are outside the scene-oriented API. Use target texture userData.headlessThreeRenderer.renderMode for the supported color, mask, object-id, normal, and depth auxiliary outputs.',
       )
     }
     return this
@@ -2908,7 +2908,9 @@ function toNativeInput(
     rendererCallbackContext,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
-  const meshes = applyRendererToneMapping(applyRenderMode(flattenedMeshes, renderMode), rendererToneMapping)
+  const meshes = renderMode === 'depth'
+    ? flattenedMeshes.map(depthReadbackMesh)
+    : applyRendererToneMapping(applyRenderMode(flattenedMeshes, renderMode), rendererToneMapping)
   const viewport = normalizeOptionalPixelRect(
     effectiveViewport(options),
     size.width,
@@ -2949,11 +2951,11 @@ function toNativeInput(
     backgroundTextureRotation,
     backgroundTextureBlurriness,
     format: options.format ?? (options.target ? 'rgba' : 'png'),
-    outputColorSpace: options.outputColorSpace,
-    toneMapping: rendererToneMapping,
-    toneMappingExposure,
+    outputColorSpace: renderMode === 'depth' ? 'srgb-linear' : options.outputColorSpace,
+    toneMapping: renderMode === 'depth' ? undefined : rendererToneMapping,
+    toneMappingExposure: renderMode === 'depth' ? undefined : toneMappingExposure,
     transmissionResolutionScale: (options as InternalRenderOptions).__headlessThreeRendererTransmissionResolutionScale,
-    sampleCount: resolveSampleCount(options),
+    sampleCount: renderMode === 'depth' ? 1 : resolveSampleCount(options),
     shadowMapType: rendererShadowMapType,
     meshes,
     lights,
@@ -2989,9 +2991,9 @@ function normalizedRenderMode(mode: RenderOptions['renderMode']): RenderMode {
 }
 
 function checkedRenderMode(mode: unknown, label: string): RenderMode {
-  if (mode === 'color' || mode === 'mask' || mode === 'object-id' || mode === 'normal') return mode
+  if (mode === 'color' || mode === 'mask' || mode === 'object-id' || mode === 'normal' || mode === 'depth') return mode
   throw new TypeError(
-    `${label} must be "color", "mask", "object-id", or "normal"; received ${String(mode)}`,
+    `${label} must be "color", "mask", "object-id", "normal", or "depth"; received ${String(mode)}`,
   )
 }
 
@@ -3147,6 +3149,7 @@ function renderModeFragment(mode: Exclude<RenderMode, 'color'>, color: Color4): 
       'return vec4<f32>(view_normal * 0.5 + vec3<f32>(0.5), 1.0);',
     ].join('\n')
   }
+  if (mode === 'depth') return DEPTH_READBACK_FRAGMENT
   return `return vec4<f32>(${formatWgslFloat(color[0])}, ${formatWgslFloat(color[1])}, ${formatWgslFloat(color[2])}, 1.0);`
 }
 
@@ -5263,7 +5266,7 @@ function assertAuxiliaryRenderTargetAttachments(colorTextures: RenderTargetTextu
     const mode = renderTargetTextureRenderMode(colorTextures[i], targetColorTextureLabel(i))
     if (i > 0 && mode == null) {
       throw new Error(
-        `${targetColorTextureLabel(i)} is a secondary color attachment and must declare userData.headlessThreeRenderer.renderMode as "color", "mask", "object-id", or "normal". Arbitrary native MRT shader outputs are not supported yet.`,
+        `${targetColorTextureLabel(i)} is a secondary color attachment and must declare userData.headlessThreeRenderer.renderMode as "color", "mask", "object-id", "normal", or "depth". Arbitrary native MRT shader outputs are not supported yet.`,
       )
     }
   }

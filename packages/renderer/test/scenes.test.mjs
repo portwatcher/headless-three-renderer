@@ -2096,6 +2096,7 @@ test('ArrayCamera supports auxiliary MRT-shaped target attachments', () => {
       { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+      { userData: { headlessThreeRenderer: { renderMode: 'depth' } } },
     ],
   }
 
@@ -2132,6 +2133,10 @@ test('ArrayCamera supports auxiliary MRT-shaped target attachments', () => {
   const normalLeft = meanRegion(target.textures[4].image.data, 64, 64, 8, 20, 24, 44)
   const normalRight = meanRegion(target.textures[4].image.data, 64, 64, 40, 20, 56, 44)
   assert.ok(normalLeft.b > 250 && normalRight.b > 250, `normal attachment should compose both viewports (${normalLeft.b}, ${normalRight.b})`)
+
+  const depthLeft = meanRegion(target.textures[5].image.data, 64, 64, 8, 20, 24, 44)
+  const depthRight = meanRegion(target.textures[5].image.data, 64, 64, 40, 20, 56, 44)
+  assert.ok(depthLeft.r > 0 && depthRight.r > 0, `depth attachment should compose both viewports (${depthLeft.r}, ${depthRight.r})`)
 })
 
 test('malformed ArrayCamera sub-camera containers fail clearly', () => {
@@ -2852,6 +2857,7 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
     { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
     { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
     { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+    { userData: { headlessThreeRenderer: { renderMode: 'depth' } } },
   ]
   const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
   const [positiveX, negativeX] = scene.children
@@ -2865,6 +2871,7 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
   assert.equal(cubeTarget.textures[2].image.length, 6)
   assert.equal(cubeTarget.textures[3].image.length, 6)
   assert.equal(cubeTarget.textures[4].image.length, 6)
+  assert.equal(cubeTarget.textures[5].image.length, 6)
 
   const colorPx = meanRegion(cubeTarget.textures[0].image[0].data, 32, 32, 12, 12, 20, 20)
   const colorNx = meanRegion(cubeTarget.textures[0].image[1].data, 32, 32, 12, 12, 20, 20)
@@ -2903,6 +2910,10 @@ test('CubeCamera supports auxiliary MRT-shaped target attachments', () => {
   const normalPx = meanRegion(cubeTarget.textures[4].image[0].data, 32, 32, 12, 12, 20, 20)
   const normalNx = meanRegion(cubeTarget.textures[4].image[1].data, 32, 32, 12, 12, 20, 20)
   assert.ok(normalPx.b > 250 && normalNx.b > 250, `cube normal attachment should capture face normals (${normalPx.b}, ${normalNx.b})`)
+
+  const depthPx = meanRegion(cubeTarget.textures[5].image[0].data, 32, 32, 12, 12, 20, 20)
+  const depthNx = meanRegion(cubeTarget.textures[5].image[1].data, 32, 32, 12, 12, 20, 20)
+  assert.ok(depthPx.r > 0 && depthNx.r > 0, `cube depth attachment should capture visible faces (${depthPx.r}, ${depthNx.r})`)
 })
 
 test('CubeCamera renders active mip target faces', () => {
@@ -3221,6 +3232,23 @@ test('renderMode normal outputs view-space normal colors', () => {
   assert.ok(background.r < 2 && background.g < 2 && background.b < 2, `normal background should be black (${background.r}, ${background.g}, ${background.b})`)
 })
 
+test('renderMode depth outputs normalized depth grayscale', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 0, 0)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ color: 0x0088ff })))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64, renderMode: 'depth' })
+  const center = meanRegion(rgba, 64, 64, 28, 28, 36, 36)
+  const corner = meanRegion(rgba, 64, 64, 0, 0, 8, 8)
+  assert.ok(center.r > 150 && center.g > 150 && center.b > 150, `depth center should encode visible geometry (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(Math.abs(center.r - center.g) < 2 && Math.abs(center.r - center.b) < 2, `depth output should be grayscale (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(corner.r < 2 && corner.g < 2 && corner.b < 2, `depth background should be black (${corner.r}, ${corner.g}, ${corner.b})`)
+})
+
 test('renderMode object-id target includes reverse lookup metadata', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -3292,7 +3320,7 @@ test('renderMode auxiliary passes bypass post-processing', () => {
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
 
-  for (const renderMode of ['mask', 'object-id', 'normal']) {
+  for (const renderMode of ['mask', 'object-id', 'normal', 'depth']) {
     const base = renderRgba(scene, camera, { width: 64, height: 64, renderMode })
     const processed = renderRgba(scene, camera, {
       width: 64,
@@ -3330,7 +3358,7 @@ test('renderMode auxiliary passes preserve texture alpha cutouts', () => {
   ]
 
   for (const [label, makeDiscardedMaterial, makeVisibleMaterial] of cases) {
-    for (const renderMode of ['mask', 'object-id', 'normal']) {
+    for (const renderMode of ['mask', 'object-id', 'normal', 'depth']) {
       const scene = new THREE.Scene()
       const discarded = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), makeDiscardedMaterial())
       const visible = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), makeVisibleMaterial())
@@ -3347,8 +3375,10 @@ test('renderMode auxiliary passes preserve texture alpha cutouts', () => {
         assert.ok(rightMean.r > 250 && rightMean.g > 250 && rightMean.b > 250, `mask should keep opaque ${label} pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
       } else if (renderMode === 'object-id') {
         assertRgbClose(rightMean, objectIdBytes(visible.id + 1), `object-id should keep opaque ${label} pixels`)
-      } else {
+      } else if (renderMode === 'normal') {
         assert.ok(rightMean.r > 120 && rightMean.g > 120 && rightMean.b > 250, `normal should keep opaque ${label} pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+      } else {
+        assert.ok(rightMean.r > 150 && rightMean.g > 150 && rightMean.b > 150, `depth should keep opaque ${label} pixels (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
       }
     }
   }
@@ -3372,7 +3402,7 @@ test('renderMode auxiliary passes preserve alphaHash cutouts', () => {
     return renderRgba(scene, camera, { width: 64, height: 64, renderMode })
   }
 
-  for (const renderMode of ['mask', 'object-id', 'normal']) {
+  for (const renderMode of ['mask', 'object-id', 'normal', 'depth']) {
     const opaque = renderAuxiliary(renderMode, false)
     const hashed = renderAuxiliary(renderMode, true)
     const visiblePixel = (r, g, b) => r > 0 || g > 0 || b > 0
@@ -3390,7 +3420,7 @@ test('invalid renderMode values fail clearly', () => {
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial()))
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 32, height: 32, renderMode: 'normals' }),
-    /options\.renderMode must be "color", "mask", "object-id", or "normal"/i,
+    /options\.renderMode must be "color", "mask", "object-id", "normal", or "depth"/i,
   )
 })
 
@@ -23494,6 +23524,7 @@ test('MRT-shaped targets can request auxiliary render-mode attachments', () => {
       { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
       { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+      { userData: { headlessThreeRenderer: { renderMode: 'depth' } } },
     ],
   }
   renderToTarget(scene, camera, target, {
@@ -23526,6 +23557,11 @@ test('MRT-shaped targets can request auxiliary render-mode attachments', () => {
 
   const normalCenter = meanRegion(target.textures[4].image.data, 64, 64, 28, 28, 36, 36)
   assert.ok(normalCenter.r > 120 && normalCenter.b > 200, `normal attachment should encode the tilted view normal (${normalCenter.r}, ${normalCenter.g}, ${normalCenter.b})`)
+
+  const depthCenter = meanRegion(target.textures[5].image.data, 64, 64, 28, 28, 36, 36)
+  const depthCorner = meanRegion(target.textures[5].image.data, 64, 64, 0, 0, 8, 8)
+  assert.ok(depthCenter.r > depthCorner.r + 20, `depth attachment should encode nearer mesh depth over background (${depthCenter.r} vs ${depthCorner.r})`)
+  assert.ok(depthCenter.r > 150, `depth attachment center should be bright for the near mesh (${depthCenter.r})`)
 
   const countedTarget = new THREE.WebGLRenderTarget(64, 64, { count: 2 })
   countedTarget.textures[1].userData.headlessThreeRenderer = { renderMode: 'mask' }
@@ -23731,7 +23767,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: { source: { data: 'bad' } } }, /target\.texture\.source\.data must be an image-like object/i, 'texture source data container'],
     [{ texture: [{}, {}] }, /secondary color attachment.*renderMode/i, 'texture array'],
     [{ textures: [{}, {}] }, /secondary color attachment.*renderMode/i, 'textures array'],
-    [{ textures: [{}, { userData: { headlessThreeRenderer: { renderMode: 'depth' } } }] }, /target color texture\[1\]\.userData\.headlessThreeRenderer\.renderMode must be "color", "mask", "object-id", or "normal"/i, 'secondary renderMode value'],
+    [{ textures: [{}, { userData: { headlessThreeRenderer: { renderMode: 'albedo' } } }] }, /target color texture\[1\]\.userData\.headlessThreeRenderer\.renderMode must be "color", "mask", "object-id", "normal", or "depth"/i, 'secondary renderMode value'],
     [{ textures: [{}, { userData: { headlessThreeRenderer: 'mask' } }] }, /target color texture\[1\]\.userData\.headlessThreeRenderer must be an object/i, 'secondary renderMode hints'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'color array texture'],
     [{ depthTexture: new THREE.Data3DTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target\.depthTexture uses an array or 3D texture/i, 'depth 3D texture'],

@@ -4,7 +4,7 @@
 
 export type RenderOutputFormat = 'png' | 'rgba'
 export type RenderOutputColorSpace = 'srgb' | 'srgb-linear' | 'linear-srgb' | 'linearsrgb' | 'linear'
-export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal'
+export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal' | 'depth'
 export type RenderAnimationLoopCallback = (time: number, frame?: unknown) => void
 export type RendererPowerPreferenceLike = 'default' | 'high-performance' | 'low-power'
 
