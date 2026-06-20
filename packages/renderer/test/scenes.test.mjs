@@ -11,6 +11,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
@@ -2534,6 +2535,37 @@ test('EffectComposer ShaderPass CopyShader copies read buffer output', () => {
   renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
   const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
   assert.ok(mean.r > mean.b + 80, `ShaderPass CopyShader target should contain copied red output (${mean.r} vs ${mean.b})`)
+})
+
+test('EffectComposer OutputPass copies read buffer output', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+  camera.position.z = 2
+
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  renderer.toneMapping = THREE.NoToneMapping
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  composer.addPass(new RenderPass(scene, camera))
+  composer.addPass(new OutputPass())
+
+  composer.render(0)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `OutputPass target should contain copied red output (${mean.r} vs ${mean.b})`)
 })
 
 test('EffectComposer TexturePass renders standard CopyShader texture input', () => {

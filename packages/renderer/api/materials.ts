@@ -2121,13 +2121,18 @@ interface CopyShaderMaterialInfo {
 }
 
 function copyShaderMaterialInfo(material: ThreeMaterialLike | undefined): CopyShaderMaterialInfo | null {
-  if (!material || shaderMaterialKind(material) !== 'ShaderMaterial') return null
-  if (!isCopyShaderFragment(material.fragmentShader)) return null
+  if (!material) return null
+  const kind = shaderMaterialKind(material)
+  if (kind !== 'ShaderMaterial' && kind !== 'RawShaderMaterial') return null
+  if (kind === 'ShaderMaterial' && !isCopyShaderFragment(material.fragmentShader)) return null
+  if (kind === 'RawShaderMaterial' && !isOutputShaderFragment(material.fragmentShader)) return null
   const uniforms = material.uniforms
   if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return null
   return {
     texture: uniformValue((uniforms as Record<string, unknown>).tDiffuse),
-    opacity: uniformValue((uniforms as Record<string, unknown>).opacity) ?? 1,
+    opacity: kind === 'ShaderMaterial'
+      ? uniformValue((uniforms as Record<string, unknown>).opacity) ?? 1
+      : 1,
   }
 }
 
@@ -2143,6 +2148,15 @@ function isCopyShaderFragment(fragmentShader: unknown): boolean {
     compact.includes('uniformsampler2DtDiffuse;') &&
     compact.includes('texture2D(tDiffuse,vUv)') &&
     compact.includes('gl_FragColor=opacity*texel;')
+}
+
+function isOutputShaderFragment(fragmentShader: unknown): boolean {
+  if (typeof fragmentShader !== 'string') return false
+  const compact = fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('gl_FragColor=texture2D(tDiffuse,vUv);') &&
+    compact.includes('tonemapping_pars_fragment') &&
+    compact.includes('colorspace_pars_fragment')
 }
 
 export function extractTextureData(
