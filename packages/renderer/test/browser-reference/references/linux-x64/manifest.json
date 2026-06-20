@@ -112,6 +112,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-depth-material-displacement-map.png",
+      "name": "mesh-depth-material-displacement-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-depth-material-wireframe.png",
       "name": "mesh-depth-material-wireframe",
       "width": 96,
@@ -121,6 +128,20 @@
     {
       "file": "mesh-normal-material-flat.png",
       "name": "mesh-normal-material-flat",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-object-space-normal-map.png",
+      "name": "mesh-normal-material-object-space-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-bump-map.png",
+      "name": "mesh-normal-material-bump-map",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"

@@ -2157,7 +2157,6 @@ function meshDepthDisplacementMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options)
       flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
@@ -2465,7 +2464,6 @@ function meshNormalMaterialObjectSpaceNormalMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const tangent = renderer.render(tangentScene, camera, options)
       tangentCenter = meanRegion(tangent, options.width, 32, 32, 64, 64)
@@ -2519,7 +2517,6 @@ function meshNormalMaterialBumpMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options).slice()
       const bumped = renderer.render(bumpedScene, camera, options)
