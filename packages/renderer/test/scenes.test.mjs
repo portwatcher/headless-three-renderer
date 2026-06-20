@@ -31899,7 +31899,7 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
   }
 })
 
-test('Renderer resource init hooks are validated no-op compatibility hooks', () => {
+test('Renderer resource init hooks are validated no-op compatibility hooks', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
   scene.add(new THREE.Mesh(
@@ -31913,6 +31913,8 @@ test('Renderer resource init hooks are validated no-op compatibility hooks', () 
 
   assert.equal(renderer.initRenderTarget(target), undefined)
   assert.equal(renderer.initTexture(texture), undefined)
+  assert.equal(renderer.hasInitialized(), true)
+  assert.equal(await renderer.initTextureAsync(texture), undefined)
 
   const out = renderer.renderToTarget(scene, camera, target, {
     width: 32,
@@ -31938,6 +31940,10 @@ test('Renderer resource init hooks are validated no-op compatibility hooks', () 
   )
   assert.throws(
     () => renderer.initTexture([]),
+    /Renderer\.initTexture texture must be a texture-like object/i,
+  )
+  await assert.rejects(
+    () => renderer.initTextureAsync(null),
     /Renderer\.initTexture texture must be a texture-like object/i,
   )
 })

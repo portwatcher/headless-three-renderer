@@ -1519,6 +1519,14 @@ export class Renderer {
     assertThreeTextureLike(texture, 'Renderer.initTexture texture')
   }
 
+  async initTextureAsync(texture: ThreeTextureLike): Promise<void> {
+    this.initTexture(texture)
+  }
+
+  hasInitialized(): boolean {
+    return true
+  }
+
   setRenderTargetTextures(renderTarget: RenderTargetLike, colorTexture: unknown, depthTexture: unknown = null): never {
     assertRenderTargetLike(renderTarget, 'Renderer.setRenderTargetTextures renderTarget')
     validateUnsupportedRenderTargetOptions(renderTarget)
