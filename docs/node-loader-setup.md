@@ -71,7 +71,10 @@ avatar manually.
 For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
 configured `{ loader, manager, encodedImages }` bundle so callers can add more
 handlers or reuse the loader directly. Loader `rootDir` values accept relative
-paths, absolute paths, and `file://` directory URLs.
+paths, absolute paths, and `file://` directory URLs. The helper also installs
+the narrow WebP `Image` support probe that Three.js `GLTFLoader` uses for
+`EXT_texture_webp` capability detection; image bytes are still loaded through
+the encoded-buffer handlers rather than a DOM image decoder.
 
 Local helper paths are normalized through `resolveLocalAssetPath(url, rootDir)`.
 Relative paths resolve under relative, absolute, or `file://` `rootDir`
@@ -175,7 +178,8 @@ Only install polyfills that your loader path actually uses:
 - `createImageBitmap`: needed if you want `GLTFLoader` to use
   `ImageBitmapLoader` for embedded images.
 - DOM `Image`/`document.createElementNS`: needed only when falling back to
-  Three.js `TextureLoader`/`ImageLoader`.
+  Three.js `TextureLoader`/`ImageLoader`; the exported helpers already provide
+  the minimal WebP support probe needed by `EXT_texture_webp` detection.
 
 If a polyfilled image loader returns browser image objects instead of encoded
 bytes or raw one-channel, two-channel, RGB, or RGBA data, normalize those

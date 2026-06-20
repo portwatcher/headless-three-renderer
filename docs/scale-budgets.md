@@ -12,7 +12,9 @@ target platform and GPU backend.
 | Nested scene graph traversal | 2,048 transform groups and 256 meshes | A 16 x 16 grid renders visible meshes below eight-level `Object3D` transform chains to exercise hierarchy traversal and world-matrix propagation. |
 | Mixed mesh/texture/light scene | 144 meshes | A 12 x 12 grid of transformed box meshes renders with ten unique raw textures and supported punctual lights. |
 | Instanced mesh expansion | 7,056 instances | A single `InstancedMesh` renders an 84 x 84 grid with per-instance matrices and colors. |
+| InstancedBufferGeometry expansion | 4,096 instances | A single mapped mesh uses `InstancedBufferGeometry` with per-instance offset, scale, color, normal, and UV attributes. |
 | BatchedMesh expansion | 2,048 packed instances | A single `BatchedMesh` renders a 64 x 32 grid using one packed plane geometry plus per-instance matrices and colors. |
+| CPU deformation baking | 4,096 vertices | A morphed `SkinnedMesh` only enters the frame after both morph target deltas and skeletal transforms are baked on the CPU. |
 | Points billboard expansion | 4,096 points | A single `Points` object renders a 64 x 64 grid with per-point colors through CPU billboard expansion. |
 | Points object count | 2,048 `Points` objects | A 64 x 32 grid of independently transformed single-point objects renders with shared geometry and a small material set. |
 | Sprite billboard expansion | 2,048 sprites | A 64 x 32 grid of `Sprite` objects renders with shared colored `SpriteMaterial` instances through CPU billboard expansion. |
@@ -42,7 +44,7 @@ published native packages:
 
 ## Interpreting The Numbers
 
-- The mesh, hierarchy, texture, and light budgets above are regression floors. Passing them means the supported scene breadth remains covered, not that production scenes must stay under those counts.
+- The mesh, hierarchy, deformation, texture, and light budgets above are regression floors. Passing them means the supported scene breadth remains covered, not that production scenes must stay under those counts.
 - The direct light limit is a real current renderer limit: more than 64 visible non-ambient lights fail clearly until native light arrays are expanded.
 - Texture memory depends on decoded image dimensions, not just texture count. The CI texture-heavy scenes and generated NodePerformanceTest-shaped glTF graph use tiny 4 x 4 raw and encoded textures to exercise many unique bindings, loader objects, and native image decode paths without creating a large memory benchmark; a separate 512 x 512 raw texture test covers a larger single decoded upload.
 - For production workloads, benchmark representative scenes on each target OS, CPU architecture, GPU backend, and output size. Track render time, peak RSS, and whether textures are encoded buffers or already-decoded RGBA data.
