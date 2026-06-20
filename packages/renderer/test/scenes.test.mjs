@@ -34012,6 +34012,33 @@ test('Renderer copyFramebufferToTexture copies active framebuffer source rectang
   assert.deepEqual(mipPixel(0, 0), sourcePixel(0, 2, 5))
   assert.deepEqual(mipPixel(1, 1), sourcePixel(1, 3, 5))
   assert.ok(destination.version > versionAfterRectangleCopy, 'destination texture should be marked dirty after framebuffer mip copy')
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+  const actualTarget = new THREE.WebGLRenderTarget(8, 6)
+  renderToTarget(scene, camera, actualTarget, { outputColorSpace: THREE.LinearSRGBColorSpace })
+  renderer.setRenderTarget(actualTarget)
+
+  const actualDestinationData = new Uint8Array(3 * 2 * 4)
+  actualDestinationData.fill(7)
+  const actualDestination = new THREE.DataTexture(actualDestinationData, 3, 2, THREE.RGBAFormat)
+  const actualDestinationVersion = actualDestination.version
+  renderer.copyFramebufferToTexture(actualDestination, { x: 2, y: 1, width: 3, height: 2 })
+
+  const expectedActualCopy = new Uint8Array(3 * 2 * 4)
+  for (let row = 0; row < 2; row += 1) {
+    const sourceStart = (((1 + row) * 8) + 2) * 4
+    expectedActualCopy.set(actualTarget.data.subarray(sourceStart, sourceStart + 3 * 4), row * 3 * 4)
+  }
+  assert.deepEqual(actualDestination.image.data, expectedActualCopy)
+  assert.ok(actualDestination.version > actualDestinationVersion, 'destination texture should be marked dirty after actual render target framebuffer copy')
   renderer.setRenderTarget(null)
 })
 
