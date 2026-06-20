@@ -32644,7 +32644,7 @@ test('Renderer copyFramebufferToTexture copies active framebuffer source rectang
   const destination = new THREE.DataTexture(destinationData, 3, 3, THREE.RGBAFormat)
   const initialVersion = destination.version
 
-  renderer.copyFramebufferToTexture(destination, new THREE.Vector2(1, 1))
+  renderer.copyFramebufferToTexture(destination, new THREE.Vector2(1.8, 1.2))
 
   function pixel(x, y) {
     const offset = (y * 3 + x) * 4
@@ -32653,7 +32653,7 @@ test('Renderer copyFramebufferToTexture copies active framebuffer source rectang
 
   assert.deepEqual(pixel(0, 0), sourcePixel(1, 1, 5))
   assert.deepEqual(pixel(2, 2), sourcePixel(3, 3, 5))
-  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after framebuffer copy')
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after floored framebuffer position copy')
 
   destination.image.data.fill(9)
   const versionAfterVector2Copy = destination.version

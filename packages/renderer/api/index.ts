@@ -5062,14 +5062,14 @@ function textureCopyFramebufferSourceRegion(
   } else if (Array.isArray(value)) {
     region = value.length >= 4
       ? {
-          x: textureCopyInteger(value[0], `${label}.x`),
-          y: textureCopyInteger(value[1], `${label}.y`),
-          width: textureCopyPositiveInteger(value[2], `${label}.width`),
-          height: textureCopyPositiveInteger(value[3], `${label}.height`),
+          x: textureCopyFlooredInteger(value[0], `${label}.x`),
+          y: textureCopyFlooredInteger(value[1], `${label}.y`),
+          width: textureCopyPositiveFlooredInteger(value[2], `${label}.width`),
+          height: textureCopyPositiveFlooredInteger(value[3], `${label}.height`),
         }
       : {
-          x: textureCopyInteger(value[0], `${label}.x`),
-          y: textureCopyInteger(value[1], `${label}.y`),
+          x: textureCopyFlooredInteger(value[0], `${label}.x`),
+          y: textureCopyFlooredInteger(value[1], `${label}.y`),
           width: defaultWidth,
           height: defaultHeight,
         }
@@ -5084,8 +5084,8 @@ function textureCopyFramebufferSourceRegion(
       width?: unknown
       height?: unknown
     }
-    const x = textureCopyInteger(candidate.x, `${label}.x`)
-    const y = textureCopyInteger(candidate.y, `${label}.y`)
+    const x = textureCopyFlooredInteger(candidate.x, `${label}.x`)
+    const y = textureCopyFlooredInteger(candidate.y, `${label}.y`)
     const isVector2 = candidate.isVector2 === true
     const isVector4 = candidate.isVector4 === true
     const width = isVector2 ? undefined : (isVector4 ? candidate.z : candidate.width ?? candidate.z)
@@ -5095,8 +5095,8 @@ function textureCopyFramebufferSourceRegion(
       : {
           x,
           y,
-          width: textureCopyPositiveInteger(width, `${label}.width`),
-          height: textureCopyPositiveInteger(height, `${label}.height`),
+          width: textureCopyPositiveFlooredInteger(width, `${label}.width`),
+          height: textureCopyPositiveFlooredInteger(height, `${label}.height`),
         }
   } else {
     throw new TypeError(`${label} must be a vector, rectangle object, array, or null.`)
@@ -5135,8 +5135,23 @@ function textureCopyInteger(value: unknown, label: string): number {
   return value as number
 }
 
+function textureCopyFlooredInteger(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  return Math.floor(value)
+}
+
 function textureCopyPositiveInteger(value: unknown, label: string): number {
   const integer = textureCopyInteger(value, label)
+  if (integer <= 0) {
+    throw new RangeError(`${label} must be a positive integer.`)
+  }
+  return integer
+}
+
+function textureCopyPositiveFlooredInteger(value: unknown, label: string): number {
+  const integer = textureCopyFlooredInteger(value, label)
   if (integer <= 0) {
     throw new RangeError(`${label} must be a positive integer.`)
   }
