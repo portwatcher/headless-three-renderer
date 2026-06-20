@@ -31225,6 +31225,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.state.scissor(0, 0, 8, 8), undefined)
   assert.equal(renderer.state.viewport({ x: 0, y: 0, width: 16, height: 16 }), undefined)
   assert.equal(renderer.state.viewport(0, 0, 16, 16), undefined)
+  assert.equal(renderer.state.resetVertexState(), undefined)
   assert.equal(renderer.state.reset(), undefined)
   assert.equal(renderer.state.unbindTexture(), undefined)
   assert.throws(
@@ -31297,6 +31298,8 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
     ['bindFramebuffer', /WebGL framebuffer binding/i],
     ['drawBuffers', /WebGL draw-buffer binding/i],
     ['useProgram', /WebGL program binding/i],
+    ['setMRTBlending', /WebGL MRT indexed blending/i],
+    ['setVertexState', /WebGL vertex-array binding/i],
     ['activeTexture', /WebGL texture-unit binding/i],
     ['bindTexture', /WebGL texture binding/i],
     ['compressedTexImage2D', /WebGL texture uploads/i],

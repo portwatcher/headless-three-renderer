@@ -820,6 +820,18 @@ class RendererState {
     rendererStateBoolean(scissorTest, 'Renderer.state.setScissorTest scissorTest')
   }
 
+  setMRTBlending(): never {
+    throwUnsupportedRendererStateWebGl('setMRTBlending', 'WebGL MRT indexed blending')
+  }
+
+  setVertexState(): never {
+    throwUnsupportedRendererStateWebGl('setVertexState', 'WebGL vertex-array binding')
+  }
+
+  resetVertexState(): void {
+    // Native vertex state is rebuilt while preparing each render pass.
+  }
+
   setColorMask(colorMask: unknown): void {
     this.buffers.color.setMask(colorMask)
   }
