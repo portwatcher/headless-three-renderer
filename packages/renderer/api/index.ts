@@ -670,6 +670,106 @@ class RendererBackendState {
 
   finishCompute(_computeGroup?: unknown): void {}
 
+  draw(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.draw', 'backend draw commands')
+  }
+
+  compute(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.compute', 'backend compute dispatch')
+  }
+
+  createProgram(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createProgram', 'backend shader program creation')
+  }
+
+  destroyProgram(): void {}
+
+  createBindings(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createBindings', 'backend bind-group creation')
+  }
+
+  updateBindings(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.updateBindings', 'backend bind-group updates')
+  }
+
+  updateBinding(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.updateBinding', 'backend buffer binding updates')
+  }
+
+  createRenderPipeline(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createRenderPipeline', 'backend render pipeline creation')
+  }
+
+  createComputePipeline(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createComputePipeline', 'backend compute pipeline creation')
+  }
+
+  needsRenderUpdate(_renderObject?: unknown): boolean {
+    return false
+  }
+
+  getRenderCacheKey(_renderObject?: unknown): string {
+    return 'headless-three-renderer'
+  }
+
+  createNodeBuilder(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createNodeBuilder', 'Three.js shader node builders')
+  }
+
+  createSampler(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createSampler', 'backend sampler creation')
+  }
+
+  destroySampler(): void {}
+
+  createDefaultTexture(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createDefaultTexture', 'backend default texture creation')
+  }
+
+  createTexture(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createTexture', 'backend texture creation')
+  }
+
+  updateTexture(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.updateTexture', 'backend texture uploads')
+  }
+
+  generateMipmaps(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.generateMipmaps', 'backend mipmap generation')
+  }
+
+  destroyTexture(): void {}
+
+  copyTextureToBuffer(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.copyTextureToBuffer', 'backend texture-to-buffer readback')
+  }
+
+  copyTextureToTexture(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.copyTextureToTexture', 'backend texture copies')
+  }
+
+  copyFramebufferToTexture(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.copyFramebufferToTexture', 'backend framebuffer-to-texture copies')
+  }
+
+  createAttribute(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createAttribute', 'backend vertex attribute buffer creation')
+  }
+
+  createIndexAttribute(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createIndexAttribute', 'backend index buffer creation')
+  }
+
+  createStorageAttribute(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createStorageAttribute', 'backend storage buffer creation')
+  }
+
+  updateAttribute(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.updateAttribute', 'backend attribute buffer updates')
+  }
+
+  destroyAttribute(): void {}
+
   getDomElement(): RendererDomElementState {
     return this.renderer.domElement
   }
@@ -5211,6 +5311,12 @@ function unsupportedTextureBindingError(method: string): Error {
 function unsupportedInternalRenderDispatchError(method: string): Error {
   return new Error(
     `${method}() is not supported by @headless-three/renderer because CommonRenderer internal render pipeline dispatch depends on backend render contexts, render lists, nodes, pipelines, and bindings that are outside the scene-oriented API. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().`,
+  )
+}
+
+function unsupportedBackendOperationError(method: string, operation: string): Error {
+  return new Error(
+    `${method}() is not supported by @headless-three/renderer because ${operation} would require backend WebGL/WebGPU resource state that is outside the scene-oriented API. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().`,
   )
 }
 

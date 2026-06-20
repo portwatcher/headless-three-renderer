@@ -32899,6 +32899,12 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   renderer.backend.set(backendKey, { reset: false })
   renderer.backend.dispose()
   assert.equal(renderer.backend.has(backendKey), false)
+  assert.equal(renderer.backend.destroyProgram({}), undefined)
+  assert.equal(renderer.backend.destroySampler({}), undefined)
+  assert.equal(renderer.backend.destroyTexture({}), undefined)
+  assert.equal(renderer.backend.destroyAttribute({}), undefined)
+  assert.equal(renderer.backend.needsRenderUpdate({}), false)
+  assert.equal(renderer.backend.getRenderCacheKey({}), 'headless-three-renderer')
   assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
   assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
   assert.equal(renderer.extensions.init(), undefined)
@@ -33251,6 +33257,34 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
     () => renderer.backend.isOccluded({}, null),
     /Renderer\.isOccluded object must be an object-like value/i,
   )
+  for (const method of [
+    'draw',
+    'compute',
+    'createProgram',
+    'createBindings',
+    'updateBindings',
+    'updateBinding',
+    'createRenderPipeline',
+    'createComputePipeline',
+    'createNodeBuilder',
+    'createSampler',
+    'createDefaultTexture',
+    'createTexture',
+    'updateTexture',
+    'generateMipmaps',
+    'copyTextureToBuffer',
+    'copyTextureToTexture',
+    'copyFramebufferToTexture',
+    'createAttribute',
+    'createIndexAttribute',
+    'createStorageAttribute',
+    'updateAttribute',
+  ]) {
+    assert.throws(
+      () => renderer.backend[method]({}),
+      new RegExp(`Renderer\\.backend\\.${method}\\(\\) is not supported.*WebGL\\/WebGPU resource state.*Renderer\\.render\\(\\) or renderToTarget\\(\\)`, 'i'),
+    )
+  }
   await assert.rejects(
     () => renderer.backend.getArrayBufferAsync({ isStorageBufferAttribute: true }),
     /Renderer\.backend\.getArrayBufferAsync\(\) is not supported.*storage-buffer GPU readback.*Renderer\.readRenderTargetPixels\(\)/i,
