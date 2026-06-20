@@ -645,6 +645,8 @@ export interface RenderTargetImageLike {
 }
 
 export interface RenderTargetLike {
+  isRenderTarget?: boolean
+  isWebGLRenderTarget?: boolean
   width?: number
   height?: number
   viewport?: RenderPixelRectLike | null

@@ -23094,6 +23094,75 @@ test('renderToTarget populates a target-like object with raw RGBA', () => {
   assert.equal(singleAttachmentMrtTarget.textures[0].needsUpdate, true)
 })
 
+test('render targets write actual Three.js RenderTarget classes', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function assertThreeTargetWrite(label, target, width, height, initialTextureVersion, initialSourceVersion) {
+    assert.equal(target.width, width, `${label} should preserve target width`)
+    assert.equal(target.height, height, `${label} should preserve target height`)
+    assert.ok(Buffer.isBuffer(target.data), `${label} should receive Buffer-backed target data`)
+    assert.equal(target.data.length, width * height * 4, `${label} should receive RGBA8 data`)
+    assert.strictEqual(target.texture, target.textures[0], `${label} texture should remain the primary texture`)
+    assert.strictEqual(target.texture.source.data, target.texture.image, `${label} source.data should remain the texture image object`)
+    assert.strictEqual(target.texture.image.data, target.data, `${label} image should reference target.data`)
+    assert.strictEqual(target.texture.source.data.data, target.data, `${label} source image should reference target.data`)
+    assert.equal(target.texture.image.width, width, `${label} image width should update`)
+    assert.equal(target.texture.image.height, height, `${label} image height should update`)
+    assert.equal(target.texture.image.depth, 1, `${label} image depth should keep Three.js target shape`)
+    assert.ok(target.texture.version > initialTextureVersion, `${label} texture version should advance`)
+    assert.ok(target.texture.source.version > initialSourceVersion, `${label} texture source version should advance`)
+
+    const center = ((Math.floor(height / 2) * width) + Math.floor(width / 2)) * 4
+    assert.ok(
+      target.data[center] > target.data[center + 1] + 80 && target.data[center] > target.data[center + 2] + 80,
+      `${label} should capture the red mesh (${target.data[center]}, ${target.data[center + 1]}, ${target.data[center + 2]})`,
+    )
+
+    const readback = Buffer.alloc(target.data.length)
+    new Renderer().readRenderTargetPixels(target, 0, 0, width, height, readback)
+    assert.deepEqual(readback, target.data, `${label} should be readable through Renderer.readRenderTargetPixels`)
+  }
+
+  const directTarget = new THREE.RenderTarget(17, 9)
+  const directTextureVersion = directTarget.texture.version
+  const directSourceVersion = directTarget.texture.source.version
+  assert.strictEqual(
+    renderToTarget(scene, camera, directTarget, { outputColorSpace: THREE.LinearSRGBColorSpace }),
+    directTarget,
+  )
+  assertThreeTargetWrite('THREE.RenderTarget renderToTarget', directTarget, 17, 9, directTextureVersion, directSourceVersion)
+
+  const optionsTarget = new THREE.RenderTarget(11, 6)
+  const optionsTextureVersion = optionsTarget.texture.version
+  const optionsSourceVersion = optionsTarget.texture.source.version
+  const optionsReturned = new Renderer().render(scene, camera, {
+    target: optionsTarget,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  assert.strictEqual(optionsReturned, optionsTarget.data)
+  assertThreeTargetWrite('THREE.RenderTarget options.target', optionsTarget, 11, 6, optionsTextureVersion, optionsSourceVersion)
+
+  const rendererTarget = new THREE.WebGLRenderTarget(13, 7)
+  const rendererTextureVersion = rendererTarget.texture.version
+  const rendererSourceVersion = rendererTarget.texture.source.version
+  const renderer = new Renderer()
+  renderer.setRenderTarget(rendererTarget)
+  const rendererReturned = renderer.render(scene, camera, { outputColorSpace: THREE.LinearSRGBColorSpace })
+  assert.strictEqual(rendererReturned, rendererTarget.data)
+  assert.strictEqual(renderer.getRenderTarget(), rendererTarget)
+  assertThreeTargetWrite('THREE.WebGLRenderTarget Renderer.setRenderTarget', rendererTarget, 13, 7, rendererTextureVersion, rendererSourceVersion)
+  renderer.setRenderTarget(null)
+})
+
 test('Renderer readRenderTargetPixels reads stored target color data', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
