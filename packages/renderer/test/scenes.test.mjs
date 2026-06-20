@@ -33658,6 +33658,15 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   const externalFramebuffer = {}
   const source = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
   const destination = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat)
+  const compressedTexture = () => new THREE.CompressedTexture([
+    { data: new Uint8Array(16), width: 4, height: 4 },
+  ], 4, 4, THREE.RGBAFormat)
+  const compressedFormatTexture = () => new THREE.DataTexture(
+    new Uint8Array(16),
+    4,
+    4,
+    THREE.RGBA_S3TC_DXT5_Format,
+  )
 
   assert.throws(
     () => renderer.setRenderTargetTextures(target, externalColorTexture, externalDepthTexture),
@@ -33692,6 +33701,14 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyFramebufferToTexture(new THREE_WEBGPU.StorageTexture(1, 1)),
     /Renderer\.copyFramebufferToTexture texture uses a StorageTexture.*backing data.*not directly readable/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(compressedTexture()),
+    /Renderer\.copyFramebufferToTexture texture uses a compressed texture.*texture copy.*Pre-decode/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(compressedFormatTexture()),
+    /Renderer\.copyFramebufferToTexture texture uses a compressed texture format.*texture copy.*Pre-decode/i,
   )
   assert.throws(
     () => renderer.copyFramebufferToTexture(source, { x: 1, y: 0 }),
@@ -33773,6 +33790,18 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyTextureToTexture(source, new THREE_WEBGPU.StorageTexture(1, 1)),
     /Renderer\.copyTextureToTexture destination texture uses a StorageTexture.*backing data.*not directly readable/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(compressedTexture(), destination),
+    /Renderer\.copyTextureToTexture source texture uses a compressed texture.*texture copy.*Pre-decode/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, compressedTexture()),
+    /Renderer\.copyTextureToTexture destination texture uses a compressed texture.*texture copy.*Pre-decode/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(compressedFormatTexture(), destination),
+    /Renderer\.copyTextureToTexture source texture uses a compressed texture format.*texture copy.*Pre-decode/i,
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, null, null, 1),

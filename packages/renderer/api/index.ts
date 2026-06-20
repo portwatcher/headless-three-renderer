@@ -5103,11 +5103,24 @@ function rawTextureCopyImage(
     )
   }
   if (
+    texture.isCompressedTexture === true ||
+    texture.isCompressedArrayTexture === true ||
+    texture.isCompressedCubeTexture === true
+  ) {
+    throw new Error(
+      `${label} uses a compressed texture, which is not supported by @headless-three/renderer texture copy because compressed GPU payloads are not decoded in this path. Pre-decode the texture to readable raw data before copying.`,
+    )
+  }
+  if (isCompressedTextureFormat(texture.format)) {
+    throw new Error(
+      `${label} uses a compressed texture format, which is not supported by @headless-three/renderer texture copy because compressed GPU payloads are not decoded in this path. Pre-decode the texture to readable raw data before copying.`,
+    )
+  }
+  if (
     texture.isDataArrayTexture === true ||
     texture.isData3DTexture === true ||
     texture.isArrayTexture === true ||
-    texture.is3DTexture === true ||
-    texture.isCompressedArrayTexture === true
+    texture.is3DTexture === true
   ) {
     throw new Error(
       `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer texture copy yet. Use a readable 2D texture or copy layers separately.`,
