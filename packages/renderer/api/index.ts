@@ -21,6 +21,8 @@ import type {
   ThreeEulerLike,
   ThreePlaneLike,
   ThreeTextureLike,
+  ThreeMaterialLike,
+  ThreeObject3DLike,
   RenderSortFunction,
   RenderAnimationLoopCallback,
   RendererParametersLike,
@@ -1099,6 +1101,49 @@ class RendererRenderListsState {
   }
 }
 
+function collectCompileMaterials(scene: ThreeSceneRootLike): Set<ThreeMaterialLike> {
+  const materials = new Set<ThreeMaterialLike>()
+  collectObjectCompileMaterials(scene, materials, 'Renderer.compile scene')
+  return materials
+}
+
+function collectObjectCompileMaterials(
+  object: ThreeObject3DLike,
+  materials: Set<ThreeMaterialLike>,
+  label: string,
+): void {
+  if (isCompileRenderableObject(object) && object.material != null) {
+    if (Array.isArray(object.material)) {
+      for (let i = 0; i < object.material.length; i += 1) {
+        addCompileMaterial(object.material[i], materials, `${label}.material[${i}]`)
+      }
+    } else {
+      addCompileMaterial(object.material, materials, `${label}.material`)
+    }
+  }
+
+  const children = object.children ?? []
+  for (let i = 0; i < children.length; i += 1) {
+    collectObjectCompileMaterials(children[i], materials, `${label}.children[${i}]`)
+  }
+}
+
+function isCompileRenderableObject(object: ThreeObject3DLike): boolean {
+  return object.isMesh === true
+    || object.isPoints === true
+    || object.isLine === true
+    || object.isLineSegments === true
+    || object.isLineLoop === true
+    || object.isSprite === true
+}
+
+function addCompileMaterial(material: unknown, materials: Set<ThreeMaterialLike>, label: string): void {
+  if (material === null || typeof material !== 'object' || Array.isArray(material)) {
+    throw new TypeError(`${label} must be a material-like object.`)
+  }
+  materials.add(material as ThreeMaterialLike)
+}
+
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private opaqueSort: RenderSortFunction | null = null
@@ -1260,18 +1305,25 @@ export class Renderer {
     this.transparentSort = method
   }
 
-  compile(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, targetScene: ThreeSceneRootLike | null = null): void {
+  compile(
+    scene: ThreeSceneRootLike,
+    camera: ThreeRenderCameraLike,
+    targetScene: ThreeSceneRootLike | null = null,
+  ): Set<ThreeMaterialLike> {
     validateThreeSceneRoot(scene)
     validateTopLevelRenderCamera(camera)
     if (targetScene !== null) validateThreeSceneRoot(targetScene)
+    validateObjectChildrenTree(scene)
+    if (targetScene !== null) validateObjectChildrenTree(targetScene)
+    return collectCompileMaterials(scene)
   }
 
   async compileAsync(
     scene: ThreeSceneRootLike,
     camera: ThreeRenderCameraLike,
     targetScene: ThreeSceneRootLike | null = null,
-  ): Promise<void> {
-    this.compile(scene, camera, targetScene)
+  ): Promise<Set<ThreeMaterialLike>> {
+    return this.compile(scene, camera, targetScene)
   }
 
   setEffects(effects: readonly unknown[] | null = null): void {

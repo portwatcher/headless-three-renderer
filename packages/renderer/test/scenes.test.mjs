@@ -30554,20 +30554,37 @@ test('Renderer debug state is inert validated compatibility state', () => {
   )
 })
 
-test('Renderer compile hooks are validated no-op compatibility hooks', async () => {
+test('Renderer compile hooks return validated material sets', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  const arrayMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
   scene.add(new THREE.Mesh(
     new THREE.PlaneGeometry(4, 4),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    material,
+  ))
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-1, -1, 0), new THREE.Vector3(1, 1, 0)]),
+    [material, arrayMaterial],
   ))
   const targetScene = new THREE.Scene()
   const camera = makeCamera()
   const renderer = new Renderer()
 
-  assert.equal(renderer.compile(scene, camera), undefined)
-  assert.equal(await renderer.compileAsync(scene, camera), undefined)
-  assert.equal(await renderer.compileAsync(scene, camera, targetScene), undefined)
+  const compiledMaterials = renderer.compile(scene, camera)
+  assert.ok(compiledMaterials instanceof Set)
+  assert.equal(compiledMaterials.size, 2)
+  assert.equal(compiledMaterials.has(material), true)
+  assert.equal(compiledMaterials.has(arrayMaterial), true)
+
+  const asyncCompiledMaterials = await renderer.compileAsync(scene, camera)
+  assert.ok(asyncCompiledMaterials instanceof Set)
+  assert.equal(asyncCompiledMaterials.size, 2)
+  assert.equal(asyncCompiledMaterials.has(material), true)
+
+  const targetCompiledMaterials = await renderer.compileAsync(scene, camera, targetScene)
+  assert.ok(targetCompiledMaterials instanceof Set)
+  assert.equal(targetCompiledMaterials.size, 2)
 
   const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
   const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
@@ -30584,6 +30601,13 @@ test('Renderer compile hooks are validated no-op compatibility hooks', async () 
   await assert.rejects(
     () => renderer.compileAsync(scene, camera, {}),
     /THREE\.Scene or THREE\.Object3D root/i,
+  )
+  assert.throws(
+    () => renderer.compile(Object.assign(new THREE.Object3D(), {
+      isMesh: true,
+      material: ['invalid'],
+    }), camera),
+    /Renderer\.compile scene\.material\[0\] must be a material-like object/i,
   )
 })
 
