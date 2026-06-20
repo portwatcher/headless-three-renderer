@@ -480,6 +480,46 @@ test('points billboard budget renders 4,096 colored points', () => {
   assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `point colors should survive billboard expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('sprite billboard budget renders 2,048 colored sprites', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 32
+  const materialCount = 64
+  const materials = Array.from({ length: materialCount }, (_, index) => {
+    const t = index / (materialCount - 1)
+    return new THREE.SpriteMaterial({
+      color: new THREE.Color(0.25 + 0.75 * t, 0.25 + 0.65 * (1 - t), 0.45 + 0.45 * Math.sin(t * Math.PI)),
+      transparent: false,
+    })
+  })
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const sprite = new THREE.Sprite(materials[(row * columns + col) % materialCount])
+      sprite.position.set(
+        (col / (columns - 1) - 0.5) * 1.9,
+        (row / (rows - 1) - 0.5) * 1.9,
+        Math.sin(col * 0.17 + row * 0.31) * 0.01,
+      )
+      sprite.scale.setScalar(0.045)
+      scene.add(sprite)
+    }
+  }
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.35, `sprite billboard scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `sprite colors should survive billboard expansion (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('wide line budget renders 4,032 colored segments', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
