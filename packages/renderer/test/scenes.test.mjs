@@ -31379,7 +31379,7 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
     () => renderer.setMRT({ output: 'color' }),
     /Renderer\.setMRT\(\) is not supported.*arbitrary native MRT shader outputs.*userData\.headlessThreeRenderer\.renderMode/i,
   )
-  for (const method of ['setTexture2D', 'setTextureCube', 'setTexture3D', 'setTexture2DArray']) {
+  for (const method of ['setTexture2D', 'setTextureCube', 'setTextureCubeDynamic', 'setTexture3D', 'setTexture2DArray']) {
     assert.throws(
       () => renderer[method](texture, 0),
       new RegExp(`Renderer\\.${method}\\(\\) is not supported.*browser WebGL texture units.*material, background, environment, or render-target texture inputs`, 'i'),

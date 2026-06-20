@@ -1419,6 +1419,12 @@ export class Renderer {
     throw unsupportedTextureBindingError('Renderer.setTextureCube')
   }
 
+  setTextureCubeDynamic(texture: unknown, slot: unknown): never {
+    assertThreeTextureLike(texture, 'Renderer.setTextureCubeDynamic texture')
+    assertTextureBindingSlot(slot, 'Renderer.setTextureCubeDynamic slot')
+    throw unsupportedTextureBindingError('Renderer.setTextureCubeDynamic')
+  }
+
   setTexture3D(texture: unknown, slot: unknown): never {
     assertThreeTextureLike(texture, 'Renderer.setTexture3D texture')
     assertTextureBindingSlot(slot, 'Renderer.setTexture3D slot')
