@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import * as THREE from 'three'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
@@ -12,6 +13,7 @@ import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 const { Renderer, render, renderToTarget } = pkg
 const { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } = lightsApi
 const { extractEnvironmentMap } = materialsApi
+const cjsRequire = createRequire(import.meta.url)
 
 const SIZE = 128
 const BG = [26, 26, 26] // 0.1 * 255
@@ -23371,6 +23373,58 @@ test('reusable renderer reuses cached material texture payload until texture ver
   const thirdLeft = meanRegion(third, 64, 64, 8, 24, 28, 40)
   assert.ok(thirdLeft.b > thirdLeft.r + 120, `texture version changes should render updated blue payload (${thirdLeft.r}, ${thirdLeft.g}, ${thirdLeft.b})`)
   assert.ok(textureReads > readsAfterFirstRender, 'texture version changes should invalidate cached texture payload extraction')
+})
+
+test('reusable renderer reuses cached CSS material color extraction until color changes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const material = new THREE.MeshBasicMaterial()
+  material.color = 'rgb(255, 0, 0)'
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const { Color: RequiredThreeColor } = cjsRequire('three')
+  const originalSetStyle = RequiredThreeColor.prototype.setStyle
+  let cssParseCalls = 0
+  RequiredThreeColor.prototype.setStyle = function setStyle(style, ...args) {
+    if (style === material.color) {
+      cssParseCalls += 1
+    }
+    return originalSetStyle.call(this, style, ...args)
+  }
+  try {
+    const first = renderer.render(scene, camera, options)
+    const firstCenter = meanRegion(first, 64, 64, 24, 24, 40, 40)
+    const parseCallsAfterFirstRender = cssParseCalls
+    assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial CSS material color should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+    assert.ok(parseCallsAfterFirstRender > 0, 'initial render should parse CSS material color')
+
+    renderer.render(scene, camera, options)
+    assert.equal(cssParseCalls, parseCallsAfterFirstRender, 'unchanged CSS material color should reuse cached color extraction')
+
+    material.color = 'rgb(0, 255, 0)'
+    const third = renderer.render(scene, camera, options)
+    const thirdCenter = meanRegion(third, 64, 64, 24, 24, 40, 40)
+    assert.ok(thirdCenter.g > thirdCenter.r + 80, `CSS material color changes should render updated green (${thirdCenter.r}, ${thirdCenter.g}, ${thirdCenter.b})`)
+    assert.ok(cssParseCalls > parseCallsAfterFirstRender, 'CSS material color changes should invalidate cached color extraction')
+  } finally {
+    RequiredThreeColor.prototype.setStyle = originalSetStyle
+  }
 })
 
 test('reusable renderer reuses cached static mesh geometry until attributes change', () => {

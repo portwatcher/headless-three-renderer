@@ -33,6 +33,7 @@ import {
   assertMaterialLike,
   type MaterialExtractionContext,
   type TextureExtractionCache,
+  type MaterialColorExtractionCache,
 } from './materials'
 import { applyCpuSkinning } from './skinning'
 import { applyMorphTargets } from './morphs'
@@ -110,6 +111,7 @@ export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   texturePayloads: TextureExtractionCache
+  materialColors: MaterialColorExtractionCache
   pointBillboards: WeakMap<ThreeObject3DLike, Map<string, CachedPointBillboardExpansion>>
   spriteBillboards: WeakMap<ThreeObject3DLike, CachedSpriteBillboardExpansion>
 }
@@ -292,6 +294,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     meshGeometry: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     texturePayloads: new WeakMap(),
+    materialColors: new WeakMap(),
     pointBillboards: new WeakMap(),
     spriteBillboards: new WeakMap(),
   }
@@ -486,7 +489,7 @@ function appendMesh(
 
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
     const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
-    const baseColor = materialColor(material)
+    const baseColor = materialColor(material, materialContext)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
     const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, material)
@@ -886,7 +889,7 @@ function appendShadowOnlyMeshGroup(
   instances: MeshInstance[],
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
-  const baseColor = materialColor(shadowMaterial)
+  const baseColor = materialColor(shadowMaterial, materialContext)
   const useVertexColors = vertexColors && material.vertexColors !== false
   const pbrProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
   const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, shadowMaterial)
@@ -1137,7 +1140,7 @@ function appendSprite(
     positions,
     indices,
     uvs,
-    color: materialColor(material),
+    color: materialColor(material, materialContext),
     texture: textureInfo?.data,
     textureWidth: textureInfo?.width ?? undefined,
     textureHeight: textureInfo?.height ?? undefined,
@@ -1338,7 +1341,7 @@ function appendPoints(
       })
       : null
 
-    const baseColor = materialColor(material)
+    const baseColor = materialColor(material, materialContext)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
     const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
@@ -1761,7 +1764,7 @@ function appendShadowOnlyBillboardMesh(
     indices,
     uvs,
     uvs2,
-    color: materialColor(shadowMaterial),
+    color: materialColor(shadowMaterial, materialContext),
     texture: textureInfo?.data,
     textureWidth: textureInfo?.width ?? undefined,
     textureHeight: textureInfo?.height ?? undefined,
@@ -2016,7 +2019,7 @@ function appendLineOrPoints(
     let outputSecondaryUvs: number[] | undefined = topology === 'lines' ? uvStreams.uvs2?.values : undefined
     let outputColors: number[] | undefined
     let thickCenter: [number, number, number] | undefined
-    const color = materialColor(material)
+    const color = materialColor(material, materialContext)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
     if (topology === 'lines') {
