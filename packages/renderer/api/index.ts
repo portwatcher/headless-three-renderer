@@ -1311,6 +1311,10 @@ export class Renderer {
     return WEBGL_COORDINATE_SYSTEM
   }
 
+  getMaxAnisotropy(): number {
+    return this.capabilities.getMaxAnisotropy()
+  }
+
   getOutputBufferType(): number {
     return UnsignedByteType
   }

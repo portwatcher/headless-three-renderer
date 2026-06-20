@@ -31445,6 +31445,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.capabilities.maxColorAttachments, 1)
   assert.equal(renderer.capabilities.maxSamples, 4)
   assert.equal(renderer.capabilities.samples, 0)
+  assert.equal(renderer.getMaxAnisotropy(), 0)
   assert.equal(renderer.capabilities.getMaxAnisotropy(), 0)
   assert.equal(renderer.capabilities.getMaxPrecision('highp'), 'highp')
   assert.equal(renderer.capabilities.getMaxPrecision('mediump'), 'mediump')
