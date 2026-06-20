@@ -9714,6 +9714,36 @@ test('InstancedBufferGeometry expands selected instanced texture UV channels', (
   assert.ok(right.g > right.r + 60, `right selected instanced uv1 should sample green (${right.g} vs ${right.r})`)
 })
 
+test('custom WGSL fragment materials reject unsupported InstancedBufferGeometry attributes', () => {
+  const base = new THREE.PlaneGeometry(0.85, 0.85)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.35, 0, 0, 0.35, 0, 0]),
+    3,
+  ))
+  geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(
+    new Float32Array([0.25, 1]),
+    1,
+  ))
+
+  const material = new THREE.ShaderMaterial()
+  material.userData.headlessThreeRenderer = {
+    fragmentWgsl: 'return vec4<f32>(1.0, 1.0, 1.0, alpha);',
+  }
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(geometry, material))
+
+  const camera = makeCamera()
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 64, height: 64 }),
+    /Custom WGSL fragment materials.*geometry\.attributes\.instanceOpacity.*vertex-attribute shader integration/i,
+  )
+})
+
 test('invalid instance counts fail clearly', () => {
   const camera = makeCamera()
 

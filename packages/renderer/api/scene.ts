@@ -93,6 +93,20 @@ interface InstancedAttributeRef {
   label: string
 }
 
+const SupportedInstancedBufferGeometryAttributes = new Set([
+  'color',
+  'normal',
+  'uv',
+  'uv1',
+  'uv2',
+  'uv3',
+  'instanceOffset',
+  'instancePosition',
+  'offset',
+  'translate',
+  'translation',
+])
+
 interface ThickLineExpansion {
   center: [number, number, number]
   colors?: number[]
@@ -545,6 +559,7 @@ function appendMesh(
     const baseColor = materialColor(material, materialContext)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
+    assertSupportedCustomFragmentInstancedAttributes(geometry, pbrProps)
     const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, material)
     if (uvStreams.alphaMapUsesUv2 !== undefined) {
       pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
@@ -949,6 +964,7 @@ function appendShadowOnlyMeshGroup(
   const baseColor = materialColor(shadowMaterial, materialContext)
   const useVertexColors = vertexColors && material.vertexColors !== false
   const pbrProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
+  assertSupportedCustomFragmentInstancedAttributes(object.geometry!, pbrProps)
   const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, shadowMaterial)
   if (uvStreams.alphaMapUsesUv2 !== undefined) {
     pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
@@ -1478,6 +1494,7 @@ function appendPoints(
     const textureInfo = extractTextureData(material, materialContext)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
     const pbrProps = extractPbrProperties(material, materialContext)
+    assertSupportedCustomFragmentInstancedAttributes(geometry, pbrProps)
     pbrProps.alphaMapUsesUv2 = pointUvStreams?.alphaMapUsesUv2 ?? false
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
@@ -2129,6 +2146,7 @@ function appendLineOrPoints(
     const color = materialColor(material, materialContext)
     const useVertexColors = vertexColors && material?.vertexColors !== false
     const pbrProps = extractPbrProperties(material, materialContext)
+    assertSupportedCustomFragmentInstancedAttributes(geometry, pbrProps)
     if (topology === 'lines') {
       pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
     }
@@ -3049,6 +3067,24 @@ function instancedBufferGeometryCount(geometry: ThreeBufferGeometryLike): number
   const effectiveCount = Math.min(requested, maxCount)
   if (effectiveCount === Infinity) return 1
   return clampInteger(effectiveCount, 0, Math.max(0, Math.floor(maxCount)))
+}
+
+function assertSupportedCustomFragmentInstancedAttributes(
+  geometry: ThreeBufferGeometryLike,
+  pbrProps: Pick<PbrProperties, 'customFragmentShader'>,
+): void {
+  if (!pbrProps.customFragmentShader) return
+
+  const unsupported: string[] = []
+  for (const [name, attribute] of Object.entries(geometryAttributes(geometry))) {
+    if (!isInstancedAttribute(attribute)) continue
+    if (!SupportedInstancedBufferGeometryAttributes.has(name)) unsupported.push(`geometry.attributes.${name}`)
+  }
+  if (unsupported.length === 0) return
+
+  throw new Error(
+    `Custom WGSL fragment materials cannot bind arbitrary InstancedBufferGeometry vertex attributes (${unsupported.join(', ')}) in @headless-three/renderer yet. Use supported instanced offset, color, normal, or UV attributes, expand the geometry on the CPU, or render separate draws until custom vertex-attribute shader integration is implemented.`,
+  )
 }
 
 function isInstancedAttribute(attribute: ThreeBufferAttributeLike | undefined | null): attribute is ThreeBufferAttributeLike {
