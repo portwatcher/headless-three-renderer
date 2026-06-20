@@ -66,6 +66,18 @@ const SupportedRendererStateBlendingModes = new Set([
   MultiplyBlending,
   CustomBlending,
 ])
+const WebGLDrawModePoints = 0x0000
+const WebGLDrawModeLines = 0x0001
+const WebGLDrawModeLineLoop = 0x0002
+const WebGLDrawModeLineStrip = 0x0003
+const WebGLDrawModeTriangles = 0x0004
+const SupportedRendererInfoDrawModes = new Set([
+  WebGLDrawModePoints,
+  WebGLDrawModeLines,
+  WebGLDrawModeLineLoop,
+  WebGLDrawModeLineStrip,
+  WebGLDrawModeTriangles,
+])
 const NoToneMapping = 0
 const LinearToneMapping = 1
 const ReinhardToneMapping = 2
@@ -236,12 +248,37 @@ class RendererInfoState {
     this.autoResetValue = rendererStateBoolean(value, 'Renderer.info.autoReset')
   }
 
+  update(count: unknown, mode: unknown, instanceCount: unknown = 1): void {
+    const drawCount = rendererInfoDrawCount(count, 'Renderer.info.update count')
+    const drawMode = rendererInfoDrawMode(mode, 'Renderer.info.update mode')
+    const instances = rendererInfoInstanceCount(instanceCount, 'Renderer.info.update instanceCount')
+
+    this.render.calls += 1
+
+    switch (drawMode) {
+      case WebGLDrawModeTriangles:
+        this.render.triangles += instances * (drawCount / 3)
+        break
+      case WebGLDrawModeLines:
+        this.render.lines += instances * (drawCount / 2)
+        break
+      case WebGLDrawModeLineStrip:
+        this.render.lines += instances * (drawCount - 1)
+        break
+      case WebGLDrawModeLineLoop:
+        this.render.lines += instances * drawCount
+        break
+      case WebGLDrawModePoints:
+        this.render.points += instances * drawCount
+        break
+    }
+  }
+
   reset(): void {
     this.render.calls = 0
     this.render.triangles = 0
     this.render.points = 0
     this.render.lines = 0
-    this.render.frame = 0
   }
 }
 
@@ -3627,6 +3664,32 @@ function rendererStateOptionalFiniteInteger(value: unknown, label: string): void
 function rendererStateBoolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') {
     throw new TypeError(`${label} must be a boolean.`)
+  }
+  return value
+}
+
+function rendererInfoDrawCount(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || Math.floor(value) !== value || value < 0) {
+    throw new TypeError(`${label} must be a non-negative integer.`)
+  }
+  return value
+}
+
+function rendererInfoInstanceCount(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || Math.floor(value) !== value || value < 0) {
+    throw new TypeError(`${label} must be a non-negative integer.`)
+  }
+  return value
+}
+
+function rendererInfoDrawMode(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || Math.floor(value) !== value) {
+    throw new TypeError(`${label} must be an integer WebGL draw mode.`)
+  }
+  if (!SupportedRendererInfoDrawModes.has(value)) {
+    throw new Error(
+      `${label} ${String(value)} is not supported. Use POINTS, LINES, LINE_STRIP, LINE_LOOP, or TRIANGLES WebGL draw mode constants.`,
+    )
   }
   return value
 }

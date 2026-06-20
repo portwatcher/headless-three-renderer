@@ -31129,15 +31129,38 @@ test('Renderer info exposes inert compatibility counters', () => {
 
   renderer.info.autoReset = false
   assert.equal(renderer.info.autoReset, false)
-  renderer.info.render.calls = 3
-  renderer.info.render.triangles = 12
+  renderer.info.update(6, 0x0004)
+  renderer.info.update(4, 0x0001, 2)
+  renderer.info.update(3, 0x0003)
+  renderer.info.update(3, 0x0002)
+  renderer.info.update(5, 0x0000)
+  assert.equal(renderer.info.render.calls, 5)
+  assert.equal(renderer.info.render.triangles, 2)
+  assert.equal(renderer.info.render.lines, 9)
+  assert.equal(renderer.info.render.points, 5)
+  renderer.info.render.frame = 7
   renderer.info.reset()
   assert.equal(renderer.info.render.calls, 0)
   assert.equal(renderer.info.render.triangles, 0)
+  assert.equal(renderer.info.render.points, 0)
+  assert.equal(renderer.info.render.lines, 0)
+  assert.equal(renderer.info.render.frame, 7)
 
   assert.throws(
     () => { renderer.info.autoReset = 'yes' },
     /Renderer\.info\.autoReset must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.info.update(-1, 0x0004),
+    /Renderer\.info\.update count must be a non-negative integer/i,
+  )
+  assert.throws(
+    () => renderer.info.update(3, 0x0005),
+    /Renderer\.info\.update mode 5 is not supported/i,
+  )
+  assert.throws(
+    () => renderer.info.update(3, 0x0004, Number.NaN),
+    /Renderer\.info\.update instanceCount must be a non-negative integer/i,
   )
 
   renderer.setClearColor(0x204080, 0.5)
