@@ -1793,7 +1793,15 @@ export class Renderer {
     assertOptionalBoolean(color, 'Renderer.clear color')
     assertOptionalBoolean(depth, 'Renderer.clear depth')
     assertOptionalBoolean(stencil, 'Renderer.clear stencil')
-    // Each render call owns its native pass, so there is no persistent framebuffer to clear.
+    if (color && this.currentRenderTarget) {
+      clearRenderTargetColor(
+        this.currentRenderTarget,
+        this.currentClearColor,
+        this.currentSize,
+        this.currentActiveCubeFace,
+        this.currentActiveMipmapLevel,
+      )
+    }
   }
 
   clearTarget(target: RenderTargetLike | null, color = true, depth = true, stencil = true): void {
@@ -5079,6 +5087,89 @@ function writeRenderTarget(
   writeObjectIdMetadata(target, objectIdEntries)
 
   return target
+}
+
+function clearRenderTargetColor(
+  target: RenderTargetLike,
+  color: Color4,
+  fallbackSize: PixelSize | null,
+  activeCubeFace: number,
+  activeMipmapLevel: number,
+): void {
+  const size = renderTargetClearSize(target, fallbackSize)
+  if (!size) return
+
+  const colorTextures = renderTargetColorTextures(target)
+  if (isCubeRenderTarget(target)) {
+    const resolvedMipmapLevel = resolveActiveMipmapLevel(activeMipmapLevel, size.width, 'Renderer activeMipmapLevel')
+    const mipSize = cubeMipmapSize(size.width, size.height, resolvedMipmapLevel)
+    const face = clearColorBuffer(color, mipSize.width, mipSize.height)
+    const attachments = colorTextures.slice(1).map((texture) => ({ texture, data: face }))
+    writeCubeRenderTargetFace(
+      target,
+      face,
+      size.width,
+      size.height,
+      mipSize.width,
+      mipSize.height,
+      activeCubeFace,
+      resolvedMipmapLevel,
+      undefined,
+      undefined,
+      attachments,
+    )
+    return
+  }
+
+  const data = clearColorBuffer(color, size.width, size.height)
+  const attachments = colorTextures.slice(1).map((texture) => ({ texture, data }))
+  writeRenderTarget(target, data, size.width, size.height, undefined, undefined, attachments)
+}
+
+function renderTargetClearSize(
+  target: RenderTargetLike,
+  fallbackSize: PixelSize | null,
+): { width: number; height: number } | null {
+  const image = renderTargetClearImage(target)
+  const rawWidth = target.width ?? image?.width ?? fallbackSize?.width
+  const width = renderTargetClearDimension(rawWidth)
+  const height = renderTargetClearDimension(
+    target.height ?? image?.height ?? fallbackSize?.height ?? (isCubeRenderTarget(target) ? rawWidth : undefined),
+  )
+  if (width === null || height === null) return null
+  return { width, height }
+}
+
+function renderTargetClearImage(target: RenderTargetLike): RenderTargetImageLike | undefined {
+  const texture = renderTargetColorTexture(target)
+  if (texture) {
+    const image = Array.isArray(texture.image) ? texture.image[0] : texture.image
+    if (image && !Buffer.isBuffer(image) && !(image instanceof Uint8Array)) return image
+    const sourceData = texture.source?.data
+    if (sourceData && !Buffer.isBuffer(sourceData) && !(sourceData instanceof Uint8Array) && !Array.isArray(sourceData)) {
+      return sourceData
+    }
+  }
+  return target.image
+}
+
+function renderTargetClearDimension(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null
+}
+
+function clearColorBuffer(color: Color4, width: number, height: number): Buffer {
+  const data = Buffer.alloc(width * height * 4)
+  const r = Math.round(clamp01(color[0]) * 255)
+  const g = Math.round(clamp01(color[1]) * 255)
+  const b = Math.round(clamp01(color[2]) * 255)
+  const a = Math.round(clamp01(color[3]) * 255)
+  for (let offset = 0; offset < data.length; offset += 4) {
+    data[offset] = r
+    data[offset + 1] = g
+    data[offset + 2] = b
+    data[offset + 3] = a
+  }
+  return data
 }
 
 function writeObjectIdMetadata(target: RenderTargetLike, objectIdEntries?: RenderObjectIdEntry[]): void {

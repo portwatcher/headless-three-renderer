@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import pkg from '../dist/index.js'
@@ -2245,6 +2246,36 @@ test('EffectComposer RenderPass uses Renderer target state and readback', () => 
   renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
   const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
   assert.ok(mean.r > mean.b + 80, `EffectComposer RenderPass target should contain red scene output (${mean.r} vs ${mean.b})`)
+})
+
+test('EffectComposer ClearPass uses Renderer clear and target state', () => {
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  renderer.setClearColor(0x204080, 0.25)
+  const previousTarget = { texture: {} }
+  renderer.setRenderTarget(previousTarget)
+
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  composer.addPass(new ClearPass(0x00ff00, 1))
+
+  composer.render(0)
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+  assert.equal(renderer.getClearAlpha(), 0.25)
+  const restoredClearColor = renderer.getClearColor(new THREE.Color())
+  assert.ok(Math.abs(restoredClearColor.r - 0x20 / 255) < 1e-6, `restored clear red should match original (${restoredClearColor.r})`)
+  assert.ok(Math.abs(restoredClearColor.g - 0x40 / 255) < 1e-6, `restored clear green should match original (${restoredClearColor.g})`)
+  assert.ok(Math.abs(restoredClearColor.b - 0x80 / 255) < 1e-6, `restored clear blue should match original (${restoredClearColor.b})`)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.g > 240 && mean.r < 10 && mean.b < 10, `ClearPass target should contain green clear output (${mean.r}, ${mean.g}, ${mean.b})`)
+  assert.ok(mean.a > 250, `ClearPass target should contain opaque clear alpha (${mean.a})`)
 })
 
 test('CubeCamera.update works with Renderer render-target state', async () => {
@@ -32016,7 +32047,7 @@ test('Renderer copyFramebufferToTexture copies active render target color data o
   renderer.setRenderTarget(null)
 })
 
-test('Renderer clear methods are no-op compatibility hooks', () => {
+test('Renderer clear methods validate compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
   const renderer = new Renderer()
