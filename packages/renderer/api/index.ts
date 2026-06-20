@@ -1553,7 +1553,7 @@ export class Renderer {
       0,
       'Renderer.copyFramebufferToTexture',
     )
-    const destination = rawTextureCopyImage(texture, 'Renderer.copyFramebufferToTexture texture')
+    const destination = rawTextureCopyImage(texture, 'Renderer.copyFramebufferToTexture texture', { level })
     if (source.channels !== destination.channels) {
       throw new Error(
         `Renderer.copyFramebufferToTexture framebuffer and destination texture must use the same raw channel count (${source.channels} framebuffer channels, ${destination.channels} destination channels).`,
@@ -1592,8 +1592,13 @@ export class Renderer {
     assertTextureCopyLevel(srcLevel, 'Renderer.copyTextureToTexture source level')
     assertTextureCopyLevel(dstLevel, 'Renderer.copyTextureToTexture destination level')
 
-    const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture', { allowCanvasRead: true })
-    const destination = rawTextureCopyImage(dstTexture, 'Renderer.copyTextureToTexture destination texture')
+    const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture', {
+      allowCanvasRead: true,
+      level: srcLevel,
+    })
+    const destination = rawTextureCopyImage(dstTexture, 'Renderer.copyTextureToTexture destination texture', {
+      level: dstLevel,
+    })
     if (source.channels !== destination.channels) {
       throw new Error(
         `Renderer.copyTextureToTexture textures must use the same raw channel count (${source.channels} source channels, ${destination.channels} destination channels).`,
@@ -4401,9 +4406,19 @@ interface TextureCopyPosition {
 function rawTextureCopyImage(
   texture: ThreeTextureLike,
   label: string,
-  options: { allowCanvasRead?: boolean } = {},
+  options: { allowCanvasRead?: boolean; level?: number } = {},
 ): RawTextureCopyImage {
-  const image = texture.image ?? texture.source?.data
+  const level = options.level ?? 0
+  let image = texture.image ?? texture.source?.data
+  if (level > 0) {
+    if (!Array.isArray(texture.mipmaps)) {
+      throw new TypeError(`${label}.mipmaps must be an array of image-like mip levels for level ${level}.`)
+    }
+    image = texture.mipmaps[level - 1]
+    if (!image) {
+      throw new TypeError(`${label}.mipmaps[${level - 1}] must provide a readable raw image object with data, width, and height.`)
+    }
+  }
   if (!image || Array.isArray(image) || Buffer.isBuffer(image) || image instanceof Uint8Array) {
     throw new TypeError(textureCopyReadableImageError(label, options.allowCanvasRead === true))
   }
@@ -4455,9 +4470,6 @@ function assertTextureCopyLevel(value: unknown, label: string): void {
   const level = value == null ? 0 : value
   if (!Number.isInteger(level) || (level as number) < 0) {
     throw new TypeError(`${label} must be a non-negative integer.`)
-  }
-  if (level !== 0) {
-    throw new Error(`${label} only supports level 0 for readable CPU texture copies.`)
   }
 }
 

@@ -31844,8 +31844,8 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     /Renderer\.copyFramebufferToTexture target has no readable color data.*Render into the target/i,
   )
   assert.throws(
-    () => renderer.copyFramebufferToTexture(source, null, 1),
-    /Renderer\.copyFramebufferToTexture level only supports level 0/i,
+    () => renderer.copyFramebufferToTexture(source, null, -1),
+    /Renderer\.copyFramebufferToTexture level must be a non-negative integer/i,
   )
   renderer.setRenderTarget(null)
   assert.throws(
@@ -31886,7 +31886,11 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, null, null, 1),
-    /Renderer\.copyTextureToTexture source level only supports level 0/i,
+    /Renderer\.copyTextureToTexture source texture\.mipmaps\[0\] must provide a readable raw image object/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, destination, null, null, -1),
+    /Renderer\.copyTextureToTexture source level must be a non-negative integer/i,
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, { x: 0, y: 0, width: 2, height: 1 }),
@@ -31940,6 +31944,41 @@ test('Renderer copyTextureToTexture copies readable raw texture data on the CPU'
   assert.deepEqual(pixel(1, 2), [255, 255, 0, 255])
   assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after CPU copy')
+})
+
+test('Renderer copyTextureToTexture copies readable raw texture mip levels on the CPU', () => {
+  const renderer = new Renderer()
+  const source = new THREE.DataTexture(new Uint8Array(4 * 4 * 4).fill(1), 4, 4, THREE.RGBAFormat)
+  source.mipmaps = [{
+    data: new Uint8Array([
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+      0, 0, 255, 255,
+      255, 255, 0, 255,
+    ]),
+    width: 2,
+    height: 2,
+  }]
+  const destinationData = new Uint8Array(4 * 4 * 4)
+  destinationData.fill(5)
+  const destinationMip = new Uint8Array(2 * 2 * 4)
+  destinationMip.fill(9)
+  const destination = new THREE.DataTexture(destinationData, 4, 4, THREE.RGBAFormat)
+  destination.mipmaps = [{ data: destinationMip, width: 2, height: 2 }]
+  const initialVersion = destination.version
+
+  renderer.copyTextureToTexture(source, destination, { x: 1, y: 0, width: 1, height: 2 }, { x: 0, y: 0 }, 1, 1)
+
+  function mipPixel(x, y) {
+    const offset = (y * 2 + x) * 4
+    return Array.from(destination.mipmaps[0].data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(mipPixel(0, 0), [0, 255, 0, 255])
+  assert.deepEqual(mipPixel(0, 1), [255, 255, 0, 255])
+  assert.deepEqual(mipPixel(1, 1), [9, 9, 9, 9])
+  assert.deepEqual(Array.from(destination.image.data.slice(0, 4)), [5, 5, 5, 5])
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after mip CPU copy')
 })
 
 test('Renderer copyTextureToTexture copies readable canvas-like source data on the CPU', () => {
@@ -32079,6 +32118,23 @@ test('Renderer copyFramebufferToTexture copies active render target color data o
   assert.ok(copiedBottomRight[0] > 200 && copiedBottomRight[1] < 20 && copiedBottomRight[2] < 20 && copiedBottomRight[3] === 255, `bottom-right copied framebuffer pixel should be red (${copiedBottomRight})`)
   assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after framebuffer copy')
+
+  const mipData = new Uint8Array(4 * 4 * 4)
+  mipData.fill(11)
+  destination.mipmaps = [{ data: mipData, width: 4, height: 4 }]
+  const versionAfterBaseCopy = destination.version
+  renderer.copyFramebufferToTexture(destination, { x: 0, y: 0 }, 1)
+
+  function mipPixel(x, y) {
+    const offset = (y * 4 + x) * 4
+    return Array.from(destination.mipmaps[0].data.slice(offset, offset + 4))
+  }
+
+  const mipTopLeft = mipPixel(0, 0)
+  const mipBottomRight = mipPixel(3, 3)
+  assert.ok(mipTopLeft[0] > 200 && mipTopLeft[1] < 20 && mipTopLeft[2] < 20 && mipTopLeft[3] === 255, `top-left copied framebuffer mip pixel should be red (${mipTopLeft})`)
+  assert.ok(mipBottomRight[0] > 200 && mipBottomRight[1] < 20 && mipBottomRight[2] < 20 && mipBottomRight[3] === 255, `bottom-right copied framebuffer mip pixel should be red (${mipBottomRight})`)
+  assert.ok(destination.version > versionAfterBaseCopy, 'destination texture should be marked dirty after framebuffer mip copy')
   renderer.setRenderTarget(null)
 })
 
