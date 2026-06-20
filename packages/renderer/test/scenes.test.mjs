@@ -15,6 +15,7 @@ import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
+import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
@@ -2253,6 +2254,28 @@ test('WebGLCubeRenderTarget.clear uses Renderer target state for all faces', () 
     assertRgbClose(mean, [0x12, 0x34, 0x56], `cleared cube face ${face}`)
     assert.ok(Math.abs(mean.a - 128) <= 1, `cleared cube face ${face} should preserve clear alpha (${mean.a})`)
   }
+})
+
+test('Common CubeRenderTarget.clear uses Renderer target state for all faces', () => {
+  const renderer = new Renderer()
+  const cubeTarget = new CommonCubeRenderTarget(8)
+  const previousTarget = { width: 4, height: 4, texture: {} }
+
+  renderer.setRenderTarget(previousTarget)
+  renderer.setClearColor(0x2a4c6e, 0.75)
+  assert.equal(cubeTarget.clear(renderer), undefined)
+  assert.equal(renderer.getRenderTarget(), previousTarget)
+
+  for (let face = 0; face < 6; face += 1) {
+    const data = Buffer.alloc(8 * 8 * 4)
+    renderer.readRenderTargetPixels(cubeTarget, 0, 0, 8, 8, data, face)
+    const mean = meanRgba(data)
+    assertRgbClose(mean, [0x2a, 0x4c, 0x6e], `cleared common cube face ${face}`)
+    assert.ok(Math.abs(mean.a - 191) <= 1, `cleared common cube face ${face} should preserve clear alpha (${mean.a})`)
+  }
+
+  assert.equal(cubeTarget.texture.image.length, 6)
+  assert.strictEqual(cubeTarget.texture.source.data, cubeTarget.texture.image)
 })
 
 test('LightProbeGenerator reads cube targets through the WebGLRenderer marker path', async () => {
