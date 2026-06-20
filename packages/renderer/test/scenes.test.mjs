@@ -26427,7 +26427,7 @@ test('Renderer shadowMap enabled gates reusable renderer shadows', () => {
   assert.ok(explicitLum < disabledLum - 20, `Renderer shadowMap.enabled=true should keep shadows enabled (${explicitLum} vs ${disabledLum})`)
 })
 
-test('Renderer shadowMap type controls Basic versus PCF sampling', () => {
+test('Renderer shadowMap type controls Basic versus filtered sampling', () => {
   function renderShadowType(type, radius) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(1, 1, 1)
@@ -26477,6 +26477,8 @@ test('Renderer shadowMap type controls Basic versus PCF sampling', () => {
   const basicSmallRadius = renderShadowType(THREE.BasicShadowMap, 0)
   const basicLargeRadius = renderShadowType(THREE.BasicShadowMap, 4)
   const pcfLargeRadius = renderShadowType(THREE.PCFShadowMap, 4)
+  const pcfSoftLargeRadius = renderShadowType(THREE.PCFSoftShadowMap, 4)
+  const vsmLargeRadius = renderShadowType(THREE.VSMShadowMap, 4)
 
   assert.ok(
     Math.abs(basicSmallRadius - basicLargeRadius) < 1,
@@ -26485,6 +26487,14 @@ test('Renderer shadowMap type controls Basic versus PCF sampling', () => {
   assert.ok(
     pcfLargeRadius < basicLargeRadius - 10,
     `PCFShadowMap should use radius-based PCF sampling (${pcfLargeRadius} vs ${basicLargeRadius})`,
+  )
+  assert.ok(
+    pcfSoftLargeRadius < basicLargeRadius - 10,
+    `PCFSoftShadowMap should use the current filtered shadow path (${pcfSoftLargeRadius} vs ${basicLargeRadius})`,
+  )
+  assert.ok(
+    vsmLargeRadius < basicLargeRadius - 10,
+    `VSMShadowMap should use the current filtered shadow path (${vsmLargeRadius} vs ${basicLargeRadius})`,
   )
 })
 
