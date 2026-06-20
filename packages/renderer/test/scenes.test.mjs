@@ -17743,6 +17743,63 @@ test('unsupported array and 3D texture inputs fail clearly', () => {
   }
 })
 
+test('unsupported framebuffer and depth texture scene inputs fail clearly', () => {
+  function framebufferTexture() {
+    const texture = new THREE.FramebufferTexture(1, 1)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function depthTexture() {
+    const texture = new THREE.DepthTexture(1, 1)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const textureFactories = [
+    ['FramebufferTexture', framebufferTexture, /uses a FramebufferTexture.*texture slots/i],
+    ['DepthTexture', depthTexture, /uses a DepthTexture.*target\.depthTexture/i],
+  ]
+  const slots = [
+    ['material map', (scene, texture) => {
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: texture }),
+      ))
+    }, (pattern) => new RegExp(`material\\.map ${pattern.source}`, 'i')],
+    ['background', (scene, texture) => {
+      scene.background = texture
+    }, (pattern) => new RegExp(`background ${pattern.source}`, 'i')],
+    ['environment', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.environment = texture
+    }, (pattern) => new RegExp(`scene\\.environment ${pattern.source}`, 'i')],
+    ['material envMap', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap: texture }),
+      ))
+    }, (pattern) => new RegExp(`material\\.envMap ${pattern.source}`, 'i')],
+    ['reflection probe', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture } }
+    }, (pattern) => new RegExp(`reflectionProbe\\.texture ${pattern.source}`, 'i')],
+  ]
+
+  for (const [textureName, makeTexture, pattern] of textureFactories) {
+    for (const [slotName, setup, slotPattern] of slots) {
+      const scene = new THREE.Scene()
+      setup(scene, makeTexture())
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+        slotPattern(pattern),
+        `${slotName} ${textureName} should fail clearly`,
+      )
+    }
+  }
+})
+
 test('unsupported cube texture material slots fail clearly', () => {
   function makeCubeMap() {
     return cubeTexture([
@@ -24262,6 +24319,9 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ textures: [{}, { userData: { headlessThreeRenderer: 'mask' } }] }, /target color texture\[1\]\.userData\.headlessThreeRenderer must be an object/i, 'secondary renderMode hints'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'color array texture'],
     [{ depthTexture: new THREE.Data3DTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target\.depthTexture uses an array or 3D texture/i, 'depth 3D texture'],
+    [{ texture: new THREE.FramebufferTexture(1, 1) }, /target color texture uses a FramebufferTexture/i, 'color framebuffer texture'],
+    [{ depthTexture: new THREE.FramebufferTexture(1, 1) }, /target\.depthTexture uses a FramebufferTexture/i, 'depth framebuffer texture'],
+    [{ texture: new THREE.DepthTexture(1, 1) }, /target color texture uses a DepthTexture as a color attachment/i, 'color depth texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'color compressed texture'],
     [{ depthTexture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target\.depthTexture uses a compressed texture/i, 'depth compressed texture'],
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'color compressed format'],
@@ -24289,6 +24349,8 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
   const optionsTargetCases = [
     [{ texture: [{}, {}] }, /secondary color attachment.*renderMode/i, 'options.target texture array'],
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
+    [{ texture: new THREE.FramebufferTexture(1, 1) }, /target color texture uses a FramebufferTexture/i, 'options.target color framebuffer texture'],
+    [{ texture: new THREE.DepthTexture(1, 1) }, /target color texture uses a DepthTexture as a color attachment/i, 'options.target color depth texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'options.target compressed color texture'],
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'options.target compressed color format'],
     [{ depthTexture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target\.depthTexture\.format uses a compressed texture format/i, 'options.target compressed depth format'],
@@ -33345,6 +33407,14 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   )
   renderer.setRenderTarget({ width: 1, height: 1, texture: {}, data: new Uint8Array([255, 0, 0, 255]) })
   assert.throws(
+    () => renderer.copyFramebufferToTexture(new THREE.FramebufferTexture(1, 1)),
+    /Renderer\.copyFramebufferToTexture texture uses a FramebufferTexture/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(new THREE.DepthTexture(1, 1)),
+    /Renderer\.copyFramebufferToTexture texture uses a DepthTexture/i,
+  )
+  assert.throws(
     () => renderer.copyFramebufferToTexture(source, { x: 1, y: 0 }),
     /Renderer\.copyFramebufferToTexture source rectangle must fit inside the active framebuffer bounds/i,
   )
@@ -33392,6 +33462,22 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyTextureToTexture({ isTexture: true, image: Buffer.from([1, 2, 3, 4]) }, destination),
     /Renderer\.copyTextureToTexture source texture must provide a readable image object.*raw data.*canvas-like pixel access/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(new THREE.FramebufferTexture(1, 1), destination),
+    /Renderer\.copyTextureToTexture source texture uses a FramebufferTexture/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, new THREE.FramebufferTexture(1, 1)),
+    /Renderer\.copyTextureToTexture destination texture uses a FramebufferTexture/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(new THREE.DepthTexture(1, 1), destination),
+    /Renderer\.copyTextureToTexture source texture uses a DepthTexture/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, new THREE.DepthTexture(1, 1)),
+    /Renderer\.copyTextureToTexture destination texture uses a DepthTexture/i,
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, null, null, 1),

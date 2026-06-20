@@ -5082,6 +5082,16 @@ function rawTextureCopyImage(
   label: string,
   options: { allowCanvasRead?: boolean; level?: number } = {},
 ): RawTextureCopyImage {
+  if (texture.isFramebufferTexture === true) {
+    throw new Error(
+      `${label} uses a FramebufferTexture, which is not supported by @headless-three/renderer texture copy yet. Use a readable raw DataTexture-style source or destination, or render into a target-like object and copy its readable color data.`,
+    )
+  }
+  if (texture.isDepthTexture === true) {
+    throw new Error(
+      `${label} uses a DepthTexture, which is not supported by @headless-three/renderer texture copy yet. Use Renderer.readRenderTargetPixels() or target.depthTexture readback for depth data.`,
+    )
+  }
   if (
     texture.isDataArrayTexture === true ||
     texture.isData3DTexture === true ||
@@ -5682,6 +5692,11 @@ function assertNormalizedNumberOption(value: unknown, label: string): void {
 
 function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLike | undefined, label = 'target color texture'): void {
   if (!texture) return
+  if (texture.isDepthTexture === true) {
+    throw new Error(
+      `${label} uses a DepthTexture as a color attachment, which is not supported by @headless-three/renderer render targets. Use target.depthTexture for depth readback and a regular color texture for color output.`,
+    )
+  }
   const format = texture.format
   if (isCompressedTextureFormat(format)) {
     throw new Error(
@@ -5777,6 +5792,11 @@ function assertSupportedRenderTargetTextureDimensionality(texture: RenderTargetT
 
 function assertSupportedRenderTargetTextureClass(texture: RenderTargetTextureLike | undefined, label: string): void {
   if (!texture) return
+  if (texture.isFramebufferTexture === true) {
+    throw new Error(
+      `${label} uses a FramebufferTexture, which is not supported by @headless-three/renderer render targets. Use a regular target texture or target-like texture object for renderer-owned readback data.`,
+    )
+  }
   if (texture.isCompressedTexture === true) {
     throw new Error(
       `${label} uses a compressed texture, which is not supported by @headless-three/renderer render targets. Use a regular 2D target texture and compress output after readback if needed.`,

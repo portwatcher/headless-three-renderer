@@ -3388,6 +3388,16 @@ function assertSupportedTextureInput(
   label: string,
   options: { allowMipmaps?: boolean } = {},
 ): void {
+  if (map.isFramebufferTexture === true) {
+    throw new Error(
+      `${label} uses a FramebufferTexture, which is not supported by @headless-three/renderer texture slots. Copy framebuffer output into a readable raw texture with Renderer.copyFramebufferToTexture(), or render into a target-like object and use its color texture data.`,
+    )
+  }
+  if (map.isDepthTexture === true) {
+    throw new Error(
+      `${label} uses a DepthTexture, which is only supported as target.depthTexture for render-target depth readback. Use a readable color texture for material, background, or environment slots.`,
+    )
+  }
   if (
     map.isCompressedTexture === true ||
     map.isCompressedArrayTexture === true ||

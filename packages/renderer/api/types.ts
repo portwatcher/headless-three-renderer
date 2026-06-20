@@ -114,6 +114,8 @@ export interface ThreeTextureLike {
   version?: number
   isTexture?: boolean
   isCubeTexture?: boolean
+  isFramebufferTexture?: boolean
+  isDepthTexture?: boolean
   isCompressedTexture?: boolean
   isCompressedArrayTexture?: boolean
   isCompressedCubeTexture?: boolean
@@ -616,6 +618,8 @@ export interface RenderTargetTextureLike {
   }
   userData?: Record<string, any>
   isCubeTexture?: boolean
+  isFramebufferTexture?: boolean
+  isDepthTexture?: boolean
   isCompressedTexture?: boolean
   isDataArrayTexture?: boolean
   isData3DTexture?: boolean
