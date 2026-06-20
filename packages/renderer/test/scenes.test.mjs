@@ -25828,6 +25828,7 @@ test('Renderer shadowMap enabled gates reusable renderer shadows', () => {
   assert.equal(renderer.shadowMap.enabled, true)
   assert.equal(renderer.shadowMap.autoUpdate, true)
   assert.equal(renderer.shadowMap.needsUpdate, false)
+  assert.equal(renderer.shadowMap.transmitted, false)
   assert.equal(renderer.shadowMap.type, THREE.PCFShadowMap)
 
   for (const shadowMapType of [THREE.BasicShadowMap, THREE.PCFShadowMap, THREE.PCFSoftShadowMap, THREE.VSMShadowMap]) {
@@ -25837,15 +25838,18 @@ test('Renderer shadowMap enabled gates reusable renderer shadows', () => {
 
   renderer.shadowMap.autoUpdate = false
   renderer.shadowMap.needsUpdate = true
+  renderer.shadowMap.transmitted = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   assert.equal(renderer.shadowMap.autoUpdate, false)
   assert.equal(renderer.shadowMap.needsUpdate, true)
+  assert.equal(renderer.shadowMap.transmitted, true)
   assert.equal(renderer.shadowMap.type, THREE.PCFSoftShadowMap)
 
   for (const [property, value, pattern] of [
     ['enabled', 'yes', /Renderer\.shadowMap\.enabled must be a boolean/i],
     ['autoUpdate', 'yes', /Renderer\.shadowMap\.autoUpdate must be a boolean/i],
     ['needsUpdate', 'yes', /Renderer\.shadowMap\.needsUpdate must be a boolean/i],
+    ['transmitted', 'yes', /Renderer\.shadowMap\.transmitted must be a boolean/i],
     ['type', 'soft', /Renderer\.shadowMap\.type must be a Three\.js shadow map type constant/i],
     ['type', 999, /Renderer\.shadowMap\.type 999 is not supported.*BasicShadowMap.*PCFShadowMap.*PCFSoftShadowMap.*VSMShadowMap/i],
   ]) {

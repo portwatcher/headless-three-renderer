@@ -204,6 +204,7 @@ class RendererShadowMapState {
   private enabledValue = true
   private autoUpdateValue = true
   private needsUpdateValue = false
+  private transmittedValue = false
   private typeValue = PCFShadowMap
 
   get enabled(): boolean {
@@ -228,6 +229,14 @@ class RendererShadowMapState {
 
   set needsUpdate(value: boolean) {
     this.needsUpdateValue = rendererStateBoolean(value, 'Renderer.shadowMap.needsUpdate')
+  }
+
+  get transmitted(): boolean {
+    return this.transmittedValue
+  }
+
+  set transmitted(value: boolean) {
+    this.transmittedValue = rendererStateBoolean(value, 'Renderer.shadowMap.transmitted')
   }
 
   get type(): number {
