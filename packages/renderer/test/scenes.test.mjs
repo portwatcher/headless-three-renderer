@@ -34996,6 +34996,10 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
     /Renderer\.renderBufferDirect\(\) is not supported.*WebGL buffer binding.*Renderer\.render\(\) or renderToTarget\(\)/i,
   )
   assert.throws(
+    () => renderer.renderBufferImmediate(),
+    /Renderer\.renderBufferImmediate\(\) is not supported.*legacy WebGL immediate buffer binding.*Renderer\.render\(\) or renderToTarget\(\)/i,
+  )
+  assert.throws(
     () => renderer.renderObject(),
     /Renderer\.renderObject\(\) is not supported.*render-object dispatch.*Renderer\.render\(\) or renderToTarget\(\)/i,
   )

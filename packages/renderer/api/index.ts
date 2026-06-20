@@ -2667,6 +2667,12 @@ export class Renderer {
     )
   }
 
+  renderBufferImmediate(): never {
+    throw new Error(
+      'Renderer.renderBufferImmediate() is not supported by @headless-three/renderer because it does not expose legacy WebGL immediate buffer binding or direct material program dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
+    )
+  }
+
   renderObject(): never {
     throw new Error(
       'Renderer.renderObject() is not supported by @headless-three/renderer because it does not expose renderer-internal render-object dispatch or direct material program dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
