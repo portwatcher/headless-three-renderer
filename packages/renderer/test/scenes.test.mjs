@@ -30641,6 +30641,7 @@ test('Renderer setEffects is an inert validated compatibility hook', () => {
 
 test('Renderer renderBufferDirect fails clearly as unsupported', () => {
   const renderer = new Renderer()
+  const texture = {}
 
   assert.equal(renderer.getRenderObjectFunction(), null)
   assert.equal(renderer.setRenderObjectFunction(null), undefined)
@@ -30669,6 +30670,20 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
     () => renderer.setMRT({ output: 'color' }),
     /Renderer\.setMRT\(\) is not supported.*arbitrary native MRT shader outputs.*userData\.headlessThreeRenderer\.renderMode/i,
   )
+  for (const method of ['setTexture2D', 'setTextureCube', 'setTexture3D', 'setTexture2DArray']) {
+    assert.throws(
+      () => renderer[method](texture, 0),
+      new RegExp(`Renderer\\.${method}\\(\\) is not supported.*browser WebGL texture units.*material, background, environment, or render-target texture inputs`, 'i'),
+    )
+    assert.throws(
+      () => renderer[method](null, 0),
+      new RegExp(`Renderer\\.${method} texture must be a texture-like object`, 'i'),
+    )
+    assert.throws(
+      () => renderer[method](texture, -1),
+      new RegExp(`Renderer\\.${method} slot must be a non-negative integer`, 'i'),
+    )
+  }
 })
 
 test('Renderer resource init hooks are validated no-op compatibility hooks', () => {

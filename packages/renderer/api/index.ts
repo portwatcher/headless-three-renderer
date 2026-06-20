@@ -1406,6 +1406,30 @@ export class Renderer {
     return null
   }
 
+  setTexture2D(texture: unknown, slot: unknown): never {
+    assertThreeTextureLike(texture, 'Renderer.setTexture2D texture')
+    assertTextureBindingSlot(slot, 'Renderer.setTexture2D slot')
+    throw unsupportedTextureBindingError('Renderer.setTexture2D')
+  }
+
+  setTextureCube(texture: unknown, slot: unknown): never {
+    assertThreeTextureLike(texture, 'Renderer.setTextureCube texture')
+    assertTextureBindingSlot(slot, 'Renderer.setTextureCube slot')
+    throw unsupportedTextureBindingError('Renderer.setTextureCube')
+  }
+
+  setTexture3D(texture: unknown, slot: unknown): never {
+    assertThreeTextureLike(texture, 'Renderer.setTexture3D texture')
+    assertTextureBindingSlot(slot, 'Renderer.setTexture3D slot')
+    throw unsupportedTextureBindingError('Renderer.setTexture3D')
+  }
+
+  setTexture2DArray(texture: unknown, slot: unknown): never {
+    assertThreeTextureLike(texture, 'Renderer.setTexture2DArray texture')
+    assertTextureBindingSlot(slot, 'Renderer.setTexture2DArray slot')
+    throw unsupportedTextureBindingError('Renderer.setTexture2DArray')
+  }
+
   initRenderTarget(target: RenderTargetLike): void {
     assertRenderTargetLike(target, 'Renderer.initRenderTarget target')
     validateUnsupportedRenderTargetOptions(target)
@@ -4207,6 +4231,18 @@ function assertThreeTextureLike(value: unknown, label: string): asserts value is
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a texture-like object.`)
   }
+}
+
+function assertTextureBindingSlot(value: unknown, label: string): asserts value is number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new TypeError(`${label} must be a non-negative integer.`)
+  }
+}
+
+function unsupportedTextureBindingError(method: string): Error {
+  return new Error(
+    `${method}() is not supported by @headless-three/renderer because it does not expose browser WebGL texture units or direct texture binding. Use material, background, environment, or render-target texture inputs instead.`,
+  )
 }
 
 function assertExternalWebGlObjectLike(value: unknown, label: string): void {
