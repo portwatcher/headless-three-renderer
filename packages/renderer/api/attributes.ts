@@ -41,15 +41,15 @@ export function readVec2Attribute(attribute: ThreeBufferAttributeLike, label = '
   return values
 }
 
-export function readColorAttribute(attribute: ThreeBufferAttributeLike, materialColor: Color4, label = 'THREE.BufferAttribute'): number[] {
+export function readColorAttribute(attribute: ThreeBufferAttributeLike, _materialColor: Color4, label = 'THREE.BufferAttribute'): number[] {
   const count = attributeCount(attribute, label)
   const itemSize = attributeItemSize(attribute, label) ?? 3
   const values = new Array<number>(count * 4)
   for (let i = 0; i < count; i += 1) {
-    values[i * 4] = clamp01(attributeComponent(attribute, i, 0, label) * materialColor[0])
-    values[i * 4 + 1] = clamp01(attributeComponent(attribute, i, 1, label) * materialColor[1])
-    values[i * 4 + 2] = clamp01(attributeComponent(attribute, i, 2, label) * materialColor[2])
-    values[i * 4 + 3] = clamp01((itemSize >= 4 ? attributeComponent(attribute, i, 3, label) : 1) * materialColor[3])
+    values[i * 4] = clamp01(attributeComponent(attribute, i, 0, label))
+    values[i * 4 + 1] = clamp01(attributeComponent(attribute, i, 1, label))
+    values[i * 4 + 2] = clamp01(attributeComponent(attribute, i, 2, label))
+    values[i * 4 + 3] = clamp01(itemSize >= 4 ? attributeComponent(attribute, i, 3, label) : 1)
   }
   return values
 }

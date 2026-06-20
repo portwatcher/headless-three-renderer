@@ -2902,17 +2902,17 @@ impl<'a> ColorMode<'a> {
     fn new(
         colors: Option<&'a [f64]>,
         vertex_count: usize,
-        material_color: [f64; 4],
+        _material_color: [f64; 4],
         mesh_index: usize,
     ) -> Result<Self> {
         let Some(colors) = colors else {
-            return Ok(Self::Uniform(color_to_f32(material_color)));
+            return Ok(Self::Uniform([1.0, 1.0, 1.0, 1.0]));
         };
 
         match colors.len() {
             3 | 4 => Ok(Self::Uniform(color_to_f32(parse_color(
                 Some(colors),
-                material_color,
+                [1.0, 1.0, 1.0, 1.0],
                 &format!("scene.meshes[{mesh_index}].colors"),
             )?))),
             len if len == vertex_count * 3 => Ok(Self::RgbPerVertex(colors)),

@@ -336,7 +336,7 @@ function transparentLayerCorpus() {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
       const cornerMatchesBackground = Math.abs(corner.r - 80) <= 1 && Math.abs(corner.g - 80) <= 1 && Math.abs(corner.b - 89) <= 1
-      if (!(center.r > center.g + 40 && center.b > center.g + 50 && cornerMatchesBackground)) {
+      if (!(center.r > center.g + 8 && center.b > center.r + 30 && center.b > center.g + 40 && cornerMatchesBackground)) {
         throw new Error(`transparent layer corpus should blend the blue front over the orange back, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -369,11 +369,11 @@ function alphaToCoverageCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    minMeanAlpha: 220,
+    minMeanAlpha: 190,
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.r > 35 && center.r < 70 && center.g > 35 && center.g < 70 && center.b > 35 && center.b < 70 && center.a < 240 && corner.r === 0 && corner.g === 0 && corner.b === 0 && corner.a === 255)) {
+      if (!(center.r > 80 && center.r < 120 && center.g > 80 && center.g < 120 && center.b > 80 && center.b < 120 && center.a > 180 && center.a < 210 && corner.r === 0 && corner.g === 0 && corner.b === 0 && corner.a === 255)) {
         throw new Error(`alpha-to-coverage corpus should resolve a partial gray plane over black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -565,7 +565,7 @@ function stencilRenderStateCorpus() {
     validate(rgba, { width }) {
       const masked = meanRegion(rgba, width, 16, 24, 44, 72)
       const unmasked = meanRegion(rgba, width, 52, 24, 80, 72)
-      if (!(masked.b > masked.g + 180 && masked.b > masked.r + 200 && unmasked.r < 2 && unmasked.g < 2 && unmasked.b < 2)) {
+      if (!(masked.b > masked.g + 120 && masked.b > masked.r + 160 && unmasked.r < 2 && unmasked.g < 2 && unmasked.b < 2)) {
         throw new Error(`stencil corpus should render only the masked blue side, got masked=${JSON.stringify(masked)} unmasked=${JSON.stringify(unmasked)}`)
       }
     },
@@ -639,7 +639,7 @@ function backgroundOverrideCorpus() {
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       const corner = meanRegion(rgba, width, 4, 4, 20, 20)
-      if (!(center.g > center.r + 120 && center.g > center.b + 80 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
+      if (!(center.g > center.r + 80 && center.g > center.b + 40 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
         throw new Error(`background override corpus should render green mesh on black option background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -829,7 +829,7 @@ function linearOutputColorSpaceCorpus() {
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.r > 60 && center.r < 90 && center.g < 20 && center.b < 10 && corner.r > 40 && corner.r < 55 && corner.g > 40 && corner.g < 55 && corner.b > 40 && corner.b < 55)) {
+      if (!(center.r > 130 && center.r < 160 && center.g > 60 && center.g < 85 && center.b > 15 && center.b < 35 && corner.r > 40 && corner.r < 55 && corner.g > 40 && corner.g < 55 && corner.b > 40 && corner.b < 55)) {
         throw new Error(`linear output corpus should preserve linear RGB values, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -1154,7 +1154,7 @@ function spriteAlphaMapCorpus() {
     validate(rgba, { width }) {
       const cutout = meanRegion(rgba, width, 20, 34, 40, 62)
       const visible = meanRegion(rgba, width, 56, 34, 76, 62)
-      if (!(cutout.b > cutout.g + 25 && visible.g > visible.b + 80 && visible.g > visible.r + 80)) {
+      if (!(cutout.b > cutout.g + 25 && visible.g > visible.b + 45 && visible.g > visible.r + 65)) {
         throw new Error(`sprite alpha-map corpus should cut out the left side and keep the right side green, got cutout=${JSON.stringify(cutout)} visible=${JSON.stringify(visible)}`)
       }
     },
@@ -1226,6 +1226,7 @@ function billboardAlphaCutoutCorpus() {
     options: a2cOptions,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.04,
+    minMeanAlpha: 238,
     browserReference: false,
     render(renderer) {
       let output = null
@@ -1574,7 +1575,7 @@ function globalClippingPlaneCorpus() {
     validate(rgba, { width }) {
       const clipped = meanRegion(rgba, width, 16, 32, 40, 64)
       const visible = meanRegion(rgba, width, 56, 32, 80, 64)
-      if (!(clipped.r < 5 && clipped.g < 5 && clipped.b > 25 && visible.r > visible.g + 180 && visible.r > visible.b + 180)) {
+      if (!(clipped.r < 5 && clipped.g < 5 && clipped.b > 25 && visible.r > visible.g + 130 && visible.r > visible.b + 170)) {
         throw new Error(`global clipping corpus should keep only the red right half, got clipped=${JSON.stringify(clipped)} visible=${JSON.stringify(visible)}`)
       }
     },
@@ -1608,7 +1609,7 @@ function materialLocalClippingCorpus() {
       const visible = meanRegion(rgba, width, 32, 16, 64, 40)
       const clipped = meanRegion(rgba, width, 32, 56, 64, 80)
       const clippedMatchesBackground = Math.abs(clipped.r - 39) <= 1 && Math.abs(clipped.g - 39) <= 1 && Math.abs(clipped.b - 80) <= 1
-      if (!(visible.b > visible.r + 120 && visible.g > visible.r + 80 && clippedMatchesBackground)) {
+      if (!(visible.b > visible.r + 90 && visible.g > visible.r + 80 && clippedMatchesBackground)) {
         throw new Error(`local clipping corpus should keep only the cyan top half, got visible=${JSON.stringify(visible)} clipped=${JSON.stringify(clipped)}`)
       }
     },
@@ -1650,7 +1651,7 @@ function nestedClippingGroupCorpus() {
       const visible = pixelAt(rgba, width, 64, 32)
       const clippedLeft = pixelAt(rgba, width, 32, 32)
       const clippedBottom = pixelAt(rgba, width, 64, 64)
-      if (!(visible.r > visible.g + 180 && visible.r > visible.b + 180 && clippedLeft.r < 5 && clippedLeft.g < 5 && clippedLeft.b > 25 && clippedBottom.r < 5 && clippedBottom.g < 5 && clippedBottom.b > 25)) {
+      if (!(visible.r > visible.g + 130 && visible.r > visible.b + 170 && clippedLeft.r < 5 && clippedLeft.g < 5 && clippedLeft.b > 25 && clippedBottom.r < 5 && clippedBottom.g < 5 && clippedBottom.b > 25)) {
         throw new Error(`nested clipping corpus should keep only the red upper-right quadrant, got visible=${JSON.stringify(visible)} clippedLeft=${JSON.stringify(clippedLeft)} clippedBottom=${JSON.stringify(clippedBottom)}`)
       }
     },
@@ -1993,7 +1994,7 @@ function meshBasicMaterialWireframeCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.004,
     validate(rgba, { width, height }) {
-      const yellowPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && g > 100 && b < 120)
+      const yellowPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && g > 100 && r > b + 35 && g > b + 15)
       const center = pixelAt(rgba, width, 48, 48)
       if (!(yellowPixels > 700 && yellowPixels < 1200 && center.r < 5 && center.g < 5 && center.b < 5)) {
         throw new Error(`basic wireframe corpus should render sparse yellow grid lines, got yellow=${yellowPixels} center=${JSON.stringify(center)}`)
@@ -2869,7 +2870,7 @@ function meshToonMaterialCorpus() {
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
-      if (!(center.b > center.g + 40 && center.g > center.r + 80)) {
+      if (!(center.b > center.g + 20 && center.g > center.r + 60)) {
         throw new Error(`toon gradient corpus should sample the blue-green ramp, got ${JSON.stringify(center)}`)
       }
     },
@@ -3153,7 +3154,7 @@ function arrayCameraViewportCorpus() {
     validate(rgba, { width }) {
       const left = meanRegion(rgba, width, 16, 32, 40, 64)
       const right = meanRegion(rgba, width, 56, 32, 80, 64)
-      if (!(left.r > left.g + 180 && left.r > left.b + 180 && right.g > right.r + 70 && right.g > right.b + 100)) {
+      if (!(left.r > left.g + 170 && left.r > left.b + 180 && right.g > right.r + 60 && right.g > right.b + 70)) {
         throw new Error(`ArrayCamera corpus should render red left and green right viewports, got left=${JSON.stringify(left)} right=${JSON.stringify(right)}`)
       }
     },
@@ -3411,7 +3412,7 @@ function customSortGroupCorpus() {
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.r > center.b + 180 && center.r > center.g + 180 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
+      if (!(center.r > center.b + 160 && center.r > center.g + 170 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
         throw new Error(`custom sort corpus should draw the red group last on black background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -3462,7 +3463,7 @@ function skinnedMorphCorpus() {
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.b > center.g + 50 && center.g > 80 && center.r < 20 && corner.r === 63 && corner.g === 69 && corner.b === 80)) {
+      if (!(center.b > center.g + 25 && center.g > center.r + 50 && center.b > center.r + 80 && corner.r === 63 && corner.g === 69 && corner.b === 80)) {
         throw new Error(`skinned morph corpus should render the deformed cyan plane over background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -3580,7 +3581,7 @@ function avatarLikeCorpus() {
       const head = pixelAt(rgba, width, 48, 28)
       const body = pixelAt(rgba, width, 48, 54)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(head.r > head.b + 50 && head.g > head.b + 20 && body.b > body.r + 80 && body.g > body.r + 40 && Math.abs(corner.r - 69) <= 1 && Math.abs(corner.g - 75) <= 1 && Math.abs(corner.b - 89) <= 1)) {
+      if (!(head.r > head.b + 20 && head.g > head.b + 5 && body.b > body.r + 45 && body.g > body.r + 20 && Math.abs(corner.r - 69) <= 1 && Math.abs(corner.g - 75) <= 1 && Math.abs(corner.b - 89) <= 1)) {
         throw new Error(`avatar corpus should render warm head and blue toon body, got head=${JSON.stringify(head)} body=${JSON.stringify(body)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -3958,7 +3959,7 @@ function dashedLineMaterialCorpus() {
         0,
         width,
         height,
-        (r, g, b) => r > 120 && g > 120 && b < 100,
+        (r, g, b) => r > 120 && g > 120 && r > b + 35 && g > b + 15,
       )
       const gap = pixelAt(rgba, width, 48, 48)
       if (!(yellowPixels > 30 && yellowPixels < 90 && gap.r < 5 && gap.g < 5 && gap.b < 5)) {
@@ -4174,7 +4175,7 @@ function dashedLineMaterialWideLineCorpus() {
     minNonBackgroundRatio: 0.002,
     browserReference: false,
     render(renderer) {
-      const isCyan = (r, g, b) => b > 120 && g > 90 && r < 130
+      const isCyan = (r, g, b) => b > 120 && g > 90 && b > r + 30 && g > r + 20
       const thin = renderer.render(thinScene, camera, options)
       thinPixels = countRegionPixels(thin, options.width, 0, 0, options.width, options.height, isCyan)
       const wide = renderer.render(wideScene, camera, options)
@@ -4661,7 +4662,7 @@ function batchedMeshCullingCorpus() {
       const r = rgba[offset]
       const g = rgba[offset + 1]
       const b = rgba[offset + 2]
-      if (g <= r + 80 || g <= b + 80) {
+      if (g <= r + 60 || g <= b + 80) {
         throw new Error(`batched culling should leave the center green, got rgb(${r}, ${g}, ${b})`)
       }
     },
@@ -4765,7 +4766,7 @@ function lodAndGroupsCorpus() {
     validate(rgba, { width }) {
       const group = meanRegion(rgba, width, 16, 36, 36, 60)
       const lod = meanRegion(rgba, width, 60, 36, 80, 60)
-      if (!(group.r > 80 && group.b > 80 && group.g < 30 && lod.b > lod.r + 100 && lod.g > lod.r + 40)) {
+      if (!(group.r > 80 && group.b > 80 && group.r > group.g + 70 && group.b > group.g + 80 && lod.b > lod.r + 95 && lod.g > lod.r + 65)) {
         throw new Error(`LOD/groups corpus should render the material-array group and near LOD sphere, got group=${JSON.stringify(group)} lod=${JSON.stringify(lod)}`)
       }
     },

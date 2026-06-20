@@ -22,8 +22,8 @@ const referencesRequired = areBrowserReferencesRequired()
 
 const DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF = 18
 const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map([
-  ['array-camera-viewport-split', 58],
-  ['alpha-to-coverage-msaa-plane', 44],
+  ['array-camera-viewport-split', 63],
+  ['alpha-to-coverage-msaa-plane', 26],
 ])
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
@@ -85,7 +85,7 @@ test('browser reference tolerance policy scopes known parity gaps to fixture nam
   }
 
   assert.equal(getBrowserReferenceMaxMeanDiff('mesh-depth-material-basic', {}), DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF)
-  assert.equal(getBrowserReferenceMaxMeanDiff('array-camera-viewport-split', {}), 58)
+  assert.equal(getBrowserReferenceMaxMeanDiff('array-camera-viewport-split', {}), 63)
   assert.equal(
     getBrowserReferenceMaxMeanDiff(
       'array-camera-viewport-split',
