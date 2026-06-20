@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import * as THREE from 'three'
+import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
@@ -2400,6 +2401,41 @@ test('Reflector and Refractor prepasses use Renderer target state and restore fl
     assert.equal(helper.visible, true)
     helper.dispose()
   }
+})
+
+test('StereoEffect renders scissored eye cameras without forced matrix updates', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  renderer.setRenderTarget(target)
+  renderer.autoClear = true
+
+  const effect = new StereoEffect(renderer)
+  effect.setSize(64, 32)
+  effect.render(scene, camera)
+
+  assert.ok(target.data instanceof Uint8Array, 'StereoEffect should write into the active target')
+  assert.equal(target.width, 64)
+  assert.equal(target.height, 32)
+
+  const left = meanRegion(target.data, 64, 32, 8, 8, 24, 24)
+  const right = meanRegion(target.data, 64, 32, 40, 8, 56, 24)
+  assert.ok(left.r > left.b + 80, `left eye should contain the red mesh (${left.r} vs ${left.b})`)
+  assert.ok(right.r > right.b + 80, `right eye should contain the red mesh (${right.r} vs ${right.b})`)
+  assert.equal(renderer.autoClear, true)
+  assert.equal(renderer.getScissorTest(), false)
+  assert.deepEqual(renderer.getViewport(), { x: 32, y: 0, width: 32, height: 32 })
+  assert.deepEqual(renderer.getScissor(), { x: 32, y: 0, width: 32, height: 32 })
 })
 
 test('EffectComposer RenderPass uses Renderer target state and readback', () => {

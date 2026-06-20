@@ -2519,9 +2519,10 @@ export class Renderer {
         objectIdEntries,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
+      const outputBuffer = compositeActiveTargetColorBuffer(target, buffer, width, height, targetOptions, this.autoClear)
       writeRenderTarget(
         target,
-        buffer,
+        outputBuffer,
         width,
         height,
         auxiliary.objectIdEntries,
@@ -2547,9 +2548,17 @@ export class Renderer {
       objectIdEntries,
       (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
     )
-    writeRenderTarget(
+    const outputBuffer = compositeActiveTargetColorBuffer(
       target,
       buffer,
+      nativeScene.width!,
+      nativeScene.height!,
+      targetOptions,
+      this.autoClear,
+    )
+    writeRenderTarget(
+      target,
+      outputBuffer,
       nativeScene.width!,
       nativeScene.height!,
       auxiliary.objectIdEntries,
@@ -2809,7 +2818,7 @@ function toNativeInput(
     scene.updateMatrixWorld(true)
   }
   if (typeof camera.updateMatrixWorld === 'function') {
-    camera.updateMatrixWorld(true)
+    camera.updateMatrixWorld()
   }
 
   const size = resolveSize(camera, options)
@@ -5757,6 +5766,54 @@ function writeRenderTarget(
   writeObjectIdMetadata(target, objectIdEntries)
 
   return target
+}
+
+function compositeActiveTargetColorBuffer(
+  target: RenderTargetLike,
+  data: Buffer,
+  width: number,
+  height: number,
+  options: RenderOptions,
+  autoClear: boolean,
+): Buffer {
+  if (autoClear) return data
+  const existing = renderTargetExistingColorBuffer(target.data, width, height)
+  if (!existing) return data
+
+  const rect = activeTargetRenderRect(options, width, height)
+  if (rect.width <= 0 || rect.height <= 0) return existing
+  if (rect.x === 0 && rect.y === 0 && rect.width === width && rect.height === height) return data
+
+  const output = Buffer.from(existing)
+  for (let row = 0; row < rect.height; row += 1) {
+    const rowStart = ((rect.y + row) * width + rect.x) * 4
+    const rowEnd = rowStart + rect.width * 4
+    data.copy(output, rowStart, rowStart, rowEnd)
+  }
+  return output
+}
+
+function activeTargetRenderRect(options: RenderOptions, width: number, height: number): PixelRect {
+  const bounds = { x: 0, y: 0, width, height }
+  const viewport = effectiveViewport(options)
+  const viewportRect = viewport
+    ? intersectPixelRects(bounds, rendererStatePixelRect(viewport, undefined, undefined, undefined, effectiveViewportLabel(options))!)
+    : bounds
+  const scissor = effectiveScissor(options)
+  if (!scissor) return viewportRect ?? bounds
+  return intersectPixelRects(
+    viewportRect ?? bounds,
+    rendererStatePixelRect(scissor, undefined, undefined, undefined, effectiveScissorLabel(options))!,
+  ) ?? { x: 0, y: 0, width: 0, height: 0 }
+}
+
+function intersectPixelRects(a: PixelRect, b: PixelRect): PixelRect | null {
+  const x = Math.max(a.x, b.x)
+  const y = Math.max(a.y, b.y)
+  const right = Math.min(a.x + a.width, b.x + b.width)
+  const bottom = Math.min(a.y + a.height, b.y + b.height)
+  if (right <= x || bottom <= y) return null
+  return { x, y, width: right - x, height: bottom - y }
 }
 
 function clearRenderTargetColor(
