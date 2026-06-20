@@ -32373,6 +32373,19 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     () => renderer.copyFramebufferToTexture(source, null, -1),
     /Renderer\.copyFramebufferToTexture level must be a non-negative integer/i,
   )
+  renderer.setRenderTarget({ width: 1, height: 1, texture: {}, data: new Uint8Array([255, 0, 0, 255]) })
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(source, { x: 1, y: 0 }),
+    /Renderer\.copyFramebufferToTexture source rectangle must fit inside the active framebuffer bounds/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(source, { x: 0, y: 0, width: 0, height: 1 }),
+    /Renderer\.copyFramebufferToTexture source rectangle\.width must be a positive integer/i,
+  )
+  assert.throws(
+    () => renderer.copyFramebufferToTexture(source, 'position'),
+    /Renderer\.copyFramebufferToTexture source rectangle must be a vector, rectangle object, array, or null/i,
+  )
   renderer.setRenderTarget(null)
   assert.throws(
     () => renderer.setRenderTargetTextures(null, externalColorTexture),
@@ -32606,61 +32619,65 @@ test('Renderer copyTextureToTexture copies readable canvas-like source data on t
   }
 })
 
-test('Renderer copyFramebufferToTexture copies active render target color data on the CPU', () => {
+test('Renderer copyFramebufferToTexture copies active framebuffer source rectangles on the CPU', () => {
   const renderer = new Renderer()
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
-  ))
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
-  camera.position.set(0, 0, 2)
-  camera.lookAt(0, 0, 0)
 
-  const target = { texture: {} }
+  function sourcePixel(x, y, width) {
+    return [10 + x, 20 + y, 30 + x + y * width, 255]
+  }
+
+  function patternedTarget(width, height) {
+    const data = new Uint8Array(width * height * 4)
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        data.set(sourcePixel(x, y, width), (y * width + x) * 4)
+      }
+    }
+    return { width, height, texture: {}, data }
+  }
+
+  const target = patternedTarget(5, 4)
   renderer.setRenderTarget(target)
-  renderer.render(scene, camera, {
-    width: 4,
-    height: 4,
-    outputColorSpace: THREE.LinearSRGBColorSpace,
-  })
 
-  const destinationData = new Uint8Array(6 * 6 * 4)
+  const destinationData = new Uint8Array(3 * 3 * 4)
   destinationData.fill(9)
-  const destination = new THREE.DataTexture(destinationData, 6, 6, THREE.RGBAFormat)
+  const destination = new THREE.DataTexture(destinationData, 3, 3, THREE.RGBAFormat)
   const initialVersion = destination.version
 
-  renderer.copyFramebufferToTexture(destination, { x: 1, y: 2 })
+  renderer.copyFramebufferToTexture(destination, new THREE.Vector2(1, 1))
 
   function pixel(x, y) {
-    const offset = (y * 6 + x) * 4
+    const offset = (y * 3 + x) * 4
     return Array.from(destination.image.data.slice(offset, offset + 4))
   }
 
-  const copiedTopLeft = pixel(1, 2)
-  const copiedBottomRight = pixel(4, 5)
-  assert.ok(copiedTopLeft[0] > 200 && copiedTopLeft[1] < 20 && copiedTopLeft[2] < 20 && copiedTopLeft[3] === 255, `top-left copied framebuffer pixel should be red (${copiedTopLeft})`)
-  assert.ok(copiedBottomRight[0] > 200 && copiedBottomRight[1] < 20 && copiedBottomRight[2] < 20 && copiedBottomRight[3] === 255, `bottom-right copied framebuffer pixel should be red (${copiedBottomRight})`)
-  assert.deepEqual(pixel(0, 0), [9, 9, 9, 9])
+  assert.deepEqual(pixel(0, 0), sourcePixel(1, 1, 5))
+  assert.deepEqual(pixel(2, 2), sourcePixel(3, 3, 5))
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after framebuffer copy')
 
-  const mipData = new Uint8Array(4 * 4 * 4)
+  destination.image.data.fill(9)
+  const versionAfterVector2Copy = destination.version
+  renderer.copyFramebufferToTexture(destination, new THREE.Vector4(2, 0, 2, 2))
+
+  assert.deepEqual(pixel(0, 0), sourcePixel(2, 0, 5))
+  assert.deepEqual(pixel(1, 1), sourcePixel(3, 1, 5))
+  assert.deepEqual(pixel(2, 2), [9, 9, 9, 9])
+  assert.ok(destination.version > versionAfterVector2Copy, 'destination texture should be marked dirty after framebuffer rectangle copy')
+
+  const mipData = new Uint8Array(2 * 2 * 4)
   mipData.fill(11)
-  destination.mipmaps = [{ data: mipData, width: 4, height: 4 }]
-  const versionAfterBaseCopy = destination.version
-  renderer.copyFramebufferToTexture(destination, { x: 0, y: 0 }, 1)
+  destination.mipmaps = [{ data: mipData, width: 2, height: 2 }]
+  const versionAfterRectangleCopy = destination.version
+  renderer.copyFramebufferToTexture(destination, [0, 2], 1)
 
   function mipPixel(x, y) {
-    const offset = (y * 4 + x) * 4
+    const offset = (y * 2 + x) * 4
     return Array.from(destination.mipmaps[0].data.slice(offset, offset + 4))
   }
 
-  const mipTopLeft = mipPixel(0, 0)
-  const mipBottomRight = mipPixel(3, 3)
-  assert.ok(mipTopLeft[0] > 200 && mipTopLeft[1] < 20 && mipTopLeft[2] < 20 && mipTopLeft[3] === 255, `top-left copied framebuffer mip pixel should be red (${mipTopLeft})`)
-  assert.ok(mipBottomRight[0] > 200 && mipBottomRight[1] < 20 && mipBottomRight[2] < 20 && mipBottomRight[3] === 255, `bottom-right copied framebuffer mip pixel should be red (${mipBottomRight})`)
-  assert.ok(destination.version > versionAfterBaseCopy, 'destination texture should be marked dirty after framebuffer mip copy')
+  assert.deepEqual(mipPixel(0, 0), sourcePixel(0, 2, 5))
+  assert.deepEqual(mipPixel(1, 1), sourcePixel(1, 3, 5))
+  assert.ok(destination.version > versionAfterRectangleCopy, 'destination texture should be marked dirty after framebuffer mip copy')
   renderer.setRenderTarget(null)
 })
 

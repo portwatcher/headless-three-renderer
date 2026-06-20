@@ -1883,19 +1883,23 @@ export class Renderer {
       )
     }
 
-    const destinationPosition = textureCopyDestinationPosition(position, 'Renderer.copyFramebufferToTexture position')
-    if (
-      destinationPosition.x + source.width > destination.width ||
-      destinationPosition.y + source.height > destination.height
-    ) {
-      throw new RangeError('Renderer.copyFramebufferToTexture position and framebuffer size exceed destination texture bounds.')
+    const region = textureCopyFramebufferSourceRegion(
+      position,
+      destination.width,
+      destination.height,
+      source.width,
+      source.height,
+      'Renderer.copyFramebufferToTexture source rectangle',
+    )
+    if (region.width > destination.width || region.height > destination.height) {
+      throw new RangeError('Renderer.copyFramebufferToTexture source rectangle size exceeds destination texture bounds.')
     }
 
     const channels = source.channels
-    for (let row = 0; row < source.height; row += 1) {
-      const sourceStart = row * source.width * channels
-      const destinationStart = (((destinationPosition.y + row) * destination.width) + destinationPosition.x) * channels
-      for (let i = 0; i < source.width * channels; i += 1) {
+    for (let row = 0; row < region.height; row += 1) {
+      const sourceStart = (((region.y + row) * source.width) + region.x) * channels
+      const destinationStart = row * destination.width * channels
+      for (let i = 0; i < region.width * channels; i += 1) {
         destination.data[destinationStart + i] = source.data[sourceStart + i]
       }
     }
@@ -5040,6 +5044,68 @@ function textureCopySourceRegion(value: unknown, sourceWidth: number, sourceHeig
   }
   if (region.x < 0 || region.y < 0 || region.x + region.width > sourceWidth || region.y + region.height > sourceHeight) {
     throw new RangeError(`${label} must fit inside the source texture bounds.`)
+  }
+  return region
+}
+
+function textureCopyFramebufferSourceRegion(
+  value: unknown,
+  defaultWidth: number,
+  defaultHeight: number,
+  sourceWidth: number,
+  sourceHeight: number,
+  label: string,
+): TextureCopyRegion {
+  let region: TextureCopyRegion
+  if (value == null) {
+    region = { x: 0, y: 0, width: defaultWidth, height: defaultHeight }
+  } else if (Array.isArray(value)) {
+    region = value.length >= 4
+      ? {
+          x: textureCopyInteger(value[0], `${label}.x`),
+          y: textureCopyInteger(value[1], `${label}.y`),
+          width: textureCopyPositiveInteger(value[2], `${label}.width`),
+          height: textureCopyPositiveInteger(value[3], `${label}.height`),
+        }
+      : {
+          x: textureCopyInteger(value[0], `${label}.x`),
+          y: textureCopyInteger(value[1], `${label}.y`),
+          width: defaultWidth,
+          height: defaultHeight,
+        }
+  } else if (typeof value === 'object') {
+    const candidate = value as {
+      isVector2?: unknown
+      isVector4?: unknown
+      x?: unknown
+      y?: unknown
+      z?: unknown
+      w?: unknown
+      width?: unknown
+      height?: unknown
+    }
+    const x = textureCopyInteger(candidate.x, `${label}.x`)
+    const y = textureCopyInteger(candidate.y, `${label}.y`)
+    const isVector2 = candidate.isVector2 === true
+    const isVector4 = candidate.isVector4 === true
+    const width = isVector2 ? undefined : (isVector4 ? candidate.z : candidate.width ?? candidate.z)
+    const height = isVector2 ? undefined : (isVector4 ? candidate.w : candidate.height ?? candidate.w)
+    region = width === undefined && height === undefined
+      ? { x, y, width: defaultWidth, height: defaultHeight }
+      : {
+          x,
+          y,
+          width: textureCopyPositiveInteger(width, `${label}.width`),
+          height: textureCopyPositiveInteger(height, `${label}.height`),
+        }
+  } else {
+    throw new TypeError(`${label} must be a vector, rectangle object, array, or null.`)
+  }
+  if (region.x < 0 || region.y < 0) {
+    throw new RangeError(`${label} x and y must be non-negative.`)
+  }
+  if (region.x + region.width > sourceWidth || region.y + region.height > sourceHeight) {
+    throw new RangeError(`${label} must fit inside the active framebuffer bounds.`)
   }
   return region
 }
