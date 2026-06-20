@@ -8032,8 +8032,8 @@ test('Renderer opaque and transparent flags gate render buckets', () => {
   assert.equal(renderer.opaque, true)
   assert.equal(renderer.transparent, true)
 
-  function bucketMeans() {
-    const rgba = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  function bucketMeans(options = {}) {
+    const rgba = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba', ...options })
     return {
       opaque: meanRegion(rgba, 64, 64, 11, 27, 21, 37),
       transmissive: meanRegion(rgba, 64, 64, 27, 27, 37, 37),
@@ -8065,6 +8065,20 @@ test('Renderer opaque and transparent flags gate render buckets', () => {
     assert.ok(mean.r < 5 && mean.g < 5 && mean.b < 5, `opaque=false and transparent=false should leave only the background in the ${label} region (${mean.r}, ${mean.g}, ${mean.b})`)
   }
 
+  const optionOpaqueOnly = bucketMeans({ opaque: true, transparent: false })
+  assert.ok(optionOpaqueOnly.opaque.g > optionOpaqueOnly.opaque.r + 160, `options.opaque=true should override renderer state for the opaque green bucket (${optionOpaqueOnly.opaque.r}, ${optionOpaqueOnly.opaque.g}, ${optionOpaqueOnly.opaque.b})`)
+  assert.ok(optionOpaqueOnly.transmissive.b < 5, `options.transparent=false should skip the transmissive blue bucket (${optionOpaqueOnly.transmissive.r}, ${optionOpaqueOnly.transmissive.g}, ${optionOpaqueOnly.transmissive.b})`)
+  assert.ok(optionOpaqueOnly.transparent.r < 5, `options.transparent=false should skip the ordinary transparent red bucket (${optionOpaqueOnly.transparent.r}, ${optionOpaqueOnly.transparent.g}, ${optionOpaqueOnly.transparent.b})`)
+  assert.equal(renderer.opaque, false)
+  assert.equal(renderer.transparent, false)
+
+  const optionTransparentOnly = bucketMeans({ opaque: false, transparent: true })
+  assert.ok(optionTransparentOnly.opaque.g < 5, `options.opaque=false should skip the opaque green bucket (${optionTransparentOnly.opaque.r}, ${optionTransparentOnly.opaque.g}, ${optionTransparentOnly.opaque.b})`)
+  assert.ok(optionTransparentOnly.transmissive.b > optionTransparentOnly.transmissive.r + 80, `options.transparent=true should override renderer state for the transmissive blue bucket (${optionTransparentOnly.transmissive.r}, ${optionTransparentOnly.transmissive.g}, ${optionTransparentOnly.transmissive.b})`)
+  assert.ok(optionTransparentOnly.transparent.r > optionTransparentOnly.transparent.g + 160, `options.transparent=true should override renderer state for the ordinary transparent red bucket (${optionTransparentOnly.transparent.r}, ${optionTransparentOnly.transparent.g}, ${optionTransparentOnly.transparent.b})`)
+  assert.equal(renderer.opaque, false)
+  assert.equal(renderer.transparent, false)
+
   assert.throws(
     () => { renderer.opaque = 'yes' },
     /Renderer\.opaque must be a boolean/i,
@@ -8086,6 +8100,14 @@ test('invalid sort controls fail clearly', () => {
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, sortObjects: 'yes' }),
     /options\.sortObjects must be a boolean/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, opaque: 'yes' }),
+    /options\.opaque must be a boolean/i,
+  )
+  assert.throws(
+    () => renderRgba(scene, camera, { width: 32, height: 32, transparent: 1 }),
+    /options\.transparent must be a boolean/i,
   )
   assert.throws(
     () => renderRgba(scene, camera, { width: 32, height: 32, opaqueSort: 'front' }),

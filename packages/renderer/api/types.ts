@@ -600,6 +600,10 @@ export interface RenderOptions {
   renderMode?: RenderMode
   /** Whether render-list sorting is enabled. Defaults to true. */
   sortObjects?: boolean
+  /** Whether opaque render-list buckets are rendered. Defaults to Renderer.opaque. */
+  opaque?: boolean
+  /** Whether transmissive/transparent render-list buckets are rendered. Defaults to Renderer.transparent. */
+  transparent?: boolean
   /** Custom opaque-bucket sort callback. `null` uses the default sort. */
   opaqueSort?: RenderSortFunction | null
   /** Custom transmissive/transparent-bucket sort callback. `null` uses the default sort. */

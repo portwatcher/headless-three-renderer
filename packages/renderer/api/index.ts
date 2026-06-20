@@ -3303,8 +3303,8 @@ export class Renderer {
       sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
       opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
       transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
-      __headlessThreeRendererOpaque: this.opaque,
-      __headlessThreeRendererTransparent: this.transparent,
+      __headlessThreeRendererOpaque: sizeOptions.opaque ?? this.opaque,
+      __headlessThreeRendererTransparent: sizeOptions.transparent ?? this.transparent,
       __headlessThreeClippingPlanesLabel: hasExplicitClippingPlanes ? undefined : 'Renderer.clippingPlanes',
       __headlessThreeRendererClearColor: cloneColor4(this.currentClearColor),
       __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
@@ -5974,6 +5974,12 @@ function assertEulerOption(value: unknown, label: string): void {
 function validateSortControls(options: RenderOptions): void {
   if (options.sortObjects != null && typeof options.sortObjects !== 'boolean') {
     throw new TypeError(`options.sortObjects must be a boolean; received ${String(options.sortObjects)}.`)
+  }
+  if (options.opaque != null && typeof options.opaque !== 'boolean') {
+    throw new TypeError(`options.opaque must be a boolean; received ${String(options.opaque)}.`)
+  }
+  if (options.transparent != null && typeof options.transparent !== 'boolean') {
+    throw new TypeError(`options.transparent must be a boolean; received ${String(options.transparent)}.`)
   }
   if (options.opaqueSort != null && typeof options.opaqueSort !== 'function') {
     throw new TypeError('options.opaqueSort must be a function or null.')
