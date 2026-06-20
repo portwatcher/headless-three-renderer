@@ -182,8 +182,29 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-toon-fallback-bands.png",
+      "name": "mesh-toon-fallback-bands",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-toon-gradient-map.png",
       "name": "mesh-toon-gradient-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-material-normal-map.png",
+      "name": "mesh-toon-material-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-material-bump-map.png",
+      "name": "mesh-toon-material-bump-map",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"

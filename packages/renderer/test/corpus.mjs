@@ -2892,7 +2892,6 @@ function meshToonMaterialFallbackBandsCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.1,
-    browserReference: false,
     render(renderer) {
       const lambert = renderer.render(lambertScene, camera, options)
       lambertMean = meanRegion(lambert, options.width, 0, 0, options.width, options.height)
@@ -2941,7 +2940,6 @@ function meshToonMaterialNormalMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options)
       flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
@@ -3013,7 +3011,6 @@ function meshToonMaterialBumpMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options)
       flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
