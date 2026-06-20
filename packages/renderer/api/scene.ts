@@ -135,6 +135,7 @@ export interface SceneExtractionCache {
   instancedColorExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedColorExpansion>>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
+  instancedDashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedDashedLineExpansion>>
   texturePayloads: TextureExtractionCache
   materialColors: MaterialColorExtractionCache
   textureStates: TextureStateExtractionCache
@@ -181,6 +182,11 @@ interface CachedBatchedGeometryView {
 
 interface CachedDashedLineExpansion {
   signature: DashedLineSignature
+  expansion: DashedLineExpansion
+}
+
+interface CachedInstancedDashedLineExpansion {
+  signature: InstancedDashedLineSignature
   expansion: DashedLineExpansion
 }
 
@@ -259,6 +265,30 @@ interface DashedLineSignature {
   start: number
   end: number
   sourceLength: number
+  isLineSegments?: boolean
+  isLineLoop?: boolean
+  isLine?: boolean
+  dashSize: number
+  gapSize: number
+  scale: number
+}
+
+interface InstancedDashedLineSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  position: AttributeSignature
+  index: AttributeSignature
+  uv: UvChannelSignature
+  uv2: UvChannelSignature
+  lineDistance: AttributeSignature
+  vertexColors: AttributeSignature
+  instancedPositionOffset: AttributeSignature
+  instancedPositionScale: AttributeSignature
+  materialColor?: Color4
+  start: number
+  end: number
+  sourceLength: number
+  instanceCount: number
   isLineSegments?: boolean
   isLineLoop?: boolean
   isLine?: boolean
@@ -438,6 +468,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     instancedColorExpansions: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
+    instancedDashedLines: new WeakMap(),
     texturePayloads: new WeakMap(),
     materialColors: new WeakMap(),
     textureStates: new WeakMap(),
@@ -2312,7 +2343,10 @@ function appendLineOrPoints(
       if (material?.isLineDashedMaterial === true) {
         const lineDistance = getAttribute(geometry, 'lineDistance')
         const dashed = instancedGeometryCount > 1 || instancedPositionOffset || instancedPositionScale
-          ? dashedLineAttributesForInstances(
+          ? dashedLineAttributesForInstancesWithCache(
+            cache,
+            geometry,
+            position,
             positions,
             uvStreams.uvs,
             uvStreams.uvs2,
@@ -4325,6 +4359,221 @@ function sameDashedLineSignature(a: DashedLineSignature, b: DashedLineSignature)
     && a.start === b.start
     && a.end === b.end
     && a.sourceLength === b.sourceLength
+    && a.isLineSegments === b.isLineSegments
+    && a.isLineLoop === b.isLineLoop
+    && a.isLine === b.isLine
+    && Object.is(a.dashSize, b.dashSize)
+    && Object.is(a.gapSize, b.gapSize)
+    && Object.is(a.scale, b.scale)
+}
+
+function dashedLineAttributesForInstancesWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+  positions: number[],
+  uvChannel: UvChannel | null,
+  uvChannel2: UvChannel | null,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  materialColor: Color4,
+  source: number[],
+  start: number,
+  end: number,
+  object: ThreeObject3DLike,
+  lineDistance: ThreeBufferAttributeLike | undefined,
+  material: { dashSize?: number; gapSize?: number; scale?: number },
+  instanceCount: number,
+  offsetAttribute: InstancedAttributeRef | null,
+  scaleAttribute: InstancedAttributeRef | null,
+): DashedLineExpansion {
+  const dashSize = positiveMaterialOrObjectNumber(material.dashSize, 'material.dashSize', 3)
+  const gapSize = nonNegativeMaterialOrObjectNumber(material.gapSize, 'material.gapSize', 1)
+  const scale = nonNegativeMaterialOrObjectNumber(material.scale, 'material.scale', 1)
+  if (!cache) {
+    return dashedLineAttributesForInstances(
+      positions,
+      uvChannel,
+      uvChannel2,
+      vertexColors,
+      materialColor,
+      source,
+      start,
+      end,
+      object,
+      lineDistance,
+      material,
+      instanceCount,
+      offsetAttribute,
+      scaleAttribute,
+    )
+  }
+
+  const signature = instancedDashedLineSignature(
+    geometry,
+    position,
+    uvChannel,
+    uvChannel2,
+    vertexColors,
+    materialColor,
+    lineDistance,
+    start,
+    end,
+    source.length,
+    object,
+    dashSize,
+    gapSize,
+    scale,
+    instanceCount,
+    offsetAttribute,
+    scaleAttribute,
+  )
+  if (!signature.cacheable) {
+    return dashedLineAttributesForInstances(
+      positions,
+      uvChannel,
+      uvChannel2,
+      vertexColors,
+      materialColor,
+      source,
+      start,
+      end,
+      object,
+      lineDistance,
+      material,
+      instanceCount,
+      offsetAttribute,
+      scaleAttribute,
+    )
+  }
+
+  const cacheKey = instancedDashedLineCacheKey(signature)
+  let geometryCache = cache.instancedDashedLines.get(geometry)
+  const cached = geometryCache?.get(cacheKey)
+  if (cached && sameInstancedDashedLineSignature(cached.signature, signature)) {
+    return cached.expansion
+  }
+
+  const expansion = dashedLineAttributesForInstances(
+    positions,
+    uvChannel,
+    uvChannel2,
+    vertexColors,
+    materialColor,
+    source,
+    start,
+    end,
+    object,
+    lineDistance,
+    material,
+    instanceCount,
+    offsetAttribute,
+    scaleAttribute,
+  )
+  if (!geometryCache) {
+    geometryCache = new Map()
+    cache.instancedDashedLines.set(geometry, geometryCache)
+  }
+  geometryCache.set(cacheKey, { signature, expansion })
+  return expansion
+}
+
+function instancedDashedLineSignature(
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+  uvChannel: UvChannel | null,
+  uvChannel2: UvChannel | null,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  materialColor: Color4,
+  lineDistance: ThreeBufferAttributeLike | undefined,
+  start: number,
+  end: number,
+  sourceLength: number,
+  object: ThreeObject3DLike,
+  dashSize: number,
+  gapSize: number,
+  scale: number,
+  instanceCount: number,
+  offsetAttribute: InstancedAttributeRef | null,
+  scaleAttribute: InstancedAttributeRef | null,
+): InstancedDashedLineSignature {
+  const signature: InstancedDashedLineSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    position: attributeSignature(position),
+    index: attributeSignature(geometry.index),
+    uv: uvChannelSignature(uvChannel),
+    uv2: uvChannelSignature(uvChannel2),
+    lineDistance: attributeSignature(lineDistance),
+    vertexColors: attributeSignature(vertexColors),
+    instancedPositionOffset: attributeSignature(offsetAttribute?.attribute),
+    instancedPositionScale: attributeSignature(scaleAttribute?.attribute),
+    materialColor: vertexColors ? materialColor.slice() as Color4 : undefined,
+    start,
+    end,
+    sourceLength,
+    instanceCount,
+    isLineSegments: object.isLineSegments,
+    isLineLoop: object.isLineLoop,
+    isLine: object.isLine,
+    dashSize,
+    gapSize,
+    scale,
+  }
+  signature.cacheable = instancedDashedLineSignatureCacheable(signature)
+  return signature
+}
+
+function instancedDashedLineSignatureCacheable(signature: InstancedDashedLineSignature): boolean {
+  return attributeSignatureCacheable(signature.position)
+    && attributeSignatureCacheable(signature.index)
+    && attributeSignatureCacheable(signature.uv.attribute)
+    && attributeSignatureCacheable(signature.uv2.attribute)
+    && attributeSignatureCacheable(signature.lineDistance)
+    && attributeSignatureCacheable(signature.vertexColors)
+    && attributeSignatureCacheable(signature.instancedPositionOffset)
+    && attributeSignatureCacheable(signature.instancedPositionScale)
+}
+
+function instancedDashedLineCacheKey(signature: InstancedDashedLineSignature): string {
+  return [
+    'instanced',
+    signature.start,
+    signature.end,
+    signature.sourceLength,
+    signature.instanceCount,
+    signature.isLineSegments ? 1 : 0,
+    signature.isLineLoop ? 1 : 0,
+    signature.isLine ? 1 : 0,
+    signature.uv.attribute.ref ? 1 : 0,
+    signature.uv2.attribute.ref ? 1 : 0,
+    signature.vertexColors.ref ? 1 : 0,
+    signature.instancedPositionOffset.ref ? 1 : 0,
+    signature.instancedPositionScale.ref ? 1 : 0,
+    signature.dashSize,
+    signature.gapSize,
+    signature.scale,
+  ].join(':')
+}
+
+function sameInstancedDashedLineSignature(
+  a: InstancedDashedLineSignature,
+  b: InstancedDashedLineSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && sameAttributeSignature(a.position, b.position)
+    && sameAttributeSignature(a.index, b.index)
+    && sameUvChannelSignature(a.uv, b.uv)
+    && sameUvChannelSignature(a.uv2, b.uv2)
+    && sameAttributeSignature(a.lineDistance, b.lineDistance)
+    && sameAttributeSignature(a.vertexColors, b.vertexColors)
+    && sameAttributeSignature(a.instancedPositionOffset, b.instancedPositionOffset)
+    && sameAttributeSignature(a.instancedPositionScale, b.instancedPositionScale)
+    && sameOptionalNumberArray(a.materialColor, b.materialColor)
+    && a.start === b.start
+    && a.end === b.end
+    && a.sourceLength === b.sourceLength
+    && a.instanceCount === b.instanceCount
     && a.isLineSegments === b.isLineSegments
     && a.isLineLoop === b.isLineLoop
     && a.isLine === b.isLine

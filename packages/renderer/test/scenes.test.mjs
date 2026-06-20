@@ -26389,6 +26389,93 @@ test('reusable renderer reuses cached dashed-line expansion until dash inputs ch
   assert.ok(lineDistanceReads > readsAfterDashStateChange, 'lineDistance version changes should invalidate cached dashed-line expansion')
 })
 
+test('reusable renderer reuses cached instanced dashed-line expansion until inputs change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.2, 0, 0,
+    0.2, 0, 0,
+  ], 3))
+  const offset = new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.35, 0, 0,
+    0.35, 0, 0,
+  ]), 3)
+  geometry.setAttribute('instanceOffset', offset)
+  geometry.setAttribute('lineDistance', new THREE.Float32BufferAttribute([0, 0.4], 1))
+  geometry.instanceCount = 2
+
+  const originalOffsetGetX = offset.getX.bind(offset)
+  let offsetReads = 0
+  offset.getX = (index) => {
+    offsetReads += 1
+    return originalOffsetGetX(index)
+  }
+
+  const lineDistance = geometry.getAttribute('lineDistance')
+  const originalLineDistanceGetX = lineDistance.getX.bind(lineDistance)
+  let lineDistanceReads = 0
+  lineDistance.getX = (index) => {
+    lineDistanceReads += 1
+    return originalLineDistanceGetX(index)
+  }
+
+  const material = new THREE.LineDashedMaterial({
+    color: 0xff0000,
+    dashSize: 0.2,
+    gapSize: 0,
+    linewidth: 8,
+    scale: 1,
+  })
+  const line = new THREE.LineSegments(geometry, material)
+  line.frustumCulled = false
+  scene.add(line)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const offsetReadsAfterFirstRender = offsetReads
+  const lineDistanceReadsAfterFirstRender = lineDistanceReads
+  assert.ok(offsetReadsAfterFirstRender > 0, 'initial render should read instanced dashed-line offsets')
+  assert.ok(lineDistanceReadsAfterFirstRender > 0, 'initial render should read instanced dashed-line distances')
+
+  material.color.set(0x00ff00)
+  line.position.y += 0.05
+  renderer.render(scene, camera, options)
+  assert.equal(offsetReads, offsetReadsAfterFirstRender, 'material/transform animation should reuse cached instanced dashed-line offsets')
+  assert.equal(lineDistanceReads, lineDistanceReadsAfterFirstRender, 'material/transform animation should reuse cached instanced dashed-line distances')
+
+  material.gapSize = 0.1
+  renderer.render(scene, camera, options)
+  const offsetReadsAfterDashStateChange = offsetReads
+  const lineDistanceReadsAfterDashStateChange = lineDistanceReads
+  assert.ok(offsetReadsAfterDashStateChange > offsetReadsAfterFirstRender, 'dash-state changes should invalidate cached instanced dashed-line offsets')
+  assert.ok(lineDistanceReadsAfterDashStateChange > lineDistanceReadsAfterFirstRender, 'dash-state changes should invalidate cached instanced dashed-line distances')
+
+  offset.array[0] = -0.3
+  offset.needsUpdate = true
+  renderer.render(scene, camera, options)
+  const lineDistanceReadsAfterOffsetUpdate = lineDistanceReads
+  assert.ok(offsetReads > offsetReadsAfterDashStateChange, 'instanced offset version changes should invalidate cached dashed-line expansion')
+
+  lineDistance.array[1] = 0.55
+  lineDistance.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(lineDistanceReads > lineDistanceReadsAfterOffsetUpdate, 'lineDistance version changes should invalidate cached instanced dashed-line expansion')
+})
+
 test('reusable renderer reuses cached point billboard expansion until UV attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
