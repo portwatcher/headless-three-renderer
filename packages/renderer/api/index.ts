@@ -674,6 +674,20 @@ class RendererBackendState {
     throw unsupportedBackendOperationError('Renderer.backend.clear', 'backend render-context clearing')
   }
 
+  _getDefaultRenderPassDescriptor(): never {
+    throw unsupportedBackendOperationError(
+      'Renderer.backend._getDefaultRenderPassDescriptor',
+      'backend default render-pass descriptor creation',
+    )
+  }
+
+  _getRenderPassDescriptor(): never {
+    throw unsupportedBackendOperationError(
+      'Renderer.backend._getRenderPassDescriptor',
+      'backend render-target pass descriptor creation',
+    )
+  }
+
   async resolveOccludedAsync(_renderContext?: unknown): Promise<void> {}
 
   initTimestampQuery(_renderContext?: unknown, _descriptor?: unknown): void {}
@@ -706,6 +720,10 @@ class RendererBackendState {
 
   destroyProgram(): void {}
 
+  _completeCompile(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._completeCompile', 'backend shader program compilation')
+  }
+
   createBindings(): never {
     throw unsupportedBackendOperationError('Renderer.backend.createBindings', 'backend bind-group creation')
   }
@@ -716,6 +734,14 @@ class RendererBackendState {
 
   updateBinding(): never {
     throw unsupportedBackendOperationError('Renderer.backend.updateBinding', 'backend buffer binding updates')
+  }
+
+  _setupBindings(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._setupBindings', 'backend program binding setup')
+  }
+
+  _bindUniforms(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._bindUniforms', 'WebGL uniform binding')
   }
 
   createRenderPipeline(): never {
@@ -778,6 +804,14 @@ class RendererBackendState {
     throw unsupportedBackendOperationError('Renderer.backend.createAttribute', 'backend vertex attribute buffer creation')
   }
 
+  _getVaoKey(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._getVaoKey', 'WebGL vertex-array cache keys')
+  }
+
+  _createVao(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._createVao', 'WebGL vertex-array binding')
+  }
+
   createIndexAttribute(): never {
     throw unsupportedBackendOperationError('Renderer.backend.createIndexAttribute', 'backend index buffer creation')
   }
@@ -790,11 +824,19 @@ class RendererBackendState {
     throw unsupportedBackendOperationError('Renderer.backend.createIndirectStorageAttribute', 'backend indirect storage buffer creation')
   }
 
+  _getTransformFeedback(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._getTransformFeedback', 'WebGL transform-feedback state')
+  }
+
   updateAttribute(): never {
     throw unsupportedBackendOperationError('Renderer.backend.updateAttribute', 'backend attribute buffer updates')
   }
 
   destroyAttribute(): void {}
+
+  _setFramebuffer(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._setFramebuffer', 'WebGL framebuffer configuration')
+  }
 
   getDomElement(): RendererDomElementState {
     return this.renderer.domElement
