@@ -5097,6 +5097,11 @@ function rawTextureCopyImage(
       `${label} uses a VideoTexture, which is not supported by @headless-three/renderer texture copy because live video frames are not directly readable in Node. Copy from a readable raw texture or canvas-like image instead.`,
     )
   }
+  if (texture.isStorageTexture === true) {
+    throw new Error(
+      `${label} uses a StorageTexture, which is not supported by @headless-three/renderer texture copy because WebGPU storage texture backing data is not directly readable in Node. Copy from a readable raw texture or canvas-like image instead.`,
+    )
+  }
   if (
     texture.isDataArrayTexture === true ||
     texture.isData3DTexture === true ||
@@ -5800,6 +5805,11 @@ function assertSupportedRenderTargetTextureClass(texture: RenderTargetTextureLik
   if (texture.isFramebufferTexture === true) {
     throw new Error(
       `${label} uses a FramebufferTexture, which is not supported by @headless-three/renderer render targets. Use a regular target texture or target-like texture object for renderer-owned readback data.`,
+    )
+  }
+  if (texture.isStorageTexture === true) {
+    throw new Error(
+      `${label} uses a StorageTexture, which is not supported by @headless-three/renderer render targets because WebGPU storage texture attachments are outside the scene-oriented output contract. Use a regular target texture or target-like texture object for renderer-owned readback data.`,
     )
   }
   if (texture.isCompressedTexture === true) {

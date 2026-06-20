@@ -3403,6 +3403,11 @@ function assertSupportedTextureInput(
       `${label} uses a VideoTexture, which is not supported by @headless-three/renderer in Node because live video frames are not directly readable. Provide a canvas-like image exposing getContext("2d").getImageData(), an encoded image, or raw DataTexture pixels before rendering.`,
     )
   }
+  if (map.isStorageTexture === true) {
+    throw new Error(
+      `${label} uses a StorageTexture, which is not supported by @headless-three/renderer texture slots because WebGPU storage texture backing data is not directly readable. Provide a readable raw, encoded, or canvas-like texture before rendering.`,
+    )
+  }
   if (
     map.isCompressedTexture === true ||
     map.isCompressedArrayTexture === true ||

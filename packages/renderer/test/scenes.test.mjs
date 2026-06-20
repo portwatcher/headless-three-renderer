@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import * as THREE from 'three'
+import * as THREE_WEBGPU from 'three/webgpu'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
@@ -17889,6 +17890,51 @@ test('unsupported VideoTexture scene inputs fail clearly in Node slots', () => {
   }
 })
 
+test('unsupported StorageTexture scene inputs fail clearly in Node slots', () => {
+  function storageTexture() {
+    const texture = new THREE_WEBGPU.StorageTexture(1, 1)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const slots = [
+    ['material map', (scene, texture) => {
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: texture }),
+      ))
+    }, /material\.map uses a StorageTexture.*backing data.*not directly readable/i],
+    ['background', (scene, texture) => {
+      scene.background = texture
+    }, /background uses a StorageTexture.*backing data.*not directly readable/i],
+    ['environment', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.environment = texture
+    }, /scene\.environment uses a StorageTexture.*backing data.*not directly readable/i],
+    ['material envMap', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap: texture }),
+      ))
+    }, /material\.envMap uses a StorageTexture.*backing data.*not directly readable/i],
+    ['reflection probe', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture } }
+    }, /reflectionProbe\.texture uses a StorageTexture.*backing data.*not directly readable/i],
+  ]
+
+  for (const [slotName, setup, pattern] of slots) {
+    const scene = new THREE.Scene()
+    setup(scene, storageTexture())
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${slotName} StorageTexture should fail clearly`,
+    )
+  }
+})
+
 test('unsupported cube texture material slots fail clearly', () => {
   function makeCubeMap() {
     return cubeTexture([
@@ -24411,6 +24457,8 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: new THREE.FramebufferTexture(1, 1) }, /target color texture uses a FramebufferTexture/i, 'color framebuffer texture'],
     [{ depthTexture: new THREE.FramebufferTexture(1, 1) }, /target\.depthTexture uses a FramebufferTexture/i, 'depth framebuffer texture'],
     [{ texture: new THREE.DepthTexture(1, 1) }, /target color texture uses a DepthTexture as a color attachment/i, 'color depth texture'],
+    [{ texture: new THREE_WEBGPU.StorageTexture(1, 1) }, /target color texture uses a StorageTexture.*scene-oriented output contract/i, 'color storage texture'],
+    [{ depthTexture: new THREE_WEBGPU.StorageTexture(1, 1) }, /target\.depthTexture uses a StorageTexture.*scene-oriented output contract/i, 'depth storage texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'color compressed texture'],
     [{ depthTexture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target\.depthTexture uses a compressed texture/i, 'depth compressed texture'],
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'color compressed format'],
@@ -24440,6 +24488,8 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1) }, /target color texture uses an array or 3D texture/i, 'options.target color array texture'],
     [{ texture: new THREE.FramebufferTexture(1, 1) }, /target color texture uses a FramebufferTexture/i, 'options.target color framebuffer texture'],
     [{ texture: new THREE.DepthTexture(1, 1) }, /target color texture uses a DepthTexture as a color attachment/i, 'options.target color depth texture'],
+    [{ texture: new THREE_WEBGPU.StorageTexture(1, 1) }, /target color texture uses a StorageTexture.*scene-oriented output contract/i, 'options.target color storage texture'],
+    [{ depthTexture: new THREE_WEBGPU.StorageTexture(1, 1) }, /target\.depthTexture uses a StorageTexture.*scene-oriented output contract/i, 'options.target depth storage texture'],
     [{ texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat) }, /target color texture uses a compressed texture/i, 'options.target compressed color texture'],
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'options.target compressed color format'],
     [{ depthTexture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target\.depthTexture\.format uses a compressed texture format/i, 'options.target compressed depth format'],
@@ -33504,6 +33554,10 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     /Renderer\.copyFramebufferToTexture texture uses a DepthTexture/i,
   )
   assert.throws(
+    () => renderer.copyFramebufferToTexture(new THREE_WEBGPU.StorageTexture(1, 1)),
+    /Renderer\.copyFramebufferToTexture texture uses a StorageTexture.*backing data.*not directly readable/i,
+  )
+  assert.throws(
     () => renderer.copyFramebufferToTexture(source, { x: 1, y: 0 }),
     /Renderer\.copyFramebufferToTexture source rectangle must fit inside the active framebuffer bounds/i,
   )
@@ -33575,6 +33629,14 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyTextureToTexture(source, new THREE.VideoTexture({ videoWidth: 1, videoHeight: 1 })),
     /Renderer\.copyTextureToTexture destination texture uses a VideoTexture.*live video frames.*not directly readable/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(new THREE_WEBGPU.StorageTexture(1, 1), destination),
+    /Renderer\.copyTextureToTexture source texture uses a StorageTexture.*backing data.*not directly readable/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, new THREE_WEBGPU.StorageTexture(1, 1)),
+    /Renderer\.copyTextureToTexture destination texture uses a StorageTexture.*backing data.*not directly readable/i,
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, null, null, 1),
