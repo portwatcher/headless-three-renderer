@@ -24504,6 +24504,32 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     /secondary color attachment.*renderMode/i,
   )
 
+  const arrayOr3DRenderTargetClasses = [
+    ['THREE.RenderTargetArray', THREE.RenderTargetArray],
+    ['THREE.RenderTarget3D', THREE.RenderTarget3D],
+    ['THREE.WebGLArrayRenderTarget', THREE.WebGLArrayRenderTarget],
+    ['THREE.WebGL3DRenderTarget', THREE.WebGL3DRenderTarget],
+  ]
+
+  for (const [label, TargetClass] of arrayOr3DRenderTargetClasses) {
+    const directTarget = new TargetClass(4, 4, 2)
+    assert.throws(
+      () => renderToTarget(scene, camera, directTarget, { width: 32, height: 32 }),
+      /target color texture uses an array or 3D texture/i,
+      label,
+    )
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32, target: new TargetClass(4, 4, 2) }),
+      /target color texture uses an array or 3D texture/i,
+      `${label} options.target`,
+    )
+    assert.throws(
+      () => renderer.setRenderTarget(new TargetClass(4, 4, 2)),
+      /target color texture uses an array or 3D texture/i,
+      `${label} Renderer.setRenderTarget`,
+    )
+  }
+
   const targetCases = [
     [{ image: 'bad' }, /target\.image must be an image-like object/i, 'target image container'],
     [{ texture: 'bad' }, /target\.texture must be a texture-like object/i, 'color texture container'],
