@@ -205,6 +205,56 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_finite_geometry_attribute_inputs() {
+        let cases: Vec<(&str, Box<dyn Fn(&mut SceneMesh)>)> = vec![
+            (
+                "normals",
+                Box::new(|mesh| {
+                    mesh.normals = Some(vec![0.0, 0.0, 1.0, f64::NAN, 0.0, 1.0, 0.0, 0.0, 1.0]);
+                }),
+            ),
+            (
+                "uvs",
+                Box::new(|mesh| {
+                    mesh.uvs = Some(vec![0.0, 0.0, 1.0, f64::INFINITY, 0.0, 1.0]);
+                }),
+            ),
+            (
+                "uvs2",
+                Box::new(|mesh| {
+                    mesh.uvs2 = Some(vec![0.0, 0.0, 1.0, 0.0, f64::NEG_INFINITY, 1.0]);
+                }),
+            ),
+            (
+                "colors",
+                Box::new(|mesh| {
+                    mesh.colors = Some(vec![1.0, 0.0, 0.0, 0.0, f64::NAN, 0.0, 0.0, 0.0, 1.0]);
+                }),
+            ),
+        ];
+
+        for (label, mutate) in cases {
+            let mut mesh = SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                ..SceneMesh::default()
+            };
+            mutate(&mut mesh);
+            let scene = RenderScene {
+                meshes: Some(vec![mesh]),
+                ..RenderScene::default()
+            };
+            let error = match prepare_meshes(&scene) {
+                Ok(_) => panic!("{label} should fail"),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains("must contain finite"),
+                "{label} should fail with a finite attribute error, got: {error}",
+            );
+        }
+    }
+
+    #[test]
     fn rejects_non_finite_material_scalar_inputs() {
         let cases: Vec<(&str, Box<dyn Fn(&mut SceneMesh)>)> = vec![
             ("metallic", Box::new(|mesh| mesh.metallic = Some(f64::NAN))),

@@ -5,7 +5,7 @@ use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
 
 use crate::types::SceneMesh;
-use crate::util::{clamp01, color_to_f32, finite_f32, parse_color, parse_transform};
+use crate::util::{clamp01, color_to_f32, finite_color, finite_f32, parse_color, parse_transform};
 
 pub const MAX_CLIPPING_PLANES: usize = 8;
 const PARALLEL_MESH_PREPARE_THRESHOLD: usize = 8;
@@ -726,6 +726,9 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     }
 
     let mut vertices = Vec::with_capacity(vertex_count);
+    let normals_field = format!("scene.meshes[{mesh_index}].normals");
+    let uvs_field = format!("scene.meshes[{mesh_index}].uvs");
+    let uvs2_field = format!("scene.meshes[{mesh_index}].uvs2");
     for vertex_index in 0..vertex_count {
         let base = vertex_index * 3;
         let uv_base = vertex_index * 2;
@@ -737,7 +740,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             ],
             normal: if has_normals {
                 let n = normals.unwrap();
-                [n[base] as f32, n[base + 1] as f32, n[base + 2] as f32]
+                [
+                    finite_f32(n[base], &normals_field)?,
+                    finite_f32(n[base + 1], &normals_field)?,
+                    finite_f32(n[base + 2], &normals_field)?,
+                ]
             } else {
                 [0.0, 0.0, 0.0]
             },
@@ -745,16 +752,25 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             color: color_mode.color(vertex_index),
             uv: if has_uvs {
                 let u = uvs.unwrap();
-                [u[uv_base] as f32, u[uv_base + 1] as f32]
+                [
+                    finite_f32(u[uv_base], &uvs_field)?,
+                    finite_f32(u[uv_base + 1], &uvs_field)?,
+                ]
             } else {
                 [0.0, 0.0]
             },
             uv2: if has_uvs2 {
                 let u = uvs2.unwrap();
-                [u[uv_base] as f32, u[uv_base + 1] as f32]
+                [
+                    finite_f32(u[uv_base], &uvs2_field)?,
+                    finite_f32(u[uv_base + 1], &uvs2_field)?,
+                ]
             } else if has_uvs {
                 let u = uvs.unwrap();
-                [u[uv_base] as f32, u[uv_base + 1] as f32]
+                [
+                    finite_f32(u[uv_base], &uvs_field)?,
+                    finite_f32(u[uv_base + 1], &uvs_field)?,
+                ]
             } else {
                 [0.0, 0.0]
             },
@@ -2966,8 +2982,14 @@ impl<'a> ColorMode<'a> {
                 [1.0, 1.0, 1.0, 1.0],
                 &format!("scene.meshes[{mesh_index}].colors"),
             )?))),
-            len if len == vertex_count * 3 => Ok(Self::RgbPerVertex(colors)),
-            len if len == vertex_count * 4 => Ok(Self::RgbaPerVertex(colors)),
+            len if len == vertex_count * 3 => {
+                validate_color_values(colors, &format!("scene.meshes[{mesh_index}].colors"))?;
+                Ok(Self::RgbPerVertex(colors))
+            }
+            len if len == vertex_count * 4 => {
+                validate_color_values(colors, &format!("scene.meshes[{mesh_index}].colors"))?;
+                Ok(Self::RgbaPerVertex(colors))
+            }
             len => bail!(
                 "scene.meshes[{mesh_index}].colors has length {len}; expected 3, 4, vertex_count * 3, or vertex_count * 4"
             ),
@@ -2997,6 +3019,13 @@ impl<'a> ColorMode<'a> {
             }
         }
     }
+}
+
+fn validate_color_values(values: &[f64], field: &str) -> Result<()> {
+    for value in values {
+        finite_color(*value, field)?;
+    }
+    Ok(())
 }
 
 fn compute_flat_normals(vertices: &mut [Vertex], indices: Option<&[u32]>) {
