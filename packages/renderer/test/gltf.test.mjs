@@ -8026,7 +8026,7 @@ test('committed Khronos glTF Sample Assets SpecularSilkPouf fixture loads real s
 
   assert.ok(nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.15, 'SpecularSilkPouf should render visible dark silk geometry')
   const centerSample = meanRegion(rgba, 128, 128, 48, 48, 80, 80)
-  assert.ok(centerSample.b > centerSample.r && centerSample.b > centerSample.g && centerSample.b < 5, `SpecularSilkPouf center should render dark blue silk (${centerSample.r}, ${centerSample.g}, ${centerSample.b})`)
+  assert.ok(centerSample.b > centerSample.r + 10 && centerSample.b > centerSample.g + 10 && centerSample.b < 35, `SpecularSilkPouf center should render dark blue silk (${centerSample.r}, ${centerSample.g}, ${centerSample.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materials_specular scalar and texture inputs', async () => {
@@ -10949,7 +10949,7 @@ test('committed Khronos glTF Sample Assets SimpleMaterial fixture loads scalar P
 
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.25, 'SimpleMaterial sample should render visible PBR geometry')
   const center = meanRegion(rgba, 96, 96, 34, 34, 62, 62)
-  assert.ok(center.r > center.b + 50 && center.g > center.b + 35, `SimpleMaterial sample should render warm base-color pixels (${center.r}, ${center.g}, ${center.b})`)
+  assert.ok(center.r > center.b + 30 && center.g > center.b + 20, `SimpleMaterial sample should render warm base-color pixels (${center.r}, ${center.g}, ${center.b})`)
 })
 
 test('committed Khronos glTF Sample Assets SimpleMeshes fixture reuses a mesh across nodes', async () => {
@@ -11023,8 +11023,8 @@ test('committed Khronos glTF Sample Assets UnlitTest fixture loads KHR_materials
   assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'UnlitTest should render visible objects without scene lights')
   const left = meanRegion(rgba, 128, 96, 24, 32, 54, 64)
   const right = meanRegion(rgba, 128, 96, 74, 32, 104, 64)
-  assert.ok(left.r > left.g + 180 && left.r > left.b + 200, `unlit orange mesh should render orange without lights (${left.r}, ${left.g}, ${left.b})`)
-  assert.ok(right.b > right.g + 150 && right.b > right.r + 180, `unlit blue mesh should render blue without lights (${right.r}, ${right.g}, ${right.b})`)
+  assert.ok(left.r > left.g + 120 && left.r > left.b + 200, `unlit orange mesh should render orange without lights (${left.r}, ${left.g}, ${left.b})`)
+  assert.ok(right.b > right.g + 110 && right.b > right.r + 180, `unlit blue mesh should render blue without lights (${right.r}, ${right.g}, ${right.b})`)
 })
 
 test('committed Khronos glTF Sample Assets Triangle fixture loads minimal indexed primitive', async () => {

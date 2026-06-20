@@ -248,6 +248,7 @@ export async function createNodeGltfLoader(
   if (installFetch !== false) {
     installLocalFileFetch()
   }
+  installEncodedImageSupportProbe()
 
   const encodedImages = createEncodedImageTextureLoader(root, loadingManager)
   if (registerTextureHandlers !== false) {
@@ -543,6 +544,35 @@ export function installLocalFileFetch(): void {
   globalScope[marker] = true
 }
 
+function installEncodedImageSupportProbe(): void {
+  const globalScope = globalThis as any
+  if (typeof globalScope.Image === 'function') return
+  const marker = Symbol.for('headless-three-renderer.encoded-image-probe')
+  if (globalScope[marker]) return
+
+  globalScope.Image = class EncodedImageProbe {
+    height = 0
+    onerror: (() => unknown) | null = null
+    onload: (() => unknown) | null = null
+    width = 0
+
+    set src(value: unknown) {
+      const url = String(value ?? '')
+      const supported = /^data:image\/webp[;,]/i.test(url)
+      this.width = supported ? 1 : 0
+      this.height = supported ? 1 : 0
+      queueMicrotask(() => {
+        if (supported) {
+          this.onload?.()
+        } else {
+          this.onerror?.()
+        }
+      })
+    }
+  }
+  globalScope[marker] = true
+}
+
 function registerEncodedImageHandlers(manager: ThreeLoadingManagerLike, encodedImages: EncodedImageTextureLoader): void {
   manager.addHandler(/^blob:/i, encodedImages)
   manager.addHandler(/^data:image\/(?:png|jpe?g|webp)/i, encodedImages)
@@ -661,11 +691,24 @@ function applyNodeVisibilityExtension(gltf: unknown, parser: GltfNodeVisibilityP
   const associations = parser.associations
   const nodes = parser.json?.nodes
   if (!associations || !Array.isArray(nodes)) return
+  const nodeIndexByName = uniqueNodeIndexByName(nodes)
 
   for (const root of gltfRootScenes(gltf)) {
     root.traverse?.((object) => {
       const association = associations.get(object)
-      const nodeIndex = association?.nodes
+      let nodeIndex = association?.nodes
+      const objectName = typeof (object as { name?: unknown }).name === 'string'
+        ? (object as { name: string }).name
+        : ''
+      const associatedNode = typeof nodeIndex === 'number' && Number.isInteger(nodeIndex)
+        ? nodes[nodeIndex]
+        : undefined
+      const associatedName = typeof (associatedNode as { name?: unknown } | undefined)?.name === 'string'
+        ? (associatedNode as { name: string }).name
+        : ''
+      if (objectName && associatedName !== objectName) {
+        nodeIndex = nodeIndexByName.get(objectName) ?? nodeIndex
+      }
       if (typeof nodeIndex !== 'number' || !Number.isInteger(nodeIndex)) return
       const node = nodes[nodeIndex]
       if (!node || typeof node !== 'object' || Array.isArray(node)) return
@@ -678,6 +721,25 @@ function applyNodeVisibilityExtension(gltf: unknown, parser: GltfNodeVisibilityP
       }
     })
   }
+}
+
+function uniqueNodeIndexByName(nodes: unknown[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const node of nodes) {
+    const name = typeof (node as { name?: unknown } | undefined)?.name === 'string'
+      ? (node as { name: string }).name
+      : ''
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+
+  const result = new Map<string, number>()
+  nodes.forEach((node, index) => {
+    const name = typeof (node as { name?: unknown } | undefined)?.name === 'string'
+      ? (node as { name: string }).name
+      : ''
+    if (name && counts.get(name) === 1) result.set(name, index)
+  })
+  return result
 }
 
 function gltfRootScenes(gltf: unknown): TraversableObjectLike[] {
