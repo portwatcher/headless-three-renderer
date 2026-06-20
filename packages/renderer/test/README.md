@@ -57,7 +57,7 @@ If references are committed under `packages/renderer/test/browser-reference/refe
 `pnpm run test:golden` detects that platform directory without the environment
 variable.
 
-The harness defaults to a mean RGBA tolerance of `18` and carries two fixture-scoped
+The harness defaults to a mean RGBA tolerance of `18` and carries one fixture-scoped
 tolerances for known browser parity gaps in the Linux x64 corpus. Use
 `HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF` to override that policy for ad hoc
 local comparisons against a chosen browser/GPU reference platform.

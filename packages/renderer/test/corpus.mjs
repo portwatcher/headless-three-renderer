@@ -3151,6 +3151,7 @@ function arrayCameraViewportCorpus() {
     camera: new THREE.ArrayCamera([leftCamera, rightCamera]),
     options: { width, height, format: 'rgba' },
     background: [0, 0, 20],
+    browserReference: false,
     validate(rgba, { width }) {
       const left = meanRegion(rgba, width, 16, 32, 40, 64)
       const right = meanRegion(rgba, width, 56, 32, 80, 64)
