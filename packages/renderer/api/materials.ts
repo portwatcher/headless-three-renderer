@@ -118,6 +118,7 @@ const LinearEncoding = 3000
 const sRGBEncoding = 3001
 
 // Three.js texture format constants
+const AlphaFormat = 1021
 const LuminanceAlphaFormat = 1025
 
 const CompressedTextureFormats = new Set([
@@ -3251,11 +3252,7 @@ function rawHalfFloatTextureDataToRgba(
   const out = new Uint16Array(pixels * 4)
   for (let i = 0; i < pixels; i += 1) {
     if (channels === 1) {
-      const value = rawData[i]
-      out[i * 4] = value
-      out[i * 4 + 1] = value
-      out[i * 4 + 2] = value
-      out[i * 4 + 3] = 0x3C00
+      writeOneChannelRawRgba(out, i, rawData[i], 0x3C00, options.format)
     } else if (channels === 2) {
       writeTwoChannelRawRgba(out, i, rawData[i * channels], rawData[i * channels + 1], 0x3C00, options.format)
     } else {
@@ -3286,11 +3283,7 @@ function rawFloatTextureDataToRgba(
   const out = new Float32Array(pixels * 4)
   for (let i = 0; i < pixels; i += 1) {
     if (channels === 1) {
-      const value = rawData[i]
-      out[i * 4] = value
-      out[i * 4 + 1] = value
-      out[i * 4 + 2] = value
-      out[i * 4 + 3] = 1.0
+      writeOneChannelRawRgba(out, i, rawData[i], 1.0, options.format)
     } else if (channels === 2) {
       writeTwoChannelRawRgba(out, i, rawData[i * channels], rawData[i * channels + 1], 1.0, options.format)
     } else {
@@ -3302,6 +3295,20 @@ function rawFloatTextureDataToRgba(
   }
   const data = options.premultiplyAlpha === true ? premultiplyFloatRgba(out) : out
   return Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+}
+
+function writeOneChannelRawRgba(
+  out: Uint16Array | Float32Array,
+  pixelIndex: number,
+  value: number,
+  opaqueAlpha: number,
+  format: unknown,
+): void {
+  const offset = pixelIndex * 4
+  out[offset] = value
+  out[offset + 1] = value
+  out[offset + 2] = value
+  out[offset + 3] = format === AlphaFormat ? value : opaqueAlpha
 }
 
 function writeTwoChannelRawRgba(
@@ -3682,10 +3689,7 @@ function toRgba8(
     if (allowNarrowChannels && data.length === pixels) {
       const out = new Uint8Array(pixels * 4)
       for (let i = 0; i < pixels; i++) {
-        out[i * 4] = data[i]
-        out[i * 4 + 1] = data[i]
-        out[i * 4 + 2] = data[i]
-        out[i * 4 + 3] = 255
+        writeOneChannelRgba8(out, i, data[i], textureFormat)
       }
       return out
     }
@@ -3727,10 +3731,7 @@ function toRgba8(
       const out = new Uint8Array(pixels * 4)
       for (let i = 0; i < pixels; i++) {
         const value = Math.max(0, Math.min(255, Math.round(data[i] * 255)))
-        out[i * 4] = value
-        out[i * 4 + 1] = value
-        out[i * 4 + 2] = value
-        out[i * 4 + 3] = 255
+        writeOneChannelRgba8(out, i, value, textureFormat)
       }
       return out
     }
@@ -3773,10 +3774,7 @@ function toRgba8(
       const out = new Uint8Array(pixels * 4)
       for (let i = 0; i < pixels; i++) {
         const value = Math.max(0, Math.min(255, (data as any)[i]))
-        out[i * 4] = value
-        out[i * 4 + 1] = value
-        out[i * 4 + 2] = value
-        out[i * 4 + 3] = 255
+        writeOneChannelRgba8(out, i, value, textureFormat)
       }
       return out
     }
@@ -3816,10 +3814,7 @@ function toRgba8(
     const out = new Uint8Array(pixels * 4)
     for (let i = 0; i < pixels; i++) {
       const value = Math.max(0, Math.min(255, data[i]))
-      out[i * 4] = value
-      out[i * 4 + 1] = value
-      out[i * 4 + 2] = value
-      out[i * 4 + 3] = 255
+      writeOneChannelRgba8(out, i, value, textureFormat)
     }
     return out
   }
@@ -3868,10 +3863,7 @@ function normalizedUnsignedIntegerDataToRgba8(
     const out = new Uint8Array(pixels * 4)
     for (let i = 0; i < pixels; i++) {
       const value = normalizedUnsignedIntegerToByte(data[i], maxValue)
-      out[i * 4] = value
-      out[i * 4 + 1] = value
-      out[i * 4 + 2] = value
-      out[i * 4 + 3] = 255
+      writeOneChannelRgba8(out, i, value, format)
     }
     return out
   }
@@ -3923,10 +3915,7 @@ function normalizedSignedIntegerDataToRgba8(
     const out = new Uint8Array(pixels * 4)
     for (let i = 0; i < pixels; i++) {
       const value = normalizedSignedIntegerToByte(data[i], maxValue)
-      out[i * 4] = value
-      out[i * 4 + 1] = value
-      out[i * 4 + 2] = value
-      out[i * 4 + 3] = 255
+      writeOneChannelRgba8(out, i, value, format)
     }
     return out
   }
@@ -4043,14 +4032,24 @@ function halfFloatDataToRgba8(
     const out = new Uint8Array(pixels * 4)
     for (let i = 0; i < pixels; i++) {
       const value = halfFloatToByte(data[i])
-      out[i * 4] = value
-      out[i * 4 + 1] = value
-      out[i * 4 + 2] = value
-      out[i * 4 + 3] = 255
+      writeOneChannelRgba8(out, i, value, format)
     }
     return out
   }
   return null
+}
+
+function writeOneChannelRgba8(
+  out: Uint8Array,
+  pixelIndex: number,
+  value: number,
+  format: unknown,
+): void {
+  const offset = pixelIndex * 4
+  out[offset] = value
+  out[offset + 1] = value
+  out[offset + 2] = value
+  out[offset + 3] = format === AlphaFormat ? value : 255
 }
 
 function writeTwoChannelRgba8(
