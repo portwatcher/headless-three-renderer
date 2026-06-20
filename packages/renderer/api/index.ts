@@ -34,7 +34,7 @@ const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
 import { DEFAULT_BACKGROUND_COLOR, cssColorStringToArray, resolveBackground, validatedColorLikeToArray } from './color'
-import { flattenScene, type ShadowMaterialMode } from './scene'
+import { createSceneExtractionCache, flattenScene, type SceneExtractionCache, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { canvasLikeImageToRgba, extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
 import { extractClippingPlanes } from './clipping'
@@ -1183,6 +1183,7 @@ function addCompileMaterial(material: unknown, materials: Set<ThreeMaterialLike>
 
 export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
+  private readonly sceneExtractionCache: SceneExtractionCache = createSceneExtractionCache()
   private opaqueSort: RenderSortFunction | null = null
   private sortObjectsValue = true
   private transparentSort: RenderSortFunction | null = null
@@ -2088,7 +2089,7 @@ export class Renderer {
     camera: ThreeCameraLike,
     options: RenderOptions,
   ): { buffer: Buffer; nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
-    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options)
+    const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options, this.sceneExtractionCache)
     return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, nativeCamera, objectIdEntries }
   }
 
@@ -2261,6 +2262,7 @@ function toNativeInput(
   scene: ThreeSceneRootLike,
   camera: ThreeCameraLike,
   options: RenderOptions,
+  sceneExtractionCache?: SceneExtractionCache,
 ): { nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
   validateThreeSceneRoot(scene)
   validateThreeCamera(camera)
@@ -2345,6 +2347,7 @@ function toNativeInput(
       transparentSort: options.transparentSort,
     },
     overrideMaterial,
+    sceneExtractionCache,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRendererToneMapping(applyRenderMode(flattenedMeshes, renderMode), rendererToneMapping)

@@ -23311,6 +23311,60 @@ test('reusable renderer reflects mutated mesh material texture and transform sta
   assert.ok(thirdRight.r < 20 && thirdRight.g < 20 && thirdRight.b < 20, `updated transform should clear the previous right region (${thirdRight.r}, ${thirdRight.g}, ${thirdRight.b})`)
 })
 
+test('reusable renderer reuses cached static mesh geometry until attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const geometry = new THREE.PlaneGeometry(0.75, 0.75)
+  geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1)
+  const position = geometry.getAttribute('position')
+  const originalGetX = position.getX.bind(position)
+  let positionReads = 0
+  position.getX = (index) => {
+    positionReads += 1
+    return originalGetX(index)
+  }
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  const mesh = new THREE.Mesh(geometry, material)
+  mesh.frustumCulled = false
+  mesh.position.x = -0.5
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const readsAfterFirstRender = positionReads
+  assert.ok(readsAfterFirstRender > 0, 'initial render should extract mesh geometry')
+
+  material.color.set(0x00ff00)
+  mesh.position.x = 0.5
+  renderer.render(scene, camera, options)
+  assert.equal(
+    positionReads,
+    readsAfterFirstRender,
+    'material and transform animation should reuse cached static geometry extraction',
+  )
+
+  for (let i = 0; i < position.count; i += 1) {
+    position.array[i * position.itemSize] += 0.1
+  }
+  position.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(positionReads > readsAfterFirstRender, 'attribute version changes should invalidate cached geometry extraction')
+})
+
 test('reusable renderer reflects mutated scene environment texture bytes', () => {
   const renderer = new Renderer()
   const data = new Uint8Array(2 * 2 * 4)

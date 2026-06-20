@@ -105,6 +105,65 @@ interface TextureUvStreams {
   pbrUsesUv2?: Partial<Record<PbrUvFlag, boolean>>
 }
 
+export interface SceneExtractionCache {
+  meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
+}
+
+interface CachedMeshGeometryExtraction {
+  signature: MeshGeometrySignature
+  extraction: MeshGeometryExtraction
+}
+
+interface MeshGeometryExtraction {
+  position: ThreeBufferAttributeLike
+  positions: number[]
+  uvChannels: Array<UvChannel | null>
+  uvs: number[] | null
+  normalAttribute?: ThreeBufferAttributeLike
+  normals: number[] | null
+  vertexColors?: ThreeBufferAttributeLike
+  index: number[] | null
+  groups: GeometryGroup[]
+  instancedGeometryCount: number
+  instancedPositionOffset: InstancedAttributeRef | null
+}
+
+interface MeshGeometrySignature {
+  cacheable: boolean
+  geometryVersion?: number
+  isInstancedBufferGeometry?: boolean
+  instanceCount?: number
+  drawRange: string
+  drawRangeStart?: unknown
+  drawRangeCount?: unknown
+  groups: string
+  position: AttributeSignature
+  normal: AttributeSignature
+  color: AttributeSignature
+  index: AttributeSignature
+  uv: AttributeSignature
+  uv1: AttributeSignature
+  uv2: AttributeSignature
+  uv3: AttributeSignature
+  instancedPositionOffsetName?: string
+  instancedPositionOffset: AttributeSignature
+  instancedAttributes: Array<{ name: string; signature: AttributeSignature }>
+}
+
+interface AttributeSignature {
+  ref?: ThreeBufferAttributeLike
+  version?: number
+  count?: number
+  itemSize?: number
+  normalized?: boolean
+  array?: ArrayLike<number>
+  dataArray?: ArrayLike<number>
+  dataStride?: number
+  offset?: number
+  isInstancedBufferAttribute?: boolean
+  meshPerAttribute?: number
+}
+
 type PbrUvFlag = Extract<keyof PbrProperties, `${string}UsesUv2`>
 
 interface MaterialUvSlot {
@@ -140,6 +199,10 @@ type SortKeyOverride = Partial<MeshSortInfo['keys']>
 
 const MAX_POINT_SPRITE_SIZE = 64
 
+export function createSceneExtractionCache(): SceneExtractionCache {
+  return { meshGeometry: new WeakMap() }
+}
+
 export function flattenScene(
   scene: ThreeObject3DLike,
   camera?: ThreeCameraLike,
@@ -150,6 +213,7 @@ export function flattenScene(
   materialContext: MaterialExtractionContext = {},
   sortOptions: SceneSortOptions = {},
   overrideMaterial?: ThreeMaterialLike,
+  cache?: SceneExtractionCache,
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
   const clippingContext: ClippingContext = {
@@ -157,7 +221,7 @@ export function flattenScene(
     intersectionPlanes: [],
     clipShadows: false,
   }
-  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
+  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
   return sortFlattenedMeshes(meshes, sortOptions)
     .map(({ mesh }) => mesh)
 }
@@ -173,6 +237,7 @@ function visitObject(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
+  cache: SceneExtractionCache | undefined,
 ): void {
   if (!object) return
   if (optionalObjectBoolean(object.visible, 'object.visible') === false) return
@@ -189,11 +254,11 @@ function visitObject(
 
     if (object.isBatchedMesh === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
+        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
       }
     } else if (object.isMesh === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
+        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
       }
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
@@ -209,7 +274,7 @@ function visitObject(
   }
 
   for (const child of objectChildren(object)) {
-    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
+    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
   }
 }
 
@@ -223,6 +288,7 @@ function appendBatchedMesh(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
+  cache: SceneExtractionCache | undefined,
 ): void {
   const geometry = object.geometry!
   const draws = batchedMeshDraws(object, camera, geometry)
@@ -253,6 +319,7 @@ function appendBatchedMesh(
       shadowMaterialMode,
       materialContext,
       overrideMaterial,
+      cache,
       [draw.instance],
       sortKeyOverride,
       object,
@@ -270,24 +337,28 @@ function appendMesh(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
   overrideMaterial?: ThreeMaterialLike,
+  cache?: SceneExtractionCache,
   instanceOverride?: MeshInstance[],
   sortKeyOverride?: SortKeyOverride,
   sortItemObject?: ThreeObject3DLike,
 ): void {
   const geometry = object.geometry!
-  const position = getAttribute(geometry, 'position')
-  if (!position) return
+  const geometryExtraction = meshGeometryExtraction(geometry, cache)
+  if (!geometryExtraction) return
 
-  let positions = readVec3Attribute(position, 'geometry.attributes.position')
-  const uvChannels = readUvChannels(geometry)
-  const uvs = uvChannels[0]?.values ?? null
-  const normalAttribute = getAttribute(geometry, 'normal')
-  let normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
-  const vertexColors = getAttribute(geometry, 'color')
-  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
-  const groups = effectiveGroups(geometry, index, position.count)
-  const instancedGeometryCount = instancedBufferGeometryCount(geometry)
-  const instancedPositionOffset = instancedOffsetAttribute(geometry)
+  const {
+    position,
+    uvChannels,
+    uvs,
+    normalAttribute,
+    vertexColors,
+    index,
+    groups,
+    instancedGeometryCount,
+    instancedPositionOffset,
+  } = geometryExtraction
+  let positions = geometryExtraction.positions
+  let normals = geometryExtraction.normals
 
   // CPU-side morph targets (blend shapes / shape keys / VRM blendshapes)
   if (object.morphTargetInfluences && object.morphTargetInfluences.length > 0) {
@@ -482,6 +553,219 @@ function appendMesh(
       )
     }
   }
+}
+
+function meshGeometryExtraction(
+  geometry: ThreeBufferGeometryLike,
+  cache?: SceneExtractionCache,
+): MeshGeometryExtraction | null {
+  const position = getAttribute(geometry, 'position')
+  if (!position) return null
+
+  const signature = meshGeometrySignature(geometry, position)
+  if (cache && signature.cacheable) {
+    const cached = cache.meshGeometry.get(geometry) as CachedMeshGeometryExtraction | undefined
+    if (cached && sameMeshGeometrySignature(cached.signature, signature)) {
+      return cached.extraction
+    }
+  }
+
+  const extraction = readMeshGeometryExtraction(geometry, position)
+  if (cache && signature.cacheable) {
+    cache.meshGeometry.set(geometry, { signature, extraction })
+  }
+  return extraction
+}
+
+function readMeshGeometryExtraction(
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+): MeshGeometryExtraction {
+  const positions = readVec3Attribute(position, 'geometry.attributes.position')
+  const uvChannels = readUvChannels(geometry)
+  const normalAttribute = getAttribute(geometry, 'normal')
+  const normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
+  const vertexColors = getAttribute(geometry, 'color')
+  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
+  const groups = effectiveGroups(geometry, index, position.count)
+  const instancedGeometryCount = instancedBufferGeometryCount(geometry)
+  const instancedPositionOffset = instancedOffsetAttribute(geometry)
+
+  return {
+    position,
+    positions,
+    uvChannels,
+    uvs: uvChannels[0]?.values ?? null,
+    normalAttribute,
+    normals,
+    vertexColors,
+    index,
+    groups,
+    instancedGeometryCount,
+    instancedPositionOffset,
+  }
+}
+
+function meshGeometrySignature(
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+): MeshGeometrySignature {
+  const attributes = geometryAttributes(geometry)
+  const instancedAttributes = Object.entries(attributes)
+    .filter((entry): entry is [string, ThreeBufferAttributeLike] => isInstancedAttribute(entry[1]))
+    .map(([name, attribute]) => ({ name, signature: attributeSignature(attribute) }))
+  const instancedPositionOffset = namedInstancedOffsetAttribute(geometry)
+  const signature: MeshGeometrySignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    isInstancedBufferGeometry: geometry.isInstancedBufferGeometry,
+    instanceCount: geometry.instanceCount,
+    drawRange: geometryDrawRangeSignature(geometry.drawRange),
+    drawRangeStart: geometry.drawRange?.start,
+    drawRangeCount: geometry.drawRange?.count,
+    groups: geometryGroupsSignature(geometry.groups),
+    position: attributeSignature(position),
+    normal: attributeSignature(getAttribute(geometry, 'normal')),
+    color: attributeSignature(getAttribute(geometry, 'color')),
+    index: attributeSignature(geometry.index),
+    uv: attributeSignature(getAttribute(geometry, 'uv')),
+    uv1: attributeSignature(getAttribute(geometry, 'uv1')),
+    uv2: attributeSignature(getAttribute(geometry, 'uv2')),
+    uv3: attributeSignature(getAttribute(geometry, 'uv3')),
+    instancedPositionOffsetName: instancedPositionOffset?.name,
+    instancedPositionOffset: attributeSignature(instancedPositionOffset?.attribute),
+    instancedAttributes,
+  }
+  signature.cacheable = meshGeometrySignatureCacheable(signature)
+  return signature
+}
+
+function meshGeometrySignatureCacheable(signature: MeshGeometrySignature): boolean {
+  return [
+    signature.position,
+    signature.normal,
+    signature.color,
+    signature.index,
+    signature.uv,
+    signature.uv1,
+    signature.uv2,
+    signature.uv3,
+    signature.instancedPositionOffset,
+    ...signature.instancedAttributes.map(({ signature }) => signature),
+  ].every(attributeSignatureCacheable)
+}
+
+function attributeSignature(attribute: ThreeBufferAttributeLike | null | undefined): AttributeSignature {
+  if (!attribute) return {}
+  const data = attribute.data && typeof attribute.data === 'object' && !Array.isArray(attribute.data)
+    ? attribute.data
+    : undefined
+  return {
+    ref: attribute,
+    version: attribute.version,
+    count: attribute.count,
+    itemSize: attribute.itemSize,
+    normalized: attribute.normalized,
+    array: attribute.array,
+    dataArray: data?.array,
+    dataStride: data?.stride,
+    offset: attribute.offset,
+    isInstancedBufferAttribute: attribute.isInstancedBufferAttribute,
+    meshPerAttribute: attribute.meshPerAttribute,
+  }
+}
+
+function attributeSignatureCacheable(signature: AttributeSignature): boolean {
+  return signature.ref == null || typeof signature.version === 'number'
+}
+
+function namedInstancedOffsetAttribute(
+  geometry: ThreeBufferGeometryLike,
+): { name: string; attribute: ThreeBufferAttributeLike } | null {
+  const names = ['instanceOffset', 'instancePosition', 'offset', 'translate', 'translation']
+  for (const name of names) {
+    const attribute = getAttribute(geometry, name)
+    if (isInstancedAttribute(attribute)) return { name, attribute }
+  }
+  return null
+}
+
+function geometryGroupsSignature(groups: ThreeBufferGeometryLike['groups']): string {
+  if (groups == null) return 'none'
+  if (!Array.isArray(groups)) return `invalid:${typeof groups}`
+  return groups.map((group, index) => {
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      return `${index}:invalid:${typeof group}`
+    }
+    return [
+      index,
+      typeof group.start,
+      String(group.start),
+      typeof group.count,
+      String(group.count),
+      typeof group.materialIndex,
+      String(group.materialIndex),
+    ].join(':')
+  }).join('|')
+}
+
+function geometryDrawRangeSignature(drawRange: ThreeBufferGeometryLike['drawRange']): string {
+  if (drawRange == null) return 'none'
+  if (typeof drawRange !== 'object' || Array.isArray(drawRange)) return `invalid:${typeof drawRange}`
+  return [
+    typeof drawRange.start,
+    String(drawRange.start),
+    typeof drawRange.count,
+    String(drawRange.count),
+  ].join(':')
+}
+
+function sameMeshGeometrySignature(a: MeshGeometrySignature, b: MeshGeometrySignature): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && a.isInstancedBufferGeometry === b.isInstancedBufferGeometry
+    && a.instanceCount === b.instanceCount
+    && a.drawRange === b.drawRange
+    && Object.is(a.drawRangeStart, b.drawRangeStart)
+    && Object.is(a.drawRangeCount, b.drawRangeCount)
+    && a.groups === b.groups
+    && a.instancedPositionOffsetName === b.instancedPositionOffsetName
+    && sameAttributeSignature(a.position, b.position)
+    && sameAttributeSignature(a.normal, b.normal)
+    && sameAttributeSignature(a.color, b.color)
+    && sameAttributeSignature(a.index, b.index)
+    && sameAttributeSignature(a.uv, b.uv)
+    && sameAttributeSignature(a.uv1, b.uv1)
+    && sameAttributeSignature(a.uv2, b.uv2)
+    && sameAttributeSignature(a.uv3, b.uv3)
+    && sameAttributeSignature(a.instancedPositionOffset, b.instancedPositionOffset)
+    && sameInstancedAttributeSignatures(a.instancedAttributes, b.instancedAttributes)
+}
+
+function sameInstancedAttributeSignatures(
+  a: MeshGeometrySignature['instancedAttributes'],
+  b: MeshGeometrySignature['instancedAttributes'],
+): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].name !== b[i].name) return false
+    if (!sameAttributeSignature(a[i].signature, b[i].signature)) return false
+  }
+  return true
+}
+
+function sameAttributeSignature(a: AttributeSignature, b: AttributeSignature): boolean {
+  return a.ref === b.ref
+    && a.version === b.version
+    && a.count === b.count
+    && a.itemSize === b.itemSize
+    && a.normalized === b.normalized
+    && a.array === b.array
+    && a.dataArray === b.dataArray
+    && a.dataStride === b.dataStride
+    && a.offset === b.offset
+    && a.isInstancedBufferAttribute === b.isInstancedBufferAttribute
+    && a.meshPerAttribute === b.meshPerAttribute
 }
 
 function appendShadowOnlyMeshGroup(

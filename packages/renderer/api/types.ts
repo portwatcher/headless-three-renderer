@@ -60,6 +60,7 @@ export interface ThreeSphereLike {
 
 export interface ThreeBufferAttributeLike {
   count: number
+  version?: number
   itemSize?: number
   normalized?: boolean
   isInstancedBufferAttribute?: boolean
@@ -77,6 +78,7 @@ export interface ThreeBufferAttributeLike {
 }
 
 export interface ThreeBufferGeometryLike {
+  version?: number
   isInstancedBufferGeometry?: boolean
   instanceCount?: number
   attributes?: Record<string, ThreeBufferAttributeLike | undefined>
@@ -91,6 +93,7 @@ export interface ThreeBufferGeometryLike {
 }
 
 export interface ThreeTextureLike {
+  version?: number
   isTexture?: boolean
   isCubeTexture?: boolean
   isCompressedTexture?: boolean
