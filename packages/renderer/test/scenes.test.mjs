@@ -32619,6 +32619,14 @@ test('Renderer debug state is inert validated compatibility state', async () => 
     /Renderer\.debug\.getShaderAsync\(\) is not supported.*generated backend shader source is not exposed/i,
   )
   await assert.rejects(
+    () => renderer.debug.getShaderAsync({}, camera, scene.children[0]),
+    /THREE\.Scene or THREE\.Object3D root/i,
+  )
+  await assert.rejects(
+    () => renderer.debug.getShaderAsync(scene, {}, scene.children[0]),
+    /THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
+  )
+  await assert.rejects(
     () => renderer.debug.getShaderAsync(scene, camera, null),
     /Renderer\.debug\.getShaderAsync object must be an object-like value/i,
   )
