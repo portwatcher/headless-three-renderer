@@ -34096,6 +34096,28 @@ test('Renderer copyFramebufferToTexture copies active framebuffer source rectang
   assert.deepEqual(mipPixel(1, 1), sourcePixel(1, 3, 5))
   assert.ok(destination.version > versionAfterRectangleCopy, 'destination texture should be marked dirty after framebuffer mip copy')
 
+  const sourceBackedDestinationData = new Uint8Array(2 * 2 * 4)
+  sourceBackedDestinationData.fill(7)
+  const sourceBackedDestination = new THREE.Texture()
+  sourceBackedDestination.source = {
+    data: {
+      data: sourceBackedDestinationData,
+      width: 2,
+      height: 2,
+    },
+  }
+  const sourceBackedVersion = sourceBackedDestination.version
+  renderer.copyFramebufferToTexture(sourceBackedDestination, { x: 1, y: 0, width: 2, height: 2 })
+
+  function sourceBackedPixel(x, y) {
+    const offset = (y * 2 + x) * 4
+    return Array.from(sourceBackedDestination.source.data.data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(sourceBackedPixel(0, 0), sourcePixel(1, 0, 5))
+  assert.deepEqual(sourceBackedPixel(1, 1), sourcePixel(2, 1, 5))
+  assert.ok(sourceBackedDestination.version > sourceBackedVersion, 'source-backed destination texture should be marked dirty after framebuffer copy')
+
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
   scene.add(new THREE.Mesh(
