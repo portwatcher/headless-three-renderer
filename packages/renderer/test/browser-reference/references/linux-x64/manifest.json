@@ -77,6 +77,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "array-camera-viewport-split.png",
+      "name": "array-camera-viewport-split",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "viewport-scissor-rectangle.png",
       "name": "viewport-scissor-rectangle",
       "width": 96,
