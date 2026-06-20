@@ -322,8 +322,22 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "object-id-render-mode-planes.png",
+      "name": "object-id-render-mode-planes",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "normal-render-mode-tilted-plane.png",
       "name": "normal-render-mode-tilted-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "depth-render-mode-plane.png",
+      "name": "depth-render-mode-plane",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"

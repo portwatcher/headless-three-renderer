@@ -965,7 +965,6 @@ function objectIdRenderModeCorpus() {
     background: [0, 0, 0],
     backgroundTolerance: 0,
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const leftId = pixelAt(rgba, width, 30, 48)
       const rightId = pixelAt(rgba, width, 66, 48)
@@ -1037,7 +1036,6 @@ function depthRenderModeCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       const corner = meanRegion(rgba, width, 0, 0, 8, 8)

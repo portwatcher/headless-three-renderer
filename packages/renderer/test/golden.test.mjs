@@ -22,6 +22,8 @@ const referencesRequired = areBrowserReferencesRequired()
 
 const DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF = 18
 const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map()
+const browserReferenceFixtures = createBrowserReferenceFixtures(createSceneCorpus())
+const browserReferenceFixtureNames = new Set(browserReferenceFixtures.map((fixture) => fixture.name))
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
   const fixtures = [
@@ -76,11 +78,8 @@ test('browser reference required mode parses explicit opt-in values', () => {
 })
 
 test('browser reference tolerance policy scopes known parity gaps to fixture names', () => {
-  const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
-  const fixtureNames = new Set(fixtures.map((fixture) => fixture.name))
-
   for (const name of BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE.keys()) {
-    assert.ok(fixtureNames.has(name), `browser reference tolerance entry ${name} must match a generated fixture`)
+    assert.ok(browserReferenceFixtureNames.has(name), `browser reference tolerance entry ${name} must match a generated fixture`)
   }
 
   assert.equal(getBrowserReferenceMaxMeanDiff('mesh-depth-material-basic', {}), DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF)
@@ -113,15 +112,14 @@ test('generated corpus matches browser WebGLRenderer golden references', {
     `Browser reference directory is required. Set HEADLESS_THREE_BROWSER_REFERENCE_DIR or add browser-generated references at ${defaultBrowserReferenceDir()}.`,
   )
 
-  const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
   const manifest = await readReferenceManifest(referenceDir)
-  validateReferenceManifest(manifest, createBrowserReferenceManifest(fixtures))
+  validateReferenceManifest(manifest, createBrowserReferenceManifest(browserReferenceFixtures))
   await validateReferenceFiles(referenceDir, manifest)
 
   const renderer = new Renderer()
   renderer.toneMapping = THREE.NoToneMapping
   renderer.toneMappingExposure = 1
-  for (const fixture of fixtures) {
+  for (const fixture of browserReferenceFixtures) {
     await t.test(fixture.name, async () => {
       const referencePath = path.join(referenceDir, `${fixture.name}.png`)
       const referencePng = await readFile(referencePath)

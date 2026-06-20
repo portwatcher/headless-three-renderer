@@ -27,6 +27,10 @@ downloadAllButton.addEventListener('click', () => {
 
 async function renderBrowserReferenceCorpus() {
   try {
+    const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
+    const manifest = createBrowserReferenceManifest(fixtures)
+    setupManifestDownload(manifest)
+
     renderer = new THREE.WebGLRenderer({
       alpha: true,
       antialias: true,
@@ -39,10 +43,6 @@ async function renderBrowserReferenceCorpus() {
     renderer.toneMapping = THREE.NoToneMapping
     renderer.toneMappingExposure = 1
     RectAreaLightUniformsLib.init()
-
-    const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
-    const manifest = createBrowserReferenceManifest(fixtures)
-    setupManifestDownload(manifest)
 
     const renderedFixtures = []
     for (const fixture of fixtures) {
@@ -267,8 +267,11 @@ function applyFixtureRenderMode(fixture) {
   if (mode === 'color') {
     return () => {}
   }
-  if (mode !== 'normal' && mode !== 'mask') {
-    throw new Error(`Browser reference generation only supports color, mask, and normal render modes; received ${mode}.`)
+  if (mode === 'object-id') {
+    return applyFixtureObjectIdRenderMode(fixture)
+  }
+  if (mode !== 'normal' && mode !== 'mask' && mode !== 'depth') {
+    throw new Error(`Browser reference generation only supports color, mask, object-id, normal, and depth render modes; received ${mode}.`)
   }
   if (fixture.scene?.isScene !== true) {
     throw new Error('Browser reference render modes require a THREE.Scene fixture.')
@@ -278,7 +281,9 @@ function applyFixtureRenderMode(fixture) {
   const previousBackground = fixture.scene.background
   const overrideMaterial = mode === 'normal'
     ? new THREE.MeshNormalMaterial()
-    : new THREE.MeshBasicMaterial({ color: 0xffffff })
+    : mode === 'depth'
+      ? new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking })
+      : new THREE.MeshBasicMaterial({ color: 0xffffff })
 
   fixture.scene.overrideMaterial = overrideMaterial
   fixture.scene.background = new THREE.Color(0, 0, 0)
@@ -287,6 +292,44 @@ function applyFixtureRenderMode(fixture) {
     fixture.scene.overrideMaterial = previousOverrideMaterial
     fixture.scene.background = previousBackground
     overrideMaterial.dispose()
+  }
+}
+
+function applyFixtureObjectIdRenderMode(fixture) {
+  if (fixture.scene?.isScene !== true) {
+    throw new Error('Browser reference render modes require a THREE.Scene fixture.')
+  }
+
+  const previousBackground = fixture.scene.background
+  const replacements = []
+  let fallbackIndex = 0
+  fixture.scene.traverse((object) => {
+    if (!object.material) return
+    const id = typeof object.id === 'number' && Number.isSafeInteger(object.id) && object.id >= 0
+      ? object.id
+      : fallbackIndex
+    fallbackIndex += 1
+    const encoded = ((id + 1) & 0xffffff) || 1
+    const material = new THREE.MeshBasicMaterial({
+      color: encoded,
+      toneMapped: false,
+    })
+    replacements.push({
+      object,
+      material,
+      previousMaterial: object.material,
+    })
+    object.material = material
+  })
+
+  fixture.scene.background = new THREE.Color(0, 0, 0)
+
+  return () => {
+    fixture.scene.background = previousBackground
+    for (const replacement of replacements) {
+      replacement.object.material = replacement.previousMaterial
+      replacement.material.dispose()
+    }
   }
 }
 
