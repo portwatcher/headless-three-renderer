@@ -294,6 +294,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "points-material-uv-channel-selection.png",
+      "name": "points-material-uv-channel-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "instanced-lines-and-points.png",
       "name": "instanced-lines-and-points",
       "width": 96,

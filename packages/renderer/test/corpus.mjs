@@ -4302,7 +4302,6 @@ function pointsMaterialUvChannelCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const spriteLeft = meanRegion(rgba, width, 16, 40, 26, 56)
       const spriteRight = meanRegion(rgba, width, 32, 40, 42, 56)
