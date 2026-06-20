@@ -244,6 +244,7 @@ interface MeshGeometryExtraction {
   normals: number[] | null
   vertexColors?: ThreeBufferAttributeLike
   index: number[] | null
+  sourceIndex: number[]
   groups: GeometryGroup[]
   instancedGeometryCount: number
   instancedPositionOffset: InstancedAttributeRef | null
@@ -734,6 +735,7 @@ function readMeshGeometryExtraction(
   const normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
+  const sourceIndex = index ?? rangeIndices(position.count)
   const groups = effectiveGroups(geometry, index, position.count)
   const instancedGeometryCount = instancedBufferGeometryCount(geometry)
   const instancedPositionOffset = instancedOffsetAttribute(geometry)
@@ -747,6 +749,7 @@ function readMeshGeometryExtraction(
     normals,
     vertexColors,
     index,
+    sourceIndex,
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
@@ -1396,6 +1399,7 @@ function appendPoints(
     positions,
     vertexColors,
     index,
+    sourceIndex,
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
@@ -1425,7 +1429,7 @@ function appendPoints(
       group,
       position,
       positions,
-      index,
+      index ?? sourceIndex,
       instancedGeometryCount,
       instancedPositionOffset,
       transform,
@@ -2076,6 +2080,7 @@ function appendLineOrPoints(
     uvs,
     vertexColors,
     index,
+    sourceIndex,
     groups,
     instancedGeometryCount,
     instancedPositionOffset,
@@ -2114,7 +2119,7 @@ function appendLineOrPoints(
     const thickLine = topology === 'lines' && lineWidth > 1
 
     if (topology === 'lines') {
-      const source = indexAttr ?? rangeIndices(vertexCount)
+      const source = sourceIndex
       if (material?.isLineDashedMaterial === true) {
         const lineDistance = getAttribute(geometry, 'lineDistance')
         const dashed = instancedGeometryCount > 1 || instancedPositionOffset
