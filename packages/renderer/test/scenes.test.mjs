@@ -31469,6 +31469,12 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.depth, true)
   assert.equal(renderer.stencil, false)
   assert.equal(renderer.logarithmicDepthBuffer, false)
+  assert.equal(renderer.currentToneMapping, THREE.ACESFilmicToneMapping)
+  assert.equal(renderer.needsFrameBufferTarget, false)
+  renderer.currentToneMapping = THREE.NoToneMapping
+  assert.equal(renderer.toneMapping, THREE.NoToneMapping)
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  assert.equal(renderer.currentToneMapping, THREE.ACESFilmicToneMapping)
   assert.equal(renderer.highPrecision, false)
   renderer.highPrecision = false
   assert.equal(renderer.highPrecision, false)
@@ -31494,6 +31500,10 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => { renderer.highPrecision = 1 },
     /Renderer\.highPrecision must be a boolean/i,
+  )
+  assert.throws(
+    () => { renderer.currentToneMapping = 'aces' },
+    /Renderer\.toneMapping must be a Three\.js tone mapping constant/i,
   )
   assert.equal(renderer.capabilities.isWebGL2, false)
   assert.equal(renderer.capabilities.drawBuffers, false)

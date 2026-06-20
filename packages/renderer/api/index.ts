@@ -1432,6 +1432,14 @@ export class Renderer {
     this.toneMappingValue = rendererStateToneMapping(value)
   }
 
+  get currentToneMapping(): number {
+    return this.toneMappingValue
+  }
+
+  set currentToneMapping(value: number) {
+    this.toneMappingValue = rendererStateToneMapping(value)
+  }
+
   get toneMappingExposure(): number {
     return this.toneMappingExposureValue
   }
@@ -1470,6 +1478,10 @@ export class Renderer {
 
   get samples(): number {
     return 0
+  }
+
+  get needsFrameBufferTarget(): boolean {
+    return false
   }
 
   get currentSamples(): number {
