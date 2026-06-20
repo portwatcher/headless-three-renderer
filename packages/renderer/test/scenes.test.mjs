@@ -31460,10 +31460,21 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.depth, true)
   assert.equal(renderer.stencil, false)
   assert.equal(renderer.logarithmicDepthBuffer, false)
+  assert.equal(renderer.highPrecision, false)
+  renderer.highPrecision = false
+  assert.equal(renderer.highPrecision, false)
   assert.equal(renderer.coordinateSystem, THREE.WebGLCoordinateSystem)
   assert.throws(
     () => { renderer.coordinateSystem = THREE.WebGPUCoordinateSystem },
     /coordinateSystem/i,
+  )
+  assert.throws(
+    () => { renderer.highPrecision = true },
+    /Renderer\.highPrecision = true is not supported.*shader-node state/i,
+  )
+  assert.throws(
+    () => { renderer.highPrecision = 1 },
+    /Renderer\.highPrecision must be a boolean/i,
   )
   assert.equal(renderer.capabilities.isWebGL2, false)
   assert.equal(renderer.capabilities.drawBuffers, false)

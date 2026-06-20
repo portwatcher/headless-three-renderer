@@ -1456,6 +1456,18 @@ export class Renderer {
     this.localClippingEnabledValue = rendererStateBoolean(value, 'Renderer.localClippingEnabled')
   }
 
+  get highPrecision(): boolean {
+    return false
+  }
+
+  set highPrecision(value: boolean) {
+    const enabled = rendererStateBoolean(value, 'Renderer.highPrecision')
+    if (!enabled) return
+    throw new Error(
+      'Renderer.highPrecision = true is not supported by @headless-three/renderer because Three.js CommonRenderer high-precision matrix nodes require backend shader-node state that is outside the scene-oriented API.',
+    )
+  }
+
   setOpaqueSort(method: RenderSortFunction | null): void {
     assertSortFunctionOrNull(method, 'Renderer.setOpaqueSort')
     this.opaqueSort = method
