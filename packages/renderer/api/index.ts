@@ -1822,11 +1822,16 @@ export class Renderer {
   private transmissionResolutionScaleValue = 1
   private animationLoop: RenderAnimationLoopCallback | null = null
   private inspectorValue: RendererInspectorLike = new RendererInspectorState()
-  private onDeviceLostValue: (info?: unknown) => void = () => {}
+  private isDeviceLostValue = false
+  private readonly defaultOnDeviceLost: (info?: unknown) => void = () => {
+    this.isDeviceLostValue = true
+  }
+  private onDeviceLostValue: (info?: unknown) => void = this.defaultOnDeviceLost
   private readonly contextAttributes: RendererContextAttributesLike
 
   readonly isRenderer = true
   readonly isWebGLRenderer = true
+  readonly isWebGPURenderer = false
   readonly alpha: boolean
   readonly depth: boolean
   readonly stencil: boolean
@@ -1867,6 +1872,10 @@ export class Renderer {
     return true
   }
 
+  get isDeviceLost(): boolean {
+    return this.isDeviceLostValue
+  }
+
   get onDeviceLost(): (info?: unknown) => void {
     return this.onDeviceLostValue
   }
@@ -1879,7 +1888,10 @@ export class Renderer {
   }
 
   _onDeviceLost(info?: unknown): void {
-    this.onDeviceLostValue(info)
+    this.defaultOnDeviceLost(info)
+    if (this.onDeviceLostValue !== this.defaultOnDeviceLost) {
+      this.onDeviceLostValue(info)
+    }
   }
 
   get inspector(): RendererInspectorLike {
@@ -2526,6 +2538,7 @@ export class Renderer {
 
   forceContextRestore(): void {
     // Native render state is recreated per pass, so there is no persistent WebGL context to restore.
+    this.isDeviceLostValue = false
   }
 
   getRenderTarget(): RenderTargetLike | null {

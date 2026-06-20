@@ -32773,6 +32773,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
 
   assert.equal(renderer.isRenderer, true)
   assert.equal(renderer.isWebGLRenderer, true)
+  assert.equal(renderer.isWebGPURenderer, false)
   assert.equal(renderer.initialized, true)
   assert.equal(renderer.hasInitialized(), true)
   assert.equal(renderer.alpha, false)
@@ -34886,18 +34887,31 @@ test('Renderer context loss hooks are no-op compatibility hooks', () => {
 
   assert.equal(typeof renderer.onDeviceLost, 'function')
   assert.equal(typeof renderer._onDeviceLost, 'function')
+  assert.equal(renderer.isDeviceLost, false)
   assert.equal(renderer.onDeviceLost(deviceLostInfo), undefined)
+  assert.equal(renderer.isDeviceLost, true)
+  assert.equal(renderer.forceContextRestore(), undefined)
+  assert.equal(renderer.isDeviceLost, false)
   assert.equal(renderer._onDeviceLost(deviceLostInfo), undefined)
+  assert.equal(renderer.isDeviceLost, true)
+  assert.equal(renderer.forceContextRestore(), undefined)
+  assert.equal(renderer.isDeviceLost, false)
   renderer.onDeviceLost = (info) => { observedDeviceLostInfo = info }
   assert.equal(renderer.onDeviceLost(deviceLostInfo), undefined)
   assert.equal(observedDeviceLostInfo, deviceLostInfo)
+  assert.equal(renderer.isDeviceLost, false)
   observedDeviceLostInfo = null
   assert.equal(renderer._onDeviceLost(deviceLostInfo), undefined)
   assert.equal(observedDeviceLostInfo, deviceLostInfo)
+  assert.equal(renderer.isDeviceLost, true)
+  assert.equal(renderer.forceContextRestore(), undefined)
+  assert.equal(renderer.isDeviceLost, false)
 
   renderer.setClearColor(0x204080, 0.5)
   assert.equal(renderer.forceContextLoss(), undefined)
+  assert.equal(renderer.isDeviceLost, false)
   assert.equal(renderer.forceContextRestore(), undefined)
+  assert.equal(renderer.isDeviceLost, false)
 
   const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
   assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer context loss hooks should preserve renderer state')
