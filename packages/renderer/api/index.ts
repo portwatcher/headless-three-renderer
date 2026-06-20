@@ -1959,7 +1959,15 @@ export class Renderer {
     )
   }
 
-  copyFramebufferToTexture(texture: ThreeTextureLike, position: unknown = null, level = 0): void {
+  copyFramebufferToTexture(texture: ThreeTextureLike, position?: unknown, level?: number): void
+  copyFramebufferToTexture(position: unknown, texture: ThreeTextureLike, level?: number): void
+  copyFramebufferToTexture(textureOrPosition: unknown, positionOrTexture: unknown = null, level = 0): void {
+    let texture = textureOrPosition
+    let position = positionOrTexture
+    if (!hasThreeTextureMarker(textureOrPosition) && isThreeTextureArgument(positionOrTexture)) {
+      position = textureOrPosition ?? null
+      texture = positionOrTexture
+    }
     assertThreeTextureLike(texture, 'Renderer.copyFramebufferToTexture texture')
     assertTextureCopyLevel(level, 'Renderer.copyFramebufferToTexture level')
     if (!this.currentRenderTarget) {
@@ -4943,6 +4951,39 @@ function assertThreeTextureLike(value: unknown, label: string): asserts value is
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a texture-like object.`)
   }
+}
+
+function hasThreeTextureMarker(value: unknown): value is ThreeTextureLike {
+  return (
+    value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && (value as { isTexture?: unknown }).isTexture === true
+  )
+}
+
+function isThreeTextureArgument(value: unknown): value is ThreeTextureLike {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const texture = value as Record<string, unknown>
+  return (
+    texture.isTexture === true
+    || 'image' in texture
+    || 'source' in texture
+    || 'mipmaps' in texture
+    || 'format' in texture
+    || 'type' in texture
+    || 'needsUpdate' in texture
+    || 'colorSpace' in texture
+    || texture.isFramebufferTexture === true
+    || texture.isDepthTexture === true
+    || texture.isVideoTexture === true
+    || texture.isStorageTexture === true
+    || texture.isCompressedTexture === true
+    || texture.isDataArrayTexture === true
+    || texture.isData3DTexture === true
+    || texture.isArrayTexture === true
+    || texture.is3DTexture === true
+  )
 }
 
 function assertCanvasTargetLike(value: unknown, label: string): void {

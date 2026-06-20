@@ -34174,6 +34174,28 @@ test('Renderer copyFramebufferToTexture copies active framebuffer source rectang
   assert.deepEqual(mipPixel(1, 1), sourcePixel(1, 3, 5))
   assert.ok(destination.version > versionAfterRectangleCopy, 'destination texture should be marked dirty after framebuffer mip copy')
 
+  mipData.fill(12)
+  const versionAfterMipCopy = destination.version
+  renderer.copyFramebufferToTexture([1, 1], destination, 1)
+
+  assert.deepEqual(mipPixel(0, 0), sourcePixel(1, 1, 5))
+  assert.deepEqual(mipPixel(1, 1), sourcePixel(2, 2, 5))
+  assert.ok(destination.version > versionAfterMipCopy, 'destination texture should be marked dirty after legacy framebuffer mip copy')
+
+  const rawDestinationData = new Uint8Array(2 * 2 * 4)
+  rawDestinationData.fill(6)
+  const rawDestination = { image: { data: rawDestinationData, width: 2, height: 2 } }
+  renderer.copyFramebufferToTexture(rawDestination, [2, 0])
+
+  function rawPixel(x, y) {
+    const offset = (y * 2 + x) * 4
+    return Array.from(rawDestination.image.data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(rawPixel(0, 0), sourcePixel(2, 0, 5))
+  assert.deepEqual(rawPixel(1, 1), sourcePixel(3, 1, 5))
+  assert.equal(rawDestination.needsUpdate, true, 'plain raw destination texture should still be marked dirty')
+
   const sourceBackedDestinationData = new Uint8Array(2 * 2 * 4)
   sourceBackedDestinationData.fill(7)
   const sourceBackedDestination = new THREE.Texture()
