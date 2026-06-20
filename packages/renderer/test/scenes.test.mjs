@@ -8,6 +8,10 @@ import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerat
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
+import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
@@ -2276,6 +2280,89 @@ test('EffectComposer ClearPass uses Renderer clear and target state', () => {
   const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
   assert.ok(mean.g > 240 && mean.r < 10 && mean.b < 10, `ClearPass target should contain green clear output (${mean.r}, ${mean.g}, ${mean.b})`)
   assert.ok(mean.a > 250, `ClearPass target should contain opaque clear alpha (${mean.a})`)
+})
+
+test('EffectComposer ShaderPass CopyShader copies read buffer output', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+  camera.position.z = 2
+
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  composer.addPass(new RenderPass(scene, camera))
+  composer.addPass(new ShaderPass(CopyShader))
+
+  composer.render(0)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `ShaderPass CopyShader target should contain copied red output (${mean.r} vs ${mean.b})`)
+})
+
+test('EffectComposer TexturePass renders standard CopyShader texture input', () => {
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  const texture = new THREE.DataTexture(new Uint8Array([0, 255, 0, 255]), 1, 1, THREE.RGBAFormat)
+  texture.needsUpdate = true
+  composer.addPass(new TexturePass(texture))
+
+  composer.render(0)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.g > mean.r + 80 && mean.g > mean.b + 80, `TexturePass target should contain copied green texture (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('EffectComposer SavePass copies read buffer into its save target', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+  camera.position.z = 2
+
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const saveTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  composer.addPass(new RenderPass(scene, camera))
+  composer.addPass(new SavePass(saveTarget))
+
+  composer.render(0)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(saveTarget, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `SavePass target should contain copied red output (${mean.r} vs ${mean.b})`)
 })
 
 test('CubeCamera.update works with Renderer render-target state', async () => {

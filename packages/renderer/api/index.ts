@@ -4150,7 +4150,10 @@ function cameraClipDistances(camera: ThreeCameraLike): Pick<NativeCamera, 'near'
   const near = optionalFiniteNumber(camera.near, 'camera.near')
   const far = optionalFiniteNumber(camera.far, 'camera.far')
 
-  if (near != null && near <= 0) {
+  if (near != null && camera.isOrthographicCamera === true && near < 0) {
+    throw new TypeError('camera.near must be non-negative for orthographic cameras.')
+  }
+  if (near != null && camera.isOrthographicCamera !== true && near <= 0) {
     throw new TypeError('camera.near must be positive.')
   }
   if (far != null && far <= 0) {

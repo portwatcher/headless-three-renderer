@@ -318,6 +318,10 @@ export interface ThreeMaterialLike {
   isShaderMaterial?: boolean
   isRawShaderMaterial?: boolean
   isNodeMaterial?: boolean
+  name?: string
+  vertexShader?: string
+  fragmentShader?: string
+  uniforms?: Record<string, { value?: unknown } | unknown>
   depthPacking?: number
   referencePosition?: ThreeVector3Like | ArrayLike<number>
   nearDistance?: number
@@ -503,6 +507,7 @@ export interface ThreeCameraLike {
   matrixWorldInverse: ThreeMatrix4Like
   matrixWorld?: ThreeMatrix4Like
   isPerspectiveCamera?: boolean
+  isOrthographicCamera?: boolean
   isArrayCamera?: boolean
   isCubeCamera?: boolean
   cameras?: ThreeCameraLike[]

@@ -197,7 +197,10 @@ impl RenderSettings {
                 bail!("camera.fov_y_degrees must be finite and between 1 and 179");
             }
 
-            let near = finite_positive(camera.near.unwrap_or(0.01), "camera.near")?;
+            let near = finite_f32(camera.near.unwrap_or(0.01), "camera.near")?;
+            if near < 0.0 {
+                bail!("camera.near must be greater than or equal to 0");
+            }
             let far = finite_positive(camera.far.unwrap_or(100.0), "camera.far")?;
             if far <= near {
                 bail!("camera.far must be greater than camera.near");

@@ -591,8 +591,12 @@ export function materialColor(
     }
   }
 
+  const copyShader = copyShaderMaterialInfo(material)
   const color = validatedColorLikeToArray(material?.color, 'material.color') ?? [1, 1, 1, 1] as Color4
-  color[3] = clamp01(optionalFiniteNumber(material?.opacity, 'material.opacity') ?? color[3] ?? 1)
+  const opacity = copyShader
+    ? optionalFiniteNumber(copyShader.opacity, 'material.uniforms.opacity.value')
+    : optionalFiniteNumber(material?.opacity, 'material.opacity')
+  color[3] = clamp01(opacity ?? color[3] ?? 1)
   if (material && signature) {
     materialColorCacheEntry(context, material, true)!.base = { signature, color: copyColor(color) }
   }
@@ -600,7 +604,8 @@ export function materialColor(
 }
 
 function materialColorSignature(material: ThreeMaterialLike): MaterialColorSignature {
-  return materialSlotColorSignature(material.color, material.opacity)
+  const copyShader = copyShaderMaterialInfo(material)
+  return materialSlotColorSignature(material.color, copyShader ? copyShader.opacity : material.opacity)
 }
 
 function materialSlotColor(
@@ -1407,6 +1412,8 @@ function materialRenderStateProperties(
 
   if (customFragmentShader && shaderMaterialKind(material)) {
     props.shadingModel = 'basic'
+  } else if (copyShaderMaterialInfo(material)) {
+    props.shadingModel = 'basic'
   } else if (material.isMeshBasicMaterial || material.isSpriteMaterial) {
     props.shadingModel = 'basic'
   } else if (material.isMeshDepthMaterial) {
@@ -1484,6 +1491,7 @@ function materialRenderStateSignature(
       material.flatShading,
       material.fog,
       material.type,
+      copyShaderMaterialInfo(material) != null,
       material.isRawShaderMaterial,
       material.isNodeMaterial,
       material.isShaderMaterial,
@@ -2013,7 +2021,7 @@ function assertSupportedShaderMaterial(
   customFragmentShader: string | undefined,
 ): void {
   const kind = shaderMaterialKind(material)
-  if (!kind || customFragmentShader) return
+  if (!kind || customFragmentShader || copyShaderMaterialInfo(material)) return
 
   throw new Error(
     `${kind} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2054,7 +2062,7 @@ function assertSupportedMaterialClass(
   material: ThreeMaterialLike,
   customFragmentShader: string | undefined,
 ): void {
-  if (customFragmentShader || supportedMaterialClass(material)) return
+  if (customFragmentShader || supportedMaterialClass(material) || copyShaderMaterialInfo(material)) return
 
   const type = typeof material.type === 'string' && material.type.trim()
     ? material.type
@@ -2107,12 +2115,51 @@ function shaderMaterialKind(material: ThreeMaterialLike): string | undefined {
   return undefined
 }
 
+interface CopyShaderMaterialInfo {
+  texture: unknown
+  opacity: unknown
+}
+
+function copyShaderMaterialInfo(material: ThreeMaterialLike | undefined): CopyShaderMaterialInfo | null {
+  if (!material || shaderMaterialKind(material) !== 'ShaderMaterial') return null
+  if (!isCopyShaderFragment(material.fragmentShader)) return null
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return null
+  return {
+    texture: uniformValue((uniforms as Record<string, unknown>).tDiffuse),
+    opacity: uniformValue((uniforms as Record<string, unknown>).opacity) ?? 1,
+  }
+}
+
+function uniformValue(uniform: unknown): unknown {
+  if (!uniform || typeof uniform !== 'object' || Array.isArray(uniform)) return undefined
+  return (uniform as { value?: unknown }).value
+}
+
+function isCopyShaderFragment(fragmentShader: unknown): boolean {
+  if (typeof fragmentShader !== 'string') return false
+  const compact = fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatopacity;') &&
+    compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('texture2D(tDiffuse,vUv)') &&
+    compact.includes('gl_FragColor=opacity*texel;')
+}
+
 export function extractTextureData(
   material: ThreeMaterialLike | undefined,
   context: MaterialExtractionContext = {},
 ): TextureInfo | null {
-  const slot = material?.isMeshMatcapMaterial ? material.matcap : material?.map
-  const label = material?.isMeshMatcapMaterial ? 'material.matcap' : 'material.map'
+  const copyShader = copyShaderMaterialInfo(material)
+  const slot = copyShader
+    ? copyShader.texture as ThreeMaterialLike['map']
+    : material?.isMeshMatcapMaterial
+      ? material.matcap
+      : material?.map
+  const label = copyShader
+    ? 'material.uniforms.tDiffuse.value'
+    : material?.isMeshMatcapMaterial
+      ? 'material.matcap'
+      : 'material.map'
   const base = extractTextureFromSlot(slot, label, context.textureCache)
   if (!base) return null
 
