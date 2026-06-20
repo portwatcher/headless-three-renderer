@@ -23296,6 +23296,19 @@ test('reusable renderer reflects mutated mesh material texture and transform sta
   assert.ok(secondLeft.r < 20 && secondLeft.g < 20 && secondLeft.b < 20, `updated transform should clear the previous left region (${secondLeft.r}, ${secondLeft.g}, ${secondLeft.b})`)
   assert.ok(secondRight.g > 180, `updated texture data should render green on the right (${secondRight.r}, ${secondRight.g}, ${secondRight.b})`)
   assert.ok(secondRight.g > secondRight.r + 50 && secondRight.g > secondRight.b + 80, `updated material and texture state should produce a green-dominant right region (${secondRight.r}, ${secondRight.g}, ${secondRight.b})`)
+
+  texture.image.data.set([255, 255, 255, 255])
+  texture.needsUpdate = true
+  material.color.set(0xff0000)
+  mesh.position.x = -0.5
+
+  const third = renderer.render(scene, camera, options)
+  const thirdLeft = meanRegion(third, 64, 64, 8, 24, 28, 40)
+  const thirdRight = meanRegion(third, 64, 64, 36, 24, 56, 40)
+
+  assert.ok(thirdLeft.r > 180, `dynamic mesh uniform slot should update back to red on the left (${thirdLeft.r}, ${thirdLeft.g}, ${thirdLeft.b})`)
+  assert.ok(thirdLeft.g < 40 && thirdLeft.b < 40, `updated uniform slot should not retain prior green texture state (${thirdLeft.r}, ${thirdLeft.g}, ${thirdLeft.b})`)
+  assert.ok(thirdRight.r < 20 && thirdRight.g < 20 && thirdRight.b < 20, `updated transform should clear the previous right region (${thirdRight.r}, ${thirdRight.g}, ${thirdRight.b})`)
 })
 
 test('reusable renderer reflects mutated scene environment texture bytes', () => {

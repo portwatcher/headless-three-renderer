@@ -167,7 +167,7 @@ pub struct GpuRenderer {
     ao_physical_bind_group_cache: Mutex<HashMap<AoPhysicalBindGroupKey, wgpu::BindGroup>>,
     background_bind_group_cache: Mutex<HashMap<BackgroundBindGroupKey, CachedBackgroundBindGroup>>,
     ibl_bind_group_cache: Mutex<HashMap<IblBindGroupKey, wgpu::BindGroup>>,
-    uniform_bind_group_cache: Mutex<HashMap<UniformBindGroupKey, CachedUniformBindGroup>>,
+    dynamic_uniform_bind_group_cache: Mutex<Vec<CachedDynamicUniformBindGroup>>,
     post_uniform_buffer: Mutex<Option<wgpu::Buffer>>,
     color_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
     post_bind_group_cache: Mutex<HashMap<ScratchTextureKey, CachedPostBindGroup>>,
@@ -233,6 +233,22 @@ struct GpuBackground<'a> {
 struct CachedUniformBindGroup {
     buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+}
+
+#[derive(Clone)]
+struct CachedDynamicUniformBindGroup {
+    key: UniformBindGroupKey,
+    buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+}
+
+impl CachedDynamicUniformBindGroup {
+    fn as_uniform_bind_group(&self) -> CachedUniformBindGroup {
+        CachedUniformBindGroup {
+            buffer: self.buffer.clone(),
+            bind_group: self.bind_group.clone(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -2055,7 +2071,7 @@ impl GpuRenderer {
             ao_physical_bind_group_cache: Mutex::new(HashMap::new()),
             background_bind_group_cache: Mutex::new(HashMap::new()),
             ibl_bind_group_cache: Mutex::new(HashMap::new()),
-            uniform_bind_group_cache: Mutex::new(HashMap::new()),
+            dynamic_uniform_bind_group_cache: Mutex::new(Vec::new()),
             post_uniform_buffer: Mutex::new(None),
             color_texture_cache: Mutex::new(HashMap::new()),
             post_bind_group_cache: Mutex::new(HashMap::new()),
@@ -2138,9 +2154,16 @@ impl GpuRenderer {
         });
         let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        let mut dynamic_uniform_guard = self
+            .dynamic_uniform_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let gpu_meshes = meshes
             .iter()
-            .map(|mesh| self.upload_mesh(settings, mesh))
+            .enumerate()
+            .map(|(index, mesh)| {
+                self.upload_mesh(settings, mesh, index, &mut dynamic_uniform_guard)
+            })
             .collect::<Result<Vec<_>>>()?;
         let mut scene_color_texture_guard = None;
         let mut post_texture_guard = None;
@@ -2495,6 +2518,7 @@ impl GpuRenderer {
         drop(scene_color_texture_guard);
         drop(color_texture_guard);
         drop(readback_buffer_guard);
+        drop(dynamic_uniform_guard);
 
         Ok(rgba)
     }
@@ -3761,41 +3785,45 @@ impl GpuRenderer {
             .clone()
     }
 
-    fn uniform_bind_group_for(&self, uniforms: &Uniforms) -> CachedUniformBindGroup {
+    fn dynamic_uniform_bind_group_for(
+        &self,
+        slots: &mut Vec<CachedDynamicUniformBindGroup>,
+        slot: usize,
+        uniforms: &Uniforms,
+    ) -> CachedUniformBindGroup {
         let key = UniformBindGroupKey::from_uniforms(uniforms);
-        if let Some(cached) = self
-            .uniform_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .get(&key)
-            .cloned()
-        {
-            return cached;
+        if let Some(cached) = slots.get_mut(slot) {
+            if cached.key != key {
+                self.queue
+                    .write_buffer(&cached.buffer, 0, bytemuck::bytes_of(uniforms));
+                cached.key = key;
+            }
+            return cached.as_uniform_bind_group();
         }
 
+        debug_assert_eq!(slot, slots.len());
         let buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("headless-three-renderer uniform buffer"),
+                label: Some("headless-three-renderer dynamic uniform buffer"),
                 contents: bytemuck::bytes_of(uniforms),
-                usage: wgpu::BufferUsages::UNIFORM,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
         let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("headless-three-renderer bind group"),
+            label: Some("headless-three-renderer dynamic bind group"),
             layout: &self.uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: buffer.as_entire_binding(),
             }],
         });
-        let cached = CachedUniformBindGroup { buffer, bind_group };
-
-        self.uniform_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| cached.clone())
-            .clone()
+        let cached = CachedDynamicUniformBindGroup {
+            key,
+            buffer,
+            bind_group,
+        };
+        slots.push(cached.clone());
+        cached.as_uniform_bind_group()
     }
 
     fn write_post_uniform_buffer(
@@ -3895,7 +3923,13 @@ impl GpuRenderer {
             .clone()
     }
 
-    fn upload_mesh(&self, settings: &RenderSettings, mesh: &PreparedMesh) -> Result<GpuMesh> {
+    fn upload_mesh(
+        &self,
+        settings: &RenderSettings,
+        mesh: &PreparedMesh,
+        uniform_slot: usize,
+        dynamic_uniform_slots: &mut Vec<CachedDynamicUniformBindGroup>,
+    ) -> Result<GpuMesh> {
         let CachedMeshBuffers {
             vertex_buffer,
             index_buffer,
@@ -4188,7 +4222,7 @@ impl GpuRenderer {
         let CachedUniformBindGroup {
             buffer: uniform_buffer,
             bind_group,
-        } = self.uniform_bind_group_for(&uniforms);
+        } = self.dynamic_uniform_bind_group_for(dynamic_uniform_slots, uniform_slot, &uniforms);
 
         let (texture_bind_group, _mesh_texture) = match &mesh.texture {
             Some(tex) => {
