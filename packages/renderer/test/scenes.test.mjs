@@ -33780,12 +33780,16 @@ test('Renderer info exposes inert compatibility counters', () => {
     points: 0,
     lines: 0,
     timestamp: 0,
+    previousFrameCalls: 0,
+    timestampCalls: 0,
     frame: 0,
   })
   assert.deepEqual(renderer.info.compute, {
     calls: 0,
     frameCalls: 0,
     timestamp: 0,
+    previousFrameCalls: 0,
+    timestampCalls: 0,
   })
   assert.equal(renderer.info.programs, null)
 
@@ -33813,12 +33817,28 @@ test('Renderer info exposes inert compatibility counters', () => {
   assert.equal(renderer.info.render.triangles, 8)
   assert.equal(renderer.info.render.lines, 18)
   assert.equal(renderer.info.render.points, 11)
+  renderer.info.render.previousFrameCalls = 2
+  renderer.info.updateTimestamp('render', 1.25)
+  assert.equal(renderer.info.render.timestamp, 1.25)
+  assert.equal(renderer.info.render.timestampCalls, 1)
+  renderer.info.updateTimestamp('render', 2.5)
+  assert.equal(renderer.info.render.timestamp, 3.75)
+  assert.equal(renderer.info.render.timestampCalls, 0)
+  renderer.info.updateTimestamp('render', 4)
+  assert.equal(renderer.info.render.timestamp, 4)
+  assert.equal(renderer.info.render.timestampCalls, 1)
+  renderer.info.compute.previousFrameCalls = 1
+  renderer.info.updateTimestamp('compute', 7)
+  assert.equal(renderer.info.compute.timestamp, 7)
+  assert.equal(renderer.info.compute.timestampCalls, 0)
   renderer.info.render.frame = 7
   renderer.info.render.frameCalls = 3
   renderer.info.render.timestamp = 123
+  renderer.info.render.timestampCalls = 1
   renderer.info.compute.calls = 4
   renderer.info.compute.frameCalls = 2
   renderer.info.compute.timestamp = 456
+  renderer.info.compute.timestampCalls = 1
   renderer.info.calls = 9
   renderer.info.memory.geometries = 1
   renderer.info.memory.textures = 2
@@ -33831,9 +33851,13 @@ test('Renderer info exposes inert compatibility counters', () => {
   assert.equal(renderer.info.render.lines, 0)
   assert.equal(renderer.info.render.frame, 7)
   assert.equal(renderer.info.render.timestamp, 123)
+  assert.equal(renderer.info.render.previousFrameCalls, 3)
+  assert.equal(renderer.info.render.timestampCalls, 1)
   assert.equal(renderer.info.compute.calls, 4)
   assert.equal(renderer.info.compute.frameCalls, 0)
   assert.equal(renderer.info.compute.timestamp, 456)
+  assert.equal(renderer.info.compute.previousFrameCalls, 2)
+  assert.equal(renderer.info.compute.timestampCalls, 1)
   assert.equal(renderer.info.calls, 9)
   assert.deepEqual(renderer.info.memory, { geometries: 1, textures: 2 })
   renderer.info.dispose()
@@ -33841,7 +33865,11 @@ test('Renderer info exposes inert compatibility counters', () => {
   assert.equal(renderer.info.render.calls, 0)
   assert.equal(renderer.info.compute.calls, 0)
   assert.equal(renderer.info.render.timestamp, 0)
+  assert.equal(renderer.info.render.previousFrameCalls, 0)
+  assert.equal(renderer.info.render.timestampCalls, 0)
   assert.equal(renderer.info.compute.timestamp, 0)
+  assert.equal(renderer.info.compute.previousFrameCalls, 0)
+  assert.equal(renderer.info.compute.timestampCalls, 0)
   assert.deepEqual(renderer.info.memory, { geometries: 0, textures: 0 })
 
   assert.throws(
@@ -33863,6 +33891,18 @@ test('Renderer info exposes inert compatibility counters', () => {
   assert.throws(
     () => renderer.info.update(3, 0x0004, Number.NaN),
     /Renderer\.info\.update instanceCount must be a non-negative integer/i,
+  )
+  assert.throws(
+    () => renderer.info.updateTimestamp('frame', 1),
+    /Renderer\.info\.updateTimestamp type must be "render" or "compute"; received "frame"/i,
+  )
+  assert.throws(
+    () => renderer.info.updateTimestamp('render', Number.NaN),
+    /Renderer\.info\.updateTimestamp time must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.info.updateTimestamp('render', -1),
+    /Renderer\.info\.updateTimestamp time must be non-negative/i,
   )
 
   renderer.setClearColor(0x204080, 0.5)

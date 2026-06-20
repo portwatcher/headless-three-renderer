@@ -267,6 +267,8 @@ class RendererInfoState {
     points: 0,
     lines: 0,
     timestamp: 0,
+    previousFrameCalls: 0,
+    timestampCalls: 0,
     frame: 0,
   }
 
@@ -274,6 +276,8 @@ class RendererInfoState {
     calls: 0,
     frameCalls: 0,
     timestamp: 0,
+    previousFrameCalls: 0,
+    timestampCalls: 0,
   }
 
   programs: unknown[] | null = null
@@ -319,6 +323,8 @@ class RendererInfoState {
   }
 
   reset(): void {
+    this.render.previousFrameCalls = this.render.frameCalls
+    this.compute.previousFrameCalls = this.compute.frameCalls
     this.render.calls = 0
     this.render.frameCalls = 0
     this.render.drawCalls = 0
@@ -333,9 +339,30 @@ class RendererInfoState {
     this.calls = 0
     this.compute.calls = 0
     this.render.timestamp = 0
+    this.render.previousFrameCalls = 0
+    this.render.timestampCalls = 0
     this.compute.timestamp = 0
+    this.compute.previousFrameCalls = 0
+    this.compute.timestampCalls = 0
     this.memory.geometries = 0
     this.memory.textures = 0
+  }
+
+  updateTimestamp(type: unknown, time: unknown): void {
+    assertTimestampQueryType(type, 'Renderer.info.updateTimestamp type')
+    const elapsed = rendererInfoTimestampTime(time, 'Renderer.info.updateTimestamp time')
+    const target = type === 'render' ? this.render : this.compute
+
+    if (target.timestampCalls === 0) {
+      target.timestamp = 0
+    }
+
+    target.timestamp += elapsed
+    target.timestampCalls += 1
+
+    if (target.timestampCalls >= target.previousFrameCalls) {
+      target.timestampCalls = 0
+    }
   }
 
   private updateCommonRendererObject(object: ThreeObject3DLike, count: unknown, instanceCount: unknown): void {
@@ -4348,6 +4375,16 @@ function rendererInfoDrawMode(value: unknown, label: string): number {
     throw new Error(
       `${label} ${String(value)} is not supported. Use POINTS, LINES, LINE_STRIP, LINE_LOOP, or TRIANGLES WebGL draw mode constants.`,
     )
+  }
+  return value
+}
+
+function rendererInfoTimestampTime(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  if (value < 0) {
+    throw new TypeError(`${label} must be non-negative.`)
   }
   return value
 }
