@@ -23218,6 +23218,12 @@ test('reusable renderer updates cached background and post-processing uniforms',
     ...postOptions,
     postProcessing: { grayscale: true },
   }))
+  postScene.background = new THREE.Color(0, 0, 1)
+  const invertedBlue = meanRgba(renderer.render(postScene, camera, {
+    ...postOptions,
+    postProcessing: { invert: 1 },
+  }))
+  postScene.background = new THREE.Color(1, 0, 0)
   const invertedAgain = meanRgba(renderer.render(postScene, camera, {
     ...postOptions,
     postProcessing: { invert: 1 },
@@ -23225,6 +23231,7 @@ test('reusable renderer updates cached background and post-processing uniforms',
 
   assert.ok(inverted.g > inverted.r + 80 && inverted.b > inverted.r + 80, `invert uniform should turn red toward cyan (${inverted.r}, ${inverted.g}, ${inverted.b})`)
   assert.ok(Math.max(grayscale.r, grayscale.g, grayscale.b) - Math.min(grayscale.r, grayscale.g, grayscale.b) < 3, `grayscale uniform should replace prior invert settings (${grayscale.r}, ${grayscale.g}, ${grayscale.b})`)
+  assert.ok(invertedBlue.r > invertedBlue.b + 80 && invertedBlue.g > invertedBlue.b + 80, `cached post bind group should sample updated blue scene color as yellow after invert (${invertedBlue.r}, ${invertedBlue.g}, ${invertedBlue.b})`)
   assert.ok(Math.abs(invertedAgain.g - inverted.g) < 4 && Math.abs(invertedAgain.b - inverted.b) < 4, `post uniform buffer should update back to invert settings (${invertedAgain.r}, ${invertedAgain.g}, ${invertedAgain.b})`)
 })
 

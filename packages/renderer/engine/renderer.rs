@@ -169,6 +169,8 @@ pub struct GpuRenderer {
     ibl_bind_group_cache: Mutex<HashMap<IblBindGroupKey, wgpu::BindGroup>>,
     uniform_bind_group_cache: Mutex<HashMap<UniformBindGroupKey, CachedUniformBindGroup>>,
     post_uniform_buffer: Mutex<Option<wgpu::Buffer>>,
+    color_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
+    post_bind_group_cache: Mutex<HashMap<ScratchTextureKey, CachedPostBindGroup>>,
     scene_color_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
     post_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
     readback_buffer_cache: Mutex<HashMap<ReadbackBufferKey, wgpu::Buffer>>,
@@ -237,6 +239,19 @@ struct CachedUniformBindGroup {
 struct CachedBackgroundBindGroup {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+}
+
+#[derive(Clone)]
+struct CachedPostBindGroup {
+    source_view: wgpu::TextureView,
+    bind_group: wgpu::BindGroup,
+}
+
+impl CachedPostBindGroup {
+    fn bind_group(&self) -> wgpu::BindGroup {
+        let _source_view = &self.source_view;
+        self.bind_group.clone()
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -2042,6 +2057,8 @@ impl GpuRenderer {
             ibl_bind_group_cache: Mutex::new(HashMap::new()),
             uniform_bind_group_cache: Mutex::new(HashMap::new()),
             post_uniform_buffer: Mutex::new(None),
+            color_texture_cache: Mutex::new(HashMap::new()),
+            post_bind_group_cache: Mutex::new(HashMap::new()),
             scene_color_texture_cache: Mutex::new(HashMap::new()),
             post_texture_cache: Mutex::new(HashMap::new()),
             readback_buffer_cache: Mutex::new(HashMap::new()),
@@ -2081,18 +2098,14 @@ impl GpuRenderer {
             depth_or_array_layers: 1,
         };
 
-        let color_texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("headless-three-renderer color texture"),
-            size: texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: COLOR_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+        let (color_texture, color_texture_guard) = self.cached_scratch_texture(
+            &self.color_texture_cache,
+            texture_size,
+            "headless-three-renderer color texture",
+            wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
+        );
         let color_view = color_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let msaa_color_texture = if settings.sample_count > 1 {
             Some(self.device.create_texture(&wgpu::TextureDescriptor {
@@ -2403,24 +2416,8 @@ impl GpuRenderer {
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
             let post_uniform_buffer = self.write_post_uniform_buffer(&mut guard, &post_uniforms);
-            let post_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("headless-three-renderer post bind group"),
-                layout: &self.post_layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&color_view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&self.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: post_uniform_buffer.as_entire_binding(),
-                    },
-                ],
-            });
+            let post_bind_group =
+                self.post_bind_group_for(texture_size, &color_view, &post_uniform_buffer);
             let color_attachments = [Some(wgpu::RenderPassColorAttachment {
                 view: &post_view,
                 depth_slice: None,
@@ -2496,6 +2493,7 @@ impl GpuRenderer {
         drop(post_uniform_buffer_guard);
         drop(post_texture_guard);
         drop(scene_color_texture_guard);
+        drop(color_texture_guard);
         drop(readback_buffer_guard);
 
         Ok(rgba)
@@ -3820,6 +3818,54 @@ impl GpuRenderer {
             });
         *slot = Some(buffer.clone());
         buffer
+    }
+
+    fn post_bind_group_for(
+        &self,
+        source_size: wgpu::Extent3d,
+        source_view: &wgpu::TextureView,
+        uniform_buffer: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        let key = ScratchTextureKey::from_extent(source_size);
+        if let Some(cached) = self
+            .post_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&key)
+            .cloned()
+        {
+            return cached.bind_group();
+        }
+
+        let source_view = source_view.clone();
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("headless-three-renderer post bind group"),
+            layout: &self.post_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&source_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: uniform_buffer.as_entire_binding(),
+                },
+            ],
+        });
+        let cached = CachedPostBindGroup {
+            source_view,
+            bind_group,
+        };
+        self.post_bind_group_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .entry(key)
+            .or_insert_with(|| cached.clone())
+            .bind_group()
     }
 
     fn ibl_bind_group_for(&self, ibl: &IblMaps) -> wgpu::BindGroup {
