@@ -1836,15 +1836,15 @@ export class Renderer {
   }
 
   clearColor(): void {
-    // Color buffers are created and cleared inside each native render pass.
+    this.clear(true, false, false)
   }
 
   clearDepth(): void {
-    // Depth is owned by each native render pass, so there is no persistent buffer to clear.
+    this.clear(false, true, false)
   }
 
   clearStencil(): void {
-    // Stencil state is scoped to each native render pass.
+    this.clear(false, false, true)
   }
 
   dispose(): void {

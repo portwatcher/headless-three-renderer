@@ -32081,7 +32081,7 @@ test('Renderer clear honors active render target scissor state', () => {
   renderer.setScissor(0, 0, 16, 32)
   renderer.setScissorTest(true)
   renderer.setClearColor(0x0000ff, 1)
-  renderer.clear()
+  renderer.clearColor()
 
   const rendererLeft = meanRegion(target.data, 32, 32, 4, 10, 12, 22)
   const rendererRight = meanRegion(target.data, 32, 32, 20, 10, 28, 22)
@@ -32124,6 +32124,13 @@ test('Renderer clear writes active render target depth textures', () => {
   assert.equal(depthTexture.source.data.data, depthTexture.image.data)
   assert.equal(depthTexture.needsUpdate, true)
 
+  renderer.setClearDepth(0.75)
+  renderer.clearDepth()
+  const helperDepthMean = meanScalarRegion(depthTexture.image.data, 32, 32, 10, 10, 22, 22)
+  const helperColorMean = meanRegion(target.data, 32, 32, 10, 10, 22, 22)
+  assert.ok(Math.abs(helperDepthMean - 0.75) < 1e-6, `clearDepth should write configured clear depth (${helperDepthMean})`)
+  assert.ok(helperColorMean.r > helperColorMean.g + 80, `clearDepth should preserve color output (${helperColorMean.r}, ${helperColorMean.g})`)
+
   renderer.setRenderTarget(null)
 })
 
@@ -32155,8 +32162,27 @@ test('Renderer clear methods validate compatibility hooks', () => {
   assert.strictEqual(renderer.getRenderTarget(), previousTarget)
   assert.equal(renderer.getActiveCubeFace(), 2)
   assert.equal(renderer.getActiveMipmapLevel(), 1)
+
+  const sizedClearTarget = {
+    width: 4,
+    height: 4,
+    texture: {},
+    depthTexture: { type: THREE.FloatType, source: { data: {} } },
+  }
+  renderer.setClearColor(0x204080, 0.5)
+  renderer.setClearDepth(0.375)
+  assert.equal(renderer.clearTarget(sizedClearTarget, true, true, false), undefined)
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+  assert.equal(renderer.getActiveCubeFace(), 2)
+  assert.equal(renderer.getActiveMipmapLevel(), 1)
+  const targetClear = meanRgba(sizedClearTarget.data)
+  assertRgbClose(targetClear, [0x20, 0x40, 0x80], 'Renderer.clearTarget should write color into sized targets')
+  assert.ok(Math.abs(targetClear.a - 128) <= 1, `Renderer.clearTarget should write clear alpha (${targetClear.a})`)
+  const targetDepthClear = meanScalarRegion(sizedClearTarget.depthTexture.image.data, 4, 4, 0, 0, 4, 4)
+  assert.ok(Math.abs(targetDepthClear - 0.375) < 1e-6, `Renderer.clearTarget should write clear depth (${targetDepthClear})`)
+
   renderer.setRenderTarget(null)
-  assert.equal(renderer.getClearDepth(), 0.25)
+  assert.equal(renderer.getClearDepth(), 0.375)
   assert.equal(renderer.getClearStencil(), 7)
 
   const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
