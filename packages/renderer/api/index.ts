@@ -1468,6 +1468,20 @@ export class Renderer {
     )
   }
 
+  get samples(): number {
+    return 0
+  }
+
+  get currentSamples(): number {
+    if (!this.currentRenderTarget) return this.samples
+    const targetSamples = this.currentRenderTarget.sampleCount ?? this.currentRenderTarget.samples ?? 1
+    return targetSamples > 1 ? targetSamples : 1
+  }
+
+  get isOutputTarget(): boolean {
+    return this.currentRenderTarget === null
+  }
+
   setOpaqueSort(method: RenderSortFunction | null): void {
     assertSortFunctionOrNull(method, 'Renderer.setOpaqueSort')
     this.opaqueSort = method
@@ -4119,6 +4133,7 @@ function assertRendererParametersLike(value: RendererParametersLike | undefined,
   if (parameters.powerPreference !== undefined) {
     rendererStatePowerPreference(parameters.powerPreference, `${label}.powerPreference`)
   }
+  assertRendererConstructorSamples(parameters.samples, `${label}.samples`)
   assertRendererOutputBufferType(parameters.outputBufferType, `${label}.outputBufferType`)
   assertRendererContextParameterAbsent(parameters, 'canvas', label)
   assertRendererContextParameterAbsent(parameters, 'context', label)
@@ -4144,6 +4159,18 @@ function assertRendererOutputBufferType(value: unknown, label: string): void {
   if (value !== UnsignedByteType) {
     throw new Error(
       `${label} ${String(value)} is not supported by @headless-three/renderer because it has no browser drawing buffer. Omit outputBufferType for RGBA8 output, or use a target texture with FloatType or HalfFloatType for typed offscreen readback.`,
+    )
+  }
+}
+
+function assertRendererConstructorSamples(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+    throw new TypeError(`${label} must be a non-negative integer sample count.`)
+  }
+  if (value > 1) {
+    throw new Error(
+      `${label} ${String(value)} is not supported as constructor-level MSAA state by @headless-three/renderer. Use render options samples/sampleCount or target samples/sampleCount for 4x MSAA.`,
     )
   }
 }

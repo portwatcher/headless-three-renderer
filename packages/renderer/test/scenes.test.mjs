@@ -31176,6 +31176,7 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
     preserveDrawingBuffer: true,
     powerPreference: 'high-performance',
     failIfMajorPerformanceCaveat: false,
+    samples: 0,
     outputBufferType: THREE.UnsignedByteType,
     logarithmicDepthBuffer: false,
     reversedDepthBuffer: false,
@@ -31239,6 +31240,14 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
   assert.throws(
     () => new Renderer({ outputBufferType: THREE.HalfFloatType }),
     /Renderer parameters\.outputBufferType .*not supported.*Omit outputBufferType.*FloatType or HalfFloatType/i,
+  )
+  assert.throws(
+    () => new Renderer({ samples: '4' }),
+    /Renderer parameters\.samples must be a non-negative integer sample count/i,
+  )
+  assert.throws(
+    () => new Renderer({ samples: 4 }),
+    /Renderer parameters\.samples 4 is not supported as constructor-level MSAA state.*render options samples\/sampleCount/i,
   )
   assert.throws(
     () => new Renderer({ canvas: {} }),
@@ -31463,6 +31472,16 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.highPrecision, false)
   renderer.highPrecision = false
   assert.equal(renderer.highPrecision, false)
+  assert.equal(renderer.samples, 0)
+  assert.equal(renderer.currentSamples, 0)
+  assert.equal(renderer.isOutputTarget, true)
+  renderer.setRenderTarget({ texture: {}, sampleCount: 4 })
+  assert.equal(renderer.samples, 0)
+  assert.equal(renderer.currentSamples, 4)
+  assert.equal(renderer.isOutputTarget, false)
+  renderer.setRenderTarget(null)
+  assert.equal(renderer.currentSamples, 0)
+  assert.equal(renderer.isOutputTarget, true)
   assert.equal(renderer.coordinateSystem, THREE.WebGLCoordinateSystem)
   assert.throws(
     () => { renderer.coordinateSystem = THREE.WebGPUCoordinateSystem },
