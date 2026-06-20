@@ -20950,6 +20950,81 @@ test('MeshPhysicalMaterial negative anisotropy matches Three.js positive-only fe
   assert.ok(positiveDiff > 0.5, `positive anisotropy should still affect the physical BRDF, diff=${positiveDiff.toFixed(3)}`)
 })
 
+test('inactive MeshPhysicalMaterial extension maps are ignored before texture validation', () => {
+  function ignoredCubeMap() {
+    return cubeTexture([
+      [255, 0, 0],
+      [0, 255, 0],
+      [0, 0, 255],
+      [255, 255, 0],
+      [255, 0, 255],
+      [0, 255, 255],
+    ])
+  }
+
+  function mipmappedTexture() {
+    const texture = solidTexture(255, 0, 0)
+    texture.mipmaps = [{ data: new Uint8Array([0, 255, 0, 255]), width: 1, height: 1 }]
+    return texture
+  }
+
+  function renderMaterial(params = {}) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.AmbientLight(0xffffff, 1))
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x6688aa,
+        roughness: 0.65,
+        metalness: 0,
+        ...params,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const baseline = renderMaterial()
+  const cases = [
+    ['clearcoat maps', {
+      clearcoat: 0,
+      clearcoatMap: ignoredCubeMap(),
+      clearcoatRoughnessMap: mipmappedTexture(),
+      clearcoatNormalMap: ignoredCubeMap(),
+    }],
+    ['sheen maps', {
+      sheen: 0,
+      sheenColor: new THREE.Color(1, 0, 0),
+      sheenColorMap: ignoredCubeMap(),
+      sheenRoughnessMap: mipmappedTexture(),
+    }],
+    ['anisotropy map', {
+      anisotropy: 0,
+      anisotropyMap: ignoredCubeMap(),
+    }],
+    ['iridescence maps', {
+      iridescence: 0,
+      iridescenceMap: ignoredCubeMap(),
+      iridescenceThicknessMap: mipmappedTexture(),
+    }],
+    ['transmission maps', {
+      transmission: 0,
+      thickness: 8,
+      transmissionMap: ignoredCubeMap(),
+      thicknessMap: mipmappedTexture(),
+    }],
+  ]
+
+  for (const [label, params] of cases) {
+    const diff = meanAbsDiff(baseline, renderMaterial(params))
+    assert.ok(diff < 0.05, `${label} should be ignored while its controlling scalar is zero, diff=${diff.toFixed(3)}`)
+  }
+})
+
 test('MeshPhysicalMaterial scalar clearcoat and roughness affect IBL specular', () => {
   function renderClearcoat(clearcoat, clearcoatRoughness) {
     const scene = new THREE.Scene()

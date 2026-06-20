@@ -707,10 +707,18 @@ export function extractPbrProperties(
   assertSupportedOnBeforeCompile(material, customFragmentShader)
   assertSupportedMaterialClass(material, customFragmentShader)
   assertSupportedMaterialState(material, context)
-  assertCompatiblePackedPhysicalMapSamplers(material)
   optionalBoolean(material.visible, 'material.visible')
   optionalBoolean(material.vertexColors, 'material.vertexColors')
   const props: PbrProperties = materialScalarFeatureProperties(material, context)
+  const sheen = clamp01(optionalFiniteNumber(material.sheen, 'material.sheen') ?? 0)
+  const physicalMapFeatures: PhysicalMapFeatureGates = {
+    clearcoat: (props.clearcoat ?? 0) > 0,
+    sheen: sheen > 0,
+    anisotropy: (props.anisotropy ?? 0) > 0,
+    iridescence: (props.iridescence ?? 0) > 0,
+    transmission: (props.transmission ?? 0) > 0,
+  }
+  assertCompatiblePackedPhysicalMapSamplers(material, physicalMapFeatures)
   const textureFromSlot = (slot: ThreeMaterialLike['map'], label: string) => extractTextureFromSlot(
     slot,
     label,
@@ -730,21 +738,27 @@ export function extractPbrProperties(
     options?: TextureStateOptions,
   ) => assignPbrTextureSamplerState(props, prefix, slot, label, context, options)
 
-  const clearcoatMapInfo = textureFromSlot(material.clearcoatMap, 'material.clearcoatMap')
+  const clearcoatMapInfo = physicalMapFeatures.clearcoat
+    ? textureFromSlot(material.clearcoatMap, 'material.clearcoatMap')
+    : null
   if (clearcoatMapInfo) {
     props.clearcoatMap = clearcoatMapInfo.data
     props.clearcoatMapWidth = clearcoatMapInfo.width
     props.clearcoatMapHeight = clearcoatMapInfo.height
     textureStateFromSlot('clearcoatMap', material.clearcoatMap, 'material.clearcoatMap')
   }
-  const clearcoatRoughnessMapInfo = textureFromSlot(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
+  const clearcoatRoughnessMapInfo = physicalMapFeatures.clearcoat
+    ? textureFromSlot(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
+    : null
   if (clearcoatRoughnessMapInfo) {
     props.clearcoatRoughnessMap = clearcoatRoughnessMapInfo.data
     props.clearcoatRoughnessMapWidth = clearcoatRoughnessMapInfo.width
     props.clearcoatRoughnessMapHeight = clearcoatRoughnessMapInfo.height
     textureStateFromSlot('clearcoatRoughnessMap', material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
   }
-  const clearcoatNormalMapInfo = textureFromSlot(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
+  const clearcoatNormalMapInfo = physicalMapFeatures.clearcoat
+    ? textureFromSlot(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
+    : null
   if (clearcoatNormalMapInfo) {
     props.clearcoatNormalMap = clearcoatNormalMapInfo.data
     props.clearcoatNormalMapWidth = clearcoatNormalMapInfo.width
@@ -752,7 +766,6 @@ export function extractPbrProperties(
     textureStateFromSlot('clearcoatNormalMap', material.clearcoatNormalMap, 'material.clearcoatNormalMap')
   }
   const sheenColor = colorFromSlot('sheenColor', material.sheenColor, 'material.sheenColor')
-  const sheen = clamp01(optionalFiniteNumber(material.sheen, 'material.sheen') ?? 0)
   if (sheenColor && sheen > 0) {
     props.sheenColor = [
       sheenColor[0] * sheen,
@@ -760,49 +773,63 @@ export function extractPbrProperties(
       sheenColor[2] * sheen,
     ]
   }
-  const sheenColorMapInfo = textureFromSlot(material.sheenColorMap, 'material.sheenColorMap')
+  const sheenColorMapInfo = physicalMapFeatures.sheen
+    ? textureFromSlot(material.sheenColorMap, 'material.sheenColorMap')
+    : null
   if (sheenColorMapInfo) {
     props.sheenColorMap = sheenColorMapInfo.data
     props.sheenColorMapWidth = sheenColorMapInfo.width
     props.sheenColorMapHeight = sheenColorMapInfo.height
     textureStateFromSlot('sheenColorMap', material.sheenColorMap, 'material.sheenColorMap')
   }
-  const sheenRoughnessMapInfo = textureFromSlot(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
+  const sheenRoughnessMapInfo = physicalMapFeatures.sheen
+    ? textureFromSlot(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
+    : null
   if (sheenRoughnessMapInfo) {
     props.sheenRoughnessMap = sheenRoughnessMapInfo.data
     props.sheenRoughnessMapWidth = sheenRoughnessMapInfo.width
     props.sheenRoughnessMapHeight = sheenRoughnessMapInfo.height
     textureStateFromSlot('sheenRoughnessMap', material.sheenRoughnessMap, 'material.sheenRoughnessMap')
   }
-  const anisotropyMapInfo = textureFromSlot(material.anisotropyMap, 'material.anisotropyMap')
+  const anisotropyMapInfo = physicalMapFeatures.anisotropy
+    ? textureFromSlot(material.anisotropyMap, 'material.anisotropyMap')
+    : null
   if (anisotropyMapInfo) {
     props.anisotropyMap = anisotropyMapInfo.data
     props.anisotropyMapWidth = anisotropyMapInfo.width
     props.anisotropyMapHeight = anisotropyMapInfo.height
     textureStateFromSlot('anisotropyMap', material.anisotropyMap, 'material.anisotropyMap')
   }
-  const iridescenceMapInfo = textureFromSlot(material.iridescenceMap, 'material.iridescenceMap')
+  const iridescenceMapInfo = physicalMapFeatures.iridescence
+    ? textureFromSlot(material.iridescenceMap, 'material.iridescenceMap')
+    : null
   if (iridescenceMapInfo) {
     props.iridescenceMap = iridescenceMapInfo.data
     props.iridescenceMapWidth = iridescenceMapInfo.width
     props.iridescenceMapHeight = iridescenceMapInfo.height
     textureStateFromSlot('iridescenceMap', material.iridescenceMap, 'material.iridescenceMap')
   }
-  const iridescenceThicknessMapInfo = textureFromSlot(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
+  const iridescenceThicknessMapInfo = physicalMapFeatures.iridescence
+    ? textureFromSlot(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
+    : null
   if (iridescenceThicknessMapInfo) {
     props.iridescenceThicknessMap = iridescenceThicknessMapInfo.data
     props.iridescenceThicknessMapWidth = iridescenceThicknessMapInfo.width
     props.iridescenceThicknessMapHeight = iridescenceThicknessMapInfo.height
     textureStateFromSlot('iridescenceThicknessMap', material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
   }
-  const transmissionMapInfo = textureFromSlot(material.transmissionMap, 'material.transmissionMap')
+  const transmissionMapInfo = physicalMapFeatures.transmission
+    ? textureFromSlot(material.transmissionMap, 'material.transmissionMap')
+    : null
   if (transmissionMapInfo) {
     props.transmissionMap = transmissionMapInfo.data
     props.transmissionMapWidth = transmissionMapInfo.width
     props.transmissionMapHeight = transmissionMapInfo.height
     textureStateFromSlot('transmissionMap', material.transmissionMap, 'material.transmissionMap')
   }
-  const thicknessMapInfo = textureFromSlot(material.thicknessMap, 'material.thicknessMap')
+  const thicknessMapInfo = physicalMapFeatures.transmission
+    ? textureFromSlot(material.thicknessMap, 'material.thicknessMap')
+    : null
   if (thicknessMapInfo) {
     props.thicknessMap = thicknessMapInfo.data
     props.thicknessMapWidth = thicknessMapInfo.width
@@ -3439,41 +3466,66 @@ function assertSupportedTextureInput(
   }
 }
 
-function assertCompatiblePackedPhysicalMapSamplers(material: ThreeMaterialLike): void {
-  assertNoPackedPhysicalMapMipmaps('physical extension scalar maps', [
-    ['clearcoatMap', material.clearcoatMap],
-    ['clearcoatRoughnessMap', material.clearcoatRoughnessMap],
-    ['transmissionMap', material.transmissionMap],
-    ['thicknessMap', material.thicknessMap],
-    ['anisotropyMap', material.anisotropyMap],
-    ['iridescenceMap', material.iridescenceMap],
-    ['iridescenceThicknessMap', material.iridescenceThicknessMap],
-  ])
-  assertNoPackedPhysicalMapMipmaps('physical extension sheen maps', [
-    ['sheenColorMap', material.sheenColorMap],
-    ['sheenRoughnessMap', material.sheenRoughnessMap],
-  ])
+interface PhysicalMapFeatureGates {
+  clearcoat: boolean
+  sheen: boolean
+  anisotropy: boolean
+  iridescence: boolean
+  transmission: boolean
+}
+
+function assertCompatiblePackedPhysicalMapSamplers(
+  material: ThreeMaterialLike,
+  features: PhysicalMapFeatureGates,
+): void {
+  const scalarSlots = activePackedPhysicalScalarMapSlots(material, features)
+  const sheenSlots = features.sheen
+    ? [
+      ['sheenColorMap', material.sheenColorMap],
+      ['sheenRoughnessMap', material.sheenRoughnessMap],
+    ] satisfies Array<[string, ThreeTextureLike | null | undefined]>
+    : []
+  assertNoPackedPhysicalMapMipmaps('physical extension scalar maps', scalarSlots)
+  assertNoPackedPhysicalMapMipmaps('physical extension sheen maps', sheenSlots)
   assertNoPackedPhysicalMapMipmaps('physical extension specular maps', [
     ['specularColorMap', material.specularColorMap],
     ['specularIntensityMap', material.specularIntensityMap],
   ])
-  assertMatchingSamplerSettings('physical extension scalar maps', [
-    ['clearcoatMap', material.clearcoatMap],
-    ['clearcoatRoughnessMap', material.clearcoatRoughnessMap],
-    ['transmissionMap', material.transmissionMap],
-    ['thicknessMap', material.thicknessMap],
-    ['anisotropyMap', material.anisotropyMap],
-    ['iridescenceMap', material.iridescenceMap],
-    ['iridescenceThicknessMap', material.iridescenceThicknessMap],
-  ])
-  assertMatchingSamplerSettings('physical extension sheen maps', [
-    ['sheenColorMap', material.sheenColorMap],
-    ['sheenRoughnessMap', material.sheenRoughnessMap],
-  ])
+  assertMatchingSamplerSettings('physical extension scalar maps', scalarSlots)
+  assertMatchingSamplerSettings('physical extension sheen maps', sheenSlots)
   assertMatchingSamplerSettings('physical extension specular maps', [
     ['specularColorMap', material.specularColorMap],
     ['specularIntensityMap', material.specularIntensityMap],
   ])
+}
+
+function activePackedPhysicalScalarMapSlots(
+  material: ThreeMaterialLike,
+  features: PhysicalMapFeatureGates,
+): Array<[string, ThreeTextureLike | null | undefined]> {
+  const slots: Array<[string, ThreeTextureLike | null | undefined]> = []
+  if (features.clearcoat) {
+    slots.push(
+      ['clearcoatMap', material.clearcoatMap],
+      ['clearcoatRoughnessMap', material.clearcoatRoughnessMap],
+    )
+  }
+  if (features.transmission) {
+    slots.push(
+      ['transmissionMap', material.transmissionMap],
+      ['thicknessMap', material.thicknessMap],
+    )
+  }
+  if (features.anisotropy) {
+    slots.push(['anisotropyMap', material.anisotropyMap])
+  }
+  if (features.iridescence) {
+    slots.push(
+      ['iridescenceMap', material.iridescenceMap],
+      ['iridescenceThicknessMap', material.iridescenceThicknessMap],
+    )
+  }
+  return slots
 }
 
 function assertNoPackedPhysicalMapMipmaps(groupLabel: string, slots: Array<[string, ThreeTextureLike | null | undefined]>): void {
