@@ -671,6 +671,10 @@ class RendererColorBufferState {
       rendererStateBoolean(premultipliedAlpha, 'Renderer.state.buffers.color.setClear premultipliedAlpha')
     }
   }
+
+  reset(): void {
+    // Native color-buffer state is rebuilt for each render pass.
+  }
 }
 
 class RendererDepthBufferState {
@@ -706,6 +710,10 @@ class RendererDepthBufferState {
   setClear(depth: unknown): void {
     rendererStateClearDepth(depth, 'Renderer.state.buffers.depth.setClear depth')
   }
+
+  reset(): void {
+    // Native depth-buffer state is rebuilt for each render pass.
+  }
 }
 
 class RendererStencilBufferState {
@@ -735,6 +743,10 @@ class RendererStencilBufferState {
 
   setClear(stencil: unknown): void {
     rendererStateClearStencil(stencil, 'Renderer.state.buffers.stencil.setClear stencil')
+  }
+
+  reset(): void {
+    // Native stencil-buffer state is rebuilt for each render pass.
   }
 }
 

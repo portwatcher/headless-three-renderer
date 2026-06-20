@@ -31102,6 +31102,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.state.buffers.color.setMask(false), undefined)
   assert.equal(renderer.state.buffers.color.setLocked(true), undefined)
   assert.equal(renderer.state.buffers.color.setClear(0.1, 0.2, 0.3, 0.4, true), undefined)
+  assert.equal(renderer.state.buffers.color.reset(), undefined)
   assert.equal(renderer.state.buffers.depth.getReversed(), false)
   assert.equal(renderer.state.buffers.depth.setReversed(false), undefined)
   assert.equal(renderer.state.buffers.depth.getReversed(), false)
@@ -31110,6 +31111,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.state.buffers.depth.setFunc(THREE.LessEqualDepth), undefined)
   assert.equal(renderer.state.buffers.depth.setClear(0.5), undefined)
   assert.equal(renderer.state.buffers.depth.setLocked(false), undefined)
+  assert.equal(renderer.state.buffers.depth.reset(), undefined)
   assert.equal(renderer.state.buffers.stencil.setTest(true), undefined)
   assert.equal(renderer.state.buffers.stencil.setMask(0xff), undefined)
   assert.equal(renderer.state.buffers.stencil.setFunc(THREE.AlwaysStencilFunc, 1, 0xff), undefined)
@@ -31120,6 +31122,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   ), undefined)
   assert.equal(renderer.state.buffers.stencil.setClear(1), undefined)
   assert.equal(renderer.state.buffers.stencil.setLocked(false), undefined)
+  assert.equal(renderer.state.buffers.stencil.reset(), undefined)
   assert.equal(renderer.state.setBlending(
     THREE.CustomBlending,
     THREE.AddEquation,
