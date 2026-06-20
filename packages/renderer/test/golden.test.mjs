@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
@@ -116,6 +116,7 @@ test('generated corpus matches browser WebGLRenderer golden references', {
   const fixtures = createBrowserReferenceFixtures(createSceneCorpus())
   const manifest = await readReferenceManifest(referenceDir)
   validateReferenceManifest(manifest, createBrowserReferenceManifest(fixtures))
+  await validateReferenceFiles(referenceDir, manifest)
 
   const renderer = new Renderer()
   renderer.toneMapping = THREE.NoToneMapping
@@ -180,6 +181,21 @@ function validateReferenceManifest(actual, expected) {
     actual.fixtures,
     expected.fixtures,
     'browser reference manifest fixture list mismatch; regenerate references from the current corpus',
+  )
+}
+
+async function validateReferenceFiles(referenceDir, manifest) {
+  const actualFiles = (await readdir(referenceDir))
+    .filter((file) => file.endsWith('.png'))
+    .sort()
+  const expectedFiles = manifest.fixtures
+    .map((fixture) => fixture.file)
+    .sort()
+
+  assert.deepEqual(
+    actualFiles,
+    expectedFiles,
+    'browser reference PNG file set mismatch; regenerate references and remove stale PNGs',
   )
 }
 
