@@ -1521,6 +1521,10 @@ export class Renderer {
     this.onDeviceLostValue = value
   }
 
+  _onDeviceLost(info?: unknown): void {
+    this.onDeviceLostValue(info)
+  }
+
   get inspector(): RendererInspectorLike {
     return this.inspectorValue
   }

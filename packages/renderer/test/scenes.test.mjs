@@ -33742,9 +33742,14 @@ test('Renderer context loss hooks are no-op compatibility hooks', () => {
   let observedDeviceLostInfo = null
 
   assert.equal(typeof renderer.onDeviceLost, 'function')
+  assert.equal(typeof renderer._onDeviceLost, 'function')
   assert.equal(renderer.onDeviceLost(deviceLostInfo), undefined)
+  assert.equal(renderer._onDeviceLost(deviceLostInfo), undefined)
   renderer.onDeviceLost = (info) => { observedDeviceLostInfo = info }
   assert.equal(renderer.onDeviceLost(deviceLostInfo), undefined)
+  assert.equal(observedDeviceLostInfo, deviceLostInfo)
+  observedDeviceLostInfo = null
+  assert.equal(renderer._onDeviceLost(deviceLostInfo), undefined)
   assert.equal(observedDeviceLostInfo, deviceLostInfo)
 
   renderer.setClearColor(0x204080, 0.5)
