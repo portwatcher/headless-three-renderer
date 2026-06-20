@@ -117,6 +117,10 @@ export interface ThreeTextureLike {
   isCompressedTexture?: boolean
   isCompressedArrayTexture?: boolean
   isCompressedCubeTexture?: boolean
+  isDataArrayTexture?: boolean
+  isData3DTexture?: boolean
+  isArrayTexture?: boolean
+  is3DTexture?: boolean
   image?: {
     data?: ArrayLike<number>
     width?: number

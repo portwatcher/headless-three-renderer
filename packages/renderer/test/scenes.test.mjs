@@ -33117,6 +33117,14 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     /Renderer\.copyTextureToTexture destination texture must provide a readable raw image object/i,
   )
   assert.throws(
+    () => renderer.copyTextureToTexture(new THREE.DataArrayTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, 1), destination),
+    /Renderer\.copyTextureToTexture source texture uses an array or 3D texture/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, new THREE.Data3DTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, 1)),
+    /Renderer\.copyTextureToTexture destination texture uses an array or 3D texture/i,
+  )
+  assert.throws(
     () => renderer.copyTextureToTexture3D(source, destination),
     /Renderer\.copyTextureToTexture3D\(\) is not supported.*3D and array texture GPU copies.*Renderer\.copyTextureToTexture\(\)/i,
   )

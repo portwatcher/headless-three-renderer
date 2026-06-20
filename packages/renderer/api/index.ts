@@ -4997,6 +4997,17 @@ function rawTextureCopyImage(
   label: string,
   options: { allowCanvasRead?: boolean; level?: number } = {},
 ): RawTextureCopyImage {
+  if (
+    texture.isDataArrayTexture === true ||
+    texture.isData3DTexture === true ||
+    texture.isArrayTexture === true ||
+    texture.is3DTexture === true ||
+    texture.isCompressedArrayTexture === true
+  ) {
+    throw new Error(
+      `${label} uses an array or 3D texture, which is not supported by @headless-three/renderer texture copy yet. Use a readable 2D texture or copy layers separately.`,
+    )
+  }
   const level = options.level ?? 0
   let image = texture.image ?? texture.source?.data
   if (level > 0) {
