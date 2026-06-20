@@ -8,6 +8,23 @@ export type RenderMode = 'color' | 'mask' | 'object-id' | 'normal'
 export type RenderAnimationLoopCallback = (time: number, frame?: unknown) => void
 export type RendererPowerPreferenceLike = 'default' | 'high-performance' | 'low-power'
 
+export interface RendererInspectorLike {
+  currentFrame?: unknown
+  setRenderer(renderer: unknown): unknown
+  getRenderer?(): unknown
+  init?(): unknown
+  begin?(): unknown
+  finish?(): unknown
+  inspect?(node: unknown): unknown
+  computeAsync?(computeNode: unknown, dispatchSizeOrCount?: unknown): unknown
+  beginCompute?(uid: unknown, computeNode?: unknown): unknown
+  finishCompute?(uid?: unknown): unknown
+  beginRender?(uid: unknown, scene?: unknown, camera?: unknown, renderTarget?: unknown): unknown
+  finishRender?(uid?: unknown): unknown
+  copyTextureToTexture?(srcTexture: unknown, dstTexture: unknown): unknown
+  copyFramebufferToTexture?(framebufferTexture: unknown): unknown
+}
+
 export interface RendererParametersLike {
   canvas?: unknown
   context?: unknown

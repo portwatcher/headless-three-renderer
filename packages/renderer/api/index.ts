@@ -27,6 +27,7 @@ import type {
   RenderAnimationLoopCallback,
   RendererParametersLike,
   RendererContextAttributesLike,
+  RendererInspectorLike,
 } from './types'
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -117,6 +118,20 @@ const DefaultRendererContextAttributes: RendererContextAttributesLike = {
   powerPreference: 'default',
   failIfMajorPerformanceCaveat: false,
 }
+const RendererInspectorOptionalMethods = [
+  'getRenderer',
+  'init',
+  'begin',
+  'finish',
+  'inspect',
+  'computeAsync',
+  'beginCompute',
+  'finishCompute',
+  'beginRender',
+  'finishRender',
+  'copyTextureToTexture',
+  'copyFramebufferToTexture',
+] as const
 
 export {
   applyVrmAnimation,
@@ -179,6 +194,7 @@ export type {
   RendererParametersLike,
   RendererContextAttributesLike,
   RendererPowerPreferenceLike,
+  RendererInspectorLike,
   RenderSortFunction,
   RenderSortItem,
   PostProcessingOptions,
@@ -496,6 +512,42 @@ class RendererDebugState {
     }
     this.onShaderErrorValue = value
   }
+}
+
+class RendererInspectorState implements RendererInspectorLike {
+  currentFrame: unknown = null
+  private renderer: unknown = null
+
+  setRenderer(renderer: unknown): this {
+    this.renderer = renderer
+    return this
+  }
+
+  getRenderer(): unknown {
+    return this.renderer
+  }
+
+  init(): void {}
+
+  begin(): void {}
+
+  finish(): void {}
+
+  inspect(_node: unknown): void {}
+
+  computeAsync(_computeNode: unknown, _dispatchSizeOrCount?: unknown): void {}
+
+  beginCompute(_uid: unknown, _computeNode?: unknown): void {}
+
+  finishCompute(_uid?: unknown): void {}
+
+  beginRender(_uid: unknown, _scene?: unknown, _camera?: unknown, _renderTarget?: unknown): void {}
+
+  finishRender(_uid?: unknown): void {}
+
+  copyTextureToTexture(_srcTexture: unknown, _dstTexture: unknown): void {}
+
+  copyFramebufferToTexture(_framebufferTexture: unknown): void {}
 }
 
 class RendererDomElementState {
@@ -1282,6 +1334,7 @@ export class Renderer {
   private toneMappingExposureValue = 1
   private transmissionResolutionScaleValue = 1
   private animationLoop: RenderAnimationLoopCallback | null = null
+  private inspectorValue: RendererInspectorLike = new RendererInspectorState()
   private readonly contextAttributes: RendererContextAttributesLike
 
   readonly isRenderer = true
@@ -1310,6 +1363,7 @@ export class Renderer {
     this.depth = this.contextAttributes.depth
     this.stencil = this.contextAttributes.stencil
     this.native = new native.NativeRenderer()
+    this.inspectorValue.setRenderer(this)
   }
 
   async init(): Promise<this> {
@@ -1318,6 +1372,17 @@ export class Renderer {
 
   get initialized(): boolean {
     return true
+  }
+
+  get inspector(): RendererInspectorLike {
+    return this.inspectorValue
+  }
+
+  set inspector(value: RendererInspectorLike) {
+    assertRendererInspectorLike(value, 'Renderer.inspector')
+    this.inspectorValue.setRenderer(null)
+    this.inspectorValue = value
+    this.inspectorValue.setRenderer(this)
   }
 
   get coordinateSystem(): number {
@@ -1731,6 +1796,7 @@ export class Renderer {
       }
     }
     texture.needsUpdate = true
+    this.inspector.copyFramebufferToTexture?.(texture)
   }
 
   copyTextureToTexture(
@@ -1774,6 +1840,7 @@ export class Renderer {
       }
     }
     dstTexture.needsUpdate = true
+    this.inspector.copyTextureToTexture?.(srcTexture, dstTexture)
   }
 
   setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
@@ -4614,6 +4681,21 @@ function assertThreeTextureLike(value: unknown, label: string): asserts value is
 function assertCanvasTargetLike(value: unknown, label: string): void {
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a canvas-target-like object.`)
+  }
+}
+
+function assertRendererInspectorLike(value: unknown, label: string): asserts value is RendererInspectorLike {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an inspector-like object.`)
+  }
+  const inspector = value as Record<string, unknown>
+  if (typeof inspector.setRenderer !== 'function') {
+    throw new TypeError(`${label}.setRenderer must be a function.`)
+  }
+  for (const method of RendererInspectorOptionalMethods) {
+    if (inspector[method] !== undefined && typeof inspector[method] !== 'function') {
+      throw new TypeError(`${label}.${method} must be a function when provided.`)
+    }
   }
 }
 

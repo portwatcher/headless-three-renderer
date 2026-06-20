@@ -31540,6 +31540,56 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
   assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
   assert.equal(renderer.extensions.init(), undefined)
+  const defaultInspector = renderer.inspector
+  assert.equal(defaultInspector.currentFrame, null)
+  assert.equal(defaultInspector.getRenderer(), renderer)
+  assert.equal(defaultInspector.init(), undefined)
+  assert.equal(defaultInspector.begin(), undefined)
+  assert.equal(defaultInspector.finish(), undefined)
+  assert.equal(defaultInspector.inspect({}), undefined)
+  assert.equal(defaultInspector.beginRender('render-1', scene, camera, null), undefined)
+  assert.equal(defaultInspector.finishRender('render-1'), undefined)
+  assert.equal(defaultInspector.beginCompute('compute-1', {}), undefined)
+  assert.equal(defaultInspector.finishCompute('compute-1'), undefined)
+  assert.equal(defaultInspector.computeAsync({}), undefined)
+
+  const inspectorEvents = []
+  const customInspector = {
+    currentFrame: { id: 1 },
+    setRenderer(value) {
+      inspectorEvents.push(['setRenderer', value])
+      this.renderer = value
+      return this
+    },
+    getRenderer() {
+      return this.renderer
+    },
+    copyTextureToTexture(srcTexture, dstTexture) {
+      inspectorEvents.push(['copyTextureToTexture', srcTexture, dstTexture])
+    },
+  }
+  renderer.inspector = customInspector
+  assert.equal(defaultInspector.getRenderer(), null)
+  assert.equal(customInspector.getRenderer(), renderer)
+  const inspectorSource = new THREE.DataTexture(new Uint8Array([1, 2, 3, 255]), 1, 1, THREE.RGBAFormat)
+  const inspectorDestination = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat)
+  renderer.copyTextureToTexture(inspectorSource, inspectorDestination)
+  assert.deepEqual(Array.from(inspectorDestination.image.data), [1, 2, 3, 255])
+  assert.equal(inspectorEvents.length, 2)
+  assert.deepEqual(inspectorEvents[0], ['setRenderer', renderer])
+  assert.deepEqual(inspectorEvents[1], ['copyTextureToTexture', inspectorSource, inspectorDestination])
+  assert.throws(
+    () => { renderer.inspector = null },
+    /Renderer\.inspector must be an inspector-like object/i,
+  )
+  assert.throws(
+    () => { renderer.inspector = { setRenderer: 'renderer' } },
+    /Renderer\.inspector\.setRenderer must be a function/i,
+  )
+  assert.throws(
+    () => { renderer.inspector = { setRenderer() {}, beginRender: true } },
+    /Renderer\.inspector\.beginRender must be a function/i,
+  )
   assert.equal(renderer.state.buffers.color.setMask(false), undefined)
   assert.equal(renderer.state.buffers.color.setLocked(true), undefined)
   assert.equal(renderer.state.buffers.color.setClear(0.1, 0.2, 0.3, 0.4, true), undefined)
