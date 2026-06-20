@@ -32430,7 +32430,7 @@ test('Renderer clear writes packed depth-stencil stencil bytes', () => {
   renderer.setRenderTarget(null)
 })
 
-test('Renderer clear methods validate compatibility hooks', () => {
+test('Renderer clear methods validate compatibility hooks', async () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
   const renderer = new Renderer()
@@ -32447,6 +32447,11 @@ test('Renderer clear methods validate compatibility hooks', () => {
   renderer.clearColor()
   renderer.clearDepth()
   renderer.clearStencil()
+  assert.equal(await renderer.clearAsync(), undefined)
+  assert.equal(await renderer.clearAsync(false, true, false), undefined)
+  assert.equal(await renderer.clearColorAsync(), undefined)
+  assert.equal(await renderer.clearDepthAsync(), undefined)
+  assert.equal(await renderer.clearStencilAsync(), undefined)
   const previousTarget = { texture: {} }
   const clearTarget = { texture: {} }
   renderer.setRenderTarget(previousTarget, 2, 1)
@@ -32496,6 +32501,10 @@ test('Renderer clear methods validate compatibility hooks', () => {
   assert.throws(
     () => renderer.clear(true, true, 'stencil'),
     /Renderer\.clear stencil must be a boolean/i,
+  )
+  await assert.rejects(
+    () => renderer.clearAsync('yes'),
+    /Renderer\.clear color must be a boolean/i,
   )
   assert.throws(
     () => renderer.clearTarget('target'),

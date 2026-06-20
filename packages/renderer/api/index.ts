@@ -1861,6 +1861,10 @@ export class Renderer {
     }
   }
 
+  async clearAsync(color = true, depth = true, stencil = true): Promise<void> {
+    this.clear(color, depth, stencil)
+  }
+
   clearTarget(target: RenderTargetLike | null, color = true, depth = true, stencil = true): void {
     if (target !== null) {
       assertRenderTargetLike(target, 'Renderer.clearTarget target')
@@ -1881,12 +1885,24 @@ export class Renderer {
     this.clear(true, false, false)
   }
 
+  async clearColorAsync(): Promise<void> {
+    this.clearColor()
+  }
+
   clearDepth(): void {
     this.clear(false, true, false)
   }
 
+  async clearDepthAsync(): Promise<void> {
+    this.clearDepth()
+  }
+
   clearStencil(): void {
     this.clear(false, false, true)
+  }
+
+  async clearStencilAsync(): Promise<void> {
+    this.clearStencil()
   }
 
   dispose(): void {
