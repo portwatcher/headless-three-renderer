@@ -33187,6 +33187,10 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
     /Renderer\.setSize height must be a positive integer/i,
   )
   assert.throws(
+    () => renderer.setSize(32, 16, 'yes'),
+    /Renderer\.setSize updateStyle must be a boolean/i,
+  )
+  assert.throws(
     () => renderer.setClearColor('not-a-color'),
     /Renderer\.setClearColor color "not-a-color" is not a supported CSS color string/i,
   )

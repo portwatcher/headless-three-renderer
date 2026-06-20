@@ -1779,9 +1779,13 @@ export class Renderer {
     this.currentActiveMipmapLevel = activeMipmapLevel
   }
 
-  setSize(width: number, height: number, _updateStyle = true): void {
+  setSize(width: number, height: number, updateStyle = true): void {
     this.currentSize = rendererStateSize(width, height, 'Renderer.setSize')
-    this.domElement.setSize(this.currentSize.width, this.currentSize.height, _updateStyle)
+    this.domElement.setSize(
+      this.currentSize.width,
+      this.currentSize.height,
+      rendererStateBoolean(updateStyle, 'Renderer.setSize updateStyle'),
+    )
   }
 
   setPixelRatio(value: number): void {
