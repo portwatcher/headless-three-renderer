@@ -13325,6 +13325,111 @@ test('Points customDistanceMaterial base maps sample selected geometry UV channe
   }
 })
 
+test('Points customDistanceMaterial maps use selected geometry UV channels without primary UVs', () => {
+  function cutoffTexture(slot, channel) {
+    const texture = slot === 'alphaMap'
+      ? rgbaTexture([
+        255, 0, 255, 255,
+        255, 255, 255, 255,
+      ], 2, 1)
+      : rgbaTexture([
+        255, 255, 255, 0,
+        255, 255, 255, 255,
+      ], 2, 1)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.channel = channel
+    return texture
+  }
+
+  function pointGeometry(position, channel, transparentUv) {
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(position), 3))
+    for (const index of [1, 2, 3]) {
+      geometry.setAttribute(`uv${index}`, new THREE.BufferAttribute(new Float32Array([
+        index === channel && transparentUv ? 0.25 : 0.75,
+        0.5,
+      ]), 2))
+    }
+    return geometry
+  }
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function pointsMaterial(slot, texture, inheritFromSource) {
+    const material = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 48,
+      sizeAttenuation: false,
+      [slot]: inheritFromSource ? texture : null,
+      alphaTest: inheritFromSource ? 0.5 : 0,
+    })
+    if (inheritFromSource) {
+      material.colorWrite = false
+      material.depthWrite = false
+    }
+    return material
+  }
+
+  function renderPointCustomDistancePoint(slot, channel, transparentUv, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const texture = cutoffTexture(slot, channel)
+    const points = new THREE.Points(
+      pointGeometry([0, 2.2, 1.8], channel, transparentUv),
+      pointsMaterial(slot, texture, inheritFromSource),
+    )
+    points.castShadow = true
+    points.customDistanceMaterial = inheritFromSource
+      ? new THREE.MeshDistanceMaterial()
+      : new THREE.MeshDistanceMaterial({
+        [slot]: texture,
+        alphaTest: 0.5,
+      })
+    scene.add(points)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 28, 42, 68, 82)
+  }
+
+  for (const slot of ['map', 'alphaMap']) {
+    for (const inheritFromSource of [false, true]) {
+      const label = `${inheritFromSource ? 'source material' : 'custom shadow material'} point ${slot}`
+      for (const channel of [1, 2, 3]) {
+        const opaqueDistance = renderPointCustomDistancePoint(slot, channel, false, inheritFromSource)
+        const selectedDistance = renderPointCustomDistancePoint(slot, channel, true, inheritFromSource)
+        const opaqueDistanceLum = opaqueDistance.r + opaqueDistance.g + opaqueDistance.b
+        const selectedDistanceLum = selectedDistance.r + selectedDistance.g + selectedDistance.b
+        assert.ok(
+          selectedDistanceLum > opaqueDistanceLum + 10,
+          `${label} channel=${channel} should sample transparent uv${channel} without primary UVs and remove the customDistanceMaterial caster shadow (${selectedDistanceLum} vs ${opaqueDistanceLum})`,
+        )
+      }
+    }
+  }
+})
+
 test('Sprite and Points source alphaHash applies to custom shadow material casters', () => {
   function sourceBillboardMaterial(kind, alphaHash) {
     const params = {
