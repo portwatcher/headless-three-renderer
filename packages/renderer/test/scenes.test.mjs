@@ -7897,38 +7897,75 @@ test('Renderer opaque and transparent flags gate render buckets', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
 
-  scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false }),
-  ))
-  scene.add(new THREE.Mesh(
-    new THREE.PlaneGeometry(2, 2),
-    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, depthTest: false, depthWrite: false }),
-  ))
+  const opaque = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 0.8),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false, toneMapped: false }),
+  )
+  opaque.position.x = -1.1
+  scene.add(opaque)
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  const transmissive = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 0.8),
+    new THREE.MeshPhysicalMaterial({
+      color: 0x000000,
+      emissive: 0x0000ff,
+      emissiveIntensity: 1,
+      transmission: 0.5,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  )
+  scene.add(transmissive)
+
+  const transparent = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.8, 0.8),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }),
+  )
+  transparent.position.x = 1.1
+  scene.add(transparent)
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
+  camera.updateProjectionMatrix()
 
   const renderer = new Renderer()
   assert.equal(renderer.opaque, true)
   assert.equal(renderer.transparent, true)
 
-  const all = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
-  assert.ok(all.r > all.g + 160, `default renderer bucket flags should draw transparent red over opaque green (${all.r} vs ${all.g})`)
+  function bucketMeans() {
+    const rgba = renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+    return {
+      opaque: meanRegion(rgba, 64, 64, 11, 27, 21, 37),
+      transmissive: meanRegion(rgba, 64, 64, 27, 27, 37, 37),
+      transparent: meanRegion(rgba, 64, 64, 43, 27, 53, 37),
+    }
+  }
+
+  const all = bucketMeans()
+  assert.ok(all.opaque.g > all.opaque.r + 160, `default renderer bucket flags should draw opaque green (${all.opaque.r}, ${all.opaque.g}, ${all.opaque.b})`)
+  assert.ok(all.transmissive.b > all.transmissive.r + 80, `default renderer bucket flags should draw transmissive blue (${all.transmissive.r}, ${all.transmissive.g}, ${all.transmissive.b})`)
+  assert.ok(all.transparent.r > all.transparent.g + 160, `default renderer bucket flags should draw transparent red (${all.transparent.r}, ${all.transparent.g}, ${all.transparent.b})`)
 
   renderer.transparent = false
-  const opaqueOnly = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
-  assert.ok(opaqueOnly.g > opaqueOnly.r + 60, `transparent=false should skip the transparent red bucket (${opaqueOnly.g} vs ${opaqueOnly.r})`)
+  const opaqueOnly = bucketMeans()
+  assert.ok(opaqueOnly.opaque.g > opaqueOnly.opaque.r + 160, `transparent=false should keep the opaque green bucket (${opaqueOnly.opaque.r}, ${opaqueOnly.opaque.g}, ${opaqueOnly.opaque.b})`)
+  assert.ok(opaqueOnly.transmissive.b < 5, `transparent=false should skip the transmissive blue bucket (${opaqueOnly.transmissive.r}, ${opaqueOnly.transmissive.g}, ${opaqueOnly.transmissive.b})`)
+  assert.ok(opaqueOnly.transparent.r < 5, `transparent=false should skip the ordinary transparent red bucket (${opaqueOnly.transparent.r}, ${opaqueOnly.transparent.g}, ${opaqueOnly.transparent.b})`)
 
   renderer.opaque = false
   renderer.transparent = true
-  const transparentOnly = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
-  assert.ok(transparentOnly.r > transparentOnly.g + 160, `opaque=false should skip the opaque green bucket (${transparentOnly.r} vs ${transparentOnly.g})`)
+  const transparentOnly = bucketMeans()
+  assert.ok(transparentOnly.opaque.g < 5, `opaque=false should skip the opaque green bucket (${transparentOnly.opaque.r}, ${transparentOnly.opaque.g}, ${transparentOnly.opaque.b})`)
+  assert.ok(transparentOnly.transmissive.b > transparentOnly.transmissive.r + 80, `opaque=false should keep the transmissive blue bucket (${transparentOnly.transmissive.r}, ${transparentOnly.transmissive.g}, ${transparentOnly.transmissive.b})`)
+  assert.ok(transparentOnly.transparent.r > transparentOnly.transparent.g + 160, `opaque=false should keep the ordinary transparent red bucket (${transparentOnly.transparent.r}, ${transparentOnly.transparent.g}, ${transparentOnly.transparent.b})`)
 
   renderer.transparent = false
-  const backgroundOnly = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
-  assert.ok(backgroundOnly.r < 5 && backgroundOnly.g < 5 && backgroundOnly.b < 5, `opaque=false and transparent=false should leave only the background (${backgroundOnly.r}, ${backgroundOnly.g}, ${backgroundOnly.b})`)
+  const backgroundOnly = bucketMeans()
+  for (const [label, mean] of Object.entries(backgroundOnly)) {
+    assert.ok(mean.r < 5 && mean.g < 5 && mean.b < 5, `opaque=false and transparent=false should leave only the background in the ${label} region (${mean.r}, ${mean.g}, ${mean.b})`)
+  }
 
   assert.throws(
     () => { renderer.opaque = 'yes' },
