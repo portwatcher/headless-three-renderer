@@ -11,6 +11,7 @@ const NODE_LOADER_SETUP_DOC = path.join(REPO_ROOT, 'docs', 'node-loader-setup.md
 const RELEASE_CHECKLIST_DOC = path.join(REPO_ROOT, 'docs', 'release-checklist.md')
 const CI_WORKFLOW = path.join(REPO_ROOT, '.github', 'workflows', 'CI.yml')
 const PACKAGE_JSON = path.join(REPO_ROOT, 'packages', 'renderer', 'package.json')
+const ANIMATED_PROFILE_SCRIPT = path.join(REPO_ROOT, 'packages', 'renderer', 'scripts', 'profile-animated-scene.mjs')
 const API_INDEX = path.join(REPO_ROOT, 'packages', 'renderer', 'api', 'index.ts')
 const GLTF_TEST = path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'gltf.test.mjs')
 
@@ -169,6 +170,19 @@ test('compatibility matrix and CI stay synchronized with packaged platform targe
       `CI matrix should include ${target}`,
     )
   }
+})
+
+test('animated-scene profiler stays exposed as a package script', async () => {
+  const packageJson = JSON.parse(await readFile(PACKAGE_JSON, 'utf8'))
+  assert.equal(
+    packageJson.scripts['profile:animated'],
+    'node scripts/profile-animated-scene.mjs',
+    'package.json should expose the animated-scene profiler',
+  )
+  await assert.doesNotReject(
+    () => access(ANIMATED_PROFILE_SCRIPT),
+    'profile:animated should point at a committed script',
+  )
 })
 
 function escapeRegExp(value) {

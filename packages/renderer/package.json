@@ -74,7 +74,8 @@
     "test:conformance": "node --test --test-reporter=spec test/scenes.test.mjs",
     "test:update": "UPDATE_SNAPSHOTS=1 node --test \"test/**/*.test.mjs\"",
     "test:rust": "cargo test",
-    "verify:pack": "node scripts/verify-packed-install.mjs"
+    "verify:pack": "node scripts/verify-packed-install.mjs",
+    "profile:animated": "node scripts/profile-animated-scene.mjs"
   },
   "peerDependencies": {
     "three": ">=0.150.0"
