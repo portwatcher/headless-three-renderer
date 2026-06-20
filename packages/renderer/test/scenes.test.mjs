@@ -33822,11 +33822,11 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     /Renderer\.copyTextureToTexture source texture uses a compressed texture format.*texture copy.*Pre-decode/i,
   )
   assert.throws(
-    () => renderer.copyTextureToTexture(source, destination, null, null, 1),
+    () => renderer.copyTextureToTexture(source, destination, null, null, 1, 0),
     /Renderer\.copyTextureToTexture source texture\.mipmaps\[0\] must provide a readable raw image object/i,
   )
   assert.throws(
-    () => renderer.copyTextureToTexture(source, destination, null, null, -1),
+    () => renderer.copyTextureToTexture(source, destination, null, null, -1, 0),
     /Renderer\.copyTextureToTexture source level must be a non-negative integer/i,
   )
   assert.throws(
@@ -33982,6 +33982,37 @@ test('Renderer copyTextureToTexture copies readable raw texture mip levels on th
   assert.deepEqual(mipPixel(1, 1), [9, 9, 9, 9])
   assert.deepEqual(Array.from(destination.image.data.slice(0, 4)), [5, 5, 5, 5])
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after mip CPU copy')
+})
+
+test('Renderer copyTextureToTexture supports legacy single mip level argument', () => {
+  const renderer = new Renderer()
+  const source = new THREE.DataTexture(new Uint8Array([
+    21, 31, 41, 255,
+    51, 61, 71, 255,
+    81, 91, 101, 255,
+    111, 121, 131, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  const destinationData = new Uint8Array(4 * 4 * 4)
+  destinationData.fill(3)
+  const destinationMip = new Uint8Array(2 * 2 * 4)
+  destinationMip.fill(7)
+  const destination = new THREE.DataTexture(destinationData, 4, 4, THREE.RGBAFormat)
+  destination.mipmaps = [{ data: destinationMip, width: 2, height: 2 }]
+  const initialVersion = destination.version
+
+  renderer.copyTextureToTexture(source, destination, null, null, 1, null)
+
+  function mipPixel(x, y) {
+    const offset = (y * 2 + x) * 4
+    return Array.from(destination.mipmaps[0].data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(mipPixel(0, 0), [21, 31, 41, 255])
+  assert.deepEqual(mipPixel(1, 0), [51, 61, 71, 255])
+  assert.deepEqual(mipPixel(0, 1), [81, 91, 101, 255])
+  assert.deepEqual(mipPixel(1, 1), [111, 121, 131, 255])
+  assert.deepEqual(Array.from(destination.image.data.slice(0, 4)), [3, 3, 3, 3])
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after legacy mip CPU copy')
 })
 
 test('Renderer copyTextureToTexture copies readable canvas-like source data on the CPU', () => {

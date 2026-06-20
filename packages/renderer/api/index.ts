@@ -2012,19 +2012,31 @@ export class Renderer {
     srcRegion: unknown = null,
     dstPosition: unknown = null,
     srcLevel = 0,
-    dstLevel = 0,
+    dstLevel: number | null = null,
   ): void {
     assertThreeTextureLike(srcTexture, 'Renderer.copyTextureToTexture source texture')
     assertThreeTextureLike(dstTexture, 'Renderer.copyTextureToTexture destination texture')
-    assertTextureCopyLevel(srcLevel, 'Renderer.copyTextureToTexture source level')
-    assertTextureCopyLevel(dstLevel, 'Renderer.copyTextureToTexture destination level')
+
+    let resolvedSrcLevel = srcLevel
+    let resolvedDstLevel = dstLevel
+    if (resolvedDstLevel === null) {
+      if (resolvedSrcLevel !== 0) {
+        assertTextureCopyLevel(resolvedSrcLevel, 'Renderer.copyTextureToTexture legacy destination level')
+        resolvedDstLevel = resolvedSrcLevel
+        resolvedSrcLevel = 0
+      } else {
+        resolvedDstLevel = 0
+      }
+    }
+    assertTextureCopyLevel(resolvedSrcLevel, 'Renderer.copyTextureToTexture source level')
+    assertTextureCopyLevel(resolvedDstLevel, 'Renderer.copyTextureToTexture destination level')
 
     const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture', {
       allowCanvasRead: true,
-      level: srcLevel,
+      level: resolvedSrcLevel,
     })
     const destination = rawTextureCopyImage(dstTexture, 'Renderer.copyTextureToTexture destination texture', {
-      level: dstLevel,
+      level: resolvedDstLevel,
     })
     if (source.channels !== destination.channels) {
       throw new Error(
