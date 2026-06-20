@@ -127,6 +127,20 @@ pub struct BackgroundUniforms {
     pub rotation3: [f32; 4],
 }
 
+const MAX_SAMPLER_CACHE_ENTRIES: usize = 64;
+const MAX_TEXTURE_CACHE_ENTRIES: usize = 512;
+const MAX_PHYSICAL_LAYERS_TEXTURE_CACHE_ENTRIES: usize = 256;
+const MAX_TEXTURE_BIND_GROUP_CACHE_ENTRIES: usize = 512;
+const MAX_AO_PHYSICAL_BIND_GROUP_CACHE_ENTRIES: usize = 256;
+const MAX_BACKGROUND_BIND_GROUP_CACHE_ENTRIES: usize = 64;
+const MAX_IBL_BIND_GROUP_CACHE_ENTRIES: usize = 32;
+const MAX_MESH_BUFFER_CACHE_ENTRIES: usize = 2048;
+const MAX_STATE_PIPELINE_CACHE_ENTRIES: usize = 128;
+const MAX_CUSTOM_PIPELINE_CACHE_ENTRIES: usize = 128;
+const MAX_SCRATCH_TEXTURE_CACHE_ENTRIES: usize = 32;
+const MAX_POST_BIND_GROUP_CACHE_ENTRIES: usize = 32;
+const MAX_READBACK_BUFFER_CACHE_ENTRIES: usize = 32;
+
 pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -444,6 +458,27 @@ struct CustomBlendPipelineKey {
 struct CustomPipelineKey {
     state: StatePipelineKey,
     fragment_body: String,
+}
+
+fn insert_bounded_cache<K, V>(cache: &mut HashMap<K, V>, key: K, value: V, max_entries: usize) -> V
+where
+    K: Clone + Eq + Hash,
+    V: Clone,
+{
+    if let Some(existing) = cache.get(&key) {
+        return existing.clone();
+    }
+    if max_entries == 0 {
+        return value;
+    }
+    while cache.len() >= max_entries {
+        let Some(evict_key) = cache.keys().next().cloned() else {
+            break;
+        };
+        cache.remove(&evict_key);
+    }
+    cache.insert(key, value.clone());
+    value
 }
 
 impl MeshBufferCacheKey {
@@ -2518,6 +2553,7 @@ impl GpuRenderer {
         drop(scene_color_texture_guard);
         drop(color_texture_guard);
         drop(readback_buffer_guard);
+        dynamic_uniform_guard.truncate(meshes.len());
         drop(dynamic_uniform_guard);
 
         Ok(rgba)
@@ -2550,8 +2586,7 @@ impl GpuRenderer {
                 usage,
                 view_formats: &[],
             });
-            guard.insert(key, texture.clone());
-            texture
+            insert_bounded_cache(&mut guard, key, texture, MAX_SCRATCH_TEXTURE_CACHE_ENTRIES)
         };
 
         (texture, guard)
@@ -2578,8 +2613,7 @@ impl GpuRenderer {
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
                 mapped_at_creation: false,
             });
-            guard.insert(key, buffer.clone());
-            buffer
+            insert_bounded_cache(&mut guard, key, buffer, MAX_READBACK_BUFFER_CACHE_ENTRIES)
         };
 
         (buffer, guard)
@@ -2840,12 +2874,15 @@ impl GpuRenderer {
             ..Default::default()
         });
 
-        self.sampler_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| sampler.clone())
-            .clone()
+        insert_bounded_cache(
+            &mut self
+                .sampler_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            sampler,
+            MAX_SAMPLER_CACHE_ENTRIES,
+        )
     }
 
     fn sampler_for_settings(&self, settings: TextureSamplerSettings) -> wgpu::Sampler {
@@ -2959,10 +2996,12 @@ impl GpuRenderer {
             uniform_buffer,
             bind_group,
         };
-        let cached = cache_guard
-            .entry(key)
-            .or_insert_with(|| cached.clone())
-            .clone();
+        let cached = insert_bounded_cache(
+            &mut cache_guard,
+            key,
+            cached,
+            MAX_BACKGROUND_BIND_GROUP_CACHE_ENTRIES,
+        );
         GpuBackground {
             bind_group: cached.bind_group,
             _texture: gpu_texture,
@@ -2984,12 +3023,15 @@ impl GpuRenderer {
         }
 
         let texture = self.upload_texture_uncached(label, tex);
-        self.texture_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| texture.clone())
-            .clone()
+        insert_bounded_cache(
+            &mut self
+                .texture_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            texture,
+            MAX_TEXTURE_CACHE_ENTRIES,
+        )
     }
 
     fn upload_texture_uncached(&self, label: &'static str, tex: &PreparedTexture) -> wgpu::Texture {
@@ -3057,13 +3099,15 @@ impl GpuRenderer {
             ],
         });
 
-        let bind_group = self
-            .texture_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| bind_group.clone())
-            .clone();
+        let bind_group = insert_bounded_cache(
+            &mut self
+                .texture_bind_group_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            bind_group,
+            MAX_TEXTURE_BIND_GROUP_CACHE_ENTRIES,
+        );
         (bind_group, gpu_texture)
     }
 
@@ -3364,13 +3408,15 @@ impl GpuRenderer {
                 },
             ],
         });
-        let bind_group = self
-            .ao_physical_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| bind_group.clone())
-            .clone();
+        let bind_group = insert_bounded_cache(
+            &mut self
+                .ao_physical_bind_group_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            bind_group,
+            MAX_AO_PHYSICAL_BIND_GROUP_CACHE_ENTRIES,
+        );
 
         AoPhysicalBindGroupResources {
             bind_group,
@@ -3404,12 +3450,15 @@ impl GpuRenderer {
 
         let texture =
             self.upload_physical_layers_texture_uncached(label, scalar, anisotropy, iridescence);
-        self.physical_layers_texture_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| texture.clone())
-            .clone()
+        insert_bounded_cache(
+            &mut self
+                .physical_layers_texture_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            texture,
+            MAX_PHYSICAL_LAYERS_TEXTURE_CACHE_ENTRIES,
+        )
     }
 
     fn upload_physical_layers_texture_uncached(
@@ -3645,13 +3694,15 @@ impl GpuRenderer {
             "headless-three-renderer custom material pipeline",
         );
 
-        Ok(self
-            .custom_pipeline_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| pipeline.clone())
-            .clone())
+        Ok(insert_bounded_cache(
+            &mut self
+                .custom_pipeline_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            pipeline,
+            MAX_CUSTOM_PIPELINE_CACHE_ENTRIES,
+        ))
     }
 
     fn create_state_override_pipeline(
@@ -3677,12 +3728,15 @@ impl GpuRenderer {
             "headless-three-renderer material state override pipeline",
         );
 
-        self.state_pipeline_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| pipeline.clone())
-            .clone()
+        insert_bounded_cache(
+            &mut self
+                .state_pipeline_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            pipeline,
+            MAX_STATE_PIPELINE_CACHE_ENTRIES,
+        )
     }
 
     fn create_material_pipeline(
@@ -3777,12 +3831,15 @@ impl GpuRenderer {
             }),
         };
 
-        self.mesh_buffer_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| buffers.clone())
-            .clone()
+        insert_bounded_cache(
+            &mut self
+                .mesh_buffer_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            buffers,
+            MAX_MESH_BUFFER_CACHE_ENTRIES,
+        )
     }
 
     fn dynamic_uniform_bind_group_for(
@@ -3888,12 +3945,16 @@ impl GpuRenderer {
             source_view,
             bind_group,
         };
-        self.post_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| cached.clone())
-            .bind_group()
+        insert_bounded_cache(
+            &mut self
+                .post_bind_group_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            cached,
+            MAX_POST_BIND_GROUP_CACHE_ENTRIES,
+        )
+        .bind_group()
     }
 
     fn ibl_bind_group_for(&self, ibl: &IblMaps) -> wgpu::BindGroup {
@@ -3915,12 +3976,15 @@ impl GpuRenderer {
             &self.sampler,
             ibl,
         );
-        self.ibl_bind_group_cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .entry(key)
-            .or_insert_with(|| bind_group.clone())
-            .clone()
+        insert_bounded_cache(
+            &mut self
+                .ibl_bind_group_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            key,
+            bind_group,
+            MAX_IBL_BIND_GROUP_CACHE_ENTRIES,
+        )
     }
 
     fn upload_mesh(
@@ -5457,8 +5521,8 @@ mod tests {
         AoPhysicalBindGroupKey, BackgroundBindGroupKey, BackgroundUniforms, CustomBlendPipelineKey,
         IblBindGroupKey, MeshBufferCacheKey, PhysicalLayersTextureCacheKey, PostUniforms,
         SamplerKey, TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey,
-        UniformBindGroupKey, Uniforms, downsample_rgba_mip, f32_key, post_uniforms,
-        texture_mip_level_count,
+        UniformBindGroupKey, Uniforms, downsample_rgba_mip, f32_key, insert_bounded_cache,
+        post_uniforms, texture_mip_level_count,
     };
     use crate::ibl::IblMaps;
     use crate::mesh::{
@@ -5467,6 +5531,7 @@ mod tests {
     };
     use crate::settings::PostProcessingSettings;
     use bytemuck::Zeroable;
+    use std::collections::HashMap;
 
     fn single_pixel_texture(rgba: [u8; 4]) -> PreparedTexture {
         solid_texture(1, 1, rgba)
@@ -5502,6 +5567,22 @@ mod tests {
             brdf_lut: vec![0, red, 0, 255],
             brdf_lut_size: 1,
         }
+    }
+
+    #[test]
+    fn bounded_cache_insert_reuses_existing_and_preserves_new_entry() {
+        let mut cache = HashMap::new();
+        assert_eq!(insert_bounded_cache(&mut cache, 1, "one", 2), "one");
+        assert_eq!(insert_bounded_cache(&mut cache, 2, "two", 2), "two");
+        assert_eq!(insert_bounded_cache(&mut cache, 1, "replacement", 2), "one");
+
+        assert_eq!(insert_bounded_cache(&mut cache, 3, "three", 2), "three");
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.get(&3), Some(&"three"));
+
+        let uncached = insert_bounded_cache(&mut cache, 4, "four", 0);
+        assert_eq!(uncached, "four");
+        assert_eq!(cache.get(&4), None);
     }
 
     #[test]
