@@ -130,6 +130,7 @@ export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   instancedMeshes: WeakMap<ThreeObject3DLike, CachedInstancedMeshInstances>
   instancedPositionExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedPositionExpansion>>
+  instancedUvExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedUvExpansion>>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
   texturePayloads: TextureExtractionCache
@@ -154,6 +155,11 @@ interface CachedInstancedMeshInstances {
 interface CachedInstancedPositionExpansion {
   signature: InstancedPositionExpansionSignature
   positions: number[]
+}
+
+interface CachedInstancedUvExpansion {
+  signature: InstancedUvExpansionSignature
+  uvs: number[]
 }
 
 interface CachedBatchedGeometryView {
@@ -323,6 +329,15 @@ interface InstancedPositionExpansionSignature {
   instancedPositionScale: AttributeSignature
 }
 
+interface InstancedUvExpansionSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  channel: UvChannelSignature
+  start: number
+  count: number
+  instanceCount: number
+}
+
 interface AttributeSignature {
   ref?: ThreeBufferAttributeLike
   version?: number
@@ -384,6 +399,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     meshGeometry: new WeakMap(),
     instancedMeshes: new WeakMap(),
     instancedPositionExpansions: new WeakMap(),
+    instancedUvExpansions: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
     texturePayloads: new WeakMap(),
@@ -634,10 +650,10 @@ function appendMesh(
         ? expandNormalValuesForInstances(normalAttribute, normals, 0, position.count, instancedGeometryCount)
         : undefined
       const expandedUvs = uvStreams.uvs
-        ? expandUvChannelForInstances(uvStreams.uvs, 0, position.count, instancedGeometryCount)
+        ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, 0, position.count, instancedGeometryCount)
         : undefined
       const expandedSecondaryUvs = uvStreams.uvs2
-        ? expandUvChannelForInstances(uvStreams.uvs2, 0, position.count, instancedGeometryCount)
+        ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs2, 0, position.count, instancedGeometryCount)
         : undefined
 
       for (const instance of instances) {
@@ -695,10 +711,10 @@ function appendMesh(
         ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupUvs = uvStreams.uvs
-        ? expandUvChannelForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
+        ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupSecondaryUvs = uvStreams.uvs2
-        ? expandUvChannelForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
+        ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupIndices = wireframe
         ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
@@ -1069,10 +1085,10 @@ function appendShadowOnlyMeshGroup(
       ? expandNormalValuesForInstances(normalAttribute, normals, 0, vertexCount, instancedGeometryCount)
       : undefined
     const expandedUvs = uvStreams.uvs
-      ? expandUvChannelForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
+      ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
       : undefined
     const expandedSecondaryUvs = uvStreams.uvs2
-      ? expandUvChannelForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount)
+      ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs2, 0, vertexCount, instancedGeometryCount)
       : undefined
 
     for (const instance of instances) {
@@ -1133,10 +1149,10 @@ function appendShadowOnlyMeshGroup(
     ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupUvs = uvStreams.uvs
-    ? expandUvChannelForInstances(uvStreams.uvs, group.start, group.count, instancedGeometryCount)
+    ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupSecondaryUvs = uvStreams.uvs2
-    ? expandUvChannelForInstances(uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
+    ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs2, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupIndices = wireframe
     ? expandIndicesForInstances(wireframeIndicesForUnindexedTriangles(group.count), group.count, instancedGeometryCount)
@@ -2325,8 +2341,8 @@ function appendLineOrPoints(
         if (indices.length < 2) continue
         if (instancedGeometryCount > 1 || instancedPositionOffset || instancedPositionScale) {
           outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset, instancedPositionScale)
-          outputUvs = uvStreams.uvs ? expandUvChannelForInstances(uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
-          outputSecondaryUvs = uvStreams.uvs2 ? expandUvChannelForInstances(uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
+          outputUvs = uvStreams.uvs ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
+          outputSecondaryUvs = uvStreams.uvs2 ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
           indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
         }
         if (thickLine) {
@@ -3452,6 +3468,70 @@ function expandUvChannelForInstances(channel: UvChannel, start: number, count: n
     }
   }
   return out
+}
+
+function expandUvChannelForInstancesWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  channel: UvChannel,
+  start: number,
+  count: number,
+  instanceCount: number,
+): number[] {
+  if (instanceCount <= 1 && !isInstancedAttribute(channel.attribute)) {
+    return expandUvChannelForInstances(channel, start, count, instanceCount)
+  }
+
+  const signature = instancedUvExpansionSignature(geometry, channel, start, count, instanceCount)
+  if (!cache || !signature.cacheable) {
+    return expandUvChannelForInstances(channel, start, count, instanceCount)
+  }
+
+  const key = `${channel.label}:${start}:${count}:${instanceCount}`
+  let geometryCache = cache.instancedUvExpansions.get(geometry)
+  const cached = geometryCache?.get(key)
+  if (cached && sameInstancedUvExpansionSignature(cached.signature, signature)) {
+    return cached.uvs
+  }
+
+  const uvs = expandUvChannelForInstances(channel, start, count, instanceCount)
+  if (!geometryCache) {
+    geometryCache = new Map()
+    cache.instancedUvExpansions.set(geometry, geometryCache)
+  }
+  geometryCache.set(key, { signature, uvs })
+  return uvs
+}
+
+function instancedUvExpansionSignature(
+  geometry: ThreeBufferGeometryLike,
+  channel: UvChannel,
+  start: number,
+  count: number,
+  instanceCount: number,
+): InstancedUvExpansionSignature {
+  const signature: InstancedUvExpansionSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    channel: uvChannelSignature(channel),
+    start,
+    count,
+    instanceCount,
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.channel.attribute)
+  return signature
+}
+
+function sameInstancedUvExpansionSignature(
+  a: InstancedUvExpansionSignature,
+  b: InstancedUvExpansionSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && sameUvChannelSignature(a.channel, b.channel)
+    && a.start === b.start
+    && a.count === b.count
+    && a.instanceCount === b.instanceCount
 }
 
 function appendUvForVertex(

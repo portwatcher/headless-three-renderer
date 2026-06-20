@@ -25982,6 +25982,72 @@ test('reusable renderer reuses cached InstancedBufferGeometry position expansion
   assert.ok(scaleReads > scaleReadsAfterOffsetUpdate, 'instanced scale version changes should invalidate cached position expansion')
 })
 
+test('reusable renderer reuses cached InstancedBufferGeometry UV expansion until UV attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const base = new THREE.PlaneGeometry(0.4, 0.4)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.35, 0, 0, 0.35, 0, 0]),
+    3,
+  ))
+  const uv1 = new THREE.InstancedBufferAttribute(
+    new Float32Array([0.25, 0.5, 0.75, 0.5]),
+    2,
+  )
+  geometry.setAttribute('uv1', uv1)
+
+  const map = rgbaTexture([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ], 2, 1)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.channel = 1
+
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, map }))
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const originalUvGetX = uv1.getX.bind(uv1)
+  let uvReads = 0
+  uv1.getX = (index) => {
+    uvReads += 1
+    return originalUvGetX(index)
+  }
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const readsAfterFirstRender = uvReads
+  assert.ok(readsAfterFirstRender > 0, 'initial render should read selected instanced UVs')
+
+  mesh.position.y += 0.1
+  mesh.material.color.set(0x80ff80)
+  renderer.render(scene, camera, options)
+  assert.equal(uvReads, readsAfterFirstRender, 'InstancedBufferGeometry transform/material animation should reuse cached UV expansion')
+
+  uv1.array[0] = 0.1
+  uv1.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(uvReads > readsAfterFirstRender, 'instanced UV version changes should invalidate cached UV expansion')
+})
+
 test('reusable renderer reuses cached static line and point geometry until attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
