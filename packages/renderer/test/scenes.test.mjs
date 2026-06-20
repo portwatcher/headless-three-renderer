@@ -32945,6 +32945,14 @@ test('Renderer context loss hooks are no-op compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
   const renderer = new Renderer()
+  const deviceLostInfo = { api: 'headless', message: 'test loss' }
+  let observedDeviceLostInfo = null
+
+  assert.equal(typeof renderer.onDeviceLost, 'function')
+  assert.equal(renderer.onDeviceLost(deviceLostInfo), undefined)
+  renderer.onDeviceLost = (info) => { observedDeviceLostInfo = info }
+  assert.equal(renderer.onDeviceLost(deviceLostInfo), undefined)
+  assert.equal(observedDeviceLostInfo, deviceLostInfo)
 
   renderer.setClearColor(0x204080, 0.5)
   assert.equal(renderer.forceContextLoss(), undefined)
@@ -32953,6 +32961,10 @@ test('Renderer context loss hooks are no-op compatibility hooks', () => {
   const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
   assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer context loss hooks should preserve renderer state')
   assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer context loss hooks should preserve clear alpha (${clear.a})`)
+  assert.throws(
+    () => { renderer.onDeviceLost = null },
+    /Renderer\.onDeviceLost must be a function/i,
+  )
 })
 
 test('Renderer resetState is a no-op compatibility hook', () => {

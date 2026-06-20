@@ -1357,6 +1357,7 @@ export class Renderer {
   private transmissionResolutionScaleValue = 1
   private animationLoop: RenderAnimationLoopCallback | null = null
   private inspectorValue: RendererInspectorLike = new RendererInspectorState()
+  private onDeviceLostValue: (info?: unknown) => void = () => {}
   private readonly contextAttributes: RendererContextAttributesLike
 
   readonly isRenderer = true
@@ -1394,6 +1395,17 @@ export class Renderer {
 
   get initialized(): boolean {
     return true
+  }
+
+  get onDeviceLost(): (info?: unknown) => void {
+    return this.onDeviceLostValue
+  }
+
+  set onDeviceLost(value: (info?: unknown) => void) {
+    if (typeof value !== 'function') {
+      throw new TypeError('Renderer.onDeviceLost must be a function.')
+    }
+    this.onDeviceLostValue = value
   }
 
   get inspector(): RendererInspectorLike {
