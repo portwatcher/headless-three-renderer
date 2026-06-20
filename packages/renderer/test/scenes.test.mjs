@@ -33253,9 +33253,32 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderList.transmissive[0].materialVariant, 1)
   renderList.sort(null, (a, b) => b.z - a.z)
   renderList.finish()
+  const renderState = renderer.renderStates.get(scene, 0)
+  assert.equal(renderer.renderStates.get(scene, 0), renderState)
+  assert.equal(renderer.renderStates.get(scene, 1) === renderState, false)
+  renderState.init(camera)
+  assert.equal(renderState.state.camera, camera)
+  assert.equal(renderState.state.lights.state.version, 0)
+  assert.equal(renderState.state.lights.state.hash.directionalLength, -1)
+  assert.equal(renderState.state.lights.state.probe.length, 9)
+  assert.deepEqual(renderState.state.lights.state.ambient, [0, 0, 0])
+  const lightProbe = { id: 1, type: 'PointLight' }
+  const shadowLight = { id: 2, castShadow: true }
+  renderState.pushLight(lightProbe)
+  renderState.pushShadow(shadowLight)
+  assert.deepEqual(renderState.state.lightsArray, [lightProbe])
+  assert.deepEqual(renderState.state.shadowsArray, [shadowLight])
+  assert.equal(renderState.setupLights(), undefined)
+  assert.equal(renderState.setupLightsView(camera), undefined)
+  renderState.init(camera)
+  assert.deepEqual(renderState.state.lightsArray, [])
+  assert.deepEqual(renderState.state.shadowsArray, [])
+  renderState.state.transmissionRenderTarget[camera.id] = { texture: true }
+  assert.deepEqual(renderState.state.transmissionRenderTarget[camera.id], { texture: true })
   renderer.dispose()
   assert.equal(renderer.properties.has(object), false)
   assert.equal(renderer.renderLists.get(scene, 0) === renderList, false)
+  assert.equal(renderer.renderStates.get(scene, 0) === renderState, false)
 
   const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
   const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
@@ -33449,6 +33472,14 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderList.sort('front-to-back'),
     /Renderer\.renderLists list opaque sort must be a function or null/i,
+  )
+  assert.throws(
+    () => renderer.renderStates.get(null),
+    /Renderer\.renderStates\.get scene must be an object/i,
+  )
+  assert.throws(
+    () => renderer.renderStates.get(scene, -1),
+    /Renderer\.renderStates\.get renderCallDepth must be a non-negative integer/i,
   )
 })
 

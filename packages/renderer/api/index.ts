@@ -1775,6 +1775,107 @@ class RendererRenderListsState {
   }
 }
 
+class RendererRenderLightsState {
+  readonly state = {
+    version: 0,
+    hash: {
+      directionalLength: -1,
+      pointLength: -1,
+      spotLength: -1,
+      rectAreaLength: -1,
+      hemiLength: -1,
+      numDirectionalShadows: -1,
+      numPointShadows: -1,
+      numSpotShadows: -1,
+      numSpotMaps: -1,
+      numLightProbes: -1,
+    },
+    ambient: [0, 0, 0],
+    probe: Array.from({ length: 9 }, () => ({ x: 0, y: 0, z: 0 })),
+    directional: [],
+    directionalShadow: [],
+    directionalShadowMap: [],
+    directionalShadowMatrix: [],
+    spot: [],
+    spotLightMap: [],
+    spotShadow: [],
+    spotShadowMap: [],
+    spotLightMatrix: [],
+    rectArea: [],
+    rectAreaLTC1: null,
+    rectAreaLTC2: null,
+    point: [],
+    pointShadow: [],
+    pointShadowMap: [],
+    pointShadowMatrix: [],
+    hemi: [],
+    numSpotLightShadowsWithMaps: 0,
+    numLightProbes: 0,
+  }
+
+  setup(_lights: unknown[] = []): void {}
+
+  setupView(_lights: unknown[] = [], _camera?: unknown): void {}
+}
+
+class RendererRenderState {
+  readonly state = {
+    lightsArray: [] as unknown[],
+    shadowsArray: [] as unknown[],
+    camera: null as unknown,
+    lights: new RendererRenderLightsState(),
+    transmissionRenderTarget: {} as Record<PropertyKey, unknown>,
+  }
+
+  init(camera: unknown): void {
+    this.state.camera = camera
+    this.state.lightsArray.length = 0
+    this.state.shadowsArray.length = 0
+  }
+
+  pushLight(light: unknown): void {
+    this.state.lightsArray.push(light)
+  }
+
+  pushShadow(shadowLight: unknown): void {
+    this.state.shadowsArray.push(shadowLight)
+  }
+
+  setupLights(): void {
+    this.state.lights.setup(this.state.lightsArray)
+  }
+
+  setupLightsView(camera: unknown): void {
+    this.state.lights.setupView(this.state.lightsArray, camera)
+  }
+}
+
+class RendererRenderStatesState {
+  private states = new WeakMap<object, RendererRenderState[]>()
+
+  get(scene: object, renderCallDepth = 0): RendererRenderState {
+    assertWeakMapKey(scene, 'Renderer.renderStates.get scene')
+    if (!Number.isInteger(renderCallDepth) || renderCallDepth < 0) {
+      throw new TypeError(`Renderer.renderStates.get renderCallDepth must be a non-negative integer; received ${String(renderCallDepth)}.`)
+    }
+    let stateArray = this.states.get(scene)
+    if (stateArray === undefined) {
+      stateArray = []
+      this.states.set(scene, stateArray)
+    }
+    let renderState = stateArray[renderCallDepth]
+    if (renderState === undefined) {
+      renderState = new RendererRenderState()
+      stateArray[renderCallDepth] = renderState
+    }
+    return renderState
+  }
+
+  dispose(): void {
+    this.states = new WeakMap()
+  }
+}
+
 function collectCompileMaterials(scene: ThreeSceneRootLike): Set<ThreeMaterialLike> {
   const materials = new Set<ThreeMaterialLike>()
   collectObjectCompileMaterials(scene, materials, 'Renderer.compile scene')
@@ -1874,6 +1975,7 @@ export class Renderer {
   readonly nodes = new RendererNodesState()
   readonly properties = new RendererPropertiesState()
   readonly renderLists = new RendererRenderListsState()
+  readonly renderStates = new RendererRenderStatesState()
   readonly reversedDepthBuffer = false
   readonly shadowMap = new RendererShadowMapState()
   readonly state = new RendererState()
@@ -2809,6 +2911,7 @@ export class Renderer {
     this.info.dispose()
     this.properties.dispose()
     this.renderLists.dispose()
+    this.renderStates.dispose()
     // Native resources are owned by the renderer instance and released with normal object lifetime.
   }
 
