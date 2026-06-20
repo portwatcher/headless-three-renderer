@@ -1552,6 +1552,7 @@ export class Renderer {
       isCubeRenderTarget(this.currentRenderTarget) ? this.currentActiveCubeFace : undefined,
       0,
       'Renderer.copyFramebufferToTexture',
+      isCubeRenderTarget(this.currentRenderTarget) ? this.currentActiveMipmapLevel : 0,
     )
     const destination = rawTextureCopyImage(texture, 'Renderer.copyFramebufferToTexture texture', { level })
     if (source.channels !== destination.channels) {
@@ -5463,6 +5464,7 @@ function renderTargetReadbackSource(
   activeCubeFaceIndex: number | undefined,
   textureIndex: number,
   label: string,
+  activeMipmapLevel = 0,
 ): { data: NonNullable<RenderTargetImageLike['data']>; width: number; height: number; channels: number } {
   assertRenderTargetLike(target, `${label} target`)
   if (!Number.isInteger(textureIndex) || textureIndex < 0) {
@@ -5473,7 +5475,7 @@ function renderTargetReadbackSource(
   }
 
   const texture = renderTargetColorTextures(target)[textureIndex]
-  const image = renderTargetReadbackImage(target, texture, activeCubeFaceIndex, textureIndex)
+  const image = renderTargetReadbackImage(target, texture, activeCubeFaceIndex, textureIndex, activeMipmapLevel)
   if (!image?.data) {
     throw new Error(
       `${label} target has no readable color data. Render into the target before reading pixels.`,
@@ -5503,9 +5505,10 @@ function renderTargetReadbackImage(
   texture: RenderTargetTextureLike | undefined,
   activeCubeFaceIndex: number | undefined,
   textureIndex: number,
+  activeMipmapLevel = 0,
 ): RenderTargetImageLike | undefined {
   if (activeCubeFaceIndex !== undefined) {
-    return renderTargetTextureFaceImage(texture, activeCubeFaceIndex)
+    return renderTargetTextureFaceImage(texture, activeCubeFaceIndex, activeMipmapLevel)
   }
   if (texture) {
     const image = Array.isArray(texture.image) ? texture.image[0] : texture.image

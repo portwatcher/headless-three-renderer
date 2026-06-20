@@ -32138,6 +32138,28 @@ test('Renderer copyFramebufferToTexture copies active render target color data o
   renderer.setRenderTarget(null)
 })
 
+test('Renderer copyFramebufferToTexture copies active cube mip face data on the CPU', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  cubeCamera.activeMipmapLevel = 1
+  renderToTarget(scene, cubeCamera, cubeTarget)
+
+  const renderer = new Renderer()
+  renderer.setRenderTarget(cubeTarget, 1, 1)
+  const destinationData = new Uint8Array(16 * 16 * 4)
+  destinationData.fill(3)
+  const destination = new THREE.DataTexture(destinationData, 16, 16, THREE.RGBAFormat)
+  const initialVersion = destination.version
+
+  renderer.copyFramebufferToTexture(destination)
+
+  const copied = meanRegion(destination.image.data, 16, 16, 5, 5, 11, 11)
+  assert.ok(copied.g > copied.r + 30 && copied.g > copied.b + 50, `active cube mip face copy should read the selected -X mip face (${copied.r}, ${copied.g}, ${copied.b})`)
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after cube mip framebuffer copy')
+  renderer.setRenderTarget(null)
+})
+
 test('Renderer clear honors active render target scissor state', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
