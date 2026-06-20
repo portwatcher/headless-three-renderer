@@ -331,11 +331,11 @@ function transparentLayerCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [20, 20, 26],
+    background: [80, 80, 89],
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      const cornerMatchesBackground = Math.abs(corner.r - 20) <= 1 && Math.abs(corner.g - 20) <= 1 && Math.abs(corner.b - 26) <= 1
+      const cornerMatchesBackground = Math.abs(corner.r - 80) <= 1 && Math.abs(corner.g - 80) <= 1 && Math.abs(corner.b - 89) <= 1
       if (!(center.r > center.g + 40 && center.b > center.g + 50 && cornerMatchesBackground)) {
         throw new Error(`transparent layer corpus should blend the blue front over the orange back, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
@@ -668,7 +668,7 @@ function lightProbeCorpus() {
     scene,
     camera: makeCamera([0.8, 0.4, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [8, 8, 10],
+    background: [48, 48, 56],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 40, 40, 56, 56)
@@ -754,7 +754,7 @@ function linearFogCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 5, 8],
+    background: [39, 39, 48],
     minNonBackgroundRatio: 0.08,
     validate(rgba, { width }) {
       const fogged = meanRegion(rgba, width, 20, 24, 38, 72)
@@ -794,7 +794,7 @@ function textureMatrixColorSpaceCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 5, 6],
+    background: [39, 39, 44],
     minNonBackgroundRatio: 0.1,
     validate(rgba, { width }) {
       const transformedBright = pixelAt(rgba, width, 48, 48)
@@ -1108,7 +1108,7 @@ function spriteMaterialCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 6, 8],
+    background: [39, 44, 48],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width, height }) {
       const colors = {
@@ -1510,7 +1510,7 @@ function pointSpotLightCorpus() {
     scene,
     camera: makeCamera([0, 0.2, 3.1], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 6, 8],
+    background: [39, 44, 48],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const pointLit = meanRegion(rgba, width, 20, 28, 42, 62)
@@ -1602,12 +1602,13 @@ function materialLocalClippingCorpus() {
       format: 'rgba',
       localClippingEnabled: true,
     },
-    background: [5, 5, 20],
+    background: [39, 39, 80],
     minNonBackgroundRatio: 0.05,
     validate(rgba, { width }) {
       const visible = meanRegion(rgba, width, 32, 16, 64, 40)
       const clipped = meanRegion(rgba, width, 32, 56, 64, 80)
-      if (!(visible.b > visible.r + 120 && visible.g > visible.r + 80 && clipped.r < 10 && clipped.g < 10 && clipped.b < 25)) {
+      const clippedMatchesBackground = Math.abs(clipped.r - 39) <= 1 && Math.abs(clipped.g - 39) <= 1 && Math.abs(clipped.b - 80) <= 1
+      if (!(visible.b > visible.r + 120 && visible.g > visible.r + 80 && clippedMatchesBackground)) {
         throw new Error(`local clipping corpus should keep only the cyan top half, got visible=${JSON.stringify(visible)} clipped=${JSON.stringify(clipped)}`)
       }
     },
@@ -1687,7 +1688,7 @@ function materialEnvMapCorpus() {
     scene,
     camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [10, 10, 13],
+    background: [56, 56, 63],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
@@ -1742,7 +1743,7 @@ function materialEnvMapBasicLambertCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [6, 6, 8],
+    background: [44, 44, 48],
     minNonBackgroundRatio: 0.06,
     validate(rgba, { width }) {
       const basic = meanRegion(rgba, width, 20, 30, 40, 66)
@@ -1802,7 +1803,7 @@ function materialEnvMapPbrCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 5, 6],
+    background: [39, 39, 44],
     minNonBackgroundRatio: 0.06,
     validate(rgba, { width }) {
       const standardMean = meanRegion(rgba, width, 20, 30, 40, 66)
@@ -1839,7 +1840,7 @@ function cubeUvMaterialEnvMapCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 5, 6],
+    background: [39, 39, 44],
     minNonBackgroundRatio: 0.08,
     browserReference: false,
     validate(rgba, { width }) {
@@ -1871,7 +1872,7 @@ function packedCubeUvMaterialEnvMapCorpus() {
     scene,
     camera: makeCamera([0, 0, 3]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 5, 6],
+    background: [39, 39, 44],
     minNonBackgroundRatio: 0.08,
     browserReference: false,
     validate(rgba, { width }) {
@@ -2359,7 +2360,7 @@ function meshNormalMaterialCorpus() {
     scene,
     camera: makeCamera([1.1, 0.7, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [4, 4, 5],
+    background: [33, 33, 39],
     minNonBackgroundRatio: 0.04,
     validate(rgba, { width, height }) {
       const blueFaces = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > r + 40 && b > g + 40 && b > 100)
@@ -2562,7 +2563,7 @@ function meshMatcapMaterialCorpus() {
     scene,
     camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [5, 6, 8],
+    background: [39, 44, 48],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
@@ -2863,7 +2864,7 @@ function meshToonMaterialCorpus() {
     scene,
     camera: makeCamera([0.8, 0.35, 3.0], [0, 0, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [8, 6, 9],
+    background: [48, 44, 53],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
@@ -3456,11 +3457,11 @@ function skinnedMorphCorpus() {
     scene,
     camera: makeCamera([0.2, 0.1, 2.5]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [13, 15, 20],
+    background: [63, 69, 80],
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.b > center.g + 50 && center.g > 80 && center.r < 20 && corner.r === 13 && corner.g === 15 && corner.b === 20)) {
+      if (!(center.b > center.g + 50 && center.g > 80 && center.r < 20 && corner.r === 63 && corner.g === 69 && corner.b === 80)) {
         throw new Error(`skinned morph corpus should render the deformed cyan plane over background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -3571,14 +3572,14 @@ function avatarLikeCorpus() {
     scene,
     camera: makeCamera([0.95, 0.75, 3.2], [0, 0.25, 0]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [15, 18, 26],
+    background: [69, 75, 89],
     backgroundTolerance: 8,
     minNonBackgroundRatio: 0.035,
     validate(rgba, { width }) {
       const head = pixelAt(rgba, width, 48, 28)
       const body = pixelAt(rgba, width, 48, 54)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(head.r > head.b + 50 && head.g > head.b + 20 && body.b > body.r + 80 && body.g > body.r + 40 && corner.r < 25 && corner.g < 30 && corner.b < 40)) {
+      if (!(head.r > head.b + 50 && head.g > head.b + 20 && body.b > body.r + 80 && body.g > body.r + 40 && Math.abs(corner.r - 69) <= 1 && Math.abs(corner.g - 75) <= 1 && Math.abs(corner.b - 89) <= 1)) {
         throw new Error(`avatar corpus should render warm head and blue toon body, got head=${JSON.stringify(head)} body=${JSON.stringify(body)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -3635,12 +3636,12 @@ function physicalIblShadowCorpus() {
     scene,
     camera: makeCamera([2.2, 1.4, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [10, 10, 13],
+    background: [56, 56, 63],
     validate(rgba, { width }) {
       const sphere = pixelAt(rgba, width, 48, 48)
       const ground = meanRegion(rgba, width, 60, 42, 76, 58)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(sphere.r > 200 && sphere.g > 210 && sphere.b > 220 && ground.r > 80 && ground.g > 80 && ground.b > 90 && corner.r === 10 && corner.g === 10 && corner.b === 13)) {
+      if (!(sphere.r > 200 && sphere.g > 210 && sphere.b > 220 && ground.r > 80 && ground.g > 80 && ground.b > 90 && corner.r === 56 && corner.g === 56 && corner.b === 63)) {
         throw new Error(`physical IBL shadow corpus should render a bright physical sphere and visible shadowed ground, got sphere=${JSON.stringify(sphere)} ground=${JSON.stringify(ground)} corner=${JSON.stringify(corner)}`)
       }
     },
@@ -4759,7 +4760,7 @@ function lodAndGroupsCorpus() {
     scene,
     camera: makeCamera([1.4, 1.2, 3.2]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [20, 20, 20],
+    background: [80, 80, 80],
     validate(rgba, { width }) {
       const group = meanRegion(rgba, width, 16, 36, 36, 60)
       const lod = meanRegion(rgba, width, 60, 36, 80, 60)
@@ -4845,12 +4846,12 @@ function pathologicalGeometryCorpus() {
     scene,
     camera: makeCamera([0, 0, 2.6]),
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
-    background: [13, 13, 13],
+    background: [63, 63, 63],
     validate(rgba, { width, height }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
       const geometryPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => b > 150 && g > 140 && r > 100)
-      if (!(center.b > center.r + 40 && center.g > center.r + 20 && corner.r === 13 && corner.g === 13 && corner.b === 13 && geometryPixels > 2500)) {
+      if (!(center.b > center.r + 40 && center.g > center.r + 20 && corner.r === 63 && corner.g === 63 && corner.b === 63 && geometryPixels > 2500)) {
         throw new Error(`pathological geometry corpus should render the non-degenerate cyan triangles over background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)} geometry=${geometryPixels}`)
       }
     },

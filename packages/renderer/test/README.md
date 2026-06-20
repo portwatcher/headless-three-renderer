@@ -22,7 +22,7 @@ The tests require the native binary (`headless_three_renderer.*.node`) to be bui
 - **`scenes.test.mjs`** — scene-level invariants: `rgba` format produces `width * height * 4` bytes, meshes cover reasonable portions of the frame, different materials produce different pixel statistics, LOD distance/zoom/hysteresis selection behaves consistently, EffectComposer helper flows including CopyShader passes and OutputPass render through target readback, PBR scenes show lighting gradients, line/point topologies render without error, empty scene renders background color.
 
 The default harness intentionally tests **invariants** (dimensions, color statistics, non-emptiness) rather than exact pixel matches, so the same suite passes across Metal / Vulkan / DX12 / llvmpipe without per-platform snapshot drift.
-The generated corpus, committed Linux x64 browser references, minimal local glTF fixtures, committed humanoid/full-avatar VRM/VRMA fixtures, and committed Khronos glTF Sample Assets are broader no-crash/visibility sweeps and run in CI; additional platform browser references and tighter visual tolerances remain future work.
+The generated corpus, committed Linux x64 browser references, minimal local glTF fixtures, committed humanoid/full-avatar VRM/VRMA fixtures, and committed Khronos glTF Sample Assets are broader no-crash/visibility sweeps and run in CI; additional platform browser references and tighter visual tolerances for the remaining Linux x64 exceptions remain future work.
 
 ## CI software rendering
 
@@ -57,8 +57,8 @@ If references are committed under `packages/renderer/test/browser-reference/refe
 `pnpm run test:golden` detects that platform directory without the environment
 variable.
 
-The harness defaults to a mean RGBA tolerance of `18` and carries fixture-scoped
-tolerances for known browser parity gaps in the initial Linux x64 corpus. Use
+The harness defaults to a mean RGBA tolerance of `18` and carries four fixture-scoped
+tolerances for known browser parity gaps in the Linux x64 corpus. Use
 `HEADLESS_THREE_REFERENCE_MAX_MEAN_DIFF` to override that policy for ad hoc
 local comparisons against a chosen browser/GPU reference platform.
 Set `HEADLESS_THREE_REQUIRE_BROWSER_REFERENCES=1` in CI when golden references are expected to be present; without it, `test:golden` keeps the no-reference skip mode for platforms where references have not been committed yet.

@@ -30596,6 +30596,28 @@ test('empty scene renders the background color', () => {
   assert.ok(mean.b < 20, `expected red background, got b=${mean.b}`)
 })
 
+test('THREE.Color backgrounds are encoded for sRGB output clears', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.015, 0.015, 0.02)
+  const camera = makeCamera()
+
+  const srgb = meanRgba(renderRgba(scene, camera, { width: 32, height: 32 }))
+  const linear = meanRgba(renderRgba(scene, camera, {
+    width: 32,
+    height: 32,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }))
+  const explicitArray = meanRgba(renderRgba(scene, camera, {
+    width: 32,
+    height: 32,
+    background: [0.015, 0.015, 0.02],
+  }))
+
+  assertRgbClose(srgb, [33, 33, 39], 'THREE.Color scene background sRGB output')
+  assertRgbClose(linear, [4, 4, 5], 'THREE.Color scene background linear output')
+  assertRgbClose(explicitArray, [4, 4, 5], 'explicit array background channels')
+})
+
 test('backgroundIntensity scales background color clears', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(1, 0, 0)

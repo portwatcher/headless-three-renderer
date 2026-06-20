@@ -2932,6 +2932,7 @@ function toNativeInput(
         options,
         backgroundTexture != null,
         (options as InternalRenderOptions).__headlessThreeRendererClearColor,
+        options.outputColorSpace,
       )
       : [0, 0, 0, 1],
     backgroundIntensity,

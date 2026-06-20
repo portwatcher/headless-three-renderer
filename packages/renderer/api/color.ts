@@ -1,4 +1,4 @@
-import type { Color4, ThreeColorLike, ThreeSceneRootLike, RenderOptions } from './types'
+import type { Color4, RenderOutputColorSpace, ThreeColorLike, ThreeSceneRootLike, RenderOptions } from './types'
 import { clamp01, areFiniteNumbers } from './math'
 
 type ColorLikeWithAlpha = Partial<ThreeColorLike> & { a?: unknown }
@@ -120,18 +120,49 @@ export function resolveBackground(
   options: RenderOptions,
   hasBackgroundTexture = false,
   fallbackBackground: Color4 = DEFAULT_BACKGROUND_COLOR,
+  outputColorSpace: RenderOutputColorSpace | undefined = options.outputColorSpace,
 ): Color4 {
   const hasBackgroundOverride = options.background !== undefined
   if (hasBackgroundOverride) {
-    const color = strictColorLikeToArray(options.background, 'options.background')
+    const color = strictBackgroundColorToArray(options.background, 'options.background', outputColorSpace)
     if (color) return color
     if (options.background == null || hasBackgroundTexture) return fallbackBackground
     throw new TypeError('options.background must be a color, texture, or null.')
   }
-  const color = strictColorLikeToArray(scene.background, 'scene.background')
+  const color = strictBackgroundColorToArray(scene.background, 'scene.background', outputColorSpace)
   if (color) return color
   if (scene.background == null || hasBackgroundTexture) return fallbackBackground
   throw new TypeError('scene.background must be a color, texture, or null.')
+}
+
+function strictBackgroundColorToArray(
+  value: unknown,
+  label: string,
+  outputColorSpace: RenderOutputColorSpace | undefined,
+): Color4 | null {
+  const color = strictColorLikeToArray(value, label)
+  if (!color) return null
+  if (!isThreeColorLike(value) || outputColorSpaceIsLinear(outputColorSpace)) return color
+  return [
+    linearToSrgb(color[0]),
+    linearToSrgb(color[1]),
+    linearToSrgb(color[2]),
+    color[3],
+  ]
+}
+
+function isThreeColorLike(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && (value as { isColor?: unknown }).isColor === true
+}
+
+function outputColorSpaceIsLinear(value: RenderOutputColorSpace | undefined): boolean {
+  return value === 'srgb-linear' || value === 'linear-srgb' || value === 'linearsrgb' || value === 'linear'
+}
+
+function linearToSrgb(value: number): number {
+  return value <= 0.0031308
+    ? value * 12.92
+    : 1.055 * (value ** (1 / 2.4)) - 0.055
 }
 
 function isColorShaped(value: ColorLikeWithAlpha): boolean {
