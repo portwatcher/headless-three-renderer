@@ -32992,13 +32992,23 @@ test('Renderer info exposes inert compatibility counters', () => {
   const renderer = new Renderer()
 
   assert.equal(renderer.info.autoReset, true)
+  assert.equal(renderer.info.calls, 0)
+  assert.equal(renderer.info.frame, 0)
   assert.deepEqual(renderer.info.memory, { geometries: 0, textures: 0 })
   assert.deepEqual(renderer.info.render, {
     calls: 0,
+    frameCalls: 0,
+    drawCalls: 0,
     triangles: 0,
     points: 0,
     lines: 0,
+    timestamp: 0,
     frame: 0,
+  })
+  assert.deepEqual(renderer.info.compute, {
+    calls: 0,
+    frameCalls: 0,
+    timestamp: 0,
   })
   assert.equal(renderer.info.programs, null)
 
@@ -33010,20 +33020,60 @@ test('Renderer info exposes inert compatibility counters', () => {
   renderer.info.update(3, 0x0002)
   renderer.info.update(5, 0x0000)
   assert.equal(renderer.info.render.calls, 5)
+  assert.equal(renderer.info.render.drawCalls, 5)
+  assert.equal(renderer.info.render.frameCalls, 0)
   assert.equal(renderer.info.render.triangles, 2)
   assert.equal(renderer.info.render.lines, 9)
   assert.equal(renderer.info.render.points, 5)
+  renderer.info.update({ isMesh: true }, 6, 2)
+  renderer.info.update({ isSprite: true }, 6)
+  renderer.info.update({ isPoints: true }, 2, 3)
+  renderer.info.update({ isLineSegments: true }, 4)
+  renderer.info.update({ isLine: true }, 4)
+  renderer.info.update({ isLineLoop: true }, 4)
+  assert.equal(renderer.info.render.calls, 5)
+  assert.equal(renderer.info.render.drawCalls, 11)
+  assert.equal(renderer.info.render.triangles, 8)
+  assert.equal(renderer.info.render.lines, 18)
+  assert.equal(renderer.info.render.points, 11)
   renderer.info.render.frame = 7
+  renderer.info.render.frameCalls = 3
+  renderer.info.render.timestamp = 123
+  renderer.info.compute.calls = 4
+  renderer.info.compute.frameCalls = 2
+  renderer.info.compute.timestamp = 456
+  renderer.info.calls = 9
+  renderer.info.memory.geometries = 1
+  renderer.info.memory.textures = 2
   renderer.info.reset()
   assert.equal(renderer.info.render.calls, 0)
+  assert.equal(renderer.info.render.drawCalls, 0)
+  assert.equal(renderer.info.render.frameCalls, 0)
   assert.equal(renderer.info.render.triangles, 0)
   assert.equal(renderer.info.render.points, 0)
   assert.equal(renderer.info.render.lines, 0)
   assert.equal(renderer.info.render.frame, 7)
+  assert.equal(renderer.info.render.timestamp, 123)
+  assert.equal(renderer.info.compute.calls, 4)
+  assert.equal(renderer.info.compute.frameCalls, 0)
+  assert.equal(renderer.info.compute.timestamp, 456)
+  assert.equal(renderer.info.calls, 9)
+  assert.deepEqual(renderer.info.memory, { geometries: 1, textures: 2 })
+  renderer.info.dispose()
+  assert.equal(renderer.info.calls, 0)
+  assert.equal(renderer.info.render.calls, 0)
+  assert.equal(renderer.info.compute.calls, 0)
+  assert.equal(renderer.info.render.timestamp, 0)
+  assert.equal(renderer.info.compute.timestamp, 0)
+  assert.deepEqual(renderer.info.memory, { geometries: 0, textures: 0 })
 
   assert.throws(
     () => { renderer.info.autoReset = 'yes' },
     /Renderer\.info\.autoReset must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.info.update({}, 1),
+    /Renderer\.info\.update object type is not supported/i,
   )
   assert.throws(
     () => renderer.info.update(-1, 0x0004),

@@ -251,6 +251,9 @@ class RendererShadowMapState {
 class RendererInfoState {
   private autoResetValue = true
 
+  calls = 0
+  frame = 0
+
   readonly memory = {
     geometries: 0,
     textures: 0,
@@ -258,10 +261,19 @@ class RendererInfoState {
 
   readonly render = {
     calls: 0,
+    frameCalls: 0,
+    drawCalls: 0,
     triangles: 0,
     points: 0,
     lines: 0,
+    timestamp: 0,
     frame: 0,
+  }
+
+  readonly compute = {
+    calls: 0,
+    frameCalls: 0,
+    timestamp: 0,
   }
 
   programs: unknown[] | null = null
@@ -274,12 +286,18 @@ class RendererInfoState {
     this.autoResetValue = rendererStateBoolean(value, 'Renderer.info.autoReset')
   }
 
-  update(count: unknown, mode: unknown, instanceCount: unknown = 1): void {
-    const drawCount = rendererInfoDrawCount(count, 'Renderer.info.update count')
-    const drawMode = rendererInfoDrawMode(mode, 'Renderer.info.update mode')
+  update(objectOrCount: unknown, modeOrCount: unknown, instanceCount: unknown = 1): void {
+    if (objectOrCount !== null && typeof objectOrCount === 'object' && !Array.isArray(objectOrCount)) {
+      this.updateCommonRendererObject(objectOrCount as ThreeObject3DLike, modeOrCount, instanceCount)
+      return
+    }
+
+    const drawCount = rendererInfoDrawCount(objectOrCount, 'Renderer.info.update count')
+    const drawMode = rendererInfoDrawMode(modeOrCount, 'Renderer.info.update mode')
     const instances = rendererInfoInstanceCount(instanceCount, 'Renderer.info.update instanceCount')
 
     this.render.calls += 1
+    this.render.drawCalls += 1
 
     switch (drawMode) {
       case WebGLDrawModeTriangles:
@@ -302,9 +320,45 @@ class RendererInfoState {
 
   reset(): void {
     this.render.calls = 0
+    this.render.frameCalls = 0
+    this.render.drawCalls = 0
     this.render.triangles = 0
     this.render.points = 0
     this.render.lines = 0
+    this.compute.frameCalls = 0
+  }
+
+  dispose(): void {
+    this.reset()
+    this.calls = 0
+    this.compute.calls = 0
+    this.render.timestamp = 0
+    this.compute.timestamp = 0
+    this.memory.geometries = 0
+    this.memory.textures = 0
+  }
+
+  private updateCommonRendererObject(object: ThreeObject3DLike, count: unknown, instanceCount: unknown): void {
+    const drawCount = rendererInfoDrawCount(count, 'Renderer.info.update count')
+    const instances = rendererInfoInstanceCount(instanceCount, 'Renderer.info.update instanceCount')
+
+    this.render.drawCalls += 1
+
+    if (object.isMesh === true || object.isSprite === true) {
+      this.render.triangles += instances * (drawCount / 3)
+    } else if (object.isPoints === true) {
+      this.render.points += instances * drawCount
+    } else if (object.isLineSegments === true) {
+      this.render.lines += instances * (drawCount / 2)
+    } else if (object.isLineLoop === true) {
+      this.render.lines += instances * drawCount
+    } else if (object.isLine === true) {
+      this.render.lines += instances * (drawCount - 1)
+    } else {
+      throw new Error(
+        'Renderer.info.update object type is not supported. Use a mesh, sprite, points, line, line segments, or line loop object.',
+      )
+    }
   }
 }
 
@@ -2161,6 +2215,7 @@ export class Renderer {
   }
 
   dispose(): void {
+    this.info.dispose()
     this.properties.dispose()
     this.renderLists.dispose()
     // Native resources are owned by the renderer instance and released with normal object lifetime.
