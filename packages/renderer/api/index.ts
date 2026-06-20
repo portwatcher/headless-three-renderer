@@ -1383,6 +1383,18 @@ class RendererStateBuffersState {
 class RendererState {
   readonly buffers = new RendererStateBuffersState()
 
+  get color(): RendererColorBufferState {
+    return this.buffers.color
+  }
+
+  get depth(): RendererDepthBufferState {
+    return this.buffers.depth
+  }
+
+  get stencil(): RendererStencilBufferState {
+    return this.buffers.stencil
+  }
+
   setBlending(
     blending: unknown,
     blendEquation?: unknown,
