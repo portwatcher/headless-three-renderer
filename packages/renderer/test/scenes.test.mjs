@@ -16243,7 +16243,7 @@ test('encoded texture premultiplyAlpha inputs fail clearly', () => {
   )
 })
 
-test('one-, alpha-, two-channel, and luminance-alpha raw DataTexture maps and backgrounds expand before texture upload', () => {
+test('one-, luminance-, alpha-, two-channel, and luminance-alpha raw DataTexture maps and backgrounds expand before texture upload', () => {
   function extractMap(map) {
     map.needsUpdate = true
     const info = extractTextureData(new THREE.MeshBasicMaterial({ map }))
@@ -16272,6 +16272,14 @@ test('one-, alpha-, two-channel, and luminance-alpha raw DataTexture maps and ba
   const red = extractMap(redMap)
   assert.ok(red.r > 180 && red.g > 180 && red.b > 180, `one-channel raw texture should expand to grayscale (${red.r}, ${red.g}, ${red.b})`)
 
+  const luminanceMap = new THREE.DataTexture(new Uint8Array([180]), 1, 1, THREE.LuminanceFormat)
+  const luminance = extractMap(luminanceMap)
+  assert.deepEqual(
+    [luminance.r, luminance.g, luminance.b, luminance.a],
+    [180, 180, 180, 255],
+    'LuminanceFormat raw texture should copy the single channel into RGB with opaque alpha',
+  )
+
   const alphaMap = new THREE.DataTexture(new Uint8Array([96]), 1, 1, THREE.AlphaFormat)
   const alpha = extractMap(alphaMap)
   assert.deepEqual(
@@ -16284,6 +16292,13 @@ test('one-, alpha-, two-channel, and luminance-alpha raw DataTexture maps and ba
   assert.ok(
     redBackground.r > 180 && redBackground.g > 180 && redBackground.b > 180,
     `one-channel raw background should expand to grayscale (${redBackground.r}, ${redBackground.g}, ${redBackground.b})`,
+  )
+
+  const luminanceBackground = extractBackground(new THREE.DataTexture(new Uint8Array([180]), 1, 1, THREE.LuminanceFormat))
+  assert.deepEqual(
+    [luminanceBackground.r, luminanceBackground.g, luminanceBackground.b, luminanceBackground.a],
+    [180, 180, 180, 255],
+    'LuminanceFormat raw background should copy the single channel into RGB with opaque alpha',
   )
 
   const alphaBackground = extractBackground(new THREE.DataTexture(new Uint8Array([96]), 1, 1, THREE.AlphaFormat))
@@ -16646,7 +16661,7 @@ test('one- and two-channel raw environment textures decode for IBL', () => {
   }
 })
 
-test('AlphaFormat and LuminanceAlphaFormat raw environment textures expand before IBL upload', () => {
+test('AlphaFormat, LuminanceFormat, and LuminanceAlphaFormat raw environment textures expand before IBL upload', () => {
   function extractData(texture) {
     texture.mapping = THREE.EquirectangularReflectionMapping
     texture.needsUpdate = true
@@ -16660,6 +16675,9 @@ test('AlphaFormat and LuminanceAlphaFormat raw environment textures expand befor
   const alphaData = extractData(new THREE.DataTexture(new Uint8Array([96]), 1, 1, THREE.AlphaFormat))
   assert.deepEqual(Array.from(alphaData), [96, 96, 96, 96])
 
+  const luminanceData = extractData(new THREE.DataTexture(new Uint8Array([180]), 1, 1, THREE.LuminanceFormat))
+  assert.deepEqual(Array.from(luminanceData), [180, 180, 180, 255])
+
   const byteData = extractData(new THREE.DataTexture(new Uint8Array([180, 255]), 1, 1, THREE.LuminanceAlphaFormat))
   assert.deepEqual(Array.from(byteData), [180, 180, 180, 255])
 
@@ -16669,6 +16687,13 @@ test('AlphaFormat and LuminanceAlphaFormat raw environment textures expand befor
   assert.ok(Math.abs(floatAlphaData[1] - 0.5) < 0.001, `FloatType alpha-format green should be 0.5 (${floatAlphaData[1]})`)
   assert.ok(Math.abs(floatAlphaData[2] - 0.5) < 0.001, `FloatType alpha-format blue should be 0.5 (${floatAlphaData[2]})`)
   assert.ok(Math.abs(floatAlphaData[3] - 0.5) < 0.001, `FloatType alpha-format alpha should be 0.5 (${floatAlphaData[3]})`)
+
+  const floatLuminanceBuffer = extractData(new THREE.DataTexture(new Float32Array([0.5]), 1, 1, THREE.LuminanceFormat, THREE.FloatType))
+  const floatLuminanceData = new Float32Array(floatLuminanceBuffer.buffer, floatLuminanceBuffer.byteOffset, floatLuminanceBuffer.byteLength / 4)
+  assert.ok(Math.abs(floatLuminanceData[0] - 0.5) < 0.001, `FloatType luminance red should be 0.5 (${floatLuminanceData[0]})`)
+  assert.ok(Math.abs(floatLuminanceData[1] - 0.5) < 0.001, `FloatType luminance green should be 0.5 (${floatLuminanceData[1]})`)
+  assert.ok(Math.abs(floatLuminanceData[2] - 0.5) < 0.001, `FloatType luminance blue should be 0.5 (${floatLuminanceData[2]})`)
+  assert.ok(Math.abs(floatLuminanceData[3] - 1) < 0.001, `FloatType luminance alpha should be 1 (${floatLuminanceData[3]})`)
 
   const floatBuffer = extractData(new THREE.DataTexture(new Float32Array([0.5, 1]), 1, 1, THREE.LuminanceAlphaFormat, THREE.FloatType))
   const floatData = new Float32Array(floatBuffer.buffer, floatBuffer.byteOffset, floatBuffer.byteLength / 4)
@@ -16683,6 +16708,13 @@ test('AlphaFormat and LuminanceAlphaFormat raw environment textures expand befor
   assert.ok(Math.abs(halfFloatToNumber(halfAlphaData[1]) - 0.5) < 0.001, `HalfFloatType alpha-format green should be 0.5 (${halfFloatToNumber(halfAlphaData[1])})`)
   assert.ok(Math.abs(halfFloatToNumber(halfAlphaData[2]) - 0.5) < 0.001, `HalfFloatType alpha-format blue should be 0.5 (${halfFloatToNumber(halfAlphaData[2])})`)
   assert.ok(Math.abs(halfFloatToNumber(halfAlphaData[3]) - 0.5) < 0.001, `HalfFloatType alpha-format alpha should be 0.5 (${halfFloatToNumber(halfAlphaData[3])})`)
+
+  const halfLuminanceBuffer = extractData(new THREE.DataTexture(new Uint16Array([0x3800]), 1, 1, THREE.LuminanceFormat, THREE.HalfFloatType))
+  const halfLuminanceData = new Uint16Array(halfLuminanceBuffer.buffer, halfLuminanceBuffer.byteOffset, halfLuminanceBuffer.byteLength / 2)
+  assert.ok(Math.abs(halfFloatToNumber(halfLuminanceData[0]) - 0.5) < 0.001, `HalfFloatType luminance red should be 0.5 (${halfFloatToNumber(halfLuminanceData[0])})`)
+  assert.ok(Math.abs(halfFloatToNumber(halfLuminanceData[1]) - 0.5) < 0.001, `HalfFloatType luminance green should be 0.5 (${halfFloatToNumber(halfLuminanceData[1])})`)
+  assert.ok(Math.abs(halfFloatToNumber(halfLuminanceData[2]) - 0.5) < 0.001, `HalfFloatType luminance blue should be 0.5 (${halfFloatToNumber(halfLuminanceData[2])})`)
+  assert.ok(Math.abs(halfFloatToNumber(halfLuminanceData[3]) - 1) < 0.001, `HalfFloatType luminance alpha should be 1 (${halfFloatToNumber(halfLuminanceData[3])})`)
 
   const halfBuffer = extractData(new THREE.DataTexture(new Uint16Array([0x3800, 0x3c00]), 1, 1, THREE.LuminanceAlphaFormat, THREE.HalfFloatType))
   const halfData = new Uint16Array(halfBuffer.buffer, halfBuffer.byteOffset, halfBuffer.byteLength / 2)
@@ -17172,6 +17204,35 @@ test('AlphaFormat explicit raw texture mipmaps expand before upload', () => {
 
   const firstMipOffset = size * size * 4
   assert.deepEqual(Array.from(info.data.slice(firstMipOffset, firstMipOffset + 4)), [220, 220, 220, 220])
+})
+
+test('LuminanceFormat explicit raw texture mipmaps expand before upload', () => {
+  const size = 16
+  const data = new Uint8Array(size * size)
+  data.fill(24)
+  const map = new THREE.DataTexture(data, size, size, THREE.LuminanceFormat)
+  map.wrapS = THREE.RepeatWrapping
+  map.wrapT = THREE.RepeatWrapping
+  map.repeat.set(128, 128)
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestMipmapNearestFilter
+  map.generateMipmaps = false
+  map.mipmaps = [8, 4, 2, 1].map((levelSize) => ({
+    data: new Uint8Array(levelSize * levelSize).fill(220),
+    width: levelSize,
+    height: levelSize,
+  }))
+  map.needsUpdate = true
+
+  const info = extractTextureData(new THREE.MeshBasicMaterial({ map }))
+  assert.ok(info)
+  assert.equal(info.width, size)
+  assert.equal(info.height, size)
+  assert.equal(info.data.length, (16 * 16 + 8 * 8 + 4 * 4 + 2 * 2 + 1) * 4)
+  assert.deepEqual(Array.from(info.data.slice(0, 4)), [24, 24, 24, 255])
+
+  const firstMipOffset = size * size * 4
+  assert.deepEqual(Array.from(info.data.slice(firstMipOffset, firstMipOffset + 4)), [220, 220, 220, 255])
 })
 
 test('HalfFloatType explicit raw texture mipmaps decode before upload', () => {
