@@ -154,6 +154,34 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-matcap-material-flat-shading.png",
+      "name": "mesh-matcap-material-flat-shading",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-normal-map.png",
+      "name": "mesh-matcap-material-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-object-space-normal-map.png",
+      "name": "mesh-matcap-material-object-space-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-bump-map.png",
+      "name": "mesh-matcap-material-bump-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-toon-gradient-map.png",
       "name": "mesh-toon-gradient-map",
       "width": 96,

@@ -2622,7 +2622,6 @@ function meshMatcapMaterialFlatShadingCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     render(renderer) {
       const smooth = renderer.render(smoothScene, camera, options).slice()
       const flat = renderer.render(flatScene, camera, options)
@@ -2675,7 +2674,6 @@ function meshMatcapMaterialNormalMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options)
       flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
@@ -2759,7 +2757,6 @@ function meshMatcapMaterialObjectSpaceNormalMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const tangent = renderer.render(tangentScene, camera, options).slice()
       const objectSpace = renderer.render(objectScene, camera, options)
@@ -2823,7 +2820,6 @@ function meshMatcapMaterialBumpMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options).slice()
       const bumped = renderer.render(bumpedScene, camera, options)
