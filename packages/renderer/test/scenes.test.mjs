@@ -6,6 +6,8 @@ import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExp
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
+import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -2326,6 +2328,54 @@ test('ViewHelper render uses domElement offset size and restores viewport', () =
     } else {
       globalThis.document = previousDocument
     }
+  }
+})
+
+test('Reflector and Refractor prepasses use Renderer target state and restore flags', () => {
+  for (const [label, Helper] of [
+    ['Reflector', Reflector],
+    ['Refractor', Refractor],
+  ]) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 4),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    ))
+
+    const helper = new Helper(new THREE.PlaneGeometry(2, 2), {
+      textureWidth: 16,
+      textureHeight: 16,
+    })
+    scene.add(helper)
+
+    const camera = makeCamera()
+    camera.updateMatrixWorld()
+    helper.updateMatrixWorld()
+
+    const renderer = new Renderer()
+    renderer.setSize(32, 32)
+    renderer.setViewport(3, 4, 12, 14)
+    const previousTarget = { texture: {} }
+    renderer.setRenderTarget(previousTarget)
+    renderer.xr.enabled = true
+    renderer.shadowMap.autoUpdate = true
+    renderer.autoClear = false
+
+    helper.onBeforeRender(renderer, scene, camera)
+
+    const helperTarget = helper.getRenderTarget()
+    const helperData = helperTarget.data ?? helperTarget.texture?.image?.data ?? helperTarget.texture?.source?.data?.data
+    assert.ok(helperData instanceof Uint8Array, `${label} should render its helper-owned target`)
+    assert.equal(helperTarget.width, 16)
+    assert.equal(helperTarget.height, 16)
+    assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+    assert.deepEqual(renderer.getViewport(), { x: 3, y: 4, width: 12, height: 14 })
+    assert.equal(renderer.xr.enabled, true)
+    assert.equal(renderer.shadowMap.autoUpdate, true)
+    assert.equal(renderer.autoClear, false)
+    assert.equal(helper.visible, true)
+    helper.dispose()
   }
 })
 
