@@ -31208,8 +31208,23 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.state.setLineWidth(2), undefined)
   assert.equal(renderer.state.setPolygonOffset(true, 1, -1), undefined)
   assert.equal(renderer.state.setScissorTest(true), undefined)
+  assert.equal(renderer.state.setColorMask(false), undefined)
+  assert.equal(renderer.state.setDepthTest(true), undefined)
+  assert.equal(renderer.state.setDepthMask(true), undefined)
+  assert.equal(renderer.state.setDepthFunc(THREE.LessEqualDepth), undefined)
+  assert.equal(renderer.state.setReversedDepth(false), undefined)
+  assert.equal(renderer.state.setStencilTest(true), undefined)
+  assert.equal(renderer.state.setStencilMask(0xff), undefined)
+  assert.equal(renderer.state.setStencilFunc(THREE.AlwaysStencilFunc, 1, 0xff), undefined)
+  assert.equal(renderer.state.setStencilOp(
+    THREE.ReplaceStencilOp,
+    THREE.KeepStencilOp,
+    THREE.KeepStencilOp,
+  ), undefined)
   assert.equal(renderer.state.scissor(new THREE.Vector4(0, 0, 8, 8)), undefined)
+  assert.equal(renderer.state.scissor(0, 0, 8, 8), undefined)
   assert.equal(renderer.state.viewport({ x: 0, y: 0, width: 16, height: 16 }), undefined)
+  assert.equal(renderer.state.viewport(0, 0, 16, 16), undefined)
   assert.equal(renderer.state.reset(), undefined)
   assert.equal(renderer.state.unbindTexture(), undefined)
   assert.throws(
@@ -31257,8 +31272,24 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
     /Renderer\.state\.setPolygonOffset polygonOffset must be a boolean/i,
   )
   assert.throws(
+    () => renderer.state.setColorMask(1),
+    /Renderer\.state\.buffers\.color\.setMask mask must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.setReversedDepth(true),
+    /Renderer\.state\.buffers\.depth\.setReversed\(true\) is not supported.*reversed depth buffers/i,
+  )
+  assert.throws(
+    () => renderer.state.setStencilTest(1),
+    /Renderer\.state\.buffers\.stencil\.setTest test must be a boolean/i,
+  )
+  assert.throws(
     () => renderer.state.viewport({ x: 0, y: 0, width: 0, height: 1 }),
     /Renderer\.state\.viewport width and height must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.state.scissor(0, 0, 0, 1),
+    /Renderer\.state\.scissor width and height must be greater than 0/i,
   )
   for (const [method, pattern] of [
     ['enable', /WebGL capability flags/i],

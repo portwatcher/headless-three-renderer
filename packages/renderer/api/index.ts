@@ -820,12 +820,48 @@ class RendererState {
     rendererStateBoolean(scissorTest, 'Renderer.state.setScissorTest scissorTest')
   }
 
-  scissor(rect: RenderPixelRectLike): void {
-    rendererStatePixelRect(rect, undefined, undefined, undefined, 'Renderer.state.scissor')
+  setColorMask(colorMask: unknown): void {
+    this.buffers.color.setMask(colorMask)
   }
 
-  viewport(rect: RenderPixelRectLike): void {
-    rendererStatePixelRect(rect, undefined, undefined, undefined, 'Renderer.state.viewport')
+  setDepthTest(depthTest: unknown): void {
+    this.buffers.depth.setTest(depthTest)
+  }
+
+  setDepthMask(depthMask: unknown): void {
+    this.buffers.depth.setMask(depthMask)
+  }
+
+  setDepthFunc(depthFunc: unknown): void {
+    this.buffers.depth.setFunc(depthFunc)
+  }
+
+  setReversedDepth(reversed: unknown): void {
+    this.buffers.depth.setReversed(reversed)
+  }
+
+  setStencilTest(stencilTest: unknown): void {
+    this.buffers.stencil.setTest(stencilTest)
+  }
+
+  setStencilMask(stencilMask: unknown): void {
+    this.buffers.stencil.setMask(stencilMask)
+  }
+
+  setStencilFunc(stencilFunc: unknown, stencilRef: unknown, stencilMask: unknown): void {
+    this.buffers.stencil.setFunc(stencilFunc, stencilRef, stencilMask)
+  }
+
+  setStencilOp(stencilFail: unknown, stencilZFail: unknown, stencilZPass: unknown): void {
+    this.buffers.stencil.setOp(stencilFail, stencilZFail, stencilZPass)
+  }
+
+  scissor(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
+    rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.state.scissor')
+  }
+
+  viewport(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
+    rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.state.viewport')
   }
 
   reset(): void {
