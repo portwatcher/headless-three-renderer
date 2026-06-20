@@ -1477,7 +1477,6 @@ function appendPoints(
     instancedPositionScale,
   } = geometryExtraction
   const pointUvChannels = geometryExtraction.uvChannels
-  const primaryPointUvs = geometryExtraction.uvs
   const transform = matrixElements(object.matrixWorld!, 'points.matrixWorld')
   const axes = cameraBillboardAxes(camera)
 
@@ -1485,7 +1484,7 @@ function appendPoints(
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
     invokeObjectRenderCallback(object.onBeforeRender, 'onBeforeRender', callbackContext, object, camera, geometry, material, group)
-    const pointUvStreams = primaryPointUvs && (material?.map || material?.alphaMap)
+    const pointUvStreams = material?.map || material?.alphaMap
       ? textureUvStreamsForMapAlphaMaterial(pointUvChannels, {
         map: material.map,
         alphaMap: material.alphaMap,
@@ -1536,7 +1535,7 @@ function appendPoints(
     const effectiveCustomShadowMaterial = usesCustomShadowMaterial
       ? shadowMaterialWithSourceShadowState(customShadowMaterial, material)
       : null
-    const pointShadowUvStreams = primaryPointUvs && effectiveCustomShadowMaterial && (
+    const pointShadowUvStreams = effectiveCustomShadowMaterial && (
       effectiveCustomShadowMaterial.map ||
       effectiveCustomShadowMaterial.alphaMap
     )
@@ -1742,8 +1741,12 @@ function readPointBillboardExpansion(
           center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
           center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
         )
-        if (pointUvStreams?.uvs) {
-          appendUvForVertex(outputUvs, pointUvStreams.uvs, pointIndex, instance)
+        if (pointUvStreams) {
+          if (pointUvStreams.uvs) {
+            appendUvForVertex(outputUvs, pointUvStreams.uvs, pointIndex, instance)
+          } else {
+            outputUvs.push(u, v)
+          }
           if (outputUvs2 && pointUvStreams.uvs2) {
             appendUvForVertex(outputUvs2, pointUvStreams.uvs2, pointIndex, instance)
           }
