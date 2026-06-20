@@ -670,6 +670,28 @@ class RendererBackendState {
 
   finishCompute(_computeGroup?: unknown): void {}
 
+  clear(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.clear', 'backend render-context clearing')
+  }
+
+  async resolveOccludedAsync(_renderContext?: unknown): Promise<void> {}
+
+  initTimestampQuery(_renderContext?: unknown, _descriptor?: unknown): void {}
+
+  prepareTimestampBuffer(_renderContext?: unknown, _encoder?: unknown): void {}
+
+  beginBundle(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.beginBundle', 'backend render-bundle encoding')
+  }
+
+  finishBundle(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.finishBundle', 'backend render-bundle encoding')
+  }
+
+  addBundle(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.addBundle', 'backend render-bundle encoding')
+  }
+
   draw(): never {
     throw unsupportedBackendOperationError('Renderer.backend.draw', 'backend draw commands')
   }
@@ -762,6 +784,10 @@ class RendererBackendState {
 
   createStorageAttribute(): never {
     throw unsupportedBackendOperationError('Renderer.backend.createStorageAttribute', 'backend storage buffer creation')
+  }
+
+  createIndirectStorageAttribute(): never {
+    throw unsupportedBackendOperationError('Renderer.backend.createIndirectStorageAttribute', 'backend indirect storage buffer creation')
   }
 
   updateAttribute(): never {

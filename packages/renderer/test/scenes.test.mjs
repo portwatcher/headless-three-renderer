@@ -32865,6 +32865,9 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.backend.finishCompute({ id: 'compute' }), undefined)
   assert.equal(renderer.backend.updateSize(), undefined)
   assert.equal(renderer.backend.updateViewport({ viewport: true }), undefined)
+  assert.equal(await renderer.backend.resolveOccludedAsync({ id: 'render' }), undefined)
+  assert.equal(renderer.backend.initTimestampQuery({ id: 'render' }, { type: 'timestamp' }), undefined)
+  assert.equal(renderer.backend.prepareTimestampBuffer({ id: 'render' }, { type: 'encoder' }), undefined)
   assert.equal(renderer.backend.isOccluded({}, scene), false)
   assert.equal(renderer.backend.isOccluded(scene), false)
   renderer.setClearColor(0x204080, 0.5)
@@ -33299,6 +33302,10 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
     /Renderer\.isOccluded object must be an object-like value/i,
   )
   for (const method of [
+    'clear',
+    'beginBundle',
+    'finishBundle',
+    'addBundle',
     'draw',
     'compute',
     'createProgram',
@@ -33319,6 +33326,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
     'createAttribute',
     'createIndexAttribute',
     'createStorageAttribute',
+    'createIndirectStorageAttribute',
     'updateAttribute',
   ]) {
     assert.throws(
