@@ -61,6 +61,7 @@ function parseArgs(args) {
     meshes: 256,
     width: 128,
     height: 128,
+    mode: 'mixed',
     json: false,
     help: false,
   }
@@ -83,6 +84,10 @@ function parseArgs(args) {
       throw new Error(`Unknown argument "${arg}". Use --help for usage.`)
     }
     const [, name, rawValue] = match
+    if (name === 'mode') {
+      parsed.mode = profileMode(rawValue)
+      continue
+    }
     if (!['frames', 'warmup', 'meshes', 'width', 'height'].includes(name)) {
       throw new Error(`Unknown option "--${name}". Use --help for usage.`)
     }
@@ -92,6 +97,13 @@ function parseArgs(args) {
   }
 
   return parsed
+}
+
+function profileMode(value) {
+  if (['mixed', 'transform', 'material', 'static'].includes(value)) {
+    return value
+  }
+  throw new Error('--mode must be "mixed", "transform", "material", or "static".')
 }
 
 function positiveInteger(value, label) {
@@ -166,17 +178,23 @@ function createScene(meshCount) {
 
 function updateScene(scene, meshes, materials, frame) {
   const time = frame * 0.071
+  const updateTransforms = options.mode === 'mixed' || options.mode === 'transform'
+  const updateMaterials = options.mode === 'mixed' || options.mode === 'material'
   for (let index = 0; index < meshes.length; index += 1) {
     const mesh = meshes[index]
     const material = materials[index]
     const phase = time + index * 0.137
-    mesh.position.x = mesh.userData.profileBaseX + Math.sin(phase) * 0.08
-    mesh.position.y = mesh.userData.profileBaseY + Math.cos(phase * 0.73) * 0.08
-    mesh.rotation.x = phase * 0.35
-    mesh.rotation.y = phase * 0.21
-    mesh.scale.setScalar(0.85 + Math.sin(phase * 0.47) * 0.08)
-    material.color.setHSL((phase * 0.03 + index * 0.011) % 1, 0.72, 0.55)
-    material.roughness = 0.55 + Math.sin(phase * 0.19) * 0.25
+    if (updateTransforms) {
+      mesh.position.x = mesh.userData.profileBaseX + Math.sin(phase) * 0.08
+      mesh.position.y = mesh.userData.profileBaseY + Math.cos(phase * 0.73) * 0.08
+      mesh.rotation.x = phase * 0.35
+      mesh.rotation.y = phase * 0.21
+      mesh.scale.setScalar(0.85 + Math.sin(phase * 0.47) * 0.08)
+    }
+    if (updateMaterials) {
+      material.color.setHSL((phase * 0.03 + index * 0.011) % 1, 0.72, 0.55)
+      material.roughness = 0.55 + Math.sin(phase * 0.19) * 0.25
+    }
   }
   scene.updateMatrixWorld(true)
 }
@@ -199,6 +217,7 @@ function summarize({ options, frameTimes, totalMs, checksum, startMemory, endMem
     meshes: options.meshes,
     width: options.width,
     height: options.height,
+    mode: options.mode,
     totalMs: round(totalMs),
     meanFrameMs: round(meanMs),
     medianFrameMs: round(percentile(sorted, 0.5)),
@@ -227,7 +246,7 @@ function round(value) {
 
 function printSummary(summary) {
   console.log('Animated scene profile')
-  console.log(`frames=${summary.frames} warmup=${summary.warmupFrames} meshes=${summary.meshes} size=${summary.width}x${summary.height}`)
+  console.log(`frames=${summary.frames} warmup=${summary.warmupFrames} meshes=${summary.meshes} size=${summary.width}x${summary.height} mode=${summary.mode}`)
   console.log(`total=${summary.totalMs}ms mean=${summary.meanFrameMs}ms median=${summary.medianFrameMs}ms p95=${summary.p95FrameMs}ms`)
   console.log(`min=${summary.minFrameMs}ms max=${summary.maxFrameMs}ms rssDelta=${summary.rssDeltaMb}MB heapDelta=${summary.heapUsedDeltaMb}MB checksum=${summary.checksum}`)
 }
@@ -241,6 +260,7 @@ Options:
   --meshes=N   Animated mesh count. Default: 256
   --width=N    Output width in pixels. Default: 128
   --height=N   Output height in pixels. Default: 128
+  --mode=NAME  Workload: mixed, transform, material, or static. Default: mixed
   --json       Print machine-readable JSON.
   --help       Show this message.
 `)

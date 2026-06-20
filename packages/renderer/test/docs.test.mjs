@@ -174,6 +174,7 @@ test('compatibility matrix and CI stay synchronized with packaged platform targe
 
 test('animated-scene profiler stays exposed as a package script', async () => {
   const packageJson = JSON.parse(await readFile(PACKAGE_JSON, 'utf8'))
+  const profileScript = await readFile(ANIMATED_PROFILE_SCRIPT, 'utf8')
   assert.equal(
     packageJson.scripts['profile:animated'],
     'node scripts/profile-animated-scene.mjs',
@@ -182,6 +183,16 @@ test('animated-scene profiler stays exposed as a package script', async () => {
   await assert.doesNotReject(
     () => access(ANIMATED_PROFILE_SCRIPT),
     'profile:animated should point at a committed script',
+  )
+  assert.match(
+    profileScript,
+    /--mode=NAME/,
+    'profile:animated should document workload modes',
+  )
+  assert.match(
+    profileScript,
+    /mixed.*transform.*material.*static/s,
+    'profile:animated should keep mixed, transform, material, and static workload modes available',
   )
 })
 
