@@ -6535,6 +6535,7 @@ function renderTargetReadbackSource(
   activeMipmapLevel = 0,
 ): { data: NonNullable<RenderTargetImageLike['data']>; width: number; height: number; channels: number } {
   assertRenderTargetLike(target, `${label} target`)
+  validateUnsupportedRenderTargetOptions(target)
   if (!Number.isInteger(textureIndex) || textureIndex < 0) {
     throw new TypeError(`${label} textureIndex must be a non-negative integer.`)
   }

@@ -23280,6 +23280,24 @@ test('Renderer readRenderTargetPixels reads stored target color data', async () 
     /target has no readable color data/i,
   )
   assert.throws(
+    () => renderer.readRenderTargetPixels({
+      texture: new THREE.CompressedTexture([], 1, 1, THREE.RGBAFormat),
+      width: 1,
+      height: 1,
+      data: Buffer.alloc(4),
+    }, 0, 0, 1, 1, Buffer.alloc(4)),
+    /target color texture uses a compressed texture/i,
+  )
+  await assert.rejects(
+    () => renderer.readRenderTargetPixelsAsync({
+      texture: { format: THREE.RGBA_S3TC_DXT5_Format },
+      width: 1,
+      height: 1,
+      data: Buffer.alloc(4),
+    }, 0, 0, 1, 1),
+    /target color texture format uses a compressed texture format/i,
+  )
+  assert.throws(
     () => renderer.readRenderTargetPixels(target, 15, 0, 2, 1, Buffer.alloc(8)),
     /requested read bounds are out of range/i,
   )
