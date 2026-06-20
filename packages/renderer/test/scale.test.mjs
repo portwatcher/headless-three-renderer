@@ -15,6 +15,9 @@ const BACKGROUND = [5, 5, 5]
 const NODE_PERFORMANCE_NODE_COUNT = 10000
 const NODE_PERFORMANCE_IMAGE_COUNT = 100
 const LARGE_TEXTURE_SIZE = 512
+const NESTED_GRAPH_COLUMNS = 16
+const NESTED_GRAPH_ROWS = 16
+const NESTED_GRAPH_DEPTH = 8
 
 let sharedRenderer
 
@@ -338,6 +341,62 @@ test('mesh render budget handles 1,936 separate mesh objects', () => {
   assert.ok(ratio > 0.25, `separate mesh budget scene should render broad coverage (${ratio})`)
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 25 && mean.g > 25 && mean.b > 25, `separate mesh colors should survive rendering (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('nested scene graph budget renders 2,048 transform groups with 256 meshes', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const geometry = new THREE.PlaneGeometry(0.078, 0.078)
+  const materials = [
+    new THREE.MeshBasicMaterial({ color: 0xf25f5c }),
+    new THREE.MeshBasicMaterial({ color: 0x247ba0 }),
+    new THREE.MeshBasicMaterial({ color: 0xffe066 }),
+    new THREE.MeshBasicMaterial({ color: 0x70c1b3 }),
+  ]
+  let groupCount = 0
+  let meshCount = 0
+
+  for (let row = 0; row < NESTED_GRAPH_ROWS; row += 1) {
+    for (let col = 0; col < NESTED_GRAPH_COLUMNS; col += 1) {
+      const root = new THREE.Object3D()
+      root.position.set(
+        (col - (NESTED_GRAPH_COLUMNS - 1) / 2) * 0.13,
+        (row - (NESTED_GRAPH_ROWS - 1) / 2) * 0.13,
+        0,
+      )
+      scene.add(root)
+
+      let parent = root
+      groupCount += 1
+      for (let depth = 1; depth < NESTED_GRAPH_DEPTH; depth += 1) {
+        const group = new THREE.Object3D()
+        group.rotation.z = ((row + col + depth) % 5 - 2) * 0.006
+        parent.add(group)
+        parent = group
+        groupCount += 1
+      }
+
+      const mesh = new THREE.Mesh(geometry, materials[(row + col) % materials.length])
+      mesh.rotation.z = ((row * NESTED_GRAPH_COLUMNS + col) % 9) * 0.035
+      parent.add(mesh)
+      meshCount += 1
+    }
+  }
+
+  assert.equal(groupCount, NESTED_GRAPH_ROWS * NESTED_GRAPH_COLUMNS * NESTED_GRAPH_DEPTH)
+  assert.equal(meshCount, NESTED_GRAPH_ROWS * NESTED_GRAPH_COLUMNS)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.15, `nested scene graph should render broad visible coverage (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 25 && mean.g > 25 && mean.b > 20, `nested scene graph colors should survive traversal (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('instanced mesh budget renders 7,056 transformed colored instances', () => {

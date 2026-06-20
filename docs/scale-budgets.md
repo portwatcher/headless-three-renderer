@@ -9,6 +9,7 @@ target platform and GPU backend.
 | Area | Covered budget | Notes |
 |---|---:|---|
 | Mesh count | 1,936 meshes | `scale.test.mjs` renders a 44 x 44 grid of separate mesh objects with shared lightweight geometry and a small material set. |
+| Nested scene graph traversal | 2,048 transform groups and 256 meshes | A 16 x 16 grid renders visible meshes below eight-level `Object3D` transform chains to exercise hierarchy traversal and world-matrix propagation. |
 | Mixed mesh/texture/light scene | 144 meshes | A 12 x 12 grid of transformed box meshes renders with ten unique raw textures and supported punctual lights. |
 | Instanced mesh expansion | 7,056 instances | A single `InstancedMesh` renders an 84 x 84 grid with per-instance matrices and colors. |
 | Unique material textures | 225 maps | A texture-heavy scene renders a 15 x 15 grid where every plane has a unique `DataTexture`. |
@@ -35,7 +36,7 @@ published native packages:
 
 ## Interpreting The Numbers
 
-- The mesh, texture, and light budgets above are regression floors. Passing them means the supported scene breadth remains covered, not that production scenes must stay under those counts.
+- The mesh, hierarchy, texture, and light budgets above are regression floors. Passing them means the supported scene breadth remains covered, not that production scenes must stay under those counts.
 - The direct light limit is a real current renderer limit: more than 64 visible non-ambient lights fail clearly until native light arrays are expanded.
 - Texture memory depends on decoded image dimensions, not just texture count. The CI texture-heavy scenes and generated NodePerformanceTest-shaped glTF graph use tiny 4 x 4 raw and encoded textures to exercise many unique bindings, loader objects, and native image decode paths without creating a large memory benchmark; a separate 512 x 512 raw texture test covers a larger single decoded upload.
 - For production workloads, benchmark representative scenes on each target OS, CPU architecture, GPU backend, and output size. Track render time, peak RSS, and whether textures are encoded buffers or already-decoded RGBA data.
