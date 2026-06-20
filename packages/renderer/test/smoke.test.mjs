@@ -256,6 +256,60 @@ test('local glTF example renders a committed fixture from the repo root', async 
   }
 })
 
+test('local VRM example resolves optional Pixiv packages from the caller project', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'headless-three-vrm-example-'))
+  try {
+    const projectDir = path.join(dir, 'project')
+    const pixivDir = path.join(projectDir, 'node_modules', '@pixiv', 'three-vrm')
+    await mkdir(pixivDir, { recursive: true })
+    await writeFile(path.join(projectDir, 'package.json'), '{"type":"commonjs"}\n')
+    await writeFile(path.join(pixivDir, 'package.json'), '{"main":"index.cjs"}\n')
+    await writeFile(path.join(pixivDir, 'index.cjs'), `
+class VRMLoaderPlugin {
+  constructor(parser) {
+    this.parser = parser
+    this.name = 'FakeVRMLoaderPlugin'
+  }
+
+  afterRoot(gltf) {
+    gltf.userData = gltf.userData || {}
+    gltf.userData.vrm = {
+      scene: gltf.scene,
+      update() {},
+    }
+  }
+}
+
+const VRMUtils = {
+  removeUnnecessaryVertices() {},
+  removeUnnecessaryJoints() {},
+}
+
+module.exports = { VRMLoaderPlugin, VRMUtils }
+`)
+
+    const outputPath = path.join(dir, 'vrm-render.png')
+    const { stdout } = await execFileAsync(process.execPath, [
+      path.join(REPO_ROOT, 'examples', 'render-vrm.mjs'),
+      path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'fixtures', 'simple-triangle.gltf'),
+      outputPath,
+    ], {
+      cwd: projectDir,
+      env: {
+        ...process.env,
+        WIDTH: '64',
+        HEIGHT: '48',
+      },
+    })
+    assert.match(stdout, /Rendered .*simple-triangle\.gltf.* \(64x48\)/)
+
+    const image = await readFile(outputPath)
+    assertValidPng(image, { width: 64, height: 48 })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 test('VRM animation helper creates a clip, seeks the mixer, and updates the avatar', async () => {
   const calls = []
   const scene = { name: 'avatar-scene' }

@@ -222,7 +222,7 @@ Compatible with:
 - **@pixiv/three-vrm** — VRM humanoid avatars
 - **VRMA** — VRM Animation files via `VRMAnimationLoaderPlugin` + `createVRMAnimationClip`
 
-The repository includes runnable local examples for [glTF/GLB](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs) and [VRM/VRMA](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs) assets.
+The repository includes runnable local examples for [glTF/GLB](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs) and [VRM/VRMA](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs) assets. The VRM example resolves optional Pixiv packages from the current working project when they are not installed next to the example script.
 
 Use `applyVrmAnimation()` or your own `AnimationMixer`, then call `scene.updateMatrixWorld(true)` before `render()` to bake the current pose. `applyVrmAnimation()` accepts the glTF objects returned by the local VRM/VRMA helpers or direct `vrm`/`vrmAnimation` objects; it updates the avatar by default, and accepts `updateVrm: false` if your render pipeline performs that update separately.
 

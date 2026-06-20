@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import path from 'node:path'
 import {
   applyVrmAnimation,
   loadVrmAnimationFromFile,
@@ -22,8 +23,8 @@ const width = positiveInteger(process.env.WIDTH, 1024)
 const height = positiveInteger(process.env.HEIGHT, width)
 const animationTime = Number.isFinite(Number(process.env.TIME)) ? Number(process.env.TIME) : 1.5
 
+const THREE = await importThree()
 try {
-  const THREE = await importThree()
   const packages = await importVrmPackages(Boolean(animationPath))
   const modelGltf = await loadVrmFromFile(modelPath, {
     VRMLoaderPlugin: packages.VRMLoaderPlugin,
@@ -75,27 +76,46 @@ try {
 }
 
 async function importVrmPackages(needsAnimation) {
-  let vrmModule
-  try {
-    vrmModule = await import('@pixiv/three-vrm')
-  } catch {
-    throw new Error('Missing optional dependency @pixiv/three-vrm. Install it in your project before running this VRM example.')
-  }
+  const vrmModule = await importOptionalPackage(
+    '@pixiv/three-vrm',
+    'Missing optional dependency @pixiv/three-vrm. Install it in your project before running this VRM example.',
+  )
 
   if (!needsAnimation) return vrmModule
 
-  let animationModule
-  try {
-    animationModule = await import('@pixiv/three-vrm-animation')
-  } catch {
-    throw new Error('Missing optional dependency @pixiv/three-vrm-animation. Install it before rendering VRMA animation files.')
-  }
+  const animationModule = await importOptionalPackage(
+    '@pixiv/three-vrm-animation',
+    'Missing optional dependency @pixiv/three-vrm-animation. Install it before rendering VRMA animation files.',
+  )
 
   return {
     ...vrmModule,
     VRMAnimationLoaderPlugin: animationModule.VRMAnimationLoaderPlugin,
     createVRMAnimationClip: animationModule.createVRMAnimationClip,
   }
+}
+
+async function importOptionalPackage(specifier, missingMessage) {
+  try {
+    return normalizeModuleNamespace(await import(specifier))
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error
+  }
+
+  try {
+    const requireFromCaller = createRequire(path.join(process.cwd(), 'package.json'))
+    return normalizeModuleNamespace(await import(requireFromCaller.resolve(specifier)))
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND' && error?.code !== 'MODULE_NOT_FOUND') throw error
+    throw new Error(missingMessage)
+  }
+}
+
+function normalizeModuleNamespace(module) {
+  if (module?.default && typeof module.default === 'object') {
+    return { ...module.default, ...module }
+  }
+  return module
 }
 
 function addPortraitLights(scene) {

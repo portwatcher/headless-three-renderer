@@ -89,7 +89,10 @@ node examples/render-gltf.mjs ./model.gltf render.png
 ```
 
 For VRM avatars and optional VRMA animation clips, install the Pixiv loader
-packages in your project and use the VRM example:
+packages in your project and use the VRM example. The example first uses
+packages visible to the script, then falls back to resolving the optional Pixiv
+packages from the current working project's `node_modules` before reporting a
+missing dependency:
 
 ```bash
 pnpm add @pixiv/three-vrm @pixiv/three-vrm-animation
