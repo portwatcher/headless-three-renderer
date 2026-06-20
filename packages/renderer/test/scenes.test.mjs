@@ -15,6 +15,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass.js'
+import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
@@ -2619,6 +2620,48 @@ test('EffectComposer SSAARenderPass accumulates CopyShader samples into the acti
   assert.ok(mean.r > 200, `SSAARenderPass target should accumulate red CopyShader samples (${mean.r})`)
   assert.ok(mean.r > mean.b + 80, `SSAARenderPass target should preserve red scene output (${mean.r} vs ${mean.b})`)
   assert.ok(mean.a > 220, `SSAARenderPass target should accumulate alpha (${mean.a})`)
+})
+
+test('EffectComposer TAARenderPass accumulates low-opacity CopyShader samples into the active target', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+  camera.position.z = 2
+
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  const previousTarget = { texture: {} }
+  renderer.setRenderTarget(previousTarget)
+
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  const pass = new TAARenderPass(scene, camera)
+  pass.sampleLevel = 2
+  pass.accumulate = true
+  composer.addPass(pass)
+
+  for (let frame = 0; frame < 8; frame += 1) {
+    composer.render(0)
+  }
+
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+  assert.equal(camera.view?.enabled, false)
+  assert.equal(pass.accumulateIndex, 32)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > 200, `TAARenderPass target should accumulate red CopyShader samples (${mean.r})`)
+  assert.ok(mean.r > mean.b + 80, `TAARenderPass target should preserve red scene output (${mean.r} vs ${mean.b})`)
+  assert.ok(mean.a > 220, `TAARenderPass target should accumulate alpha (${mean.a})`)
 })
 
 test('CubeCamera.update works with Renderer render-target state', async () => {

@@ -37,7 +37,7 @@ import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPositio
 import { DEFAULT_BACKGROUND_COLOR, cssColorStringToArray, resolveBackground, validatedColorLikeToArray } from './color'
 import { createSceneExtractionCache, flattenScene, type SceneExtractionCache, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
-import { canvasLikeImageToRgba, extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial, type MaterialExtractionContext } from './materials'
+import { canvasLikeImageToRgba, extractBackgroundTexture, extractTextureData, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial, type MaterialExtractionContext } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
 import { clamp01, matrixElements } from './math'
@@ -5785,9 +5785,15 @@ function compositeActiveTargetColorBuffer(
   const rect = activeTargetRenderRect(options, width, height)
   if (rect.width <= 0 || rect.height <= 0) return existing
 
-  const copyShaderBlend = activeTargetCopyShaderAdditiveBlend(scene)
+  const copyShaderBlend = activeTargetCopyShaderAdditiveBlend(scene, width, height)
   if (copyShaderBlend) {
-    return additiveCompositeColorBuffer(existing, data, width, rect, copyShaderBlend.sourceScale)
+    return additiveCompositeColorBuffer(
+      existing,
+      copyShaderBlend.sourceData ?? data,
+      width,
+      rect,
+      copyShaderBlend.sourceScale,
+    )
   }
 
   if (rect.x === 0 && rect.y === 0 && rect.width === width && rect.height === height) return data
@@ -5801,7 +5807,11 @@ function compositeActiveTargetColorBuffer(
   return output
 }
 
-function activeTargetCopyShaderAdditiveBlend(scene: ThreeSceneRootLike | undefined): { sourceScale: number } | null {
+function activeTargetCopyShaderAdditiveBlend(
+  scene: ThreeSceneRootLike | undefined,
+  width: number,
+  height: number,
+): { sourceScale: number; sourceData?: Buffer } | null {
   if (!scene || scene.isMesh !== true || Array.isArray(scene.material)) return null
   if (Array.isArray(scene.children) && scene.children.length > 0) return null
 
@@ -5812,6 +5822,13 @@ function activeTargetCopyShaderAdditiveBlend(scene: ThreeSceneRootLike | undefin
   const opacity = typeof copyShader.opacity === 'number' && Number.isFinite(copyShader.opacity)
     ? Math.max(0, copyShader.opacity)
     : 1
+  if (material?.premultipliedAlpha === true) {
+    const source = extractTextureData(material)
+    if (source && source.width === width && source.height === height) {
+      return { sourceScale: opacity, sourceData: source.data }
+    }
+  }
+
   const sourceScale = material?.premultipliedAlpha === true && opacity > 0
     ? 1 / opacity
     : 1
