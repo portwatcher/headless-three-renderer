@@ -32828,6 +32828,22 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
     () => renderer.renderObject(),
     /Renderer\.renderObject\(\) is not supported.*render-object dispatch.*Renderer\.render\(\) or renderToTarget\(\)/i,
   )
+  for (const method of [
+    '_getFrameBufferTarget',
+    '_renderScene',
+    '_projectObject',
+    '_renderBundles',
+    '_renderBundle',
+    '_renderTransparents',
+    '_renderObjects',
+    '_renderObjectDirect',
+    '_createObjectPipeline',
+  ]) {
+    assert.throws(
+      () => renderer[method](),
+      new RegExp(`Renderer\\.${method}\\(\\) is not supported.*CommonRenderer internal render pipeline dispatch.*Renderer\\.render\\(\\) or renderToTarget\\(\\)`, 'i'),
+    )
+  }
   assert.throws(
     () => renderer.setMRT({ output: 'color' }),
     /Renderer\.setMRT\(\) is not supported.*arbitrary native MRT shader outputs.*userData\.headlessThreeRenderer\.renderMode/i,

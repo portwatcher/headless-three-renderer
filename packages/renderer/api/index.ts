@@ -1783,6 +1783,42 @@ export class Renderer {
     )
   }
 
+  _getFrameBufferTarget(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._getFrameBufferTarget')
+  }
+
+  _renderScene(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderScene')
+  }
+
+  _projectObject(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._projectObject')
+  }
+
+  _renderBundles(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderBundles')
+  }
+
+  _renderBundle(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderBundle')
+  }
+
+  _renderTransparents(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderTransparents')
+  }
+
+  _renderObjects(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderObjects')
+  }
+
+  _renderObjectDirect(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderObjectDirect')
+  }
+
+  _createObjectPipeline(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._createObjectPipeline')
+  }
+
   compute(computeNodes: unknown, dispatchSize: unknown = null): never {
     assertComputeNodesLike(computeNodes, 'Renderer.compute computeNodes')
     assertComputeDispatchSize(dispatchSize, 'Renderer.compute dispatchSize')
@@ -4921,6 +4957,12 @@ function assertTextureBindingSlot(value: unknown, label: string): asserts value 
 function unsupportedTextureBindingError(method: string): Error {
   return new Error(
     `${method}() is not supported by @headless-three/renderer because it does not expose browser WebGL texture units or direct texture binding. Use material, background, environment, or render-target texture inputs instead.`,
+  )
+}
+
+function unsupportedInternalRenderDispatchError(method: string): Error {
+  return new Error(
+    `${method}() is not supported by @headless-three/renderer because CommonRenderer internal render pipeline dispatch depends on backend render contexts, render lists, nodes, pipelines, and bindings that are outside the scene-oriented API. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().`,
   )
 }
 
