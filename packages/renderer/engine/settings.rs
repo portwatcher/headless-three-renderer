@@ -268,7 +268,7 @@ impl RenderSettings {
 
             let fog = FogSettings::from_scene(scene, background)?;
             let shadow = resolve_shadow_maps(scene)?;
-            let post_processing = PostProcessingSettings::from_scene(scene);
+            let post_processing = PostProcessingSettings::from_scene(scene)?;
 
             Ok(Self {
                 width,
@@ -535,13 +535,37 @@ impl FogSettings {
 }
 
 impl PostProcessingSettings {
-    fn from_scene(scene: &RenderScene) -> Self {
-        let exposure = scene.post_exposure.unwrap_or(0.0).clamp(-16.0, 16.0) as f32;
-        let contrast = scene.post_contrast.unwrap_or(1.0).clamp(0.0, 8.0) as f32;
-        let saturation = scene.post_saturation.unwrap_or(1.0).clamp(0.0, 8.0) as f32;
-        let vignette = scene.post_vignette.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
-        let grayscale = scene.post_grayscale.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
-        let invert = scene.post_invert.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+    fn from_scene(scene: &RenderScene) -> Result<Self> {
+        let exposure = finite_f32(
+            scene.post_exposure.unwrap_or(0.0),
+            "scene.postProcessing.exposure",
+        )?
+        .clamp(-16.0, 16.0);
+        let contrast = finite_f32(
+            scene.post_contrast.unwrap_or(1.0),
+            "scene.postProcessing.contrast",
+        )?
+        .clamp(0.0, 8.0);
+        let saturation = finite_f32(
+            scene.post_saturation.unwrap_or(1.0),
+            "scene.postProcessing.saturation",
+        )?
+        .clamp(0.0, 8.0);
+        let vignette = finite_f32(
+            scene.post_vignette.unwrap_or(0.0),
+            "scene.postProcessing.vignette",
+        )?
+        .clamp(0.0, 1.0);
+        let grayscale = finite_f32(
+            scene.post_grayscale.unwrap_or(0.0),
+            "scene.postProcessing.grayscale",
+        )?
+        .clamp(0.0, 1.0);
+        let invert = finite_f32(
+            scene.post_invert.unwrap_or(0.0),
+            "scene.postProcessing.invert",
+        )?
+        .clamp(0.0, 1.0);
         let active = exposure.abs() > 0.0001
             || (contrast - 1.0).abs() > 0.0001
             || (saturation - 1.0).abs() > 0.0001
@@ -549,7 +573,7 @@ impl PostProcessingSettings {
             || grayscale > 0.0001
             || invert > 0.0001;
 
-        Self {
+        Ok(Self {
             active,
             exposure,
             contrast,
@@ -557,7 +581,7 @@ impl PostProcessingSettings {
             vignette,
             grayscale,
             invert,
-        }
+        })
     }
 }
 

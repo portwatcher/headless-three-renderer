@@ -120,6 +120,13 @@ mod tests {
         }
     }
 
+    fn render_limits() -> wgpu::Limits {
+        wgpu::Limits {
+            max_texture_dimension_2d: 8192,
+            ..wgpu::Limits::default()
+        }
+    }
+
     #[test]
     fn empty_scene_prepares_no_meshes() {
         let scene = RenderScene::default();
@@ -446,10 +453,52 @@ mod tests {
         ];
 
         let camera = Camera::default();
-        let limits = wgpu::Limits {
-            max_texture_dimension_2d: 8192,
-            ..wgpu::Limits::default()
-        };
+        let limits = render_limits();
+
+        for (label, mutate) in cases {
+            let mut scene = RenderScene::default();
+            mutate(&mut scene);
+            let error = match RenderSettings::from_scene(&scene, &camera, limits.clone()) {
+                Ok(_) => panic!("{label} should fail"),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains("must contain finite f32-compatible numbers"),
+                "{label} should fail with a finite scalar error, got: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_non_finite_post_processing_inputs() {
+        let cases: Vec<(&str, Box<dyn Fn(&mut RenderScene)>)> = vec![
+            (
+                "exposure",
+                Box::new(|scene| scene.post_exposure = Some(f64::NAN)),
+            ),
+            (
+                "contrast",
+                Box::new(|scene| scene.post_contrast = Some(f64::INFINITY)),
+            ),
+            (
+                "saturation",
+                Box::new(|scene| scene.post_saturation = Some(f64::NEG_INFINITY)),
+            ),
+            (
+                "vignette",
+                Box::new(|scene| scene.post_vignette = Some(f64::NAN)),
+            ),
+            (
+                "grayscale",
+                Box::new(|scene| scene.post_grayscale = Some(f64::INFINITY)),
+            ),
+            (
+                "invert",
+                Box::new(|scene| scene.post_invert = Some(f64::NEG_INFINITY)),
+            ),
+        ];
+        let camera = Camera::default();
+        let limits = render_limits();
 
         for (label, mutate) in cases {
             let mut scene = RenderScene::default();
