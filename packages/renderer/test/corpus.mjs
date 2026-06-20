@@ -1150,7 +1150,6 @@ function spriteAlphaMapCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 41],
     minNonBackgroundRatio: 0.04,
-    browserReference: false,
     validate(rgba, { width }) {
       const cutout = meanRegion(rgba, width, 20, 34, 40, 62)
       const visible = meanRegion(rgba, width, 56, 34, 76, 62)
