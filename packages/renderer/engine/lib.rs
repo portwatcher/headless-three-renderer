@@ -99,9 +99,26 @@ fn to_napi_error(error: anyhow::Error) -> napi::Error {
 
 #[cfg(test)]
 mod tests {
+    use super::lights::prepare_lights;
     use super::mesh::{decode_texture, prepare_meshes};
     use super::renderer::GpuRenderer;
+    use super::settings::RenderSettings;
     use super::types::{Camera, RenderScene, SceneLight, SceneMesh};
+
+    fn scene_with_light(light: SceneLight) -> RenderScene {
+        RenderScene {
+            lights: Some(vec![light]),
+            ..RenderScene::default()
+        }
+    }
+
+    fn directional_shadow_light() -> SceneLight {
+        SceneLight {
+            light_type: "directional".into(),
+            cast_shadow: Some(true),
+            ..SceneLight::default()
+        }
+    }
 
     #[test]
     fn empty_scene_prepares_no_meshes() {
@@ -281,6 +298,163 @@ mod tests {
                 ..RenderScene::default()
             };
             let error = match prepare_meshes(&scene) {
+                Ok(_) => panic!("{label} should fail"),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains("must contain finite f32-compatible numbers"),
+                "{label} should fail with a finite scalar error, got: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_non_finite_light_scalar_inputs() {
+        let cases: Vec<(&str, &str, Box<dyn Fn(&mut SceneLight)>)> = vec![
+            (
+                "intensity",
+                "directional",
+                Box::new(|light| light.intensity = Some(f64::NAN)),
+            ),
+            (
+                "distance",
+                "point",
+                Box::new(|light| light.distance = Some(f64::INFINITY)),
+            ),
+            (
+                "decay",
+                "point",
+                Box::new(|light| light.decay = Some(f64::NEG_INFINITY)),
+            ),
+            (
+                "angle",
+                "spot",
+                Box::new(|light| light.angle = Some(f64::NAN)),
+            ),
+            (
+                "penumbra",
+                "spot",
+                Box::new(|light| light.penumbra = Some(f64::INFINITY)),
+            ),
+            (
+                "width",
+                "rectArea",
+                Box::new(|light| light.width = Some(f64::NAN)),
+            ),
+            (
+                "height",
+                "rectArea",
+                Box::new(|light| light.height = Some(f64::NEG_INFINITY)),
+            ),
+        ];
+
+        for (label, light_type, mutate) in cases {
+            let mut light = SceneLight {
+                light_type: light_type.into(),
+                ..SceneLight::default()
+            };
+            mutate(&mut light);
+            let scene = scene_with_light(light);
+            let error = match prepare_lights(&scene) {
+                Ok(_) => panic!("{label} should fail"),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains("must contain finite f32-compatible numbers"),
+                "{label} should fail with a finite scalar error, got: {error}",
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_non_finite_light_settings_inputs() {
+        let valid_cascade_bounds = || {
+            vec![
+                -5.0, 5.0, 5.0, -5.0, 0.1, 10.0, -4.0, 4.0, 4.0, -4.0, 0.2, 20.0,
+            ]
+        };
+        let cases: Vec<(&str, Box<dyn Fn(&mut RenderScene)>)> = vec![
+            (
+                "ambientIntensity",
+                Box::new(|scene| scene.ambient_intensity = Some(f64::NAN)),
+            ),
+            (
+                "environmentIntensity",
+                Box::new(|scene| scene.environment_map_intensity = Some(f64::INFINITY)),
+            ),
+            (
+                "shadow.camera.near",
+                Box::new(|scene| {
+                    let mut light = directional_shadow_light();
+                    light.shadow_camera_near = Some(f64::NAN);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+            (
+                "shadow.camera.far",
+                Box::new(|scene| {
+                    let mut light = directional_shadow_light();
+                    light.shadow_camera_far = Some(f64::INFINITY);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+            (
+                "shadow.camera.left",
+                Box::new(|scene| {
+                    let mut light = directional_shadow_light();
+                    light.shadow_camera_left = Some(f64::NEG_INFINITY);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+            (
+                "shadow.bias",
+                Box::new(|scene| {
+                    let mut light = directional_shadow_light();
+                    light.shadow_bias = Some(f64::NAN);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+            (
+                "shadow.normalBias",
+                Box::new(|scene| {
+                    let mut light = directional_shadow_light();
+                    light.shadow_normal_bias = Some(f64::INFINITY);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+            (
+                "shadow.cascades",
+                Box::new(move |scene| {
+                    let mut light = directional_shadow_light();
+                    let mut bounds = valid_cascade_bounds();
+                    bounds[11] = f64::NAN;
+                    light.shadow_cascade_bounds = Some(bounds);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+            (
+                "shadow.cascadeSplits",
+                Box::new(|scene| {
+                    let mut light = directional_shadow_light();
+                    light.shadow_cascade_bounds = Some(vec![
+                        -5.0, 5.0, 5.0, -5.0, 0.1, 10.0, -4.0, 4.0, 4.0, -4.0, 0.2, 20.0,
+                    ]);
+                    light.shadow_cascade_splits = Some(vec![f64::INFINITY]);
+                    scene.lights = Some(vec![light]);
+                }),
+            ),
+        ];
+
+        let camera = Camera::default();
+        let limits = wgpu::Limits {
+            max_texture_dimension_2d: 8192,
+            ..wgpu::Limits::default()
+        };
+
+        for (label, mutate) in cases {
+            let mut scene = RenderScene::default();
+            mutate(&mut scene);
+            let error = match RenderSettings::from_scene(&scene, &camera, limits.clone()) {
                 Ok(_) => panic!("{label} should fail"),
                 Err(error) => error.to_string(),
             };

@@ -255,10 +255,16 @@ impl RenderSettings {
                 [1.0, 1.0, 1.0, 1.0],
                 "scene.ambientLight",
             )?;
-            let ambient_intensity = scene.ambient_intensity.unwrap_or(0.0) as f32;
+            let ambient_intensity = finite_f32(
+                scene.ambient_intensity.unwrap_or(0.0),
+                "scene.ambientIntensity",
+            )?;
             let (light_probe, has_light_probe) = parse_light_probe(scene.light_probe.as_deref())?;
             let ibl = join_prepare_worker(ibl_handle, "environment map worker")?;
-            let env_intensity = scene.environment_map_intensity.unwrap_or(1.0) as f32;
+            let env_intensity = finite_f32(
+                scene.environment_map_intensity.unwrap_or(1.0),
+                "scene.environmentIntensity",
+            )?;
 
             let fog = FogSettings::from_scene(scene, background)?;
             let shadow = resolve_shadow_maps(scene)?;
@@ -757,14 +763,21 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
             Vec3::new(0.0, -1.0, 0.0)
         };
 
-        let near = light.shadow_camera_near.unwrap_or(0.5) as f32;
+        let near = finite_f32(
+            light.shadow_camera_near.unwrap_or(0.5),
+            &format!("{prefix}.shadow.camera.near"),
+        )?;
         let default_far = if light_type == "point" {
-            let distance = light.distance.unwrap_or(0.0);
+            let distance =
+                finite_f32(light.distance.unwrap_or(0.0), &format!("{prefix}.distance"))?;
             if distance > 0.0 { distance } else { 500.0 }
         } else {
             500.0
         };
-        let far = light.shadow_camera_far.unwrap_or(default_far) as f32;
+        let far = match light.shadow_camera_far {
+            Some(value) => finite_f32(value, &format!("{prefix}.shadow.camera.far"))?,
+            None => default_far,
+        };
         if far <= near {
             bail!("{prefix}.shadow.camera has invalid near/far bounds");
         }
@@ -793,10 +806,11 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
             // up vector that is not collinear with `dir`.
             let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
             let view = Mat4::look_at_rh(pos, pos + dir, up);
-            let angle = light
-                .angle
-                .unwrap_or(std::f64::consts::FRAC_PI_3)
-                .clamp(0.001, std::f64::consts::FRAC_PI_2) as f32;
+            let angle = finite_f32(
+                light.angle.unwrap_or(std::f64::consts::FRAC_PI_3),
+                &format!("{prefix}.angle"),
+            )?
+            .clamp(0.001, std::f32::consts::FRAC_PI_2);
             let aspect = map_width as f32 / map_height as f32;
             let proj = Mat4::perspective_rh(
                 (angle * 2.0).min(std::f32::consts::PI - 0.001),
@@ -816,12 +830,30 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
                 if cascade_count >= 2 {
                     for cascade in 0..cascade_count {
                         let base = cascade * 6;
-                        let left = bounds[base] as f32;
-                        let right = bounds[base + 1] as f32;
-                        let top = bounds[base + 2] as f32;
-                        let bottom = bounds[base + 3] as f32;
-                        let cascade_near = bounds[base + 4] as f32;
-                        let cascade_far = bounds[base + 5] as f32;
+                        let left = finite_f32(
+                            bounds[base],
+                            &format!("{prefix}.shadow.cascades[{cascade}].left"),
+                        )?;
+                        let right = finite_f32(
+                            bounds[base + 1],
+                            &format!("{prefix}.shadow.cascades[{cascade}].right"),
+                        )?;
+                        let top = finite_f32(
+                            bounds[base + 2],
+                            &format!("{prefix}.shadow.cascades[{cascade}].top"),
+                        )?;
+                        let bottom = finite_f32(
+                            bounds[base + 3],
+                            &format!("{prefix}.shadow.cascades[{cascade}].bottom"),
+                        )?;
+                        let cascade_near = finite_f32(
+                            bounds[base + 4],
+                            &format!("{prefix}.shadow.cascades[{cascade}].near"),
+                        )?;
+                        let cascade_far = finite_f32(
+                            bounds[base + 5],
+                            &format!("{prefix}.shadow.cascades[{cascade}].far"),
+                        )?;
                         if right <= left || top <= bottom || cascade_far <= cascade_near {
                             bail!("{prefix}.shadow.cascades[{cascade}] has invalid bounds");
                         }
@@ -836,17 +868,18 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
                     }
                     if let Some(splits) = light.shadow_cascade_splits.as_deref() {
                         for (slot, value) in splits.iter().take(cascade_count - 1).enumerate() {
-                            cascade_splits[slot] = (*value as f32).max(0.0);
+                            cascade_splits[slot] = finite_f32(
+                                *value,
+                                &format!("{prefix}.shadow.cascadeSplits[{slot}]"),
+                            )?
+                            .max(0.0);
                         }
                     }
                     layer_count = cascade_count as u32;
                     ShadowKind::Cascaded
                 } else {
                     // Orthographic bounds (three.js DirectionalLightShadow defaults: ±5).
-                    let left = light.shadow_camera_left.unwrap_or(-5.0) as f32;
-                    let right = light.shadow_camera_right.unwrap_or(5.0) as f32;
-                    let top = light.shadow_camera_top.unwrap_or(5.0) as f32;
-                    let bottom = light.shadow_camera_bottom.unwrap_or(-5.0) as f32;
+                    let (left, right, top, bottom) = shadow_camera_bounds(light, &prefix)?;
                     if right <= left || top <= bottom {
                         bail!("{prefix}.shadow.camera has invalid orthographic bounds");
                     }
@@ -856,10 +889,7 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
                 }
             } else {
                 // Orthographic bounds (three.js DirectionalLightShadow defaults: ±5).
-                let left = light.shadow_camera_left.unwrap_or(-5.0) as f32;
-                let right = light.shadow_camera_right.unwrap_or(5.0) as f32;
-                let top = light.shadow_camera_top.unwrap_or(5.0) as f32;
-                let bottom = light.shadow_camera_bottom.unwrap_or(-5.0) as f32;
+                let (left, right, top, bottom) = shadow_camera_bounds(light, &prefix)?;
                 if right <= left || top <= bottom {
                     bail!("{prefix}.shadow.camera has invalid orthographic bounds");
                 }
@@ -868,8 +898,14 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
             }
         };
 
-        let bias = light.shadow_bias.unwrap_or(0.0) as f32;
-        let normal_bias = light.shadow_normal_bias.unwrap_or(0.0) as f32;
+        let bias = finite_f32(
+            light.shadow_bias.unwrap_or(0.0),
+            &format!("{prefix}.shadow.bias"),
+        )?;
+        let normal_bias = finite_f32(
+            light.shadow_normal_bias.unwrap_or(0.0),
+            &format!("{prefix}.shadow.normalBias"),
+        )?;
         let radius = shadow_radius(light, &prefix)?;
 
         let requested_layers = total_layers + layer_count;
@@ -912,6 +948,30 @@ fn shadow_radius(light: &crate::types::SceneLight, prefix: &str) -> Result<f32> 
         &format!("{prefix}.shadow.radius"),
     )?
     .max(0.0))
+}
+
+fn shadow_camera_bounds(
+    light: &crate::types::SceneLight,
+    prefix: &str,
+) -> Result<(f32, f32, f32, f32)> {
+    Ok((
+        finite_f32(
+            light.shadow_camera_left.unwrap_or(-5.0),
+            &format!("{prefix}.shadow.camera.left"),
+        )?,
+        finite_f32(
+            light.shadow_camera_right.unwrap_or(5.0),
+            &format!("{prefix}.shadow.camera.right"),
+        )?,
+        finite_f32(
+            light.shadow_camera_top.unwrap_or(5.0),
+            &format!("{prefix}.shadow.camera.top"),
+        )?,
+        finite_f32(
+            light.shadow_camera_bottom.unwrap_or(-5.0),
+            &format!("{prefix}.shadow.camera.bottom"),
+        )?,
+    ))
 }
 
 fn shadow_map_dimensions(

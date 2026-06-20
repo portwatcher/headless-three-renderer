@@ -2,7 +2,7 @@ use anyhow::{Result, bail};
 use bytemuck::{Pod, Zeroable};
 
 use crate::types::RenderScene;
-use crate::util::{parse_color, parse_vec3};
+use crate::util::{finite_f32, parse_color, parse_vec3};
 
 pub const MAX_LIGHTS: usize = 64;
 
@@ -41,10 +41,20 @@ pub fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
             [1.0, 1.0, 1.0, 1.0],
             &format!("scene.lights[{i}].color"),
         )?;
-        let intensity = light.intensity.unwrap_or(1.0) as f32;
+        let intensity = finite_f32(
+            light.intensity.unwrap_or(1.0),
+            &format!("scene.lights[{i}].intensity"),
+        )?;
 
-        let distance = light.distance.unwrap_or(0.0).max(0.0) as f32;
-        let decay = light.decay.unwrap_or(2.0) as f32;
+        let distance = finite_f32(
+            light.distance.unwrap_or(0.0),
+            &format!("scene.lights[{i}].distance"),
+        )?
+        .max(0.0);
+        let decay = finite_f32(
+            light.decay.unwrap_or(2.0),
+            &format!("scene.lights[{i}].decay"),
+        )?;
 
         let position = if light_type == 3 {
             // Hemisphere: pack ground color into position.xyz
@@ -77,18 +87,31 @@ pub fn prepare_lights(scene: &RenderScene) -> Result<Vec<GpuLight>> {
 
         // Spot light cone parameters
         let params = if light_type == 2 {
-            let angle = light
-                .angle
-                .unwrap_or(std::f64::consts::FRAC_PI_3)
-                .clamp(0.0, std::f64::consts::FRAC_PI_2) as f32;
-            let penumbra = light.penumbra.unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+            let angle = finite_f32(
+                light.angle.unwrap_or(std::f64::consts::FRAC_PI_3),
+                &format!("scene.lights[{i}].angle"),
+            )?
+            .clamp(0.0, std::f32::consts::FRAC_PI_2);
+            let penumbra = finite_f32(
+                light.penumbra.unwrap_or(0.0),
+                &format!("scene.lights[{i}].penumbra"),
+            )?
+            .clamp(0.0, 1.0);
             let cos_outer = angle.cos();
             let cos_inner = (angle * (1.0 - penumbra)).cos();
             [cos_outer, cos_inner, 0.0, 0.0]
         } else if light_type == 4 {
             [
-                light.width.unwrap_or(10.0).max(0.0) as f32,
-                light.height.unwrap_or(10.0).max(0.0) as f32,
+                finite_f32(
+                    light.width.unwrap_or(10.0),
+                    &format!("scene.lights[{i}].width"),
+                )?
+                .max(0.0),
+                finite_f32(
+                    light.height.unwrap_or(10.0),
+                    &format!("scene.lights[{i}].height"),
+                )?
+                .max(0.0),
                 0.0,
                 0.0,
             ]
