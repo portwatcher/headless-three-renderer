@@ -440,6 +440,73 @@ test('instanced mesh budget renders 7,056 transformed colored instances', () => 
   assert.ok(mean.r > 40 && mean.g > 40 && mean.b > 40, `instanced colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('InstancedBufferGeometry budget renders 4,096 mapped colored mesh instances', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 64
+  const count = columns * rows
+  const base = new THREE.PlaneGeometry(0.026, 0.026)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setIndex(base.index)
+
+  const offsets = new Float32Array(count * 3)
+  const scales = new Float32Array(count)
+  const colors = new Float32Array(count * 3)
+  const normals = new Float32Array(count * 3)
+  const uvs = new Float32Array(count * 2)
+  for (let index = 0; index < count; index += 1) {
+    const col = index % columns
+    const row = Math.floor(index / columns)
+    offsets[index * 3] = (col / (columns - 1) - 0.5) * 1.9
+    offsets[index * 3 + 1] = (row / (rows - 1) - 0.5) * 1.9
+    offsets[index * 3 + 2] = Math.sin(col * 0.19 + row * 0.13) * 0.01
+    scales[index] = 0.75 + 0.5 * ((col + row) % 5) / 4
+    colors[index * 3] = 0.25 + 0.75 * (col / (columns - 1))
+    colors[index * 3 + 1] = 0.25 + 0.75 * (row / (rows - 1))
+    colors[index * 3 + 2] = 0.35 + 0.65 * ((col + row) / (columns + rows - 2))
+    normals[index * 3] = 0
+    normals[index * 3 + 1] = 0
+    normals[index * 3 + 2] = 1
+    uvs[index * 2] = col < columns / 2 ? 0.25 : 0.75
+    uvs[index * 2 + 1] = row < rows / 2 ? 0.25 : 0.75
+  }
+
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(offsets, 3))
+  geometry.setAttribute('instanceScale', new THREE.InstancedBufferAttribute(scales, 1))
+  geometry.setAttribute('color', new THREE.InstancedBufferAttribute(colors, 3))
+  geometry.setAttribute('normal', new THREE.InstancedBufferAttribute(normals, 3))
+  geometry.setAttribute('uv', new THREE.InstancedBufferAttribute(uvs, 2))
+
+  const textureData = new Uint8Array([
+    255, 255, 255, 255,
+    96, 180, 255, 255,
+    255, 160, 96, 255,
+    180, 255, 160, 255,
+  ])
+  const texture = new THREE.DataTexture(textureData, 2, 2, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+
+  scene.add(new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, map: texture }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1.1, 1.1, 1.1, -1.1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.35, `InstancedBufferGeometry scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `InstancedBufferGeometry mapped colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('BatchedMesh budget renders 2,048 packed colored instances', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
