@@ -70,6 +70,20 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "cube-background-texture-rotation.png",
+      "name": "cube-background-texture-rotation",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "cube-background-option-rotation.png",
+      "name": "cube-background-option-rotation",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "packed-cubeuv-background-texture.png",
       "name": "packed-cubeuv-background-texture",
       "width": 96,

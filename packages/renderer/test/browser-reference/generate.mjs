@@ -90,12 +90,14 @@ function renderFixture(fixture) {
 
   let restoreRendererOptions = () => {}
   let restoreSceneOptions = () => {}
+  let restoreTextureInputs = () => {}
   let restoreRenderMode = () => {}
   let restoreDistanceMaterials = () => {}
   let dataUrl
   try {
     restoreRendererOptions = applyFixtureRendererOptions(fixture)
     restoreSceneOptions = applyFixtureSceneOptions(fixture)
+    restoreTextureInputs = applyFixtureTextureInputs(fixture)
     restoreRenderMode = applyFixtureRenderMode(fixture)
     clearFullCanvas(fixture.scene, width, height)
     applyFixtureRenderRectangles(fixture, width, height)
@@ -107,6 +109,7 @@ function renderFixture(fixture) {
   } finally {
     restoreDistanceMaterials()
     restoreRenderMode()
+    restoreTextureInputs()
     restoreSceneOptions()
     restoreRendererOptions()
   }
@@ -260,6 +263,93 @@ function applyFixtureSceneOptions(fixture) {
     fixture.scene.environmentIntensity = previous.environmentIntensity
     fixture.scene.environmentRotation = previous.environmentRotation
   }
+}
+
+function applyFixtureTextureInputs(fixture) {
+  const textures = collectFixtureTextures(fixture)
+  const replacements = []
+
+  for (const texture of textures) {
+    if (texture?.isCubeTexture !== true || !Array.isArray(texture.image)) continue
+    const convertedFaces = texture.image.map((image) => imageDataFromRawRgba(image))
+    if (convertedFaces.some((image) => image == null)) continue
+    replacements.push({
+      texture,
+      previousImage: texture.image,
+      previousImages: texture.images,
+    })
+    texture.image = convertedFaces
+    texture.images = convertedFaces
+    texture.needsUpdate = true
+  }
+
+  return () => {
+    for (const replacement of replacements) {
+      replacement.texture.image = replacement.previousImage
+      replacement.texture.images = replacement.previousImages
+      replacement.texture.needsUpdate = true
+    }
+  }
+}
+
+function collectFixtureTextures(fixture) {
+  const textures = new Set()
+  collectTexture(fixture.scene?.background, textures)
+  collectTexture(fixture.scene?.environment, textures)
+  fixture.scene?.traverse((object) => collectMaterialTextures(object.material, textures))
+  return textures
+}
+
+function collectMaterialTextures(material, textures) {
+  if (Array.isArray(material)) {
+    for (const entry of material) collectMaterialTextures(entry, textures)
+    return
+  }
+  if (!material || typeof material !== 'object') return
+  for (const key of [
+    'map',
+    'alphaMap',
+    'aoMap',
+    'bumpMap',
+    'clearcoatMap',
+    'clearcoatNormalMap',
+    'clearcoatRoughnessMap',
+    'displacementMap',
+    'emissiveMap',
+    'envMap',
+    'gradientMap',
+    'iridescenceMap',
+    'iridescenceThicknessMap',
+    'lightMap',
+    'matcap',
+    'metalnessMap',
+    'normalMap',
+    'roughnessMap',
+    'sheenColorMap',
+    'sheenRoughnessMap',
+    'specularColorMap',
+    'specularIntensityMap',
+    'specularMap',
+    'thicknessMap',
+    'transmissionMap',
+  ]) {
+    collectTexture(material[key], textures)
+  }
+}
+
+function collectTexture(value, textures) {
+  if (value?.isTexture === true) textures.add(value)
+}
+
+function imageDataFromRawRgba(image) {
+  if (!image || typeof image !== 'object') return null
+  const { data, width, height } = image
+  if (!data || typeof width !== 'number' || typeof height !== 'number') return null
+  if (width <= 0 || height <= 0 || data.length !== width * height * 4) return null
+  const clamped = data instanceof Uint8ClampedArray
+    ? data
+    : new Uint8ClampedArray(data)
+  return new ImageData(clamped, width, height)
 }
 
 function applyFixtureRenderMode(fixture) {

@@ -3266,7 +3266,6 @@ function cubeBackgroundTextureCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
-    browserReference: false,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
@@ -3295,7 +3294,6 @@ function cubeBackgroundOptionRotationCorpus() {
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
-    browserReference: false,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
