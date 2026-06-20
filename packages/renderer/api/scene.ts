@@ -128,6 +128,7 @@ interface TextureUvStreams {
 
 export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
+  instancedMeshes: WeakMap<ThreeObject3DLike, CachedInstancedMeshInstances>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
   texturePayloads: TextureExtractionCache
@@ -142,6 +143,11 @@ export interface SceneExtractionCache {
 interface CachedMeshGeometryExtraction {
   signature: MeshGeometrySignature
   extraction: MeshGeometryExtraction
+}
+
+interface CachedInstancedMeshInstances {
+  signature: InstancedMeshSignature
+  localInstances: MeshInstance[]
 }
 
 interface CachedBatchedGeometryView {
@@ -292,6 +298,13 @@ interface MeshGeometrySignature {
   instancedAttributes: Array<{ name: string; signature: AttributeSignature }>
 }
 
+interface InstancedMeshSignature {
+  cacheable: boolean
+  count: number
+  instanceMatrix: AttributeSignature
+  instanceColor: AttributeSignature
+}
+
 interface AttributeSignature {
   ref?: ThreeBufferAttributeLike
   version?: number
@@ -351,6 +364,7 @@ const MAX_POINT_SPRITE_SIZE = 64
 export function createSceneExtractionCache(): SceneExtractionCache {
   return {
     meshGeometry: new WeakMap(),
+    instancedMeshes: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
     texturePayloads: new WeakMap(),
@@ -549,7 +563,7 @@ function appendMesh(
     : isSkinned
       ? IDENTITY_4X4.slice()
       : matrixElements(object.matrixWorld!, 'mesh.matrixWorld')
-  const instances = instanceOverride ?? meshInstances(object, meshTransform)
+  const instances = instanceOverride ?? meshInstances(object, meshTransform, cache)
   if (instances.length === 0) return
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
@@ -4666,7 +4680,11 @@ function vertexDistance(positions: number[], a: number, b: number): number {
   return Math.sqrt(dx * dx + dy * dy + dz * dz)
 }
 
-function meshInstances(object: ThreeObject3DLike, baseTransform: number[]): MeshInstance[] {
+function meshInstances(
+  object: ThreeObject3DLike,
+  baseTransform: number[],
+  cache?: SceneExtractionCache,
+): MeshInstance[] {
   if (object.isInstancedMesh !== true) {
     return [{ transform: baseTransform }]
   }
@@ -4674,16 +4692,66 @@ function meshInstances(object: ThreeObject3DLike, baseTransform: number[]): Mesh
   const instanceMatrix = object.instanceMatrix
   if (!instanceMatrix || instanceMatrix.count == null) return []
   const instanceMatrixCount = attributeCount(instanceMatrix, 'InstancedMesh.instanceMatrix')
-
   const count = clampInteger(
     integerCountOrDefault(object.count, 'InstancedMesh.count', instanceMatrixCount),
     0,
     instanceMatrixCount,
   )
+  const signature = instancedMeshSignature(object, instanceMatrix, count)
+  let localInstances: MeshInstance[] | undefined
+
+  if (cache && signature.cacheable) {
+    const cached = cache.instancedMeshes.get(object)
+    if (cached && sameInstancedMeshSignature(cached.signature, signature)) {
+      localInstances = cached.localInstances
+    }
+  }
+
+  if (!localInstances) {
+    localInstances = readLocalInstancedMeshInstances(object, instanceMatrix, count)
+    if (cache && signature.cacheable) {
+      cache.instancedMeshes.set(object, { signature, localInstances })
+    }
+  }
+
+  return localInstances.map((instance) => ({
+    transform: multiplyMat4(baseTransform, instance.transform),
+    color: instance.color,
+  }))
+}
+
+function instancedMeshSignature(
+  object: ThreeObject3DLike,
+  instanceMatrix: NonNullable<ThreeObject3DLike['instanceMatrix']>,
+  count: number,
+): InstancedMeshSignature {
+  const signature: InstancedMeshSignature = {
+    cacheable: true,
+    count,
+    instanceMatrix: attributeSignature(instanceMatrix),
+    instanceColor: attributeSignature(object.instanceColor),
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.instanceMatrix)
+    && attributeSignatureCacheable(signature.instanceColor)
+  return signature
+}
+
+function sameInstancedMeshSignature(a: InstancedMeshSignature, b: InstancedMeshSignature): boolean {
+  return a.cacheable === b.cacheable
+    && a.count === b.count
+    && sameAttributeSignature(a.instanceMatrix, b.instanceMatrix)
+    && sameAttributeSignature(a.instanceColor, b.instanceColor)
+}
+
+function readLocalInstancedMeshInstances(
+  object: ThreeObject3DLike,
+  instanceMatrix: NonNullable<ThreeObject3DLike['instanceMatrix']>,
+  count: number,
+): MeshInstance[] {
   const instances = new Array<MeshInstance>(count)
   for (let i = 0; i < count; i += 1) {
     instances[i] = {
-      transform: multiplyMat4(baseTransform, readMat4Attribute(instanceMatrix, i)),
+      transform: readMat4Attribute(instanceMatrix, i),
       color: readInstanceColor(object.instanceColor, i),
     }
   }

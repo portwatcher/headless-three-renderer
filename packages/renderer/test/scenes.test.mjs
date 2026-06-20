@@ -25832,6 +25832,78 @@ test('reusable renderer reuses cached static mesh geometry until attributes chan
   assert.ok(positionReads > readsAfterFirstRender, 'attribute version changes should invalidate cached geometry extraction')
 })
 
+test('reusable renderer reuses cached InstancedMesh instances until instance attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const mesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(0.38, 0.38),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    2,
+  )
+  mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-0.35, 0, 0))
+  mesh.setMatrixAt(1, new THREE.Matrix4().makeTranslation(0.35, 0, 0))
+  mesh.setColorAt(0, new THREE.Color(1, 0, 0))
+  mesh.setColorAt(1, new THREE.Color(0, 0, 1))
+  mesh.instanceMatrix.needsUpdate = true
+  mesh.instanceColor.needsUpdate = true
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const matrix = mesh.instanceMatrix
+  const originalMatrixGetX = matrix.getX.bind(matrix)
+  let matrixReads = 0
+  matrix.getX = (index) => {
+    matrixReads += 1
+    return originalMatrixGetX(index)
+  }
+
+  const color = mesh.instanceColor
+  const originalColorGetX = color.getX.bind(color)
+  let colorReads = 0
+  color.getX = (index) => {
+    colorReads += 1
+    return originalColorGetX(index)
+  }
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const matrixReadsAfterFirstRender = matrixReads
+  const colorReadsAfterFirstRender = colorReads
+  assert.ok(matrixReadsAfterFirstRender > 0, 'initial render should read InstancedMesh instance matrices')
+  assert.ok(colorReadsAfterFirstRender > 0, 'initial render should read InstancedMesh instance colors')
+
+  mesh.position.x += 0.1
+  mesh.material.color.set(0x00ff00)
+  renderer.render(scene, camera, options)
+  assert.equal(matrixReads, matrixReadsAfterFirstRender, 'InstancedMesh transform/material animation should reuse cached instance matrices')
+  assert.equal(colorReads, colorReadsAfterFirstRender, 'InstancedMesh transform/material animation should reuse cached instance colors')
+
+  mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-0.2, 0, 0))
+  mesh.instanceMatrix.needsUpdate = true
+  renderer.render(scene, camera, options)
+  const matrixReadsAfterMatrixUpdate = matrixReads
+  const colorReadsAfterMatrixUpdate = colorReads
+  assert.ok(matrixReadsAfterMatrixUpdate > matrixReadsAfterFirstRender, 'instanceMatrix version changes should invalidate cached InstancedMesh instances')
+
+  mesh.setColorAt(1, new THREE.Color(1, 1, 0))
+  mesh.instanceColor.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(colorReads > colorReadsAfterMatrixUpdate, 'instanceColor version changes should invalidate cached InstancedMesh instances')
+})
+
 test('reusable renderer reuses cached static line and point geometry until attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
