@@ -13,6 +13,7 @@ target platform and GPU backend.
 | Instanced mesh expansion | 7,056 instances | A single `InstancedMesh` renders an 84 x 84 grid with per-instance matrices and colors. |
 | Unique material textures | 225 maps | A texture-heavy scene renders a 15 x 15 grid where every plane has a unique `DataTexture`. |
 | Unique encoded material textures | 169 maps | An encoded-texture scene renders a 13 x 13 grid where every plane has a unique PNG buffer texture. |
+| Raw material texture resolution | 512 x 512 RGBA | A single mapped plane renders a 512 x 512 `DataTexture` to exercise larger decoded texture upload, sampling, and native binding paths. |
 | Output readback size | 512 x 512 RGBA | A focused output-size scene renders a 512 x 512 frame to exercise larger color textures and readback buffers. |
 | NodePerformanceTest-shaped glTF graph | 10,000 nodes, meshes, materials, and texture definitions | A generated glTF loader stress fixture mirrors the upstream Khronos sample's scene-graph scale with 100 shared encoded PNG images, 40,000 bufferViews, and 40,000 accessors without rendering the full graph in CI. |
 | Direct lights | 64 visible non-ambient lights | The supported native light-array budget is covered with 64 point lights plus ambient light. |
@@ -36,6 +37,6 @@ published native packages:
 
 - The mesh, texture, and light budgets above are regression floors. Passing them means the supported scene breadth remains covered, not that production scenes must stay under those counts.
 - The direct light limit is a real current renderer limit: more than 64 visible non-ambient lights fail clearly until native light arrays are expanded.
-- Texture memory depends on decoded image dimensions, not just texture count. The CI texture-heavy scenes and generated NodePerformanceTest-shaped glTF graph use tiny 4 x 4 raw and encoded textures to exercise many unique bindings, loader objects, and native image decode paths without creating a large memory benchmark.
+- Texture memory depends on decoded image dimensions, not just texture count. The CI texture-heavy scenes and generated NodePerformanceTest-shaped glTF graph use tiny 4 x 4 raw and encoded textures to exercise many unique bindings, loader objects, and native image decode paths without creating a large memory benchmark; a separate 512 x 512 raw texture test covers a larger single decoded upload.
 - For production workloads, benchmark representative scenes on each target OS, CPU architecture, GPU backend, and output size. Track render time, peak RSS, and whether textures are encoded buffers or already-decoded RGBA data.
 - Pixel-accurate budget snapshots are intentionally avoided because Metal, Vulkan, DX12, and software fallback backends can differ. Use invariant statistics for cross-platform scale tests and reserve golden images for a chosen reference platform.

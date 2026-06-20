@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { deflateSync } from 'node:zlib'
 import * as THREE from 'three'
-import native from '../native.js'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 
@@ -14,6 +14,7 @@ const SIZE = 96
 const BACKGROUND = [5, 5, 5]
 const NODE_PERFORMANCE_NODE_COUNT = 10000
 const NODE_PERFORMANCE_IMAGE_COUNT = 100
+const LARGE_TEXTURE_SIZE = 512
 
 let sharedRenderer
 
@@ -51,10 +52,30 @@ function makeEncodedTexture(index) {
   const raw = makeTexture(index)
   const image = raw.image
   const data = Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength)
-  const encoded = native.encodePng(data, image.width, image.height)
+  const encoded = encodePng(data, image.width, image.height)
   const texture = new THREE.Texture()
   texture.image = encoded
   texture.source.data = encoded
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+function makeLargeTexture() {
+  const size = LARGE_TEXTURE_SIZE
+  const data = new Uint8Array(size * size * 4)
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const i = (y * size + x) * 4
+      const horizontal = x / (size - 1)
+      const vertical = y / (size - 1)
+      data[i] = x < size / 2 ? 235 : 20 + Math.round(horizontal * 55)
+      data[i + 1] = 35 + Math.round(vertical * 155)
+      data[i + 2] = x < size / 2 ? 25 + Math.round(vertical * 45) : 230
+      data[i + 3] = 255
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.needsUpdate = true
   return texture
@@ -64,7 +85,56 @@ function makePngDataUri(index) {
   const raw = makeTexture(index)
   const image = raw.image
   const data = Buffer.from(image.data.buffer, image.data.byteOffset, image.data.byteLength)
-  return `data:image/png;base64,${native.encodePng(data, image.width, image.height).toString('base64')}`
+  return `data:image/png;base64,${encodePng(data, image.width, image.height).toString('base64')}`
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const CRC32_TABLE = Array.from({ length: 256 }, (_, index) => {
+  let value = index
+  for (let bit = 0; bit < 8; bit += 1) {
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
+  }
+  return value >>> 0
+})
+
+function crc32(buffer) {
+  let crc = 0xffffffff
+  for (const byte of buffer) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+function pngChunk(type, data) {
+  const typeBuffer = Buffer.from(type)
+  const chunk = Buffer.alloc(12 + data.length)
+  chunk.writeUInt32BE(data.length, 0)
+  typeBuffer.copy(chunk, 4)
+  data.copy(chunk, 8)
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), 8 + data.length)
+  return chunk
+}
+
+function encodePng(rgba, width, height) {
+  assert.equal(rgba.length, width * height * 4)
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = 6
+
+  const stride = width * 4
+  const scanlines = Buffer.alloc((stride + 1) * height)
+  for (let y = 0; y < height; y += 1) {
+    rgba.copy(scanlines, y * (stride + 1) + 1, y * stride, (y + 1) * stride)
+  }
+
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(scanlines)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ])
 }
 
 function alignedLength(length) {
@@ -367,6 +437,28 @@ test('encoded texture budget renders 169 unique PNG buffer maps', () => {
   assert.ok(ratio > 0.25, `encoded texture scene should render many mapped pixels (${ratio})`)
   const mean = meanRgba(rgba)
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `encoded texture scene should retain decoded color (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
+test('large raw texture budget renders a 512 x 512 material map', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ map: makeLargeTexture() }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: 128, height: 128, format: 'rgba' })
+  assert.equal(rgba.length, 128 * 128 * 4)
+  const ratio = nonBackgroundRatio(rgba, [0, 0, 0], 3)
+  assert.ok(ratio > 0.9, `large texture plane should fill the frame (${ratio})`)
+  const left = meanRgba(rgba.filter((_, index) => Math.floor((index / 4) % 128) < 48))
+  const right = meanRgba(rgba.filter((_, index) => Math.floor((index / 4) % 128) >= 80))
+  assert.ok(left.r > left.b + 40, `left half should retain red texture detail (${left.r}, ${left.b})`)
+  assert.ok(right.b > right.r + 40, `right half should retain blue texture detail (${right.b}, ${right.r})`)
 })
 
 test('output-size budget renders a 512 x 512 RGBA frame', () => {
