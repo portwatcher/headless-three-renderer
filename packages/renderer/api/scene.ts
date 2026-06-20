@@ -2754,6 +2754,10 @@ function renderableMatrixWorldLabel(object: ThreeObject3DLike): string {
 }
 
 function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, number, number]; radius: number } | null {
+  if (object.isBatchedMesh === true && object.boundingSphere == null) {
+    return null
+  }
+
   if (object.boundingSphere !== undefined) {
     if (object.boundingSphere == null && typeof object.computeBoundingSphere === 'function') {
       object.computeBoundingSphere()

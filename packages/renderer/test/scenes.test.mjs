@@ -1001,6 +1001,54 @@ test('BatchedMesh skips deleted geometry ranges', () => {
   assert.ok(rightMean.r < 5 && rightMean.g < 5 && rightMean.b < 5, `deleted BatchedMesh geometry should skip its visible instance (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
+test('BatchedMesh optimize preserves repacked active geometry ranges', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.45, 0.8)
+  const batched = new THREE.BatchedMesh(
+    3,
+    source.getAttribute('position').count * 3,
+    source.index.count * 3,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  const leftGeometryId = batched.addGeometry(source)
+  const middleGeometryId = batched.addGeometry(source.clone())
+  const rightGeometryId = batched.addGeometry(source.clone())
+  const left = batched.addInstance(leftGeometryId)
+  const middle = batched.addInstance(middleGeometryId)
+  const right = batched.addInstance(rightGeometryId)
+  batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
+  batched.setMatrixAt(middle, new THREE.Matrix4())
+  batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
+  batched.setColorAt(left, new THREE.Color(1, 0, 0))
+  batched.setColorAt(middle, new THREE.Color(0, 1, 0))
+  batched.setColorAt(right, new THREE.Color(0, 0, 1))
+  batched.frustumCulled = false
+  batched.perObjectFrustumCulled = false
+  batched.sortObjects = false
+
+  const rightRangeBefore = batched.getGeometryRangeAt(rightGeometryId, {})
+  batched.deleteGeometry(middleGeometryId)
+  batched.optimize()
+  const rightRangeAfter = batched.getGeometryRangeAt(rightGeometryId, {})
+  assert.ok(rightRangeAfter.start < rightRangeBefore.start, 'optimize should move the right geometry into the deleted packed range')
+  assert.equal(rightRangeAfter.count, rightRangeBefore.count)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
+  const centerMean = meanRegion(rgba, 96, 64, 43, 28, 53, 36)
+  const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
+  assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `left optimized BatchedMesh geometry should remain red (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+  assert.ok(centerMean.r < 5 && centerMean.g < 5 && centerMean.b < 5, `deleted optimized BatchedMesh geometry should leave the center empty (${centerMean.r}, ${centerMean.g}, ${centerMean.b})`)
+  assert.ok(rightMean.b > rightMean.r + 80 && rightMean.b > rightMean.g + 80, `repacked BatchedMesh geometry should render blue on the right (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+})
+
 test('BatchedMesh material arrays honor packed geometry groups', () => {
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 3)
