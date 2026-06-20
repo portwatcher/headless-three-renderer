@@ -2017,16 +2017,47 @@ export class Renderer {
   copyTextureToTexture(
     srcTexture: ThreeTextureLike,
     dstTexture: ThreeTextureLike,
-    srcRegion: unknown = null,
-    dstPosition: unknown = null,
+    srcRegion?: unknown,
+    dstPosition?: unknown,
+    srcLevel?: number,
+    dstLevel?: number | null,
+  ): void
+  copyTextureToTexture(
+    dstPosition: unknown,
+    srcTexture: ThreeTextureLike,
+    dstTexture: ThreeTextureLike,
+    dstLevel?: number,
+  ): void
+  copyTextureToTexture(
+    srcTextureOrDstPosition: unknown,
+    dstTextureOrSrcTexture: unknown,
+    srcRegionOrDstTexture: unknown = null,
+    dstPositionOrDstLevel: unknown = null,
     srcLevel = 0,
     dstLevel: number | null = null,
   ): void {
+    let srcTexture = srcTextureOrDstPosition
+    let dstTexture = dstTextureOrSrcTexture
+    let srcRegion = srcRegionOrDstTexture
+    let dstPosition = dstPositionOrDstLevel
+    let resolvedSrcLevel = srcLevel
+    let resolvedDstLevel: unknown = dstLevel
+    if (
+      !hasThreeTextureMarker(srcTextureOrDstPosition)
+      && isThreeTextureArgument(dstTextureOrSrcTexture)
+      && isThreeTextureArgument(srcRegionOrDstTexture)
+    ) {
+      dstPosition = srcTextureOrDstPosition ?? null
+      srcTexture = dstTextureOrSrcTexture
+      dstTexture = srcRegionOrDstTexture
+      srcRegion = null
+      resolvedSrcLevel = 0
+      resolvedDstLevel = dstPositionOrDstLevel || 0
+    }
+
     assertThreeTextureLike(srcTexture, 'Renderer.copyTextureToTexture source texture')
     assertThreeTextureLike(dstTexture, 'Renderer.copyTextureToTexture destination texture')
 
-    let resolvedSrcLevel = srcLevel
-    let resolvedDstLevel = dstLevel
     if (resolvedDstLevel === null) {
       if (resolvedSrcLevel !== 0) {
         assertTextureCopyLevel(resolvedSrcLevel, 'Renderer.copyTextureToTexture legacy destination level')
@@ -2038,13 +2069,14 @@ export class Renderer {
     }
     assertTextureCopyLevel(resolvedSrcLevel, 'Renderer.copyTextureToTexture source level')
     assertTextureCopyLevel(resolvedDstLevel, 'Renderer.copyTextureToTexture destination level')
+    const resolvedDestinationLevel = resolvedDstLevel as number
 
     const source = rawTextureCopyImage(srcTexture, 'Renderer.copyTextureToTexture source texture', {
       allowCanvasRead: true,
       level: resolvedSrcLevel,
     })
     const destination = rawTextureCopyImage(dstTexture, 'Renderer.copyTextureToTexture destination texture', {
-      level: resolvedDstLevel,
+      level: resolvedDestinationLevel,
     })
     if (source.channels !== destination.channels) {
       throw new Error(

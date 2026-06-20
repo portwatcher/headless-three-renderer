@@ -34015,6 +34015,37 @@ test('Renderer copyTextureToTexture supports legacy single mip level argument', 
   assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after legacy mip CPU copy')
 })
 
+test('Renderer copyTextureToTexture supports legacy destination-position-first argument', () => {
+  const renderer = new Renderer()
+  const source = new THREE.DataTexture(new Uint8Array([
+    13, 23, 33, 255,
+    43, 53, 63, 255,
+    73, 83, 93, 255,
+    103, 113, 123, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  const destinationData = new Uint8Array(4 * 4 * 4)
+  destinationData.fill(4)
+  const destinationMip = new Uint8Array(2 * 2 * 4)
+  destinationMip.fill(8)
+  const destination = new THREE.DataTexture(destinationData, 4, 4, THREE.RGBAFormat)
+  destination.mipmaps = [{ data: destinationMip, width: 2, height: 2 }]
+  const initialVersion = destination.version
+
+  renderer.copyTextureToTexture({ x: 0, y: 0 }, source, destination, 1)
+
+  function mipPixel(x, y) {
+    const offset = (y * 2 + x) * 4
+    return Array.from(destination.mipmaps[0].data.slice(offset, offset + 4))
+  }
+
+  assert.deepEqual(mipPixel(0, 0), [13, 23, 33, 255])
+  assert.deepEqual(mipPixel(1, 0), [43, 53, 63, 255])
+  assert.deepEqual(mipPixel(0, 1), [73, 83, 93, 255])
+  assert.deepEqual(mipPixel(1, 1), [103, 113, 123, 255])
+  assert.deepEqual(Array.from(destination.image.data.slice(0, 4)), [4, 4, 4, 4])
+  assert.ok(destination.version > initialVersion, 'destination texture should be marked dirty after legacy destination-position CPU copy')
+})
+
 test('Renderer copyTextureToTexture copies readable canvas-like source data on the CPU', () => {
   const renderer = new Renderer()
 
