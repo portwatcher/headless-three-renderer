@@ -2519,7 +2519,7 @@ export class Renderer {
         objectIdEntries,
         (targetScene, targetCamera) => this.native.render(targetScene, targetCamera),
       )
-      const outputBuffer = compositeActiveTargetColorBuffer(target, buffer, width, height, targetOptions, this.autoClear)
+      const outputBuffer = compositeActiveTargetColorBuffer(target, buffer, width, height, targetOptions, this.autoClear, scene)
       writeRenderTarget(
         target,
         outputBuffer,
@@ -2555,6 +2555,7 @@ export class Renderer {
       nativeScene.height!,
       targetOptions,
       this.autoClear,
+      scene,
     )
     writeRenderTarget(
       target,
@@ -5775,6 +5776,7 @@ function compositeActiveTargetColorBuffer(
   height: number,
   options: RenderOptions,
   autoClear: boolean,
+  scene?: ThreeSceneRootLike,
 ): Buffer {
   if (autoClear) return data
   const existing = renderTargetExistingColorBuffer(target.data, width, height)
@@ -5782,6 +5784,12 @@ function compositeActiveTargetColorBuffer(
 
   const rect = activeTargetRenderRect(options, width, height)
   if (rect.width <= 0 || rect.height <= 0) return existing
+
+  const copyShaderBlend = activeTargetCopyShaderAdditiveBlend(scene)
+  if (copyShaderBlend) {
+    return additiveCompositeColorBuffer(existing, data, width, rect, copyShaderBlend.sourceScale)
+  }
+
   if (rect.x === 0 && rect.y === 0 && rect.width === width && rect.height === height) return data
 
   const output = Buffer.from(existing)
@@ -5789,6 +5797,69 @@ function compositeActiveTargetColorBuffer(
     const rowStart = ((rect.y + row) * width + rect.x) * 4
     const rowEnd = rowStart + rect.width * 4
     data.copy(output, rowStart, rowStart, rowEnd)
+  }
+  return output
+}
+
+function activeTargetCopyShaderAdditiveBlend(scene: ThreeSceneRootLike | undefined): { sourceScale: number } | null {
+  if (!scene || scene.isMesh !== true || Array.isArray(scene.material)) return null
+  if (Array.isArray(scene.children) && scene.children.length > 0) return null
+
+  const material = scene.material as ThreeMaterialLike | undefined
+  const copyShader = activeTargetCopyShaderMaterialInfo(material)
+  if (!copyShader || material?.blending !== AdditiveBlending) return null
+
+  const opacity = typeof copyShader.opacity === 'number' && Number.isFinite(copyShader.opacity)
+    ? Math.max(0, copyShader.opacity)
+    : 1
+  const sourceScale = material?.premultipliedAlpha === true && opacity > 0
+    ? 1 / opacity
+    : 1
+  return { sourceScale }
+}
+
+function activeTargetCopyShaderMaterialInfo(material: ThreeMaterialLike | undefined): { opacity: unknown } | null {
+  if (!material || !activeTargetShaderMaterialKind(material)) return null
+  if (!activeTargetCopyShaderFragment(material.fragmentShader)) return null
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return null
+  return {
+    opacity: activeTargetUniformValue((uniforms as Record<string, unknown>).opacity) ?? 1,
+  }
+}
+
+function activeTargetShaderMaterialKind(material: ThreeMaterialLike): boolean {
+  return material.isShaderMaterial === true || material.type === 'ShaderMaterial'
+}
+
+function activeTargetUniformValue(uniform: unknown): unknown {
+  if (!uniform || typeof uniform !== 'object' || Array.isArray(uniform)) return undefined
+  return (uniform as { value?: unknown }).value
+}
+
+function activeTargetCopyShaderFragment(fragmentShader: unknown): boolean {
+  if (typeof fragmentShader !== 'string') return false
+  const compact = fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatopacity;') &&
+    compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('texture2D(tDiffuse,vUv)') &&
+    compact.includes('gl_FragColor=opacity*texel;')
+}
+
+function additiveCompositeColorBuffer(
+  existing: Buffer,
+  data: Buffer,
+  width: number,
+  rect: PixelRect,
+  sourceScale: number,
+): Buffer {
+  const output = Buffer.from(existing)
+  for (let row = 0; row < rect.height; row += 1) {
+    const rowStart = ((rect.y + row) * width + rect.x) * 4
+    const rowEnd = rowStart + rect.width * 4
+    for (let offset = rowStart; offset < rowEnd; offset += 1) {
+      output[offset] = Math.min(255, Math.round(output[offset] + data[offset] * sourceScale))
+    }
   }
   return output
 }
