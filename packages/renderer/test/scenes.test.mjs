@@ -32363,6 +32363,14 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
     /Renderer\.state\.setMaterial material must be a material-like object/i,
   )
   assert.throws(
+    () => renderer.state.setMaterial(new THREE.MeshBasicMaterial(), 1),
+    /Renderer\.state\.setMaterial frontFaceCW must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.setFlipSided(1),
+    /Renderer\.state\.setFlipSided flipSided must be a boolean/i,
+  )
+  assert.throws(
     () => renderer.state.setCullFace(99),
     /Renderer\.state\.setCullFace cullFace 99 is not supported/i,
   )
@@ -32373,6 +32381,10 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderer.state.setPolygonOffset(1, 0, 0),
     /Renderer\.state\.setPolygonOffset polygonOffset must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.state.setScissorTest(1),
+    /Renderer\.state\.setScissorTest scissorTest must be a boolean/i,
   )
   assert.throws(
     () => renderer.state.setColorMask(1),
