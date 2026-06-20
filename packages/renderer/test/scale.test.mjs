@@ -440,6 +440,58 @@ test('instanced mesh budget renders 7,056 transformed colored instances', () => 
   assert.ok(mean.r > 40 && mean.g > 40 && mean.b > 40, `instanced colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('BatchedMesh budget renders 2,048 packed colored instances', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 32
+  const count = columns * rows
+  const source = new THREE.PlaneGeometry(0.04, 0.04)
+  const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  const batched = new THREE.BatchedMesh(
+    count,
+    source.getAttribute('position').count,
+    source.index.count,
+    material,
+  )
+  const geometryId = batched.addGeometry(source)
+  const matrix = new THREE.Matrix4()
+  const color = new THREE.Color()
+  for (let index = 0; index < count; index += 1) {
+    const col = index % columns
+    const row = Math.floor(index / columns)
+    const instanceId = batched.addInstance(geometryId)
+    matrix.makeTranslation(
+      (col / (columns - 1) - 0.5) * 1.9,
+      (row / (rows - 1) - 0.5) * 1.9,
+      Math.sin(col * 0.11 + row * 0.29) * 0.01,
+    )
+    batched.setMatrixAt(instanceId, matrix)
+    color.setRGB(
+      0.2 + 0.8 * (col / (columns - 1)),
+      0.2 + 0.8 * (row / (rows - 1)),
+      0.35 + 0.65 * ((col + row) / (columns + rows - 2)),
+    )
+    batched.setColorAt(instanceId, color)
+  }
+  batched.frustumCulled = false
+  batched.perObjectFrustumCulled = false
+  batched.sortObjects = false
+  scene.add(batched)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.3, `BatchedMesh scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `BatchedMesh instance colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('points billboard budget renders 4,096 colored points', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
