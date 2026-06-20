@@ -23428,6 +23428,58 @@ test('reusable renderer reuses cached base texture sampler state until texture s
   }
 })
 
+test('reusable renderer reuses cached material render state until render state changes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  material.stencilRef = 7.25
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const originalTrunc = Math.trunc
+  let stencilRefTruncCalls = 0
+  Math.trunc = (value) => {
+    if (value === material.stencilRef) {
+      stencilRefTruncCalls += 1
+    }
+    return originalTrunc(value)
+  }
+  try {
+    const first = renderer.render(scene, camera, options)
+    const firstCenter = meanRegion(first, 64, 64, 24, 24, 40, 40)
+    const callsAfterFirstRender = stencilRefTruncCalls
+    assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial material should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+    assert.ok(callsAfterFirstRender > 0, 'initial render should extract material render state')
+
+    material.color.set(0x00ff00)
+    const second = renderer.render(scene, camera, options)
+    const secondCenter = meanRegion(second, 64, 64, 24, 24, 40, 40)
+    assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while render state is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
+    assert.equal(stencilRefTruncCalls, callsAfterFirstRender, 'material-color animation should reuse cached material render state')
+
+    material.stencilRef = 11.75
+    renderer.render(scene, camera, options)
+    assert.ok(stencilRefTruncCalls > callsAfterFirstRender, 'render-state changes should invalidate cached material render state')
+  } finally {
+    Math.trunc = originalTrunc
+  }
+})
+
 test('reusable renderer reuses cached CSS material color extraction until color changes', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

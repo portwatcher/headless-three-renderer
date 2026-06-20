@@ -176,11 +176,13 @@ export interface MaterialExtractionContext {
   textureCache?: TextureExtractionCache
   materialColorCache?: MaterialColorExtractionCache
   textureStateCache?: TextureStateExtractionCache
+  materialRenderStateCache?: MaterialRenderStateExtractionCache
 }
 
 export type TextureExtractionCache = WeakMap<ThreeTextureLike, unknown>
 export type MaterialColorExtractionCache = WeakMap<ThreeMaterialLike, unknown>
 export type TextureStateExtractionCache = WeakMap<ThreeTextureLike, unknown>
+export type MaterialRenderStateExtractionCache = WeakMap<ThreeMaterialLike, unknown>
 
 export interface EnvironmentMapResolution {
   envMap: EnvironmentMapInfo | null
@@ -1234,6 +1236,37 @@ export function extractPbrProperties(
     props.alphaMapUsesUv2 = textureUvChannel(material.alphaMap) > 0
   }
 
+  Object.assign(props, materialRenderStateProperties(material, customFragmentShader, context))
+
+  return props
+}
+
+interface CachedMaterialRenderStateExtraction {
+  signature: MaterialRenderStateSignature
+  props: PbrProperties
+}
+
+interface MaterialRenderStateSignature {
+  values: unknown[]
+  blendColor: MaterialColorSignature
+}
+
+function materialRenderStateProperties(
+  material: ThreeMaterialLike,
+  customFragmentShader: string | undefined,
+  context: MaterialExtractionContext,
+): PbrProperties {
+  const signature = context.materialRenderStateCache
+    ? materialRenderStateSignature(material, customFragmentShader)
+    : null
+  if (signature) {
+    const cached = context.materialRenderStateCache?.get(material) as CachedMaterialRenderStateExtraction | undefined
+    if (cached && sameMaterialRenderStateSignature(cached.signature, signature)) {
+      return copyMaterialRenderStateProperties(cached.props)
+    }
+  }
+
+  const props: PbrProperties = {}
   const alphaTest = optionalFiniteNumber(material.alphaTest, 'material.alphaTest')
   if (alphaTest !== undefined && alphaTest > 0) {
     props.alphaTest = clamp01(alphaTest)
@@ -1273,7 +1306,7 @@ export function extractPbrProperties(
       if (material.blendDstAlpha != null) {
         props.blendDstAlpha = materialBlendFactor(material.blendDstAlpha, 'material.blendDstAlpha')
       }
-      const blendColor = colorFromSlot('blendColor', material.blendColor, 'material.blendColor')
+      const blendColor = materialSlotColor(material, 'blendColor', material.blendColor, 'material.blendColor', context)
       if (blendColor) {
         props.blendColor = [blendColor[0], blendColor[1], blendColor[2]]
       }
@@ -1354,11 +1387,6 @@ export function extractPbrProperties(
     props.fog = false
   }
 
-  // Shading model: MeshBasicMaterial is unlit, MeshDepthMaterial outputs
-  // normalized depth, MeshLambertMaterial is diffuse-only, MeshNormalMaterial
-  // outputs view-space normals, and MeshMatcapMaterial samples a baked lighting
-  // texture from view-space normals. Everything else
-  // (MeshStandardMaterial / MeshPhysicalMaterial / unknown) uses the default PBR path.
   if (customFragmentShader && shaderMaterialKind(material)) {
     props.shadingModel = 'basic'
   } else if (material.isMeshBasicMaterial || material.isSpriteMaterial) {
@@ -1385,7 +1413,90 @@ export function extractPbrProperties(
     props.customFragmentShader = customFragmentShader
   }
 
+  if (signature) {
+    context.materialRenderStateCache?.set(material, {
+      signature,
+      props: copyMaterialRenderStateProperties(props),
+    })
+  }
   return props
+}
+
+function materialRenderStateSignature(
+  material: ThreeMaterialLike,
+  customFragmentShader: string | undefined,
+): MaterialRenderStateSignature {
+  return {
+    values: [
+      customFragmentShader,
+      material.alphaTest,
+      material.alphaHash,
+      material.alphaToCoverage,
+      material.premultipliedAlpha,
+      material.toneMapped,
+      material.dithering,
+      material.precision,
+      material.transparent,
+      material.forceSinglePass,
+      material.blending,
+      material.blendEquation,
+      material.blendSrc,
+      material.blendDst,
+      material.blendEquationAlpha,
+      material.blendSrcAlpha,
+      material.blendDstAlpha,
+      material.blendAlpha,
+      material.depthTest,
+      material.depthFunc,
+      material.depthWrite,
+      material.colorWrite,
+      material.polygonOffset,
+      material.polygonOffsetFactor,
+      material.polygonOffsetUnits,
+      material.stencilWrite,
+      material.stencilWriteMask,
+      material.stencilFunc,
+      material.stencilRef,
+      material.stencilFuncMask,
+      material.stencilFail,
+      material.stencilZFail,
+      material.stencilZPass,
+      material.side,
+      material.shadowSide,
+      material.flatShading,
+      material.fog,
+      material.type,
+      material.isRawShaderMaterial,
+      material.isNodeMaterial,
+      material.isShaderMaterial,
+      material.isMeshBasicMaterial,
+      material.isSpriteMaterial,
+      material.isMeshDepthMaterial,
+      material.isMeshDistanceMaterial,
+      material.isMeshLambertMaterial,
+      material.isMeshNormalMaterial,
+      material.isMeshMatcapMaterial,
+      material.isMeshPhongMaterial,
+      material.isMeshToonMaterial,
+      material.isShadowMaterial,
+    ],
+    blendColor: materialSlotColorSignature(material.blendColor),
+  }
+}
+
+function copyMaterialRenderStateProperties(props: PbrProperties): PbrProperties {
+  return {
+    ...props,
+    blendColor: props.blendColor ? props.blendColor.slice() : undefined,
+  }
+}
+
+function sameMaterialRenderStateSignature(
+  a: MaterialRenderStateSignature,
+  b: MaterialRenderStateSignature,
+): boolean {
+  return sameUnknownArray(a.values, b.values)
+    && sameMaterialColorSignature(a.blendColor, b.blendColor)
 }
 
 function materialBlending(material: ThreeMaterialLike): string | undefined {

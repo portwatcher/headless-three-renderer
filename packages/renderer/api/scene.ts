@@ -35,6 +35,7 @@ import {
   type TextureExtractionCache,
   type MaterialColorExtractionCache,
   type TextureStateExtractionCache,
+  type MaterialRenderStateExtractionCache,
 } from './materials'
 import { applyCpuSkinning } from './skinning'
 import { applyMorphTargets } from './morphs'
@@ -114,6 +115,7 @@ export interface SceneExtractionCache {
   texturePayloads: TextureExtractionCache
   materialColors: MaterialColorExtractionCache
   textureStates: TextureStateExtractionCache
+  materialRenderStates: MaterialRenderStateExtractionCache
   pointBillboards: WeakMap<ThreeObject3DLike, Map<string, CachedPointBillboardExpansion>>
   spriteBillboards: WeakMap<ThreeObject3DLike, CachedSpriteBillboardExpansion>
 }
@@ -298,6 +300,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     texturePayloads: new WeakMap(),
     materialColors: new WeakMap(),
     textureStates: new WeakMap(),
+    materialRenderStates: new WeakMap(),
     pointBillboards: new WeakMap(),
     spriteBillboards: new WeakMap(),
   }

@@ -2338,6 +2338,7 @@ function toNativeInput(
     textureCache: sceneExtractionCache?.texturePayloads,
     materialColorCache: sceneExtractionCache?.materialColors,
     textureStateCache: sceneExtractionCache?.textureStates,
+    materialRenderStateCache: sceneExtractionCache?.materialRenderStates,
   }
   const flattenedMeshes = flattenScene(
     scene,
