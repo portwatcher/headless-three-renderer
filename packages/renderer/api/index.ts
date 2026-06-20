@@ -1860,8 +1860,9 @@ export class Renderer {
   }
 
   setViewport(rect: RenderPixelRectLike | null): void
-  setViewport(x: number, y: number, width: number, height: number): void
-  setViewport(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number): void {
+  setViewport(x: number, y: number, width: number, height: number, minDepth?: number, maxDepth?: number): void
+  setViewport(rectOrX: RenderPixelRectLike | null | number, y?: number, width?: number, height?: number, minDepth = 0, maxDepth = 1): void {
+    assertDefaultViewportDepthRange(minDepth, maxDepth, 'Renderer.setViewport')
     this.currentViewport = rendererStatePixelRect(rectOrX, y, width, height, 'Renderer.setViewport')
   }
 
@@ -3887,6 +3888,24 @@ function rendererStatePixelRectFromComponents(values: unknown[], label: string):
     throw new TypeError(`${label} width and height must be greater than 0.`)
   }
   return { x, y, width, height }
+}
+
+function assertDefaultViewportDepthRange(minDepth: unknown, maxDepth: unknown, label: string): void {
+  const min = rendererViewportDepthValue(minDepth, `${label} minDepth`)
+  const max = rendererViewportDepthValue(maxDepth, `${label} maxDepth`)
+  if (min !== 0 || max !== 1) {
+    throw new Error(`${label} depth ranges other than 0..1 are not supported by @headless-three/renderer.`)
+  }
+}
+
+function rendererViewportDepthValue(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${label} must be a finite number.`)
+  }
+  if (value < 0 || value > 1) {
+    throw new TypeError(`${label} must be between 0 and 1.`)
+  }
+  return value
 }
 
 function rendererStateClearColor(color: number | string | ThreeColorLike | number[], alpha?: number): Color4 {

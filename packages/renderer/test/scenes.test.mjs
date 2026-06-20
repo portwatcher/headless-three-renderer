@@ -33110,6 +33110,7 @@ test('Renderer viewport and scissor state apply as render fallbacks', () => {
 
   const renderer = new Renderer()
   renderer.setViewport(16, 16, 40, 32)
+  renderer.setViewport(16, 16, 40, 32, 0, 1)
   renderer.setScissor(new THREE.Vector4(24, 20, 24, 24))
   renderer.setScissorTest(true)
 
@@ -33198,6 +33199,18 @@ test('invalid viewport and scissor rectangles fail clearly', () => {
   assert.throws(
     () => renderer.setViewport(0, 0, 0, 16),
     /Renderer\.setViewport width and height must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.setViewport(0, 0, 16, 16, Number.NaN, 1),
+    /Renderer\.setViewport minDepth must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.setViewport(0, 0, 16, 16, 0, 2),
+    /Renderer\.setViewport maxDepth must be between 0 and 1/i,
+  )
+  assert.throws(
+    () => renderer.setViewport(0, 0, 16, 16, 0.25, 1),
+    /Renderer\.setViewport depth ranges other than 0\.\.1 are not supported/i,
   )
   assert.throws(
     () => renderer.setScissor({ x: '0', y: 0, width: 16, height: 16 }),
