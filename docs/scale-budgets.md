@@ -13,10 +13,11 @@ target platform and GPU backend.
 | Instanced mesh expansion | 7,056 instances | A single `InstancedMesh` renders an 84 x 84 grid with per-instance matrices and colors. |
 | Unique material textures | 225 maps | A texture-heavy scene renders a 15 x 15 grid where every plane has a unique `DataTexture`. |
 | Unique encoded material textures | 169 maps | An encoded-texture scene renders a 13 x 13 grid where every plane has a unique PNG buffer texture. |
+| Output readback size | 512 x 512 RGBA | A focused output-size scene renders a 512 x 512 frame to exercise larger color textures and readback buffers. |
 | NodePerformanceTest-shaped glTF graph | 10,000 nodes, meshes, materials, and texture definitions | A generated glTF loader stress fixture mirrors the upstream Khronos sample's scene-graph scale with 100 shared encoded PNG images, 40,000 bufferViews, and 40,000 accessors without rendering the full graph in CI. |
 | Direct lights | 64 visible non-ambient lights | The supported native light-array budget is covered with 64 point lights plus ambient light. |
 | Excess direct lights | 65 visible non-ambient lights | Scenes above the supported direct-light budget fail clearly instead of silently dropping lights. |
-| Output size | 96 x 96 RGBA | The scale tests intentionally use a small output to keep CI focused on scene breadth and adapter/native resource handling. |
+| Breadth-test output size | 96 x 96 RGBA | Most scale tests intentionally use a small output to keep CI focused on scene breadth and adapter/native resource handling. |
 
 ## Platform Expectations
 

@@ -369,6 +369,35 @@ test('encoded texture budget renders 169 unique PNG buffer maps', () => {
   assert.ok(mean.r > 15 && mean.g > 15 && mean.b > 15, `encoded texture scene should retain decoded color (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('output-size budget renders a 512 x 512 RGBA frame', () => {
+  const width = 512
+  const height = 512
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 1.2),
+    new THREE.MeshBasicMaterial({ color: 0xff8844 }),
+  ))
+  const accent = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 0.9),
+    new THREE.MeshBasicMaterial({ color: 0x2288ff }),
+  )
+  accent.position.set(0.18, -0.08, 0.01)
+  accent.rotation.z = 0.18
+  scene.add(accent)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width, height, format: 'rgba' })
+  assert.equal(rgba.length, width * height * 4)
+  const ratio = nonBackgroundRatio(rgba, [0, 0, 0], 3)
+  assert.ok(ratio > 0.45, `large output-size scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 25, `large output-size readback should retain color (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('NodePerformanceTest-shaped glTF graph loads many nodes, meshes, materials, and texture definitions', async () => {
   const source = makeNodePerformanceGltfSource()
   assert.equal(source.nodes.length, NODE_PERFORMANCE_NODE_COUNT + 2)
