@@ -34082,6 +34082,59 @@ test('Renderer clear honors active render target scissor state', () => {
   renderer.setRenderTarget(null)
 })
 
+test('Renderer clear writes actual Three.js RenderTarget classes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const clearTarget = new THREE.RenderTarget(16, 10)
+  const clearTextureVersion = clearTarget.texture.version
+  const clearSourceVersion = clearTarget.texture.source.version
+  renderer.setClearColor(0x204080, 0.5)
+  renderer.clearTarget(clearTarget, true, false, false)
+
+  assert.equal(clearTarget.data.length, 16 * 10 * 4)
+  assert.strictEqual(clearTarget.texture.source.data, clearTarget.texture.image)
+  assert.strictEqual(clearTarget.texture.image.data, clearTarget.data)
+  assert.strictEqual(clearTarget.texture.source.data.data, clearTarget.data)
+  assert.ok(clearTarget.texture.version > clearTextureVersion, 'clearTarget should mark the Three texture version dirty')
+  assert.ok(clearTarget.texture.source.version > clearSourceVersion, 'clearTarget should mark the Three source version dirty')
+  const cleared = meanRegion(clearTarget.data, 16, 10, 4, 2, 12, 8)
+  assertRgbClose(cleared, [0x20, 0x40, 0x80], 'clearTarget should write clear color into THREE.RenderTarget')
+  assert.ok(Math.abs(cleared.a - 128) <= 1, `clearTarget should write clear alpha (${cleared.a})`)
+
+  const activeTarget = new THREE.WebGLRenderTarget(32, 32)
+  renderer.setRenderTarget(activeTarget)
+  renderer.render(scene, camera, {
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  activeTarget.scissorTest = true
+  activeTarget.scissor = { x: 16, y: 0, width: 16, height: 32 }
+  const activeTextureVersion = activeTarget.texture.version
+  const activeSourceVersion = activeTarget.texture.source.version
+  renderer.setClearColor(0x00ff00, 1)
+  renderer.clearColor()
+
+  const activeLeft = meanRegion(activeTarget.data, 32, 32, 4, 10, 12, 22)
+  const activeRight = meanRegion(activeTarget.data, 32, 32, 20, 10, 28, 22)
+  assert.ok(activeLeft.r > activeLeft.g + 80, `active THREE.WebGLRenderTarget clear should preserve red outside scissor (${activeLeft.r}, ${activeLeft.g})`)
+  assert.ok(activeRight.g > activeRight.r + 80, `active THREE.WebGLRenderTarget clear should write green inside scissor (${activeRight.r}, ${activeRight.g})`)
+  assert.strictEqual(activeTarget.texture.source.data, activeTarget.texture.image)
+  assert.strictEqual(activeTarget.texture.image.data, activeTarget.data)
+  assert.ok(activeTarget.texture.version > activeTextureVersion, 'active clear should mark the Three texture version dirty')
+  assert.ok(activeTarget.texture.source.version > activeSourceVersion, 'active clear should mark the Three source version dirty')
+
+  renderer.setRenderTarget(null)
+})
+
 test('Renderer clear writes active render target depth textures', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
