@@ -31146,18 +31146,32 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
     () => renderer.state.viewport({ x: 0, y: 0, width: 0, height: 1 }),
     /Renderer\.state\.viewport width and height must be greater than 0/i,
   )
-  assert.throws(
-    () => renderer.state.bindTexture(0, {}),
-    /Renderer\.state\.bindTexture\(\) is not supported.*WebGL texture binding/i,
-  )
-  assert.throws(
-    () => renderer.state.texImage2D(),
-    /Renderer\.state\.texImage2D\(\) is not supported.*WebGL texture uploads/i,
-  )
-  assert.throws(
-    () => renderer.state.uniformBlockBinding({}, {}),
-    /Renderer\.state\.uniformBlockBinding\(\) is not supported.*WebGL uniform-buffer binding/i,
-  )
+  for (const [method, pattern] of [
+    ['enable', /WebGL capability flags/i],
+    ['disable', /WebGL capability flags/i],
+    ['bindFramebuffer', /WebGL framebuffer binding/i],
+    ['drawBuffers', /WebGL draw-buffer binding/i],
+    ['useProgram', /WebGL program binding/i],
+    ['activeTexture', /WebGL texture-unit binding/i],
+    ['bindTexture', /WebGL texture binding/i],
+    ['compressedTexImage2D', /WebGL texture uploads/i],
+    ['compressedTexImage3D', /WebGL texture uploads/i],
+    ['texImage2D', /WebGL texture uploads/i],
+    ['texImage3D', /WebGL texture uploads/i],
+    ['texStorage2D', /WebGL texture storage/i],
+    ['texStorage3D', /WebGL texture storage/i],
+    ['texSubImage2D', /WebGL texture uploads/i],
+    ['texSubImage3D', /WebGL texture uploads/i],
+    ['compressedTexSubImage2D', /WebGL texture uploads/i],
+    ['compressedTexSubImage3D', /WebGL texture uploads/i],
+    ['updateUBOMapping', /WebGL uniform-buffer binding/i],
+    ['uniformBlockBinding', /WebGL uniform-buffer binding/i],
+  ]) {
+    assert.throws(
+      () => renderer.state[method](),
+      new RegExp(`Renderer\\.state\\.${method}\\(\\) is not supported.*${pattern.source}`, 'i'),
+    )
+  }
 
   const object = {}
   assert.equal(renderer.properties.has(object), false)
