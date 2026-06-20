@@ -480,6 +480,63 @@ test('points billboard budget renders 4,096 colored points', () => {
   assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `point colors should survive billboard expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('wide line budget renders 4,032 colored segments', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 64
+  const segments = rows * (columns - 1)
+  const positions = new Float32Array(segments * 2 * 3)
+  const colors = new Float32Array(segments * 2 * 3)
+  for (let index = 0; index < segments; index += 1) {
+    const row = Math.floor(index / (columns - 1))
+    const col = index % (columns - 1)
+    const x0 = (col / (columns - 1) - 0.5) * 1.9
+    const x1 = ((col + 1) / (columns - 1) - 0.5) * 1.9
+    const y = (row / (rows - 1) - 0.5) * 1.9
+    const z = Math.sin(col * 0.19 + row * 0.13) * 0.01
+    const offset = index * 6
+    positions[offset] = x0
+    positions[offset + 1] = y
+    positions[offset + 2] = z
+    positions[offset + 3] = x1
+    positions[offset + 4] = y
+    positions[offset + 5] = z
+
+    const r0 = 0.2 + 0.8 * (col / (columns - 1))
+    const r1 = 0.2 + 0.8 * ((col + 1) / (columns - 1))
+    const g = 0.2 + 0.8 * (row / (rows - 1))
+    const b0 = 0.35 + 0.65 * ((col + row) / (columns + rows - 2))
+    const b1 = 0.35 + 0.65 * ((col + 1 + row) / (columns + rows - 2))
+    colors[offset] = r0
+    colors[offset + 1] = g
+    colors[offset + 2] = b0
+    colors[offset + 3] = r1
+    colors[offset + 4] = g
+    colors[offset + 5] = b1
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  scene.add(new THREE.LineSegments(
+    geometry,
+    new THREE.LineBasicMaterial({ linewidth: 2.2, vertexColors: true }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.5, `wide line scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `line colors should survive wide-line expansion (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('texture-heavy scene budget renders 225 unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
