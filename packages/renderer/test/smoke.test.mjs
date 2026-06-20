@@ -1,14 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { promisify } from 'node:util'
 import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { assertValidPng, parsePngDimensions } from './helpers.mjs'
 
+const execFileAsync = promisify(execFile)
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url))
 const require = createRequire(import.meta.url)
 const native = require('../native.js')
 
@@ -225,6 +229,31 @@ test('Node glTF loader option booleans fail clearly', async () => {
     }),
     /options\.registerTextureHandlers must be a boolean/i,
   )
+})
+
+test('local glTF example renders a committed fixture from the repo root', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'headless-three-example-'))
+  try {
+    const outputPath = path.join(dir, 'render.png')
+    const { stdout } = await execFileAsync(process.execPath, [
+      path.join(REPO_ROOT, 'examples', 'render-gltf.mjs'),
+      path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'fixtures', 'simple-triangle.gltf'),
+      outputPath,
+    ], {
+      cwd: REPO_ROOT,
+      env: {
+        ...process.env,
+        WIDTH: '64',
+        HEIGHT: '48',
+      },
+    })
+    assert.match(stdout, /Rendered .*simple-triangle\.gltf.* \(64x48\)/)
+
+    const image = await readFile(outputPath)
+    assertValidPng(image, { width: 64, height: 48 })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('VRM animation helper creates a clip, seeks the mixer, and updates the avatar', async () => {

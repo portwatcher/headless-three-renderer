@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises'
-import * as THREE from 'three'
+import { createRequire } from 'node:module'
 import {
   applyVrmAnimation,
   loadVrmAnimationFromFile,
@@ -23,6 +23,7 @@ const height = positiveInteger(process.env.HEIGHT, width)
 const animationTime = Number.isFinite(Number(process.env.TIME)) ? Number(process.env.TIME) : 1.5
 
 try {
+  const THREE = await importThree()
   const packages = await importVrmPackages(Boolean(animationPath))
   const modelGltf = await loadVrmFromFile(modelPath, {
     VRMLoaderPlugin: packages.VRMLoaderPlugin,
@@ -142,4 +143,14 @@ function frameSceneCamera(scene, aspect) {
 function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+async function importThree() {
+  try {
+    return await import('three')
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error
+    const requireFromRenderer = createRequire(new URL('../packages/renderer/package.json', import.meta.url))
+    return requireFromRenderer('three')
+  }
 }

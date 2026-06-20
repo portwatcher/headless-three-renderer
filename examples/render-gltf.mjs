@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises'
-import * as THREE from 'three'
+import { createRequire } from 'node:module'
 import {
   loadGltfFromFile,
   render,
@@ -16,6 +16,7 @@ if (!inputPath) {
 const width = positiveInteger(process.env.WIDTH, 1024)
 const height = positiveInteger(process.env.HEIGHT, width)
 
+const THREE = await importThree()
 const gltf = await loadGltfFromFile(inputPath)
 const scene = gltf.scene
 const camera = findRenderableCamera(scene, width / height) ?? frameSceneCamera(scene, width / height)
@@ -64,4 +65,14 @@ function frameSceneCamera(scene, aspect) {
 function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+async function importThree() {
+  try {
+    return await import('three')
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error
+    const requireFromRenderer = createRequire(new URL('../packages/renderer/package.json', import.meta.url))
+    return requireFromRenderer('three')
+  }
 }
