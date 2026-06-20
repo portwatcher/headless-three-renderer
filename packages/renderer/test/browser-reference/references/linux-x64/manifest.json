@@ -21,6 +21,20 @@
       "outputColorSpace": "srgb-linear"
     },
     {
+      "file": "alpha-to-coverage-alpha-test-threshold.png",
+      "name": "alpha-to-coverage-alpha-test-threshold",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "alpha-to-coverage-clipping-plane.png",
+      "name": "alpha-to-coverage-clipping-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
       "file": "stencil-masked-render-state.png",
       "name": "stencil-masked-render-state",
       "width": 96,

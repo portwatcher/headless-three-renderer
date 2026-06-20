@@ -403,7 +403,6 @@ function alphaToCoverageAlphaTestCorpus() {
 
   return {
     name: 'alpha-to-coverage-alpha-test-threshold',
-    browserReference: false,
     scene,
     camera: makeCamera([0, 0, 3]),
     options: {
@@ -438,7 +437,6 @@ function alphaToCoverageClippingCorpus() {
 
   return {
     name: 'alpha-to-coverage-clipping-plane',
-    browserReference: false,
     scene,
     camera: makeCamera([0, 0, 3]),
     options: {
