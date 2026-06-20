@@ -25982,6 +25982,80 @@ test('reusable renderer reuses cached InstancedBufferGeometry position expansion
   assert.ok(scaleReads > scaleReadsAfterOffsetUpdate, 'instanced scale version changes should invalidate cached position expansion')
 })
 
+test('reusable renderer reuses cached InstancedBufferGeometry line position expansion until instanced attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.2, 0, 0,
+    0.2, 0, 0,
+  ], 3))
+  const offset = new THREE.InstancedBufferAttribute(new Float32Array([
+    -0.35, 0, 0,
+    0.35, 0, 0,
+  ]), 3)
+  const scale = new THREE.InstancedBufferAttribute(new Float32Array([1, 1]), 1)
+  geometry.setAttribute('instanceOffset', offset)
+  geometry.setAttribute('instanceScale', scale)
+  geometry.instanceCount = 2
+
+  const line = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xff0000 }))
+  line.frustumCulled = false
+  scene.add(line)
+
+  const originalOffsetGetX = offset.getX.bind(offset)
+  let offsetReads = 0
+  offset.getX = (index) => {
+    offsetReads += 1
+    return originalOffsetGetX(index)
+  }
+
+  const originalScaleGetX = scale.getX.bind(scale)
+  let scaleReads = 0
+  scale.getX = (index) => {
+    scaleReads += 1
+    return originalScaleGetX(index)
+  }
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const offsetReadsAfterFirstRender = offsetReads
+  const scaleReadsAfterFirstRender = scaleReads
+  assert.ok(offsetReadsAfterFirstRender > 0, 'initial line render should read instanced position offsets')
+  assert.ok(scaleReadsAfterFirstRender > 0, 'initial line render should read instanced position scales')
+
+  line.position.y += 0.1
+  line.material.color.set(0x00ff00)
+  renderer.render(scene, camera, options)
+  assert.equal(offsetReads, offsetReadsAfterFirstRender, 'InstancedBufferGeometry line transform/material animation should reuse cached position offsets')
+  assert.equal(scaleReads, scaleReadsAfterFirstRender, 'InstancedBufferGeometry line transform/material animation should reuse cached position scales')
+
+  offset.array[0] = -0.25
+  offset.needsUpdate = true
+  renderer.render(scene, camera, options)
+  const offsetReadsAfterOffsetUpdate = offsetReads
+  const scaleReadsAfterOffsetUpdate = scaleReads
+  assert.ok(offsetReadsAfterOffsetUpdate > offsetReadsAfterFirstRender, 'instanced line offset version changes should invalidate cached position expansion')
+
+  scale.array[1] = 0.8
+  scale.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(scaleReads > scaleReadsAfterOffsetUpdate, 'instanced line scale version changes should invalidate cached position expansion')
+})
+
 test('reusable renderer reuses cached InstancedBufferGeometry UV expansion until UV attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

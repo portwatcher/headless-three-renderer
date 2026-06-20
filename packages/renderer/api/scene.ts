@@ -2376,7 +2376,7 @@ function appendLineOrPoints(
         indices = expandLineIndices(source, drawStart, drawEnd, object)
         if (indices.length < 2) continue
         if (instancedGeometryCount > 1 || instancedPositionOffset || instancedPositionScale) {
-          outputPositions = expandVec3ValuesForInstances(positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset, instancedPositionScale)
+          outputPositions = expandVec3ValuesForInstancesWithCache(cache, geometry, position, positions, 0, vertexCount, instancedGeometryCount, instancedPositionOffset, instancedPositionScale)
           outputUvs = uvStreams.uvs ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, 0, vertexCount, instancedGeometryCount) : undefined
           outputSecondaryUvs = uvStreams.uvs2 ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs2, 0, vertexCount, instancedGeometryCount) : undefined
           indices = expandIndicesForInstances(indices, vertexCount, instancedGeometryCount)
