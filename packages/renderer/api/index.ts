@@ -5133,7 +5133,11 @@ function clearRenderTargetColor(
       mipSize.width,
       mipSize.height,
       scissor,
-      renderTargetExistingColorBuffer(target.data, mipSize.width, mipSize.height),
+      renderTargetExistingColorBuffer(
+        renderTargetTextureFaceImage(cubeTargetTexture(target), activeCubeFace, resolvedMipmapLevel)?.data,
+        mipSize.width,
+        mipSize.height,
+      ),
     )
     const attachments = colorTextures.slice(1).map((texture) => ({ texture, data: face }))
     writeCubeRenderTargetFace(
@@ -5202,7 +5206,7 @@ function clearRenderTargetDepth(
         mipSize.width,
         mipSize.height,
         scissor,
-        renderTargetTextureFaceImage(target.depthTexture, activeCubeFace)?.data,
+        renderTargetTextureFaceImage(target.depthTexture, activeCubeFace, resolvedMipmapLevel)?.data,
       ),
       mipSize.width,
       mipSize.height,
@@ -5294,8 +5298,22 @@ function renderTargetClearDimension(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null
 }
 
-function renderTargetExistingColorBuffer(data: Buffer | undefined, width: number, height: number): Buffer | undefined {
-  return Buffer.isBuffer(data) && data.length === width * height * 4 ? data : undefined
+function renderTargetExistingColorBuffer(
+  data: RenderTargetImageLike['data'] | undefined,
+  width: number,
+  height: number,
+): Buffer | undefined {
+  if (
+    (
+      Buffer.isBuffer(data) ||
+      data instanceof Uint8Array ||
+      data instanceof Uint8ClampedArray
+    ) &&
+    data.length === width * height * 4
+  ) {
+    return Buffer.from(data)
+  }
+  return undefined
 }
 
 function clearColorBuffer(
@@ -5498,8 +5516,16 @@ function renderTargetReadbackImage(
 function renderTargetTextureFaceImage(
   texture: RenderTargetTextureLike | undefined,
   activeCubeFaceIndex: number,
+  activeMipmapLevel = 0,
 ): RenderTargetImageLike | undefined {
   if (!texture) return undefined
+  if (activeMipmapLevel > 0) {
+    const mipmapImage = texture.mipmaps?.[activeMipmapLevel]?.image
+    if (Array.isArray(mipmapImage) && mipmapImage[activeCubeFaceIndex]?.data) {
+      return mipmapImage[activeCubeFaceIndex]
+    }
+    return undefined
+  }
   if (Array.isArray(texture.image) && texture.image[activeCubeFaceIndex]?.data) {
     return texture.image[activeCubeFaceIndex]
   }

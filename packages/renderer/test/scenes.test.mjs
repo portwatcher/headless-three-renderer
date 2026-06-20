@@ -2572,6 +2572,41 @@ test('CubeCamera active mip target faces honor scissor clipping', () => {
   assert.ok(outside.r < 20 && outside.g < 20 && outside.b < 20, `cube scissor should leave pixels outside the active mip rectangle clear (${outside.r}, ${outside.g}, ${outside.b})`)
 })
 
+test('Renderer clear preserves active cube mip face scissor data', () => {
+  const scene = makeCubeCaptureScene()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(32)
+  cubeTarget.depthTexture = { type: THREE.FloatType, mipmaps: [] }
+  const cubeCamera = new THREE.CubeCamera(0.01, 100, cubeTarget)
+  cubeCamera.activeMipmapLevel = 1
+
+  renderToTarget(scene, cubeCamera, cubeTarget)
+
+  const depthBefore = meanScalarRegion(cubeTarget.depthTexture.mipmaps[1].image[1].data, 16, 16, 10, 6, 14, 10)
+  cubeTarget.scissorTest = true
+  cubeTarget.scissor = { x: 0, y: 0, width: 16, height: 32 }
+  const renderer = new Renderer()
+  renderer.setClearColor(0x0000ff, 1)
+  renderer.setClearDepth(0.25)
+  renderer.setRenderTarget(cubeTarget, 1, 1)
+  renderer.clear(true, true, false)
+
+  const negativeFace = cubeTarget.texture.mipmaps[1].image[1].data
+  const clearedColor = meanRegion(negativeFace, 16, 16, 2, 6, 6, 10)
+  const preservedColor = meanRegion(negativeFace, 16, 16, 10, 6, 14, 10)
+  assert.ok(clearedColor.b > clearedColor.r + 80 && clearedColor.b > clearedColor.g + 80, `cube clear should write blue inside the active mip face scissor (${clearedColor.r}, ${clearedColor.g}, ${clearedColor.b})`)
+  assert.ok(preservedColor.g > preservedColor.r + 30 && preservedColor.g > preservedColor.b + 50, `cube clear should preserve the active face outside scissor (${preservedColor.r}, ${preservedColor.g}, ${preservedColor.b})`)
+
+  const negativeDepth = cubeTarget.depthTexture.mipmaps[1].image[1].data
+  const clearedDepth = meanScalarRegion(negativeDepth, 16, 16, 2, 6, 6, 10)
+  const preservedDepth = meanScalarRegion(negativeDepth, 16, 16, 10, 6, 14, 10)
+  assert.ok(Math.abs(clearedDepth - 0.25) < 1e-6, `cube clear should write depth inside the active mip face scissor (${clearedDepth})`)
+  assert.ok(Math.abs(preservedDepth - depthBefore) < 1e-6, `cube clear should preserve depth outside the active face scissor (${preservedDepth} vs ${depthBefore})`)
+
+  const positiveFace = meanRegion(cubeTarget.texture.mipmaps[1].image[0].data, 16, 16, 5, 5, 11, 11)
+  assert.ok(positiveFace.r > positiveFace.g + 80 && positiveFace.r > positiveFace.b + 80, `cube clear should not alter other active mip faces (${positiveFace.r}, ${positiveFace.g}, ${positiveFace.b})`)
+  renderer.setRenderTarget(null)
+})
+
 test('CubeCamera captured target textures can be reused as cube inputs', () => {
   const captureTarget = {}
   const cubeCamera = new THREE.CubeCamera(0.01, 100, new THREE.WebGLCubeRenderTarget(32))
