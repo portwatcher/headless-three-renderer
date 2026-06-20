@@ -26782,13 +26782,29 @@ test('Renderer transmissionResolutionScale controls transmission scene-color res
   const fullResolution = renderer.render(makeScene(), camera, { width, height, format: 'rgba' })
   renderer.transmissionResolutionScale = 0.125
   const lowResolution = renderer.render(makeScene(), camera, { width, height, format: 'rgba' })
+  renderer.transmissionResolutionScale = 1
+  const optionLowResolution = renderer.render(makeScene(), camera, { width, height, format: 'rgba', transmissionResolutionScale: 0.125 })
+  assert.equal(renderer.transmissionResolutionScale, 1)
+  renderer.transmissionResolutionScale = 0.125
+  const optionFullResolution = renderer.render(makeScene(), camera, { width, height, format: 'rgba', transmissionResolutionScale: 1 })
+  assert.equal(renderer.transmissionResolutionScale, 0.125)
 
   const fullContrast = centerEdgeContrast(fullResolution)
   const lowContrast = centerEdgeContrast(lowResolution)
+  const optionLowContrast = centerEdgeContrast(optionLowResolution)
+  const optionFullContrast = centerEdgeContrast(optionFullResolution)
   assert.ok(fullContrast > 80, `full-resolution transmission scene color should preserve the edge (${fullContrast.toFixed(1)})`)
   assert.ok(
     lowContrast < fullContrast - 20,
     `low transmissionResolutionScale should soften the scene-color edge (${lowContrast.toFixed(1)} vs ${fullContrast.toFixed(1)})`,
+  )
+  assert.ok(
+    optionLowContrast < fullContrast - 20,
+    `options.transmissionResolutionScale should soften the scene-color edge without mutating renderer state (${optionLowContrast.toFixed(1)} vs ${fullContrast.toFixed(1)})`,
+  )
+  assert.ok(
+    optionFullContrast > 80,
+    `options.transmissionResolutionScale should override low renderer state for a full-resolution edge (${optionFullContrast.toFixed(1)})`,
   )
 })
 
@@ -32718,6 +32734,18 @@ test('Renderer transmissionResolutionScale is validated compatibility state', ()
   assert.throws(
     () => { renderer.transmissionResolutionScale = 'half' },
     /Renderer\.transmissionResolutionScale must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 32, height: 32, transmissionResolutionScale: 0 }),
+    /options\.transmissionResolutionScale must be greater than 0/i,
+  )
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 32, height: 32, transmissionResolutionScale: Number.NaN }),
+    /options\.transmissionResolutionScale must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 32, height: 32, transmissionResolutionScale: 'half' }),
+    /options\.transmissionResolutionScale must be a finite number/i,
   )
 })
 

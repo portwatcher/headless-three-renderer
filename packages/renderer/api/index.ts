@@ -3314,7 +3314,7 @@ export class Renderer {
       __headlessThreeRendererShadowMapType: this.shadowMap.type,
       __headlessThreeRendererToneMapping: this.toneMapping,
       __headlessThreeRendererToneMappingExposure: this.toneMappingExposure,
-      __headlessThreeRendererTransmissionResolutionScale: this.transmissionResolutionScale,
+      __headlessThreeRendererTransmissionResolutionScale: sizeOptions.transmissionResolutionScale ?? this.transmissionResolutionScale,
       __headlessThreeRenderer: this,
     }
   }
@@ -5485,6 +5485,9 @@ function validateUnsupportedRenderOptions(options: RenderOptions): void {
   validatePostProcessingOptions(options.postProcessing)
   assertSupportedSampleCount(options.samples, 'options.samples')
   assertSupportedSampleCount(options.sampleCount, 'options.sampleCount')
+  if (options.transmissionResolutionScale != null) {
+    rendererStatePositiveFiniteNumber(options.transmissionResolutionScale, 'options.transmissionResolutionScale')
+  }
   if (Object.prototype.hasOwnProperty.call(options, 'target') && options.target !== undefined) {
     assertRenderTargetLike(options.target, 'options.target')
   }

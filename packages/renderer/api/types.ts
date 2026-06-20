@@ -604,6 +604,8 @@ export interface RenderOptions {
   opaque?: boolean
   /** Whether transmissive/transparent render-list buckets are rendered. Defaults to Renderer.transparent. */
   transparent?: boolean
+  /** Per-render transmission scene-color resolution scale. Defaults to Renderer.transmissionResolutionScale. */
+  transmissionResolutionScale?: number
   /** Custom opaque-bucket sort callback. `null` uses the default sort. */
   opaqueSort?: RenderSortFunction | null
   /** Custom transmissive/transparent-bucket sort callback. `null` uses the default sort. */
