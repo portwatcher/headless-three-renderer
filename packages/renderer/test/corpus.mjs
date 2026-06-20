@@ -65,6 +65,7 @@ export function createSceneCorpus() {
     maskRenderModeCorpus(),
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
+    depthRenderModeCorpus(),
     spriteMaterialCorpus(),
     spriteAlphaMapCorpus(),
     billboardAlphaCutoutCorpus(),
@@ -1010,6 +1011,41 @@ function normalRenderModeCorpus() {
       const corner = meanRegion(rgba, width, 4, 4, 20, 20)
       if (!(center.r > center.g + 60 && center.b > center.g + 40 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
         throw new Error(`normal render corpus should render tilted view-normal colors on black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function depthRenderModeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.85, 0.1, 0.1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(1.35, 1.35),
+    new THREE.MeshBasicMaterial({ color: 0x0088ff }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'depth-render-mode-plane',
+    scene,
+    camera,
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      renderMode: 'depth',
+    },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 32, 32, 64, 64)
+      const corner = meanRegion(rgba, width, 0, 0, 8, 8)
+      if (!(center.r > 150 && Math.abs(center.r - center.g) < 2 && Math.abs(center.r - center.b) < 2 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
+        throw new Error(`depth render corpus should render grayscale depth on black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
   }
