@@ -1320,8 +1320,10 @@ export class Renderer {
   private native: InstanceType<typeof native.NativeRenderer>
   private readonly sceneExtractionCache: SceneExtractionCache = createSceneExtractionCache()
   private opaqueSort: RenderSortFunction | null = null
+  private opaqueValue = true
   private sortObjectsValue = true
   private transparentSort: RenderSortFunction | null = null
+  private transparentValue = true
   private currentRenderTarget: RenderTargetLike | null = null
   private currentActiveCubeFace = 0
   private currentActiveMipmapLevel = 0
@@ -1472,6 +1474,22 @@ export class Renderer {
       throw new TypeError(`Renderer.sortObjects must be a boolean; received ${String(value)}.`)
     }
     this.sortObjectsValue = value
+  }
+
+  get opaque(): boolean {
+    return this.opaqueValue
+  }
+
+  set opaque(value: boolean) {
+    this.opaqueValue = rendererStateBoolean(value, 'Renderer.opaque')
+  }
+
+  get transparent(): boolean {
+    return this.transparentValue
+  }
+
+  set transparent(value: boolean) {
+    this.transparentValue = rendererStateBoolean(value, 'Renderer.transparent')
   }
 
   get outputColorSpace(): RenderOutputColorSpace {
@@ -2503,6 +2521,8 @@ export class Renderer {
       sortObjects: sizeOptions.sortObjects ?? this.sortObjects,
       opaqueSort: sizeOptions.opaqueSort === undefined ? this.opaqueSort : sizeOptions.opaqueSort,
       transparentSort: sizeOptions.transparentSort === undefined ? this.transparentSort : sizeOptions.transparentSort,
+      __headlessThreeRendererOpaque: this.opaque,
+      __headlessThreeRendererTransparent: this.transparent,
       __headlessThreeClippingPlanesLabel: hasExplicitClippingPlanes ? undefined : 'Renderer.clippingPlanes',
       __headlessThreeRendererClearColor: cloneColor4(this.currentClearColor),
       __headlessThreeRendererViewport: clonePixelRect(this.currentViewport),
@@ -2756,6 +2776,8 @@ function toNativeInput(
       sortObjects: options.sortObjects,
       opaqueSort: options.opaqueSort,
       transparentSort: options.transparentSort,
+      opaque: (options as InternalRenderOptions).__headlessThreeRendererOpaque,
+      transparent: (options as InternalRenderOptions).__headlessThreeRendererTransparent,
     },
     overrideMaterial,
     sceneExtractionCache,
@@ -3258,6 +3280,8 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeRendererToneMapping?: number
   __headlessThreeRendererToneMappingExposure?: number
   __headlessThreeRendererTransmissionResolutionScale?: number
+  __headlessThreeRendererOpaque?: boolean
+  __headlessThreeRendererTransparent?: boolean
   __headlessThreeRenderer?: unknown
 }
 

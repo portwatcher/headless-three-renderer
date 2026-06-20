@@ -310,6 +310,8 @@ interface SceneSortOptions {
   sortObjects?: boolean
   opaqueSort?: RenderSortFunction | null
   transparentSort?: RenderSortFunction | null
+  opaque?: boolean
+  transparent?: boolean
 }
 
 interface RenderCallbackContext {
@@ -2543,6 +2545,11 @@ function mergeSortKeys(keys: MeshSortInfo['keys'], override: SortKeyOverride | u
 function sortFlattenedMeshes(meshes: FlattenedMesh[], options: SceneSortOptions): FlattenedMesh[] {
   const sortObjects = options.sortObjects !== false
   const buckets = partitionFlattenedMeshes(meshes)
+  if (options.opaque === false) buckets.opaque.length = 0
+  if (options.transparent === false) {
+    buckets.transmissive.length = 0
+    buckets.transparent.length = 0
+  }
 
   if (!sortObjects) {
     normalizeSortKeys(buckets.opaque)

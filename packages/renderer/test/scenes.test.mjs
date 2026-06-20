@@ -7505,6 +7505,53 @@ test('sortObjects=false preserves traversal order within transparent bucket', ()
   assert.ok(mean.b > mean.r + 160, `sortObjects=false should leave blue after red traversal order (${mean.b} vs ${mean.r})`)
 })
 
+test('Renderer opaque and transparent flags gate render buckets', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false }),
+  ))
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, depthTest: false, depthWrite: false }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  assert.equal(renderer.opaque, true)
+  assert.equal(renderer.transparent, true)
+
+  const all = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(all.r > all.g + 160, `default renderer bucket flags should draw transparent red over opaque green (${all.r} vs ${all.g})`)
+
+  renderer.transparent = false
+  const opaqueOnly = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(opaqueOnly.g > opaqueOnly.r + 60, `transparent=false should skip the transparent red bucket (${opaqueOnly.g} vs ${opaqueOnly.r})`)
+
+  renderer.opaque = false
+  renderer.transparent = true
+  const transparentOnly = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(transparentOnly.r > transparentOnly.g + 160, `opaque=false should skip the opaque green bucket (${transparentOnly.r} vs ${transparentOnly.g})`)
+
+  renderer.transparent = false
+  const backgroundOnly = meanRegion(renderer.render(scene, camera, { width: 64, height: 64, format: 'rgba' }), 64, 64, 24, 24, 40, 40)
+  assert.ok(backgroundOnly.r < 5 && backgroundOnly.g < 5 && backgroundOnly.b < 5, `opaque=false and transparent=false should leave only the background (${backgroundOnly.r}, ${backgroundOnly.g}, ${backgroundOnly.b})`)
+
+  assert.throws(
+    () => { renderer.opaque = 'yes' },
+    /Renderer\.opaque must be a boolean/i,
+  )
+  assert.throws(
+    () => { renderer.transparent = 'yes' },
+    /Renderer\.transparent must be a boolean/i,
+  )
+})
+
 test('invalid sort controls fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial()))
