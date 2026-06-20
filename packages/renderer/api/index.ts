@@ -640,6 +640,14 @@ class RendererDomElementState {
     return this.stylePixelSize(this.style.height, this.height)
   }
 
+  get offsetWidth(): number {
+    return this.clientWidth
+  }
+
+  get offsetHeight(): number {
+    return this.clientHeight
+  }
+
   setSize(width: number, height: number, updateStyle = true): void {
     this.width = width
     this.height = height
@@ -667,6 +675,30 @@ class RendererDomElementState {
   removeAttribute(name: unknown): void {
     assertDomElementAttributeName(name, 'Renderer.domElement.removeAttribute name')
     this.attributes.delete(name)
+  }
+
+  getBoundingClientRect(): {
+    x: number
+    y: number
+    width: number
+    height: number
+    top: number
+    right: number
+    bottom: number
+    left: number
+  } {
+    const width = this.clientWidth
+    const height = this.clientHeight
+    return {
+      x: 0,
+      y: 0,
+      width,
+      height,
+      top: 0,
+      right: width,
+      bottom: height,
+      left: 0,
+    }
   }
 
   getContext(): never {

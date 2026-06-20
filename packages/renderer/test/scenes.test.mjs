@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import * as THREE from 'three'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -2268,6 +2269,64 @@ test('LightProbeGenerator reads cube targets through the WebGLRenderer marker pa
   ), 0)
   assert.ok(Number.isFinite(energy), `generated LightProbe coefficients should stay finite (${energy})`)
   assert.ok(energy > 0.01, `generated LightProbe should contain captured cube radiance (${energy})`)
+})
+
+test('ViewHelper render uses domElement offset size and restores viewport', () => {
+  const previousDocument = globalThis.document
+  globalThis.document = {
+    createElement(type) {
+      assert.equal(type, 'canvas')
+      return {
+        width: 0,
+        height: 0,
+        getContext(contextType) {
+          assert.equal(contextType, '2d')
+          return {
+            beginPath() {},
+            arc() {},
+            closePath() {},
+            fill() {},
+            fillText() {},
+            getImageData(_x, _y, width, height) {
+              const data = new Uint8ClampedArray(width * height * 4)
+              for (let i = 0; i < data.length; i += 4) {
+                data[i] = 255
+                data[i + 1] = 255
+                data[i + 2] = 255
+                data[i + 3] = 255
+              }
+              return { data, width, height }
+            },
+          }
+        },
+      }
+    },
+  }
+
+  try {
+    const renderer = new Renderer()
+    renderer.setSize(256, 192)
+    renderer.setViewport(8, 10, 40, 50)
+    const target = { texture: {} }
+    renderer.setRenderTarget(target)
+
+    const camera = makeCamera()
+    const helper = new ViewHelper(camera, renderer.domElement)
+    helper.render(renderer)
+
+    assert.strictEqual(renderer.getRenderTarget(), target)
+    assert.deepEqual(renderer.getViewport(), { x: 8, y: 10, width: 40, height: 50 })
+    assert.ok(target.data instanceof Uint8Array, 'ViewHelper render should write into the active target')
+    assert.equal(target.width, 256)
+    assert.equal(target.height, 192)
+    helper.dispose()
+  } finally {
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
 })
 
 test('EffectComposer RenderPass uses Renderer target state and readback', () => {
@@ -31399,6 +31458,18 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.equal(renderer.domElement.height, 0)
   assert.equal(renderer.domElement.clientWidth, 0)
   assert.equal(renderer.domElement.clientHeight, 0)
+  assert.equal(renderer.domElement.offsetWidth, 0)
+  assert.equal(renderer.domElement.offsetHeight, 0)
+  assert.deepEqual(renderer.domElement.getBoundingClientRect(), {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  })
   assert.deepEqual(renderer.domElement.style, { width: '0px', height: '0px' })
   assert.throws(
     () => renderer.domElement.getContext('webgl'),
@@ -31430,6 +31501,18 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.equal(renderer.domElement.height, 32)
   assert.equal(renderer.domElement.clientWidth, 64)
   assert.equal(renderer.domElement.clientHeight, 32)
+  assert.equal(renderer.domElement.offsetWidth, 64)
+  assert.equal(renderer.domElement.offsetHeight, 32)
+  assert.deepEqual(renderer.domElement.getBoundingClientRect(), {
+    x: 0,
+    y: 0,
+    width: 64,
+    height: 32,
+    top: 0,
+    right: 64,
+    bottom: 32,
+    left: 0,
+  })
   assert.deepEqual(renderer.domElement.style, { width: '64px', height: '32px' })
 
   renderer.setSize(48, 24, false)
@@ -31450,6 +31533,8 @@ test('Renderer domElement is an inert output-size mirror', () => {
   renderer.domElement.style.height = 'invalid'
   assert.equal(renderer.domElement.clientWidth, 13)
   assert.equal(renderer.domElement.clientHeight, 20)
+  assert.equal(renderer.domElement.offsetWidth, 13)
+  assert.equal(renderer.domElement.offsetHeight, 20)
   renderer.domElement.style.width = '40px'
   renderer.domElement.style.height = '20px'
   assert.equal(renderer.domElement.style.getPropertyValue('width'), '40px')
