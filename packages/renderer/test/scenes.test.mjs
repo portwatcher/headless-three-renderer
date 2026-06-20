@@ -31193,6 +31193,10 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
     powerPreference: 'high-performance',
     failIfMajorPerformanceCaveat: false,
   })
+  assert.equal(renderer.alpha, true)
+  assert.equal(renderer.depth, true)
+  assert.equal(renderer.stencil, false)
+  assert.equal(renderer.logarithmicDepthBuffer, false)
   const mutableAttributes = renderer.getContextAttributes()
   mutableAttributes.alpha = false
   assert.equal(renderer.getContextAttributes().alpha, true)
@@ -31448,7 +31452,14 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   const camera = makeCamera()
   const renderer = new Renderer()
 
+  assert.equal(renderer.isRenderer, true)
   assert.equal(renderer.isWebGLRenderer, true)
+  assert.equal(renderer.initialized, true)
+  assert.equal(renderer.hasInitialized(), true)
+  assert.equal(renderer.alpha, false)
+  assert.equal(renderer.depth, true)
+  assert.equal(renderer.stencil, false)
+  assert.equal(renderer.logarithmicDepthBuffer, false)
   assert.equal(renderer.coordinateSystem, THREE.WebGLCoordinateSystem)
   assert.throws(
     () => { renderer.coordinateSystem = THREE.WebGPUCoordinateSystem },

@@ -1284,7 +1284,12 @@ export class Renderer {
   private animationLoop: RenderAnimationLoopCallback | null = null
   private readonly contextAttributes: RendererContextAttributesLike
 
+  readonly isRenderer = true
   readonly isWebGLRenderer = true
+  readonly alpha: boolean
+  readonly depth: boolean
+  readonly stencil: boolean
+  readonly logarithmicDepthBuffer = false
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
   readonly debug = new RendererDebugState()
@@ -1301,11 +1306,18 @@ export class Renderer {
   constructor(parameters?: RendererParametersLike) {
     assertRendererParametersLike(parameters, 'Renderer parameters')
     this.contextAttributes = rendererContextAttributes(parameters)
+    this.alpha = this.contextAttributes.alpha
+    this.depth = this.contextAttributes.depth
+    this.stencil = this.contextAttributes.stencil
     this.native = new native.NativeRenderer()
   }
 
   async init(): Promise<this> {
     return this
+  }
+
+  get initialized(): boolean {
+    return true
   }
 
   get coordinateSystem(): number {
