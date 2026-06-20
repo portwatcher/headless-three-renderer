@@ -33,6 +33,7 @@ const cjsRequire = createRequire(import.meta.url)
 
 const SIZE = 128
 const BG = [26, 26, 26] // 0.1 * 255
+const UnsignedInt101111Type = THREE.UnsignedInt101111Type ?? 35899
 
 function makeCamera() {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
@@ -16958,7 +16959,7 @@ test('packed raw environment textures unpack for IBL', () => {
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x84ff]), [136, 68, 255]],
     ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, THREE.RGBAFormat, new Uint16Array([0x823f]), [132, 66, 255]],
     ['UnsignedInt5999Type', THREE.UnsignedInt5999Type, THREE.RGBFormat, new Uint32Array([packRgb9E5(0.5, 0.25, 1)]), [128, 64, 255]],
-    ['UnsignedInt101111Type', THREE.UnsignedInt101111Type, THREE.RGBFormat, new Uint32Array([packR11G11B10F(0x380, 0x340, 0x1e0)]), [128, 64, 255]],
+    ['UnsignedInt101111Type', UnsignedInt101111Type, THREE.RGBFormat, new Uint32Array([packR11G11B10F(0x380, 0x340, 0x1e0)]), [128, 64, 255]],
   ]
 
   function byteEnvironmentTexture([r, g, b]) {
@@ -17017,7 +17018,7 @@ test('packed raw DataTexture maps unpack color channels', () => {
     ['UnsignedShort4444Type', THREE.UnsignedShort4444Type, THREE.RGBAFormat, new Uint16Array([0x842f]), 'red-dominant'],
     ['UnsignedShort5551Type', THREE.UnsignedShort5551Type, THREE.RGBAFormat, new Uint16Array([0x823f]), 'blue-dominant'],
     ['UnsignedInt5999Type', THREE.UnsignedInt5999Type, THREE.RGBFormat, new Uint32Array([packRgb9E5(0.5, 0.25, 1)]), 'blue-dominant'],
-    ['UnsignedInt101111Type', THREE.UnsignedInt101111Type, THREE.RGBFormat, new Uint32Array([packR11G11B10F(0x380, 0x340, 0x1e0)]), 'blue-dominant'],
+    ['UnsignedInt101111Type', UnsignedInt101111Type, THREE.RGBFormat, new Uint32Array([packR11G11B10F(0x380, 0x340, 0x1e0)]), 'blue-dominant'],
   ]
 
   function packedTexture(type, format, data) {
@@ -23663,6 +23664,13 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.equal(redData.length, 64 * 64, 'RedFormat color target should receive one channel per pixel')
   assert.ok(redData[redCenter] > 128, `RedFormat red channel should keep the source red (${redData[redCenter]})`)
 
+  const luminanceTarget = { texture: { format: THREE.LuminanceFormat } }
+  renderToTarget(scene, camera, luminanceTarget, options)
+  const luminanceData = luminanceTarget.texture.image.data
+  assert.ok(luminanceData instanceof Uint8Array, 'LuminanceFormat color target should receive Uint8Array data')
+  assert.equal(luminanceData.length, 64 * 64, 'LuminanceFormat color target should receive one channel per pixel')
+  assert.ok(luminanceData[redCenter] > 128, `LuminanceFormat luminance should keep the source red channel (${luminanceData[redCenter]})`)
+
   const alphaScene = new THREE.Scene()
   alphaScene.background = new THREE.Color(0, 0, 1)
   alphaScene.add(new THREE.Mesh(
@@ -23675,6 +23683,17 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(alphaData instanceof Uint8Array, 'AlphaFormat color target should receive Uint8Array data')
   assert.equal(alphaData.length, 64 * 64, 'AlphaFormat color target should receive one channel per pixel')
   assert.ok(alphaData[redCenter] > 250, `AlphaFormat should extract opaque alpha instead of red (${alphaData[redCenter]})`)
+
+  const luminanceAlphaScene = new THREE.Scene()
+  luminanceAlphaScene.background = { r: 1, g: 0, b: 0, a: 0.5 }
+  const luminanceAlphaTarget = { texture: { format: THREE.LuminanceAlphaFormat, type: THREE.FloatType } }
+  renderToTarget(luminanceAlphaScene, camera, luminanceAlphaTarget, options)
+  const luminanceAlphaData = luminanceAlphaTarget.texture.image.data
+  const luminanceAlphaCenter = redCenter * 2
+  assert.ok(luminanceAlphaData instanceof Float32Array, 'LuminanceAlphaFormat FloatType color target should receive Float32Array data')
+  assert.equal(luminanceAlphaData.length, 64 * 64 * 2, 'LuminanceAlphaFormat color target should receive two channels per pixel')
+  assert.ok(luminanceAlphaData[luminanceAlphaCenter] > 0.99, `LuminanceAlphaFormat luminance should keep red clear color (${luminanceAlphaData[luminanceAlphaCenter]})`)
+  assert.ok(Math.abs(luminanceAlphaData[luminanceAlphaCenter + 1] - 0.5) < 0.01, `LuminanceAlphaFormat alpha should keep clear alpha (${luminanceAlphaData[luminanceAlphaCenter + 1]})`)
 
   const floatTarget = { texture: { type: THREE.FloatType } }
   renderToTarget(scene, camera, floatTarget, options)
@@ -23779,7 +23798,7 @@ test('renderToTarget color textures honor typed readback requests', () => {
   assert.ok(rgb9e5Green < 0.05, `UnsignedInt5999Type green channel should stay near zero (${rgb9e5Green})`)
   assert.ok(rgb9e5Blue < 0.05, `UnsignedInt5999Type blue channel should stay near zero (${rgb9e5Blue})`)
 
-  const r11Target = { texture: { type: THREE.UnsignedInt101111Type } }
+  const r11Target = { texture: { type: UnsignedInt101111Type } }
   renderToTarget(scene, camera, r11Target, options)
   const r11Data = r11Target.texture.image.data
   const r11 = r11Data[redCenter]
@@ -24190,7 +24209,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ depthTexture: { isCubeTexture: true } }, /target\.depthTexture uses a cube texture.*THREE\.CubeCamera/i, 'regular camera cube depth texture'],
     [{ samples: 2 }, /MSAA sample count 2.*not supported/i, 'target samples'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'target sampleCount'],
-    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'color texture format'],
+    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*LuminanceFormat.*LuminanceAlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'color texture format'],
     [{ texture: { type: THREE.UnsignedInt248Type } }, /target color texture type .*not supported.*UnsignedByteType.*ByteType.*ShortType.*UnsignedShortType.*IntType.*UnsignedIntType.*HalfFloatType.*FloatType.*UnsignedShort4444Type.*UnsignedShort5551Type.*UnsignedInt101111Type.*UnsignedInt5999Type/i, 'color texture type'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'depth texture format'],
@@ -24213,7 +24232,7 @@ test('unsupported render target MRT and invalid MSAA requests fail clearly', () 
     [{ texture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target color texture format uses a compressed texture format/i, 'options.target compressed color format'],
     [{ depthTexture: { format: THREE.RGBA_S3TC_DXT5_Format } }, /target\.depthTexture\.format uses a compressed texture format/i, 'options.target compressed depth format'],
     [{ sampleCount: 8 }, /MSAA sample count 8.*not supported/i, 'options.target sampleCount'],
-    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'options.target color texture format'],
+    [{ texture: { format: THREE.DepthFormat } }, /target color texture format .*not supported.*AlphaFormat.*LuminanceFormat.*LuminanceAlphaFormat.*RedFormat.*RedIntegerFormat.*RGFormat.*RGIntegerFormat.*RGBFormat.*RGBIntegerFormat.*RGBAFormat.*RGBAIntegerFormat/i, 'options.target color texture format'],
     [{ depthTexture: { type: THREE.ByteType } }, /target\.depthTexture\.type .*not supported/i, 'options.target depth texture type'],
     [{ depthTexture: { format: THREE.RGBAFormat } }, /target\.depthTexture\.format .*not supported/i, 'options.target depth texture format'],
     [{ depthTexture: { type: THREE.FloatType, format: THREE.DepthStencilFormat } }, /DepthStencilFormat.*UnsignedInt248Type/i, 'options.target depth-stencil format with scalar type'],

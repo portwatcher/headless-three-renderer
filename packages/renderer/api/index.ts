@@ -3510,6 +3510,8 @@ const UnsignedInt248Type = 1020
 const AlphaFormat = 1021
 const RGBFormat = 1022
 const RGBAFormat = 1023
+const LuminanceFormat = 1024
+const LuminanceAlphaFormat = 1025
 const DepthFormat = 1026
 const DepthStencilFormat = 1027
 const RedFormat = 1028
@@ -5689,6 +5691,8 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
   if (
     format != null &&
     format !== AlphaFormat &&
+    format !== LuminanceFormat &&
+    format !== LuminanceAlphaFormat &&
     format !== RedFormat &&
     format !== RedIntegerFormat &&
     format !== RGFormat &&
@@ -5699,7 +5703,7 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
     format !== RGBAIntegerFormat
   ) {
     throw new Error(
-      `${label} format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBFormat, RGBIntegerFormat, RGBAFormat, RGBAIntegerFormat, or omit format for RGBA8 readback.`,
+      `${label} format ${String(format)} is not supported by @headless-three/renderer yet. Use AlphaFormat, LuminanceFormat, LuminanceAlphaFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBFormat, RGBIntegerFormat, RGBAFormat, RGBAIntegerFormat, or omit format for RGBA8 readback.`,
     )
   }
   const type = texture.type
@@ -5727,6 +5731,8 @@ function assertSupportedRenderTargetColorTexture(texture: RenderTargetTextureLik
 function isReadableRenderTargetColorFormat(format: number): boolean {
   return (
     format === AlphaFormat ||
+    format === LuminanceFormat ||
+    format === LuminanceAlphaFormat ||
     format === RedFormat ||
     format === RedIntegerFormat ||
     format === RGFormat ||
@@ -6843,9 +6849,11 @@ function packUnsignedFloat(value: number, mantissaBits: 5 | 6): number {
 function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
   switch (format) {
     case AlphaFormat:
+    case LuminanceFormat:
     case RedFormat:
     case RedIntegerFormat:
       return 1
+    case LuminanceAlphaFormat:
     case RGFormat:
     case RGIntegerFormat:
       return 2
@@ -6859,6 +6867,7 @@ function colorTextureChannelCount(format: number | undefined): 1 | 2 | 3 | 4 {
 
 function colorTextureBytes(rgba: Buffer, format: number | undefined, channels: 1 | 2 | 3 | 4): Uint8Array {
   if (format === AlphaFormat) return alphaColorTextureBytes(rgba)
+  if (format === LuminanceAlphaFormat) return luminanceAlphaColorTextureBytes(rgba)
   return channels === 4 ? rgba : narrowedColorTextureBytes(rgba, channels)
 }
 
@@ -6878,6 +6887,16 @@ function narrowedColorTextureBytes(rgba: Buffer, channels: 1 | 2 | 3): Uint8Arra
     out[p] = rgba[i]
     if (channels > 1) out[p + 1] = rgba[i + 1]
     if (channels > 2) out[p + 2] = rgba[i + 2]
+  }
+  return out
+}
+
+function luminanceAlphaColorTextureBytes(rgba: Buffer): Uint8Array {
+  const pixels = rgba.length / 4
+  const out = new Uint8Array(pixels * 2)
+  for (let i = 0, p = 0; i < rgba.length; i += 4, p += 2) {
+    out[p] = rgba[i]
+    out[p + 1] = rgba[i + 3]
   }
   return out
 }
