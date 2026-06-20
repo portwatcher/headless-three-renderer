@@ -532,6 +532,48 @@ test('points billboard budget renders 4,096 colored points', () => {
   assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `point colors should survive billboard expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('point object budget renders 2,048 separate transformed Points objects', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 32
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+  const materials = [
+    new THREE.PointsMaterial({ color: 0xf25f5c, size: 2.4, sizeAttenuation: false }),
+    new THREE.PointsMaterial({ color: 0x247ba0, size: 2.4, sizeAttenuation: false }),
+    new THREE.PointsMaterial({ color: 0x70c1b3, size: 2.4, sizeAttenuation: false }),
+    new THREE.PointsMaterial({ color: 0xffe066, size: 2.4, sizeAttenuation: false }),
+    new THREE.PointsMaterial({ color: 0xc77dff, size: 2.4, sizeAttenuation: false }),
+  ]
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const points = new THREE.Points(geometry, materials[(row + col) % materials.length])
+      points.position.set(
+        (col / (columns - 1) - 0.5) * 1.9,
+        (row / (rows - 1) - 0.5) * 1.9,
+        Math.sin(col * 0.21 + row * 0.13) * 0.02,
+      )
+      scene.add(points)
+    }
+  }
+
+  assert.equal(scene.children.length, columns * rows)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.4, `separate Points object scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 30 && mean.g > 30 && mean.b > 30, `separate Points object colors should survive traversal (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('sprite billboard budget renders 2,048 colored sprites', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)

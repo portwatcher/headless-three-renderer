@@ -14,6 +14,7 @@ target platform and GPU backend.
 | Instanced mesh expansion | 7,056 instances | A single `InstancedMesh` renders an 84 x 84 grid with per-instance matrices and colors. |
 | BatchedMesh expansion | 2,048 packed instances | A single `BatchedMesh` renders a 64 x 32 grid using one packed plane geometry plus per-instance matrices and colors. |
 | Points billboard expansion | 4,096 points | A single `Points` object renders a 64 x 64 grid with per-point colors through CPU billboard expansion. |
+| Points object count | 2,048 `Points` objects | A 64 x 32 grid of independently transformed single-point objects renders with shared geometry and a small material set. |
 | Sprite billboard expansion | 2,048 sprites | A 64 x 32 grid of `Sprite` objects renders with shared colored `SpriteMaterial` instances through CPU billboard expansion. |
 | Wide line expansion | 4,032 line segments | A single `LineSegments` object renders a 64-row grid with per-vertex colors through wide-line quad expansion. |
 | Line object count | 2,048 `LineSegments` objects | A 64 x 32 grid of independently transformed line objects renders with shared geometry and a small material set. |
