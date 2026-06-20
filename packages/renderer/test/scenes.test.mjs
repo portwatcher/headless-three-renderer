@@ -17625,6 +17625,50 @@ test('canvas-like texture images render across material, background, and IBL slo
   assert.ok(probeDiff > 0.5, `canvas-like reflection probe should affect IBL, diff=${probeDiff.toFixed(3)}`)
 })
 
+test('CanvasTexture images use canvas-like texture reads', () => {
+  function canvasImage(data, width = 1, height = 1) {
+    const pixels = new Uint8ClampedArray(data)
+    return {
+      width,
+      height,
+      getContext(type) {
+        if (type !== '2d') return null
+        return {
+          getImageData(x, y, readWidth, readHeight) {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(readWidth, width)
+            assert.equal(readHeight, height)
+            return { data: pixels, width, height }
+          },
+        }
+      },
+    }
+  }
+
+  function canvasTexture(data) {
+    const texture = new THREE.CanvasTexture(canvasImage(data))
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const mapInfo = extractTextureData(new THREE.MeshBasicMaterial({ map: canvasTexture([12, 34, 56, 255]) }))
+  assert.ok(mapInfo)
+  assert.deepEqual(Array.from(mapInfo.data.slice(0, 4)), [12, 34, 56, 255])
+
+  const backgroundInfo = extractBackgroundTexture(canvasTexture([64, 96, 128, 255]))
+  assert.ok(backgroundInfo)
+  assert.deepEqual(Array.from(backgroundInfo.data.slice(0, 4)), [64, 96, 128, 255])
+
+  const environment = canvasTexture([160, 96, 32, 255])
+  environment.mapping = THREE.EquirectangularReflectionMapping
+  const scene = new THREE.Scene()
+  scene.environment = environment
+  const environmentInfo = extractEnvironmentMap(scene)
+  assert.ok(environmentInfo)
+  assert.deepEqual(Array.from(environmentInfo.data.slice(0, 4)), [160, 96, 32, 255])
+})
+
 test('image-like texture objects render through an OffscreenCanvas polyfill', () => {
   const previousOffscreenCanvas = globalThis.OffscreenCanvas
   class FakeOffscreenCanvas {
@@ -17797,6 +17841,51 @@ test('unsupported framebuffer and depth texture scene inputs fail clearly', () =
         `${slotName} ${textureName} should fail clearly`,
       )
     }
+  }
+})
+
+test('unsupported VideoTexture scene inputs fail clearly in Node slots', () => {
+  function videoTexture() {
+    const texture = new THREE.VideoTexture({ videoWidth: 1, videoHeight: 1 })
+    texture.needsUpdate = true
+    return texture
+  }
+
+  const slots = [
+    ['material map', (scene, texture) => {
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: texture }),
+      ))
+    }, /material\.map uses a VideoTexture.*live video frames.*not directly readable/i],
+    ['background', (scene, texture) => {
+      scene.background = texture
+    }, /background uses a VideoTexture.*live video frames.*not directly readable/i],
+    ['environment', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.environment = texture
+    }, /scene\.environment uses a VideoTexture.*live video frames.*not directly readable/i],
+    ['material envMap', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ envMap: texture }),
+      ))
+    }, /material\.envMap uses a VideoTexture.*live video frames.*not directly readable/i],
+    ['reflection probe', (scene, texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping
+      scene.userData.headlessThreeRenderer = { reflectionProbe: { texture } }
+    }, /reflectionProbe\.texture uses a VideoTexture.*live video frames.*not directly readable/i],
+  ]
+
+  for (const [slotName, setup, pattern] of slots) {
+    const scene = new THREE.Scene()
+    setup(scene, videoTexture())
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${slotName} VideoTexture should fail clearly`,
+    )
   }
 })
 
@@ -33478,6 +33567,14 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
   assert.throws(
     () => renderer.copyTextureToTexture(source, new THREE.DepthTexture(1, 1)),
     /Renderer\.copyTextureToTexture destination texture uses a DepthTexture/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(new THREE.VideoTexture({ videoWidth: 1, videoHeight: 1 }), destination),
+    /Renderer\.copyTextureToTexture source texture uses a VideoTexture.*live video frames.*not directly readable/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture(source, new THREE.VideoTexture({ videoWidth: 1, videoHeight: 1 })),
+    /Renderer\.copyTextureToTexture destination texture uses a VideoTexture.*live video frames.*not directly readable/i,
   )
   assert.throws(
     () => renderer.copyTextureToTexture(source, destination, null, null, 1),

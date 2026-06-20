@@ -116,6 +116,7 @@ export interface ThreeTextureLike {
   isCubeTexture?: boolean
   isFramebufferTexture?: boolean
   isDepthTexture?: boolean
+  isVideoTexture?: boolean
   isCompressedTexture?: boolean
   isCompressedArrayTexture?: boolean
   isCompressedCubeTexture?: boolean

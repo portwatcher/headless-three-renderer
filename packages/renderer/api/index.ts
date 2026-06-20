@@ -5092,6 +5092,11 @@ function rawTextureCopyImage(
       `${label} uses a DepthTexture, which is not supported by @headless-three/renderer texture copy yet. Use Renderer.readRenderTargetPixels() or target.depthTexture readback for depth data.`,
     )
   }
+  if (texture.isVideoTexture === true) {
+    throw new Error(
+      `${label} uses a VideoTexture, which is not supported by @headless-three/renderer texture copy because live video frames are not directly readable in Node. Copy from a readable raw texture or canvas-like image instead.`,
+    )
+  }
   if (
     texture.isDataArrayTexture === true ||
     texture.isData3DTexture === true ||

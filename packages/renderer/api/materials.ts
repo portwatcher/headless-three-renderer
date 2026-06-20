@@ -3398,6 +3398,11 @@ function assertSupportedTextureInput(
       `${label} uses a DepthTexture, which is only supported as target.depthTexture for render-target depth readback. Use a readable color texture for material, background, or environment slots.`,
     )
   }
+  if (map.isVideoTexture === true) {
+    throw new Error(
+      `${label} uses a VideoTexture, which is not supported by @headless-three/renderer in Node because live video frames are not directly readable. Provide a canvas-like image exposing getContext("2d").getImageData(), an encoded image, or raw DataTexture pixels before rendering.`,
+    )
+  }
   if (
     map.isCompressedTexture === true ||
     map.isCompressedArrayTexture === true ||
