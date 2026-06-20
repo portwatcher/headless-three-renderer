@@ -22137,6 +22137,10 @@ test('Renderer readRenderTargetPixels reads stored target color data', async () 
   assert.ok(allocatedTyped instanceof Float32Array, 'async MRT readback should allocate the attachment typed-array class')
   assert.deepEqual([...allocatedTyped], [...typedAttachment])
 
+  const commonSignatureTyped = await renderer.readRenderTargetPixelsAsync(mrtTarget, 0, 0, 16, 8, 1)
+  assert.ok(commonSignatureTyped instanceof Float32Array, 'async common-renderer readback signature should allocate the attachment typed-array class')
+  assert.deepEqual([...commonSignatureTyped], [...typedAttachment])
+
   assert.throws(
     () => renderer.readRenderTargetPixels('target', 0, 0, 1, 1, Buffer.alloc(4)),
     /Renderer\.readRenderTargetPixels target must be a target-like object/i,
@@ -22168,6 +22172,10 @@ test('Renderer readRenderTargetPixels reads stored target color data', async () 
   await assert.rejects(
     () => renderer.readRenderTargetPixelsAsync(target, 0, 0, 1, 1, null),
     /buffer must be a mutable typed array or Buffer/i,
+  )
+  await assert.rejects(
+    () => renderer.readRenderTargetPixelsAsync(target, 0, 0, 1, 1, -1),
+    /textureIndex must be a non-negative integer/i,
   )
 })
 

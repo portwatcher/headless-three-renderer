@@ -2196,14 +2196,22 @@ export class Renderer {
     y: number,
     width: number,
     height: number,
-    buffer?: NonNullable<RenderTargetImageLike['data']>,
-    activeCubeFaceIndex?: number,
+    bufferOrTextureIndex?: NonNullable<RenderTargetImageLike['data']> | number,
+    activeCubeFaceIndexOrFaceIndex?: number,
     textureIndex = 0,
   ): Promise<NonNullable<RenderTargetImageLike['data']>> {
+    let buffer: NonNullable<RenderTargetImageLike['data']> | undefined
+    let targetTextureIndex = textureIndex
+    if (typeof bufferOrTextureIndex === 'number') {
+      targetTextureIndex = bufferOrTextureIndex
+    } else {
+      buffer = bufferOrTextureIndex
+    }
+    const activeCubeFaceIndex = activeCubeFaceIndexOrFaceIndex
     const readback = renderTargetReadbackSource(
       target,
       activeCubeFaceIndex,
-      textureIndex,
+      targetTextureIndex,
       'Renderer.readRenderTargetPixelsAsync',
     )
     const rect = readbackRect(x, y, width, height, 'Renderer.readRenderTargetPixelsAsync')
