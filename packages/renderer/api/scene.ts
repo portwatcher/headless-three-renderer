@@ -262,11 +262,11 @@ function visitObject(
       }
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext, overrideMaterial)
+        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext, overrideMaterial, cache)
       }
     } else if (object.isPoints === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera, viewportHeight, overrideMaterial)) {
-        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
+        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
       }
     } else if (object.isSprite === true) {
       appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
@@ -1105,22 +1105,26 @@ function appendPoints(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
+  cache: SceneExtractionCache | undefined,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
 
   const geometry = object.geometry!
-  const position = getAttribute(geometry, 'position')
-  if (!position) return
+  const geometryExtraction = meshGeometryExtraction(geometry, cache)
+  if (!geometryExtraction) return
 
-  const positions = readVec3Attribute(position, 'geometry.attributes.position')
-  const vertexColors = getAttribute(geometry, 'color')
-  const pointUvChannels = readUvChannels(geometry)
-  const primaryPointUvs = pointUvChannels[0]?.values ?? null
-  const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
-  const groups = effectiveGroups(geometry, index, position.count)
-  const instancedGeometryCount = instancedBufferGeometryCount(geometry)
-  const instancedPositionOffset = instancedOffsetAttribute(geometry)
+  const {
+    position,
+    positions,
+    vertexColors,
+    index,
+    groups,
+    instancedGeometryCount,
+    instancedPositionOffset,
+  } = geometryExtraction
+  const pointUvChannels = geometryExtraction.uvChannels
+  const primaryPointUvs = geometryExtraction.uvs
   const transform = matrixElements(object.matrixWorld!, 'points.matrixWorld')
   const axes = cameraBillboardAxes(camera)
 
@@ -1540,22 +1544,27 @@ function appendLineOrPoints(
   localClippingEnabled: boolean,
   materialContext: MaterialExtractionContext,
   overrideMaterial?: ThreeMaterialLike,
+  cache?: SceneExtractionCache,
 ): void {
   validateObjectShadowFlags(object)
   const objectCastsShadow = topology === 'lines' && optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   const geometry = object.geometry!
-  const position = getAttribute(geometry, 'position')
-  if (!position) return
+  const geometryExtraction = meshGeometryExtraction(geometry, cache)
+  if (!geometryExtraction) return
 
-  const positions = readVec3Attribute(position, 'geometry.attributes.position')
-  const uvChannels = readUvChannels(geometry)
-  const uvs = uvChannels[0]?.values ?? null
-  const vertexColors = getAttribute(geometry, 'color')
+  const {
+    position,
+    positions,
+    uvChannels,
+    uvs,
+    vertexColors,
+    index,
+    groups,
+    instancedGeometryCount,
+    instancedPositionOffset,
+  } = geometryExtraction
   const vertexCount = position.count
-  const indexAttr = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', vertexCount) : null
-  const instancedGeometryCount = instancedBufferGeometryCount(geometry)
-  const instancedPositionOffset = instancedOffsetAttribute(geometry)
-  const groups = effectiveGroups(geometry, indexAttr, vertexCount)
+  const indexAttr = index
 
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)

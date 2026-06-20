@@ -23365,6 +23365,85 @@ test('reusable renderer reuses cached static mesh geometry until attributes chan
   assert.ok(positionReads > readsAfterFirstRender, 'attribute version changes should invalidate cached geometry extraction')
 })
 
+test('reusable renderer reuses cached static line and point geometry until attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  function instrumentPosition(attribute) {
+    const originalGetX = attribute.getX.bind(attribute)
+    let reads = 0
+    attribute.getX = (index) => {
+      reads += 1
+      return originalGetX(index)
+    }
+    return () => reads
+  }
+
+  const lineGeometry = new THREE.BufferGeometry()
+  lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.7, -0.25, 0,
+    -0.2, -0.25, 0,
+  ], 3))
+  const linePosition = lineGeometry.getAttribute('position')
+  const lineReads = instrumentPosition(linePosition)
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 })
+  const line = new THREE.LineSegments(lineGeometry, lineMaterial)
+  line.frustumCulled = false
+  scene.add(line)
+
+  const pointGeometry = new THREE.BufferGeometry()
+  pointGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    0.2, 0.25, 0,
+    0.55, 0.25, 0,
+  ], 3))
+  const pointPosition = pointGeometry.getAttribute('position')
+  const pointReads = instrumentPosition(pointPosition)
+  const pointMaterial = new THREE.PointsMaterial({ color: 0x00ff00, size: 10, sizeAttenuation: false })
+  const points = new THREE.Points(pointGeometry, pointMaterial)
+  points.frustumCulled = false
+  scene.add(points)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const lineReadsAfterFirstRender = lineReads()
+  const pointReadsAfterFirstRender = pointReads()
+  assert.ok(lineReadsAfterFirstRender > 0, 'initial render should extract line geometry')
+  assert.ok(pointReadsAfterFirstRender > 0, 'initial render should extract point geometry')
+
+  line.position.x += 0.1
+  points.position.x -= 0.1
+  lineMaterial.color.set(0x0000ff)
+  pointMaterial.color.set(0xff00ff)
+  renderer.render(scene, camera, options)
+  assert.equal(lineReads(), lineReadsAfterFirstRender, 'line transform/material animation should reuse cached static geometry extraction')
+  assert.equal(pointReads(), pointReadsAfterFirstRender, 'point transform/material animation should reuse cached static geometry extraction')
+
+  linePosition.array[0] += 0.05
+  linePosition.needsUpdate = true
+  renderer.render(scene, camera, options)
+  const lineReadsAfterLineUpdate = lineReads()
+  assert.ok(lineReadsAfterLineUpdate > lineReadsAfterFirstRender, 'line attribute version changes should invalidate cached geometry extraction')
+  assert.equal(pointReads(), pointReadsAfterFirstRender, 'line invalidation should not force unrelated point geometry extraction')
+
+  pointPosition.array[0] -= 0.05
+  pointPosition.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(pointReads() > pointReadsAfterFirstRender, 'point attribute version changes should invalidate cached geometry extraction')
+  assert.equal(lineReads(), lineReadsAfterLineUpdate, 'point invalidation should not force unrelated line geometry extraction')
+})
+
 test('reusable renderer reflects mutated scene environment texture bytes', () => {
   const renderer = new Renderer()
   const data = new Uint8Array(2 * 2 * 4)
