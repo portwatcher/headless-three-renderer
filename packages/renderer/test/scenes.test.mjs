@@ -1600,6 +1600,47 @@ test('BatchedMesh customSort controls instance draw order', () => {
   assert.ok(mean.b > mean.r + 80, `BatchedMesh customSort should draw custom-ordered blue instance last (${mean.b} vs ${mean.r})`)
 })
 
+test('BatchedMesh default onBeforeRender does not re-enter customSort', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true })
+  const batched = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count,
+    source.index.count,
+    material,
+  )
+  const geometryId = batched.addGeometry(source)
+  const left = batched.addInstance(geometryId)
+  const right = batched.addInstance(geometryId)
+  batched.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.35, 0, 0))
+  batched.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.35, 0, 0))
+
+  let customSortCalls = 0
+  batched.setCustomSort((list) => {
+    customSortCalls += 1
+    list.sort((a, b) => a.index - b.index)
+  })
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  renderRgba(scene, camera, { width: 64, height: 64 })
+  assert.equal(customSortCalls, 1, 'CPU BatchedMesh sorting should not invoke the built-in multidraw onBeforeRender path')
+
+  let userBeforeRenderCalls = 0
+  batched.onBeforeRender = function () {
+    userBeforeRenderCalls += 1
+  }
+  renderRgba(scene, camera, { width: 64, height: 64 })
+  assert.equal(customSortCalls, 2, 'explicit BatchedMesh onBeforeRender callbacks should not suppress CPU customSort')
+  assert.ok(userBeforeRenderCalls > 0, 'explicit BatchedMesh onBeforeRender callbacks should still run')
+})
+
 test('BatchedMesh renderer sort callbacks receive the source object', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)

@@ -1121,8 +1121,27 @@ function invokeObjectRenderCallback(
   if (typeof callback !== 'function') {
     throw new TypeError(`THREE.Object3D.${name} must be a function when provided.`)
   }
+  if (isInternalBatchedMeshRenderCallback(object, callback, name)) return
   if (!context) return
   callback.call(object, context.renderer, context.scene, camera, geometry, material, group)
+}
+
+function isInternalBatchedMeshRenderCallback(
+  object: ThreeObject3DLike,
+  callback: Function,
+  name: 'onBeforeRender' | 'onAfterRender',
+): boolean {
+  if (name !== 'onBeforeRender' || object.isBatchedMesh !== true) return false
+  if (Object.prototype.hasOwnProperty.call(object, name)) return false
+
+  let prototype = Object.getPrototypeOf(object)
+  while (prototype && prototype !== Object.prototype) {
+    if (prototype.constructor?.name === 'BatchedMesh' && typeof prototype[name] === 'function') {
+      return callback === prototype[name]
+    }
+    prototype = Object.getPrototypeOf(prototype)
+  }
+  return false
 }
 
 function shadowOnlyMainPassState(): Pick<
