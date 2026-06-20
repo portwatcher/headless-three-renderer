@@ -1393,6 +1393,19 @@ export class Renderer {
     )
   }
 
+  setMRT(mrt: unknown = null): this {
+    if (mrt !== null) {
+      throw new Error(
+        'Renderer.setMRT() is not supported by @headless-three/renderer because arbitrary native MRT shader outputs are outside the scene-oriented API. Use target texture userData.headlessThreeRenderer.renderMode for the supported color, mask, object-id, and normal auxiliary outputs.',
+      )
+    }
+    return this
+  }
+
+  getMRT(): null {
+    return null
+  }
+
   initRenderTarget(target: RenderTargetLike): void {
     assertRenderTargetLike(target, 'Renderer.initRenderTarget target')
     validateUnsupportedRenderTargetOptions(target)

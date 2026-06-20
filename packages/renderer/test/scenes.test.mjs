@@ -30645,6 +30645,10 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
   assert.equal(renderer.getRenderObjectFunction(), null)
   assert.equal(renderer.setRenderObjectFunction(null), undefined)
   assert.equal(renderer.getRenderObjectFunction(), null)
+  assert.equal(renderer.getMRT(), null)
+  assert.strictEqual(renderer.setMRT(), renderer)
+  assert.strictEqual(renderer.setMRT(null), renderer)
+  assert.equal(renderer.getMRT(), null)
   assert.throws(
     () => renderer.setRenderObjectFunction('renderObject'),
     /Renderer\.setRenderObjectFunction renderObjectFunction must be a function or null/i,
@@ -30660,6 +30664,10 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
   assert.throws(
     () => renderer.renderObject(),
     /Renderer\.renderObject\(\) is not supported.*render-object dispatch.*Renderer\.render\(\) or renderToTarget\(\)/i,
+  )
+  assert.throws(
+    () => renderer.setMRT({ output: 'color' }),
+    /Renderer\.setMRT\(\) is not supported.*arbitrary native MRT shader outputs.*userData\.headlessThreeRenderer\.renderMode/i,
   )
 })
 
