@@ -2133,7 +2133,12 @@ class RendererRenderList {
 }
 
 class RendererRenderListsState {
+  readonly lighting: RendererLightingState
   private lists = new WeakMap<object, RendererRenderList[]>()
+
+  constructor(lighting: RendererLightingState) {
+    this.lighting = lighting
+  }
 
   get(scene: object, renderCallDepth = 0): RendererRenderList {
     assertWeakMapKey(scene, 'Renderer.renderLists.get scene')
@@ -2357,7 +2362,7 @@ export class Renderer {
   readonly lighting = new RendererLightingState()
   readonly nodes: RendererNodesState
   readonly properties = new RendererPropertiesState()
-  readonly renderLists = new RendererRenderListsState()
+  readonly renderLists = new RendererRenderListsState(this.lighting)
   readonly renderStates = new RendererRenderStatesState()
   readonly reversedDepthBuffer = false
   readonly shadowMap = new RendererShadowMapState()

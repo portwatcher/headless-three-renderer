@@ -33928,6 +33928,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.properties.has(object), false)
 
   const renderList = renderer.renderLists.get(scene, 0)
+  assert.equal(renderer.renderLists.lighting, renderer.lighting)
   assert.equal(renderer.renderLists.get(scene, 0), renderList)
   assert.equal(renderer.renderLists.get(scene, 1) === renderList, false)
   renderList.init()
