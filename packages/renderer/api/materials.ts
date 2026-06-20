@@ -1044,7 +1044,7 @@ function materialScalarFeatureProperties(
   }
   const anisotropy = optionalFiniteNumber(material.anisotropy, 'material.anisotropy')
   if (anisotropy !== undefined) {
-    props.anisotropy = clamp01(Math.abs(anisotropy))
+    props.anisotropy = clamp01(anisotropy)
   }
   const anisotropyRotation = optionalFiniteNumber(material.anisotropyRotation, 'material.anisotropyRotation')
   if (anisotropyRotation !== undefined) {

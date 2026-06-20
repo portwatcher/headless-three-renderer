@@ -20913,6 +20913,43 @@ test('MeshPhysicalMaterial specular intensity and color affect direct specular',
   assert.ok(green.g > green.r + 0.1, `green specularColor should tint the highlight green (${green.g} vs ${green.r})`)
 })
 
+test('MeshPhysicalMaterial negative anisotropy matches Three.js positive-only feature gating', () => {
+  function renderAnisotropy(anisotropy) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 64, 32),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.22,
+        metalness: 0,
+        specularIntensity: 1,
+        anisotropy,
+        anisotropyRotation: Math.PI / 3,
+        anisotropyMap: solidTexture(255, 128, 255),
+      }),
+    ))
+
+    const light = new THREE.PointLight(0xffffff, 450)
+    light.position.set(0.5, 0.35, 2.2)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const zero = renderAnisotropy(0)
+  const negative = renderAnisotropy(-0.9)
+  const positive = renderAnisotropy(0.9)
+
+  const negativeDiff = meanAbsDiff(zero, negative)
+  const positiveDiff = meanAbsDiff(zero, positive)
+  assert.ok(negativeDiff < 0.05, `negative anisotropy should render like zero anisotropy, diff=${negativeDiff.toFixed(3)}`)
+  assert.ok(positiveDiff > 0.5, `positive anisotropy should still affect the physical BRDF, diff=${positiveDiff.toFixed(3)}`)
+})
+
 test('MeshPhysicalMaterial scalar clearcoat and roughness affect IBL specular', () => {
   function renderClearcoat(clearcoat, clearcoatRoughness) {
     const scene = new THREE.Scene()
