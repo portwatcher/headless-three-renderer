@@ -365,6 +365,27 @@ test('rgba format returns raw pixel buffer of the expected byte length', () => {
   assert.equal(buf.length, SIZE * SIZE * 4, 'rgba buffer must be width*height*4 bytes')
 })
 
+test('Renderer renderAsync resolves with the same scene output contract', async () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = makeCamera()
+  const renderer = new Renderer()
+
+  const rgba = await renderer.renderAsync(scene, camera, { width: 32, height: 32, format: 'rgba' })
+  assert.equal(rgba.length, 32 * 32 * 4)
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `renderAsync should resolve rendered scene output (${mean.r} vs ${mean.b})`)
+
+  await assert.rejects(
+    () => renderer.renderAsync(scene, camera, null),
+    /options must be an options object/i,
+  )
+})
+
 test('unsupported output format values fail clearly', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xff00ff })))

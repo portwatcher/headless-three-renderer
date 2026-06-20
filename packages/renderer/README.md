@@ -66,6 +66,8 @@ const renderer = new Renderer()
 const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 ```
 
+`Renderer.renderAsync(scene, camera, options)` is a Promise-returning compatibility wrapper around the same scene-output contract.
+
 `Renderer.sortObjects`, `Renderer.setOpaqueSort(fn)`, `Renderer.setTransparentSort(fn)`, and the matching `render()` options (`sortObjects`, `opaqueSort`, `transparentSort`) control native draw-list sorting; invalid option or setter values fail clearly.
 
 It also exports Node loader helpers:

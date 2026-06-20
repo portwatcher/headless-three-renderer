@@ -2090,6 +2090,10 @@ export class Renderer {
     return buffer
   }
 
+  async renderAsync(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Promise<Buffer> {
+    return this.render(scene, camera, options)
+  }
+
   renderToTarget(
     scene: ThreeSceneRootLike,
     camera: ThreeRenderCameraLike,
