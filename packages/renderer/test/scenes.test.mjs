@@ -31152,6 +31152,8 @@ test('Renderer constructor validates WebGLRenderer-compatible parameters', () =>
     reversedDepthBuffer: false,
   })
   assert.equal(renderer.reversedDepthBuffer, false)
+  assert.equal(renderer.getOutputBufferType(), THREE.UnsignedByteType)
+  assert.equal(renderer.getColorBufferType(), THREE.UnsignedByteType)
   assert.deepEqual(renderer.getContextAttributes(), {
     alpha: true,
     depth: true,

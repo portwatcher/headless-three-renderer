@@ -1311,6 +1311,14 @@ export class Renderer {
     return WEBGL_COORDINATE_SYSTEM
   }
 
+  getOutputBufferType(): number {
+    return UnsignedByteType
+  }
+
+  getColorBufferType(): number {
+    return this.getOutputBufferType()
+  }
+
   get autoClear(): boolean {
     return this.autoClearValue
   }
