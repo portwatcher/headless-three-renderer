@@ -5,6 +5,8 @@ import * as THREE from 'three'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
@@ -2115,6 +2117,38 @@ test('LightProbeGenerator reads cube targets through the WebGLRenderer marker pa
   ), 0)
   assert.ok(Number.isFinite(energy), `generated LightProbe coefficients should stay finite (${energy})`)
   assert.ok(energy > 0.01, `generated LightProbe should contain captured cube radiance (${energy})`)
+})
+
+test('EffectComposer RenderPass uses Renderer target state and readback', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 1)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+  camera.position.z = 2
+
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  const previousTarget = { texture: {} }
+  renderer.setRenderTarget(previousTarget)
+
+  const renderTarget = new THREE.WebGLRenderTarget(32, 32, {
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+  })
+  const composer = new EffectComposer(renderer, renderTarget)
+  composer.renderToScreen = false
+  composer.addPass(new RenderPass(scene, camera))
+
+  composer.render(0)
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+
+  const pixels = Buffer.alloc(32 * 32 * 4)
+  renderer.readRenderTargetPixels(composer.readBuffer, 0, 0, 32, 32, pixels)
+  const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
+  assert.ok(mean.r > mean.b + 80, `EffectComposer RenderPass target should contain red scene output (${mean.r} vs ${mean.b})`)
 })
 
 test('CubeCamera.update works with Renderer render-target state', async () => {
