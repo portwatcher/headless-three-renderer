@@ -129,6 +129,7 @@ interface TextureUvStreams {
 export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   instancedMeshes: WeakMap<ThreeObject3DLike, CachedInstancedMeshInstances>
+  instancedPositionExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedPositionExpansion>>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
   texturePayloads: TextureExtractionCache
@@ -148,6 +149,11 @@ interface CachedMeshGeometryExtraction {
 interface CachedInstancedMeshInstances {
   signature: InstancedMeshSignature
   localInstances: MeshInstance[]
+}
+
+interface CachedInstancedPositionExpansion {
+  signature: InstancedPositionExpansionSignature
+  positions: number[]
 }
 
 interface CachedBatchedGeometryView {
@@ -305,6 +311,18 @@ interface InstancedMeshSignature {
   instanceColor: AttributeSignature
 }
 
+interface InstancedPositionExpansionSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  sourcePositions: number[]
+  start: number
+  count: number
+  instanceCount: number
+  position: AttributeSignature
+  instancedPositionOffset: AttributeSignature
+  instancedPositionScale: AttributeSignature
+}
+
 interface AttributeSignature {
   ref?: ThreeBufferAttributeLike
   version?: number
@@ -365,6 +383,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
   return {
     meshGeometry: new WeakMap(),
     instancedMeshes: new WeakMap(),
+    instancedPositionExpansions: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
     texturePayloads: new WeakMap(),
@@ -600,7 +619,10 @@ function appendMesh(
       const renderIndices = wireframe ? wireframeIndicesForTriangles(indices) : indices
 
       const expandedIndices = expandIndicesForInstances(renderIndices, position.count, instancedGeometryCount)
-      const expandedPositions = expandVec3ValuesForInstances(
+      const expandedPositions = expandVec3ValuesForInstancesWithCache(
+        cache,
+        geometry,
+        position,
         positions,
         0,
         position.count,
@@ -658,7 +680,10 @@ function appendMesh(
         throw new Error(`THREE.Mesh "${object.name || object.uuid || '<unnamed>'}" has a non-triangle vertex range`)
       }
 
-      const expandedGroupPositions = expandVec3ValuesForInstances(
+      const expandedGroupPositions = expandVec3ValuesForInstancesWithCache(
+        cache,
+        geometry,
+        position,
         positions,
         group.start,
         group.count,
@@ -739,6 +764,7 @@ function appendMesh(
         instancedPositionOffset,
         instancedPositionScale,
         instances,
+        cache,
       )
     }
 
@@ -1003,6 +1029,7 @@ function appendShadowOnlyMeshGroup(
   instancedPositionOffset: InstancedAttributeRef | null,
   instancedPositionScale: InstancedAttributeRef | null,
   instances: MeshInstance[],
+  cache?: SceneExtractionCache,
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
   const baseColor = materialColor(shadowMaterial, materialContext)
@@ -1026,7 +1053,11 @@ function appendShadowOnlyMeshGroup(
     }
     const renderIndices = wireframe ? wireframeIndicesForTriangles(indices) : indices
     const expandedIndices = expandIndicesForInstances(renderIndices, vertexCount, instancedGeometryCount)
-    const expandedPositions = expandVec3ValuesForInstances(
+    const geometry = object.geometry!
+    const expandedPositions = expandVec3ValuesForInstancesWithCache(
+      cache,
+      geometry,
+      getAttribute(geometry, 'position')!,
       positions,
       0,
       vertexCount,
@@ -1086,7 +1117,11 @@ function appendShadowOnlyMeshGroup(
     throw new Error(`THREE.Mesh "${object.name || object.uuid || '<unnamed>'}" has a non-triangle vertex range`)
   }
 
-  const expandedGroupPositions = expandVec3ValuesForInstances(
+  const geometry = object.geometry!
+  const expandedGroupPositions = expandVec3ValuesForInstancesWithCache(
+    cache,
+    geometry,
+    getAttribute(geometry, 'position')!,
     positions,
     group.start,
     group.count,
@@ -3253,6 +3288,93 @@ function expandVec3ValuesForInstances(
     }
   }
   return out
+}
+
+function expandVec3ValuesForInstancesWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+  values: number[],
+  start: number,
+  count: number,
+  instanceCount: number,
+  offsetAttribute?: InstancedAttributeRef | null,
+  scaleAttribute?: InstancedAttributeRef | null,
+): number[] {
+  if (instanceCount <= 1 && !offsetAttribute && !scaleAttribute) {
+    return expandVec3ValuesForInstances(values, start, count, instanceCount, offsetAttribute, scaleAttribute)
+  }
+
+  const signature = instancedPositionExpansionSignature(
+    geometry,
+    position,
+    values,
+    start,
+    count,
+    instanceCount,
+    offsetAttribute,
+    scaleAttribute,
+  )
+  if (!cache || !signature.cacheable) {
+    return expandVec3ValuesForInstances(values, start, count, instanceCount, offsetAttribute, scaleAttribute)
+  }
+
+  const key = `${start}:${count}:${instanceCount}`
+  let geometryCache = cache.instancedPositionExpansions.get(geometry)
+  const cached = geometryCache?.get(key)
+  if (cached && sameInstancedPositionExpansionSignature(cached.signature, signature)) {
+    return cached.positions
+  }
+
+  const positions = expandVec3ValuesForInstances(values, start, count, instanceCount, offsetAttribute, scaleAttribute)
+  if (!geometryCache) {
+    geometryCache = new Map()
+    cache.instancedPositionExpansions.set(geometry, geometryCache)
+  }
+  geometryCache.set(key, { signature, positions })
+  return positions
+}
+
+function instancedPositionExpansionSignature(
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+  values: number[],
+  start: number,
+  count: number,
+  instanceCount: number,
+  offsetAttribute?: InstancedAttributeRef | null,
+  scaleAttribute?: InstancedAttributeRef | null,
+): InstancedPositionExpansionSignature {
+  const signature: InstancedPositionExpansionSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    sourcePositions: values,
+    start,
+    count,
+    instanceCount,
+    position: attributeSignature(position),
+    instancedPositionOffset: attributeSignature(offsetAttribute?.attribute),
+    instancedPositionScale: attributeSignature(scaleAttribute?.attribute),
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.position)
+    && attributeSignatureCacheable(signature.instancedPositionOffset)
+    && attributeSignatureCacheable(signature.instancedPositionScale)
+  return signature
+}
+
+function sameInstancedPositionExpansionSignature(
+  a: InstancedPositionExpansionSignature,
+  b: InstancedPositionExpansionSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && a.sourcePositions === b.sourcePositions
+    && a.start === b.start
+    && a.count === b.count
+    && a.instanceCount === b.instanceCount
+    && sameAttributeSignature(a.position, b.position)
+    && sameAttributeSignature(a.instancedPositionOffset, b.instancedPositionOffset)
+    && sameAttributeSignature(a.instancedPositionScale, b.instancedPositionScale)
 }
 
 function instanceScaleComponents(
