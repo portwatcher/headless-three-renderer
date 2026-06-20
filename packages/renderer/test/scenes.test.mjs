@@ -7860,6 +7860,64 @@ test('transparent sort callbacks receive geometry group render items', () => {
   assert.ok(mean.r > mean.b + 10, `custom group-aware transparent sort should draw red after blue (${mean.r} vs ${mean.b})`)
 })
 
+test('transparent sort callbacks receive line and point group render items', () => {
+  function assertGroupedSortItems(object, materials, label) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(object)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    const seenGroups = new Set()
+    const seenMaterials = new Set()
+    const transparentSort = (a, b) => {
+      for (const item of [a, b]) {
+        assert.equal(item.object, object, `${label} transparent sort item should expose source object`)
+        assert.equal(item.geometry, object.geometry, `${label} transparent sort item should expose source geometry`)
+        assert.ok(item.group, `${label} transparent sort item should expose geometry group`)
+        assert.equal(item.material, materials[item.group.materialIndex], `${label} transparent sort item should expose grouped material`)
+        seenGroups.add(item.group.materialIndex)
+        seenMaterials.add(item.material)
+      }
+      return b.group.materialIndex - a.group.materialIndex
+    }
+
+    renderRgba(scene, camera, { width: 64, height: 64, transparentSort })
+    assert.deepEqual([...seenGroups].sort(), [0, 1], `${label} transparent sort should see both geometry groups`)
+    assert.deepEqual([...seenMaterials].sort((a, b) => materials.indexOf(a) - materials.indexOf(b)), materials)
+  }
+
+  const lineGeometry = new THREE.BufferGeometry()
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1.3, -0.2, 0,
+    -0.2, -0.2, 0,
+    0.2, -0.2, 0,
+    1.3, -0.2, 0,
+  ]), 3))
+  lineGeometry.addGroup(0, 2, 0)
+  lineGeometry.addGroup(2, 2, 1)
+  const lineMaterials = [
+    new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.75 }),
+    new THREE.LineBasicMaterial({ color: 0x0000ff, transparent: true, opacity: 0.75 }),
+  ]
+  assertGroupedSortItems(new THREE.LineSegments(lineGeometry, lineMaterials), lineMaterials, 'line')
+
+  const pointGeometry = new THREE.BufferGeometry()
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.5, 0.35, 0,
+    0.5, 0.35, 0,
+  ]), 3))
+  pointGeometry.addGroup(0, 1, 0)
+  pointGeometry.addGroup(1, 1, 1)
+  const pointMaterials = [
+    new THREE.PointsMaterial({ color: 0xff0000, transparent: true, opacity: 0.75, size: 18, sizeAttenuation: false }),
+    new THREE.PointsMaterial({ color: 0x0000ff, transparent: true, opacity: 0.75, size: 18, sizeAttenuation: false }),
+  ]
+  assertGroupedSortItems(new THREE.Points(pointGeometry, pointMaterials), pointMaterials, 'point')
+})
+
 test('sortObjects=false preserves traversal order within transparent bucket', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
