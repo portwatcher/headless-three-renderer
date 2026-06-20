@@ -3691,16 +3691,18 @@ function physicalTransmissionDispersionCorpus() {
     return scene
   }
 
+  const dispersedScene = makeScene(10)
+
   return {
     name: 'physical-transmission-dispersion',
-    browserReference: false,
+    scene: dispersedScene,
     camera,
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.15,
     render(renderer) {
       normalOutput = renderer.render(makeScene(0), camera, options)
-      return renderer.render(makeScene(10), camera, options)
+      return renderer.render(dispersedScene, camera, options)
     },
     validate(rgba, { width }) {
       if (!normalOutput) {

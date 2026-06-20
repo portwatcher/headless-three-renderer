@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generator": "@headless-three/renderer/test/browser-reference",
   "renderer": "THREE.WebGLRenderer",
-  "threeRevision": "183",
+  "threeRevision": "172",
   "toneMapping": 0,
   "toneMappingExposure": 1,
   "fixtures": [
@@ -240,6 +240,13 @@
     {
       "file": "physical-ibl-shadow.png",
       "name": "physical-ibl-shadow",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "physical-transmission-dispersion.png",
+      "name": "physical-transmission-dispersion",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"
