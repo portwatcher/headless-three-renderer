@@ -660,6 +660,16 @@ class RendererBackendState {
 
   constructor(readonly renderer: Renderer) {}
 
+  async init(_renderer: unknown = this.renderer): Promise<void> {}
+
+  beginRender(_renderContext?: unknown): void {}
+
+  finishRender(_renderContext?: unknown): void {}
+
+  beginCompute(_computeGroup?: unknown): void {}
+
+  finishCompute(_computeGroup?: unknown): void {}
+
   getDomElement(): RendererDomElementState {
     return this.renderer.domElement
   }
@@ -681,6 +691,35 @@ class RendererBackendState {
 
   getMaxAnisotropy(): number {
     return 0
+  }
+
+  setScissorTest(value: unknown): void {
+    this.renderer.setScissorTest(rendererStateBoolean(value, 'Renderer.backend.setScissorTest value'))
+  }
+
+  updateSize(): void {}
+
+  updateViewport(_renderContext?: unknown): void {}
+
+  isOccluded(renderContextOrObject: unknown, object?: unknown): boolean {
+    return this.renderer.isOccluded(object === undefined ? renderContextOrObject : object)
+  }
+
+  getClearColor(): ThreeColorLike & {
+    a: number
+    getRGB(target?: ThreeColorLike & { a?: number }, colorSpace?: unknown): ThreeColorLike & { a?: number }
+  } {
+    const color = this.renderer.getClearColor() as ThreeColorLike & {
+      a: number
+      getRGB(target?: ThreeColorLike & { a?: number }, colorSpace?: unknown): ThreeColorLike & { a?: number }
+    }
+    color.a = this.renderer.getClearAlpha()
+    color.getRGB = (target = color) => {
+      this.renderer.getClearColor(target)
+      target.a = this.renderer.getClearAlpha()
+      return target
+    }
+    return color
   }
 
   getContext(): never {

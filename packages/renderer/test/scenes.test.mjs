@@ -32857,6 +32857,29 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.backend.getMaxAnisotropy(), 0)
   assert.equal(renderer.backend.hasFeature('timestamp-query'), false)
   assert.equal(await renderer.backend.hasFeatureAsync('timestamp-query'), false)
+  assert.equal(await renderer.backend.init(renderer), undefined)
+  assert.equal(renderer.backend.beginRender({ id: 'render' }), undefined)
+  assert.equal(renderer.backend.finishRender({ id: 'render' }), undefined)
+  assert.equal(renderer.backend.beginCompute({ id: 'compute' }), undefined)
+  assert.equal(renderer.backend.finishCompute({ id: 'compute' }), undefined)
+  assert.equal(renderer.backend.updateSize(), undefined)
+  assert.equal(renderer.backend.updateViewport({ viewport: true }), undefined)
+  assert.equal(renderer.backend.isOccluded({}, scene), false)
+  assert.equal(renderer.backend.isOccluded(scene), false)
+  renderer.setClearColor(0x204080, 0.5)
+  const backendClearColor = renderer.backend.getClearColor()
+  assert.ok(Math.abs(backendClearColor.r - 0x20 / 255) < 1e-6, `backend clear red should match renderer state (${backendClearColor.r})`)
+  assert.ok(Math.abs(backendClearColor.g - 0x40 / 255) < 1e-6, `backend clear green should match renderer state (${backendClearColor.g})`)
+  assert.ok(Math.abs(backendClearColor.b - 0x80 / 255) < 1e-6, `backend clear blue should match renderer state (${backendClearColor.b})`)
+  assert.equal(backendClearColor.a, 0.5)
+  const backendClearTarget = {}
+  assert.strictEqual(backendClearColor.getRGB(backendClearTarget), backendClearTarget)
+  assert.ok(Math.abs(backendClearTarget.r - 0x20 / 255) < 1e-6, `backend getRGB red should match renderer state (${backendClearTarget.r})`)
+  assert.equal(backendClearTarget.a, 0.5)
+  renderer.backend.setScissorTest(true)
+  assert.equal(renderer.getScissorTest(), true)
+  renderer.backend.setScissorTest(false)
+  assert.equal(renderer.getScissorTest(), false)
   assert.equal(renderer.backend.getDrawingBufferSize(), null)
   const backendSizeTarget = new THREE.Vector2()
   assert.equal(renderer.backend.getDrawingBufferSize(backendSizeTarget), null)
@@ -33219,6 +33242,14 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderer.backend.set({}, null),
     /Renderer\.backend\.set value must be an object/i,
+  )
+  assert.throws(
+    () => renderer.backend.setScissorTest(1),
+    /Renderer\.backend\.setScissorTest value must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.backend.isOccluded({}, null),
+    /Renderer\.isOccluded object must be an object-like value/i,
   )
   await assert.rejects(
     () => renderer.backend.getArrayBufferAsync({ isStorageBufferAttribute: true }),
