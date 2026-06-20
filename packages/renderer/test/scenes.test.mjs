@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import * as THREE from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
+import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
@@ -2504,6 +2505,36 @@ test('StereoEffect renders scissored eye cameras without forced matrix updates',
   assert.equal(renderer.getScissorTest(), false)
   assert.deepEqual(renderer.getViewport(), { x: 32, y: 0, width: 32, height: 32 })
   assert.deepEqual(renderer.getScissor(), { x: 32, y: 0, width: 32, height: 32 })
+})
+
+test('PeppersGhostEffect renders scissored cameras into the active target', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.AmbientLight(0xffffff, 2))
+  scene.add(new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 5)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  renderer.setRenderTarget(target)
+
+  const effect = new PeppersGhostEffect(renderer)
+  effect.setSize(96, 96)
+  effect.cameraDistance = 5
+  effect.render(scene, camera)
+
+  assert.ok(target.data instanceof Uint8Array, 'PeppersGhostEffect should write into the active target')
+  assert.equal(target.width, 96)
+  assert.equal(target.height, 96)
+  assert.ok(nonBackgroundRatio(target.data, [0, 0, 0], 3) > 0.01, 'PeppersGhostEffect should render visible helper panels')
+  assert.equal(renderer.getRenderTarget(), target)
+  assert.equal(renderer.getScissorTest(), false)
 })
 
 test('EffectComposer RenderPass uses Renderer target state and readback', () => {
