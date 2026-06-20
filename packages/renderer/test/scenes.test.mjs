@@ -3863,6 +3863,74 @@ test('MeshNormalMaterial bumpMap perturbs output normals', () => {
   assert.ok(diff > 2, `bumpMap should perturb MeshNormalMaterial output normals (diff=${diff.toFixed(2)})`)
 })
 
+test('BackSide normalMap and bumpMap scales match Three.js sign inversion', () => {
+  function renderNormal(side, cameraZ) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({
+        normalMap: solidTexture(255, 128, 128),
+        normalScale: new THREE.Vector2(1, 1),
+        side,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, cameraZ)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const frontNormal = renderNormal(THREE.FrontSide, 3)
+  const backNormal = renderNormal(THREE.BackSide, -3)
+  const doubleBackNormal = renderNormal(THREE.DoubleSide, -3)
+
+  const normalDiff = meanAbsDiff(frontNormal, backNormal)
+  assert.ok(normalDiff < 0.1, `BackSide normalScale should be negated before shading, diff=${normalDiff.toFixed(3)}`)
+  assert.ok(
+    meanAbsDiff(frontNormal, doubleBackNormal) > 20,
+    'DoubleSide should keep the material normalScale sign while the shader handles back-facing fragments',
+  )
+
+  function renderBump(side, cameraZ) {
+    const bumpMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    bumpMap.magFilter = THREE.LinearFilter
+    bumpMap.minFilter = THREE.LinearFilter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshNormalMaterial({
+        bumpMap,
+        bumpScale: 4,
+        side,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, cameraZ)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const frontBump = renderBump(THREE.FrontSide, 3)
+  const backBump = renderBump(THREE.BackSide, -3)
+  const doubleBackBump = renderBump(THREE.DoubleSide, -3)
+
+  const bumpDiff = meanAbsDiff(frontBump, backBump)
+  assert.ok(bumpDiff < 0.1, `BackSide bumpScale should be negated before shading, diff=${bumpDiff.toFixed(3)}`)
+  const doubleBumpDiff = meanAbsDiff(frontBump, doubleBackBump)
+  assert.ok(
+    doubleBumpDiff > 3,
+    `DoubleSide should keep the material bumpScale sign while the shader handles back-facing fragments, diff=${doubleBumpDiff.toFixed(3)}`,
+  )
+})
+
 test('MeshNormalMaterial bumpMap decodes sRGB colorSpace before perturbing normals', () => {
   function renderColorSpace(colorSpace) {
     const bumpMap = rgbaTexture([
@@ -22807,6 +22875,48 @@ test('clearcoatNormalMap decodes sRGB colorSpace before shading', () => {
   assert.ok(
     diff > 2,
     `sRGB-decoded clearcoatNormalMap should alter the clearcoat response from linear sampling (diff=${diff.toFixed(2)})`,
+  )
+})
+
+test('MeshPhysicalMaterial BackSide clearcoatNormalScale matches Three.js sign inversion', () => {
+  function renderClearcoat(side, cameraZ, scale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = makeEnvironmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        clearcoatNormalMap: solidTexture(192, 128, 255),
+        clearcoatNormalScale: new THREE.Vector2(scale, scale),
+        side,
+      }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, cameraZ)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 64, height: 64 })
+  }
+
+  const frontNegative = renderClearcoat(THREE.FrontSide, 3, -1)
+  const frontPositive = renderClearcoat(THREE.FrontSide, 3, 1)
+  const backPositive = renderClearcoat(THREE.BackSide, -3, 1)
+
+  const invertedDiff = meanAbsDiff(frontNegative, backPositive)
+  assert.ok(
+    invertedDiff < 3,
+    `BackSide clearcoatNormalScale should be negated before physical shading, diff=${invertedDiff.toFixed(2)}`,
+  )
+  const uninvertedDiff = meanAbsDiff(frontPositive, backPositive)
+  assert.ok(
+    uninvertedDiff > 10,
+    `BackSide clearcoatNormalScale should not behave like the unnegated front-side scale, diff=${uninvertedDiff.toFixed(2)}`,
   )
 })
 

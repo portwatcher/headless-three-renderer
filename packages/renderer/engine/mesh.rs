@@ -907,6 +907,19 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         specular_color_map,
         specular_intensity_map,
     } = physical_texture_inputs;
+
+    let side = MeshSide::from_str_opt(mesh.side.as_deref());
+    let normal_scale = if side == MeshSide::Back {
+        [-normal_scale[0], -normal_scale[1]]
+    } else {
+        normal_scale
+    };
+    let bump_scale = if side == MeshSide::Back {
+        -bump_scale
+    } else {
+        bump_scale
+    };
+
     let physical_maps = pack_physical_maps(PhysicalMapInputs {
         clearcoat: clearcoat_map.as_ref(),
         clearcoat_roughness: clearcoat_roughness_map.as_ref(),
@@ -946,6 +959,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let clearcoat_normal_scale = match mesh.clearcoat_normal_scale.as_deref() {
         Some(s) if s.len() == 2 => [s[0] as f32, s[1] as f32],
         _ => [1.0, 1.0],
+    };
+    let clearcoat_normal_scale = if side == MeshSide::Back {
+        [-clearcoat_normal_scale[0], -clearcoat_normal_scale[1]]
+    } else {
+        clearcoat_normal_scale
     };
     let sheen_color = match mesh.sheen_color.as_deref() {
         Some(s) if s.len() == 3 => [
@@ -1108,7 +1126,6 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         mesh_index,
         "stencilZPass",
     )?;
-    let side = MeshSide::from_str_opt(mesh.side.as_deref());
     let shadow_side = parse_shadow_side(mesh.shadow_side.as_deref(), mesh_index)?;
     let requested_shading_model = ShadingModel::from_str_opt(mesh.shading_model.as_deref());
     // Lines and points are normally unlit. Depth/distance wireframe meshes are
