@@ -629,6 +629,52 @@ test('wide line budget renders 4,032 colored segments', () => {
   assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `line colors should survive wide-line expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('line object budget renders 2,048 separate transformed lines', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 64
+  const rows = 32
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.034, 0, 0,
+    0.034, 0, 0,
+  ]), 3))
+  const materials = [
+    new THREE.LineBasicMaterial({ color: 0xf25f5c, linewidth: 2.1 }),
+    new THREE.LineBasicMaterial({ color: 0x247ba0, linewidth: 2.1 }),
+    new THREE.LineBasicMaterial({ color: 0x70c1b3, linewidth: 2.1 }),
+    new THREE.LineBasicMaterial({ color: 0xffe066, linewidth: 2.1 }),
+    new THREE.LineBasicMaterial({ color: 0xc77dff, linewidth: 2.1 }),
+  ]
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const line = new THREE.LineSegments(geometry, materials[(row + col) % materials.length])
+      line.position.set(
+        (col / (columns - 1) - 0.5) * 1.94,
+        (row / (rows - 1) - 0.5) * 1.88,
+        Math.sin(col * 0.19 + row * 0.17) * 0.02,
+      )
+      line.rotation.z = ((row * columns + col) % 13) * 0.11
+      scene.add(line)
+    }
+  }
+
+  assert.equal(scene.children.length, columns * rows)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.3, `separate line object scale scene should cover much of the frame (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 30 && mean.g > 30 && mean.b > 30, `separate line object colors should survive traversal (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('texture-heavy scene budget renders 225 unique maps', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)

@@ -16,6 +16,7 @@ target platform and GPU backend.
 | Points billboard expansion | 4,096 points | A single `Points` object renders a 64 x 64 grid with per-point colors through CPU billboard expansion. |
 | Sprite billboard expansion | 2,048 sprites | A 64 x 32 grid of `Sprite` objects renders with shared colored `SpriteMaterial` instances through CPU billboard expansion. |
 | Wide line expansion | 4,032 line segments | A single `LineSegments` object renders a 64-row grid with per-vertex colors through wide-line quad expansion. |
+| Line object count | 2,048 `LineSegments` objects | A 64 x 32 grid of independently transformed line objects renders with shared geometry and a small material set. |
 | Unique material textures | 225 maps | A texture-heavy scene renders a 15 x 15 grid where every plane has a unique `DataTexture`. |
 | Unique encoded material textures | 169 maps | An encoded-texture scene renders a 13 x 13 grid where every plane has a unique PNG buffer texture. |
 | Raw material texture resolution | 512 x 512 RGBA | A single mapped plane renders a 512 x 512 `DataTexture` to exercise larger decoded texture upload, sampling, and native binding paths. |
