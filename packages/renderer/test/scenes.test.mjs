@@ -31409,7 +31409,7 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.ok(mean.r > mean.b + 80, `domElement size mirroring should preserve normal rendering (${mean.r} vs ${mean.b})`)
 })
 
-test('Renderer exposes inert WebGLRenderer helper objects', () => {
+test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
   scene.add(new THREE.Mesh(
@@ -31446,6 +31446,9 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.equal(renderer.capabilities.maxSamples, 4)
   assert.equal(renderer.capabilities.samples, 0)
   assert.equal(renderer.getMaxAnisotropy(), 0)
+  assert.equal(renderer.hasFeature('timestamp-query'), false)
+  assert.equal(await renderer.hasFeatureAsync('timestamp-query'), false)
+  assert.equal(renderer.hasCompatibility('float32-filterable'), false)
   assert.equal(renderer.capabilities.getMaxAnisotropy(), 0)
   assert.equal(renderer.capabilities.getMaxPrecision('highp'), 'highp')
   assert.equal(renderer.capabilities.getMaxPrecision('mediump'), 'mediump')
@@ -31646,6 +31649,18 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
   assert.throws(
     () => renderer.extensions.get(null),
     /Renderer\.extensions\.get name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.hasFeature(''),
+    /Renderer\.hasFeature name must be a non-empty string/i,
+  )
+  await assert.rejects(
+    () => renderer.hasFeatureAsync(1),
+    /Renderer\.hasFeature name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.hasCompatibility(null),
+    /Renderer\.hasCompatibility name must be a non-empty string/i,
   )
   assert.throws(
     () => renderer.capabilities.getMaxPrecision('ultrap'),

@@ -1315,6 +1315,20 @@ export class Renderer {
     return this.capabilities.getMaxAnisotropy()
   }
 
+  hasFeature(name: unknown): boolean {
+    assertRendererProbeName(name, 'Renderer.hasFeature name')
+    return false
+  }
+
+  async hasFeatureAsync(name: unknown): Promise<boolean> {
+    return this.hasFeature(name)
+  }
+
+  hasCompatibility(name: unknown): boolean {
+    assertRendererProbeName(name, 'Renderer.hasCompatibility name')
+    return false
+  }
+
   getOutputBufferType(): number {
     return UnsignedByteType
   }
@@ -4847,6 +4861,12 @@ function assertRenderTargetImageLike(value: unknown, label: string): asserts val
 }
 
 function assertWebGlExtensionName(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
+  }
+}
+
+function assertRendererProbeName(value: unknown, label: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(`${label} must be a non-empty string.`)
   }
