@@ -140,6 +140,27 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-distance-material-range.png",
+      "name": "mesh-distance-material-range",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-distance-material-displacement-map.png",
+      "name": "mesh-distance-material-displacement-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-distance-material-wireframe.png",
+      "name": "mesh-distance-material-wireframe",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-normal-material-flat.png",
       "name": "mesh-normal-material-flat",
       "width": 96,

@@ -2229,7 +2229,6 @@ function meshDistanceMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const near = meanRegion(rgba, width, 16, 36, 36, 60)
       const far = meanRegion(rgba, width, 60, 36, 80, 60)
@@ -2291,7 +2290,6 @@ function meshDistanceDisplacementMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const primary = renderer.render(primaryScene, camera, options)
       primaryCenter = meanRegion(primary, options.width, 32, 32, 64, 64)
@@ -2329,7 +2327,6 @@ function meshDistanceMaterialWireframeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.004,
-    browserReference: false,
     validate(rgba, { width, height }) {
       const redPixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 120 && g < 5 && b < 5)
       const center = pixelAt(rgba, width, 48, 48)

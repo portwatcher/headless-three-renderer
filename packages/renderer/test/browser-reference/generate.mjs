@@ -91,6 +91,7 @@ function renderFixture(fixture) {
   let restoreRendererOptions = () => {}
   let restoreSceneOptions = () => {}
   let restoreRenderMode = () => {}
+  let restoreDistanceMaterials = () => {}
   let dataUrl
   try {
     restoreRendererOptions = applyFixtureRendererOptions(fixture)
@@ -100,9 +101,11 @@ function renderFixture(fixture) {
     applyFixtureRenderRectangles(fixture, width, height)
     fixture.scene.updateMatrixWorld(true)
     fixture.camera.updateMatrixWorld(true)
+    restoreDistanceMaterials = applyFixtureDistanceMaterials(fixture)
     renderer.render(fixture.scene, fixture.camera)
     dataUrl = renderer.domElement.toDataURL('image/png')
   } finally {
+    restoreDistanceMaterials()
     restoreRenderMode()
     restoreSceneOptions()
     restoreRendererOptions()
@@ -285,6 +288,136 @@ function applyFixtureRenderMode(fixture) {
     fixture.scene.background = previousBackground
     overrideMaterial.dispose()
   }
+}
+
+function applyFixtureDistanceMaterials(fixture) {
+  const materials = collectDistanceMaterials(fixture.scene)
+  if (materials.length === 0) {
+    return () => {}
+  }
+
+  const cameraReferencePosition = new THREE.Vector3().setFromMatrixPosition(fixture.camera.matrixWorld)
+  const restoreFns = materials.map((material) => {
+    const properties = renderer.properties.get(material)
+    const hadLight = Object.prototype.hasOwnProperty.call(properties, 'light')
+    const previousLight = properties.light
+    const previousOnBeforeCompile = material.onBeforeCompile
+    const previousCustomProgramCacheKey = material.customProgramCacheKey
+
+    const referencePosition = distanceReferencePosition(material, cameraReferencePosition)
+    const nearDistance = distanceRangeValue(material, ['nearDistance', 'distanceNear'], fixture.camera.near)
+    const farDistance = distanceRangeValue(material, ['farDistance', 'distanceFar'], fixture.camera.far)
+    const light = {
+      matrixWorld: new THREE.Matrix4().setPosition(referencePosition),
+      shadow: {
+        camera: {
+          near: nearDistance,
+          far: farDistance,
+        },
+      },
+    }
+
+    properties.light = light
+    material.onBeforeCompile = function onBeforeCompile(shader, rendererArg) {
+      previousOnBeforeCompile.call(this, shader, rendererArg)
+      const fragmentShader = shader.fragmentShader.replace(
+        'gl_FragColor = packDepthToRGBA( dist );',
+        'gl_FragColor = vec4( dist, 0.0, 0.0, diffuseColor.a );',
+      )
+      if (fragmentShader === shader.fragmentShader) {
+        throw new Error('Browser reference MeshDistanceMaterial shader did not contain the expected packed-distance output.')
+      }
+      shader.fragmentShader = fragmentShader
+    }
+    material.customProgramCacheKey = function customProgramCacheKey() {
+      const previousKey = previousCustomProgramCacheKey.call(this)
+      return `${previousKey}|headless-three-red-distance`
+    }
+    material.needsUpdate = true
+
+    return () => {
+      if (hadLight) properties.light = previousLight
+      else delete properties.light
+      material.onBeforeCompile = previousOnBeforeCompile
+      material.customProgramCacheKey = previousCustomProgramCacheKey
+      material.needsUpdate = true
+    }
+  })
+
+  return () => {
+    for (const restore of restoreFns) restore()
+  }
+}
+
+function collectDistanceMaterials(scene) {
+  const materials = new Set()
+  scene.traverse((object) => {
+    collectDistanceMaterial(object.material, materials)
+  })
+  return [...materials]
+}
+
+function collectDistanceMaterial(material, materials) {
+  if (!material) return
+  if (Array.isArray(material)) {
+    for (const entry of material) collectDistanceMaterial(entry, materials)
+    return
+  }
+  if (material.isMeshDistanceMaterial === true) {
+    materials.add(material)
+  }
+}
+
+function distanceReferencePosition(material, fallback) {
+  const hints = materialRendererHints(material)
+  const value = firstDefined(
+    material.referencePosition,
+    hints.referencePosition,
+    hints.distanceReferencePosition,
+  )
+  if (value == null) return fallback
+  if (typeof value === 'object' && typeof value.x === 'number' && typeof value.y === 'number' && typeof value.z === 'number') {
+    return finiteVector3(value.x, value.y, value.z)
+  }
+  if (Array.isArray(value) || ArrayBuffer.isView(value)) {
+    return finiteVector3(value[0], value[1], value[2])
+  }
+  throw new Error('Browser reference MeshDistanceMaterial referencePosition must be a Vector3-like value.')
+}
+
+function finiteVector3(x, y, z) {
+  if (![x, y, z].every((value) => typeof value === 'number' && Number.isFinite(value))) {
+    throw new Error('Browser reference MeshDistanceMaterial referencePosition components must be finite numbers.')
+  }
+  return new THREE.Vector3(x, y, z)
+}
+
+function distanceRangeValue(material, keys, fallback) {
+  const hints = materialRendererHints(material)
+  for (const key of keys) {
+    const value = firstDefined(material[key], hints[key])
+    if (value !== undefined) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`Browser reference MeshDistanceMaterial ${key} must be a finite number.`)
+      }
+      return value
+    }
+  }
+  return fallback
+}
+
+function materialRendererHints(material) {
+  const userData = material.userData
+  if (!userData || typeof userData !== 'object' || Array.isArray(userData)) return {}
+  const hints = userData.headlessThreeRenderer ?? userData.headlessRenderer
+  return hints && typeof hints === 'object' && !Array.isArray(hints) ? hints : {}
+}
+
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value !== undefined) return value
+  }
+  return undefined
 }
 
 function outputColorSpace(value) {
