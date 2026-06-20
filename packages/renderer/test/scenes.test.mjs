@@ -32193,6 +32193,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.capabilities.getMaxAnisotropy(), 0)
   assert.equal(renderer.capabilities.getMaxPrecision('highp'), 'highp')
   assert.equal(renderer.capabilities.getMaxPrecision('mediump'), 'mediump')
+  assert.equal(renderer.capabilities.getMaxPrecision('lowp'), 'lowp')
   assert.equal(renderer.capabilities.textureFormatReadable(THREE.RGBAFormat), true)
   assert.equal(renderer.capabilities.textureFormatReadable(THREE.DepthFormat), false)
   assert.equal(renderer.capabilities.textureTypeReadable(THREE.UnsignedByteType), true)
@@ -32510,6 +32511,10 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.ok(mean.r > mean.b + 80, `helper object probes should not alter later rendering (${mean.r} vs ${mean.b})`)
 
   assert.throws(
+    () => renderer.extensions.has(''),
+    /Renderer\.extensions\.has name must be a non-empty string/i,
+  )
+  assert.throws(
     () => renderer.extensions.get(null),
     /Renderer\.extensions\.get name must be a non-empty string/i,
   )
@@ -32542,8 +32547,20 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
     /Renderer\.capabilities\.textureTypeReadable type must be an integer/i,
   )
   assert.throws(
+    () => renderer.properties.has(null),
+    /Renderer\.properties\.has object must be an object/i,
+  )
+  assert.throws(
     () => renderer.properties.get(null),
     /Renderer\.properties\.get object must be an object/i,
+  )
+  assert.throws(
+    () => renderer.properties.remove(null),
+    /Renderer\.properties\.remove object must be an object/i,
+  )
+  assert.throws(
+    () => renderer.properties.update(null, 'custom', 1),
+    /Renderer\.properties\.update object must be an object/i,
   )
   assert.throws(
     () => renderer.properties.update({}, '', 1),
