@@ -1550,6 +1550,31 @@ export class Renderer {
     return null
   }
 
+  setOutputRenderTarget(renderTarget: unknown = null): void {
+    if (renderTarget === null) return
+    assertRenderTargetLike(renderTarget, 'Renderer.setOutputRenderTarget renderTarget')
+    validateUnsupportedRenderTargetOptions(renderTarget)
+    throw new Error(
+      'Renderer.setOutputRenderTarget() is not supported by @headless-three/renderer because common-renderer output targets are backend-owned canvas/WebGPU state. Use Renderer.setRenderTarget() or renderToTarget() with a target-like object for offscreen output.',
+    )
+  }
+
+  getOutputRenderTarget(): null {
+    return null
+  }
+
+  setCanvasTarget(canvasTarget: unknown = null): void {
+    if (canvasTarget === null) return
+    assertCanvasTargetLike(canvasTarget, 'Renderer.setCanvasTarget canvasTarget')
+    throw new Error(
+      'Renderer.setCanvasTarget() is not supported by @headless-three/renderer because it does not own a browser canvas or WebGPU canvas target. Use Renderer.domElement for inert canvas compatibility metadata and Renderer.render() for headless output.',
+    )
+  }
+
+  getCanvasTarget(): null {
+    return null
+  }
+
   setTexture2D(texture: unknown, slot: unknown): never {
     assertThreeTextureLike(texture, 'Renderer.setTexture2D texture')
     assertTextureBindingSlot(slot, 'Renderer.setTexture2D slot')
@@ -4485,6 +4510,12 @@ function assertRenderTargetLike(value: unknown, label: string): asserts value is
 function assertThreeTextureLike(value: unknown, label: string): asserts value is ThreeTextureLike {
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError(`${label} must be a texture-like object.`)
+  }
+}
+
+function assertCanvasTargetLike(value: unknown, label: string): void {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`${label} must be a canvas-target-like object.`)
   }
 }
 

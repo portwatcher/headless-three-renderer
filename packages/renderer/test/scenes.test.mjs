@@ -32016,6 +32016,46 @@ test('Renderer common compute and GPU readback APIs fail clearly as unsupported'
   )
 })
 
+test('Renderer common output and canvas targets fail clearly as unsupported', () => {
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  const canvasTarget = {
+    addEventListener() {},
+    removeEventListener() {},
+  }
+
+  assert.equal(renderer.getOutputRenderTarget(), null)
+  assert.equal(renderer.setOutputRenderTarget(), undefined)
+  assert.equal(renderer.setOutputRenderTarget(null), undefined)
+  assert.equal(renderer.getOutputRenderTarget(), null)
+
+  assert.equal(renderer.getCanvasTarget(), null)
+  assert.equal(renderer.setCanvasTarget(), undefined)
+  assert.equal(renderer.setCanvasTarget(null), undefined)
+  assert.equal(renderer.getCanvasTarget(), null)
+
+  assert.throws(
+    () => renderer.setOutputRenderTarget(target),
+    /Renderer\.setOutputRenderTarget\(\) is not supported.*common-renderer output targets.*Renderer\.setRenderTarget\(\) or renderToTarget\(\)/i,
+  )
+  assert.throws(
+    () => renderer.setCanvasTarget(canvasTarget),
+    /Renderer\.setCanvasTarget\(\) is not supported.*browser canvas or WebGPU canvas target.*Renderer\.domElement/i,
+  )
+  assert.throws(
+    () => renderer.setOutputRenderTarget({ texture: [{}, {}] }),
+    /secondary color attachment.*renderMode/i,
+  )
+  assert.throws(
+    () => renderer.setOutputRenderTarget([]),
+    /Renderer\.setOutputRenderTarget renderTarget must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.setCanvasTarget([]),
+    /Renderer\.setCanvasTarget canvasTarget must be a canvas-target-like object/i,
+  )
+})
+
 test('Renderer resource init hooks are validated no-op compatibility hooks', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
