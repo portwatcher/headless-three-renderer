@@ -31882,7 +31882,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   )
 })
 
-test('Renderer debug state is inert validated compatibility state', () => {
+test('Renderer debug state is inert validated compatibility state', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
   scene.add(new THREE.Mesh(
@@ -31894,6 +31894,7 @@ test('Renderer debug state is inert validated compatibility state', () => {
 
   assert.equal(renderer.debug.checkShaderErrors, true)
   assert.equal(renderer.debug.onShaderError, null)
+  assert.equal(typeof renderer.debug.getShaderAsync, 'function')
 
   renderer.debug.checkShaderErrors = false
   const onShaderError = () => {}
@@ -31914,6 +31915,14 @@ test('Renderer debug state is inert validated compatibility state', () => {
   assert.throws(
     () => { renderer.debug.onShaderError = 'log' },
     /Renderer\.debug\.onShaderError must be a function or null/i,
+  )
+  await assert.rejects(
+    () => renderer.debug.getShaderAsync(scene, camera, scene.children[0]),
+    /Renderer\.debug\.getShaderAsync\(\) is not supported.*generated backend shader source is not exposed/i,
+  )
+  await assert.rejects(
+    () => renderer.debug.getShaderAsync(scene, camera, null),
+    /Renderer\.debug\.getShaderAsync object must be an object-like value/i,
   )
 })
 

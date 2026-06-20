@@ -521,6 +521,17 @@ class RendererDebugState {
     }
     this.onShaderErrorValue = value
   }
+
+  async getShaderAsync(scene: unknown, camera: unknown, object: unknown): Promise<never> {
+    validateThreeSceneRoot(scene)
+    validateTopLevelRenderCamera(camera)
+    if (object === null || typeof object !== 'object' || Array.isArray(object)) {
+      throw new TypeError('Renderer.debug.getShaderAsync object must be an object-like value.')
+    }
+    throw new Error(
+      'Renderer.debug.getShaderAsync() is not supported by @headless-three/renderer because generated backend shader source is not exposed by the scene-oriented native renderer. Use material.userData.headlessThreeRenderer.fragmentWgsl for explicit custom WGSL fragments.',
+    )
+  }
 }
 
 class RendererInspectorState implements RendererInspectorLike {
