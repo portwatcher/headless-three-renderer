@@ -34,7 +34,7 @@ const { extractBackgroundTexture, extractEnvironmentMap, extractTextureData } = 
 const cjsRequire = createRequire(import.meta.url)
 
 const SIZE = 128
-const BG = [26, 26, 26] // 0.1 * 255
+const BG = [89, 89, 89] // sRGB output for linear 0.1
 const UnsignedInt101111Type = THREE.UnsignedInt101111Type ?? 35899
 
 function makeCamera() {

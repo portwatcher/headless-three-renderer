@@ -2975,27 +2975,45 @@ function objectBoundingSphere(object: ThreeObject3DLike): { center: [number, num
   }
 
   if (object.boundingSphere !== undefined) {
+    const hadBoundingSphere = object.boundingSphere != null
     if (object.boundingSphere == null && typeof object.computeBoundingSphere === 'function') {
       if (object.isInstancedMesh === true) {
         validateInstancedMeshMatrices(object)
       }
-      object.computeBoundingSphere()
+      try {
+        object.computeBoundingSphere()
+      } catch {
+        return null
+      }
     }
-    return object.boundingSphere == null
-      ? null
-      : object.isInstancedMesh === true
+    if (object.boundingSphere == null) return null
+    try {
+      return object.isInstancedMesh === true
         ? instancedMeshBoundingSphere(object)
         : sphereLike(object.boundingSphere, 'object.boundingSphere')
+    } catch (error) {
+      if (!hadBoundingSphere) return null
+      throw error
+    }
   }
 
   const geometry = object.geometry
   if (!geometry) return null
+  const hadBoundingSphere = geometry.boundingSphere != null
   if (geometry.boundingSphere == null && typeof geometry.computeBoundingSphere === 'function') {
-    geometry.computeBoundingSphere()
+    try {
+      geometry.computeBoundingSphere()
+    } catch {
+      return null
+    }
   }
-  return geometry.boundingSphere == null
-    ? null
-    : sphereLike(geometry.boundingSphere, 'geometry.boundingSphere')
+  if (geometry.boundingSphere == null) return null
+  try {
+    return sphereLike(geometry.boundingSphere, 'geometry.boundingSphere')
+  } catch (error) {
+    if (!hadBoundingSphere) return null
+    throw error
+  }
 }
 
 function batchedMeshBoundingSphere(
