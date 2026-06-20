@@ -1223,7 +1223,6 @@ function billboardAlphaCutoutCorpus() {
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.04,
     minMeanAlpha: 238,
-    browserReference: false,
     render(renderer) {
       let output = null
       for (const kind of ['sprite', 'points']) {
@@ -2088,7 +2087,6 @@ function meshDepthPackingVariantsCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const rgba = renderer.render(rgbaFixture.scene, rgbaFixture.camera, options)
       rgbaMean = pixelAt(rgba, options.width, 48, 48)
@@ -2394,7 +2392,6 @@ function meshNormalMaterialNormalMapCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(flatScene, camera, options)
       flatCenter = meanRegion(flat, options.width, 32, 32, 64, 64)
@@ -3349,7 +3346,6 @@ function packedCubeUvBackgroundTextureCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
-    browserReference: false,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.g > center.r + 100 && center.g > center.b + 40)) {
@@ -3774,7 +3770,6 @@ function multipleDirectionalShadowCorpus() {
     options,
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.02,
-    browserReference: false,
     render(renderer) {
       const first = renderer.render(firstScene, camera, options)
       const second = renderer.render(secondScene, camera, options)
@@ -4442,7 +4437,6 @@ function instancedTextureUvCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
-    browserReference: false,
     validate(rgba, { width }) {
       const samples = [
         ['left mesh', meanRegion(rgba, width, 20, 28, 30, 38), 'red'],
@@ -4498,7 +4492,6 @@ function renderableFrustumCullingCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
-    browserReference: false,
     validate(rgba, { width, height }) {
       const redPixels = countRegionPixels(rgba, width, 0, 0, Math.floor(width / 2), height, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
       const greenPixels = countRegionPixels(rgba, width, Math.floor(width / 2), 0, width, height, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
@@ -4641,7 +4634,6 @@ function batchedMeshCullingCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.03,
-    browserReference: false,
     validate(rgba, { width, height }) {
       const x = Math.floor(width / 2)
       const y = Math.floor(height / 2)

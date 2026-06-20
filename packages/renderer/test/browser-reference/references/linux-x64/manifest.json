@@ -70,6 +70,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "packed-cubeuv-background-texture.png",
+      "name": "packed-cubeuv-background-texture",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "viewport-scissor-rectangle.png",
       "name": "viewport-scissor-rectangle",
       "width": 96,
@@ -112,6 +119,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-depth-material-packed-depth-variants.png",
+      "name": "mesh-depth-material-packed-depth-variants",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-depth-material-displacement-map.png",
       "name": "mesh-depth-material-displacement-map",
       "width": 96,
@@ -128,6 +142,13 @@
     {
       "file": "mesh-normal-material-flat.png",
       "name": "mesh-normal-material-flat",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-normal-map.png",
+      "name": "mesh-normal-material-normal-map",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"
@@ -301,6 +322,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "billboard-alpha-cutouts.png",
+      "name": "billboard-alpha-cutouts",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
       "file": "sprite-shadow-caster.png",
       "name": "sprite-shadow-caster",
       "width": 96,
@@ -345,6 +373,13 @@
     {
       "file": "physical-transmission-dispersion.png",
       "name": "physical-transmission-dispersion",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "multiple-directional-shadows.png",
+      "name": "multiple-directional-shadows",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"
@@ -406,6 +441,20 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "instanced-texture-uv-streams.png",
+      "name": "instanced-texture-uv-streams",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "renderable-frustum-culling.png",
+      "name": "renderable-frustum-culling",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "batched-mesh-instance-colors.png",
       "name": "batched-mesh-instance-colors",
       "width": 96,
@@ -415,6 +464,13 @@
     {
       "file": "batched-mesh-inactive-geometry.png",
       "name": "batched-mesh-inactive-geometry",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-per-object-culling.png",
+      "name": "batched-mesh-per-object-culling",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"
