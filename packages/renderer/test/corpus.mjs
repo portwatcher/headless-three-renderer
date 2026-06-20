@@ -1805,6 +1805,7 @@ function materialEnvMapPbrCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [39, 39, 44],
     minNonBackgroundRatio: 0.06,
+    browserReference: false,
     validate(rgba, { width }) {
       const standardMean = meanRegion(rgba, width, 20, 30, 40, 66)
       const physicalMean = meanRegion(rgba, width, 56, 30, 76, 66)

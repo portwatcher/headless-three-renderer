@@ -89,13 +89,6 @@
       "outputColorSpace": "srgb"
     },
     {
-      "file": "material-env-map-pbr.png",
-      "name": "material-env-map-pbr",
-      "width": 96,
-      "height": 96,
-      "outputColorSpace": "srgb"
-    },
-    {
       "file": "mesh-basic-material-wireframe.png",
       "name": "mesh-basic-material-wireframe",
       "width": 96,
