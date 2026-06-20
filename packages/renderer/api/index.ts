@@ -2105,10 +2105,35 @@ export class Renderer {
   copyTextureToTexture3D(
     srcTexture: ThreeTextureLike,
     dstTexture: ThreeTextureLike,
-    _srcRegion: unknown = null,
-    _dstPosition: unknown = null,
+    srcRegion?: unknown,
+    dstPosition?: unknown,
+    level?: number,
+  ): never
+  copyTextureToTexture3D(
+    srcRegion: unknown,
+    dstPosition: unknown,
+    srcTexture: ThreeTextureLike,
+    dstTexture: ThreeTextureLike,
+    level?: number,
+  ): never
+  copyTextureToTexture3D(
+    srcTextureOrSrcRegion: unknown,
+    dstTextureOrDstPosition: unknown,
+    _srcRegionOrSrcTexture: unknown = null,
+    _dstPositionOrDstTexture: unknown = null,
     level = 0,
   ): never {
+    let srcTexture = srcTextureOrSrcRegion
+    let dstTexture = dstTextureOrDstPosition
+    if (
+      !hasThreeTextureMarker(srcTextureOrSrcRegion)
+      && isThreeTextureArgument(_srcRegionOrSrcTexture)
+      && isThreeTextureArgument(_dstPositionOrDstTexture)
+    ) {
+      srcTexture = _srcRegionOrSrcTexture
+      dstTexture = _dstPositionOrDstTexture
+    }
+
     assertThreeTextureLike(srcTexture, 'Renderer.copyTextureToTexture3D source texture')
     assertThreeTextureLike(dstTexture, 'Renderer.copyTextureToTexture3D destination texture')
     assertTextureCopyLevel(level, 'Renderer.copyTextureToTexture3D level')

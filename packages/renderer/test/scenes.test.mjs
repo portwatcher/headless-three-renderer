@@ -33868,6 +33868,15 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     /Renderer\.copyTextureToTexture3D\(\) is not supported.*3D and array texture GPU copies.*Renderer\.copyTextureToTexture\(\)/i,
   )
   assert.throws(
+    () => renderer.copyTextureToTexture3D(
+      { min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 1, z: 1 }, isBox3: true },
+      { x: 0, y: 0, z: 0 },
+      source,
+      destination,
+    ),
+    /Renderer\.copyTextureToTexture3D\(\) is not supported.*3D and array texture GPU copies.*Renderer\.copyTextureToTexture\(\)/i,
+  )
+  assert.throws(
     () => renderer.copyTextureToTexture3D(null, destination),
     /Renderer\.copyTextureToTexture3D source texture must be a texture-like object/i,
   )
