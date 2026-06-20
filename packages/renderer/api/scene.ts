@@ -113,6 +113,7 @@ interface TextureUvStreams {
 export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
+  dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
   texturePayloads: TextureExtractionCache
   materialColors: MaterialColorExtractionCache
   textureStates: TextureStateExtractionCache
@@ -130,6 +131,11 @@ interface CachedMeshGeometryExtraction {
 interface CachedBatchedGeometryView {
   signature: BatchedGeometryViewSignature
   view: ThreeBufferGeometryLike
+}
+
+interface CachedDashedLineExpansion {
+  signature: DashedLineSignature
+  expansion: DashedLineExpansion
 }
 
 interface CachedPointBillboardExpansion {
@@ -193,6 +199,25 @@ interface PointBillboardSignature {
   useVertexColors: boolean
   vertexColors: AttributeSignature
   baseColor?: Color4
+}
+
+interface DashedLineSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  position: AttributeSignature
+  index: AttributeSignature
+  uv: UvChannelSignature
+  uv2: UvChannelSignature
+  lineDistance: AttributeSignature
+  start: number
+  end: number
+  sourceLength: number
+  isLineSegments?: boolean
+  isLineLoop?: boolean
+  isLine?: boolean
+  dashSize: number
+  gapSize: number
+  scale: number
 }
 
 interface UvChannelSignature {
@@ -299,6 +324,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
   return {
     meshGeometry: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
+    dashedLines: new WeakMap(),
     texturePayloads: new WeakMap(),
     materialColors: new WeakMap(),
     textureStates: new WeakMap(),
@@ -2046,6 +2072,7 @@ function appendLineOrPoints(
     if (topology === 'lines') {
       const source = indexAttr ?? rangeIndices(vertexCount)
       if (material?.isLineDashedMaterial === true) {
+        const lineDistance = getAttribute(geometry, 'lineDistance')
         const dashed = instancedGeometryCount > 1 || instancedPositionOffset
           ? dashedLineAttributesForInstances(
             positions,
@@ -2057,21 +2084,24 @@ function appendLineOrPoints(
             drawStart,
             drawEnd,
             object,
-            getAttribute(geometry, 'lineDistance'),
+            lineDistance,
             material,
             instancedGeometryCount,
             instancedPositionOffset,
           )
-          : dashedLineAttributes(
+          : dashedLineAttributesWithCache(
+            cache,
+            geometry,
+            position,
             positions,
-            uvStreams.uvs?.values ?? null,
-            uvStreams.uvs2?.values ?? null,
+            uvStreams.uvs,
+            uvStreams.uvs2,
             useVertexColors ? readColorAttribute(vertexColors!, color, 'geometry.attributes.color') : undefined,
             source,
             drawStart,
             drawEnd,
             object,
-            getAttribute(geometry, 'lineDistance'),
+            lineDistance,
             material,
           )
         if (dashed.positions.length < 6) continue
@@ -3527,6 +3557,144 @@ function dashedLineAttributes(
     appendDashedSegment(out, positions, uvs, uvs2, colors, segment, scale, dashSize, totalSize)
   }
   return out
+}
+
+function dashedLineAttributesWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+  positions: number[],
+  uvChannel: UvChannel | null,
+  uvChannel2: UvChannel | null,
+  colors: number[] | undefined,
+  source: number[],
+  start: number,
+  end: number,
+  object: ThreeObject3DLike,
+  lineDistance: ThreeBufferAttributeLike | undefined,
+  material: { dashSize?: number; gapSize?: number; scale?: number },
+): DashedLineExpansion {
+  const dashSize = positiveMaterialOrObjectNumber(material.dashSize, 'material.dashSize', 3)
+  const gapSize = nonNegativeMaterialOrObjectNumber(material.gapSize, 'material.gapSize', 1)
+  const scale = nonNegativeMaterialOrObjectNumber(material.scale, 'material.scale', 1)
+  const uvs = uvChannel?.values ?? null
+  const uvs2 = uvChannel2?.values ?? null
+  if (!cache || colors) {
+    return dashedLineAttributes(positions, uvs, uvs2, colors, source, start, end, object, lineDistance, material)
+  }
+
+  const signature = dashedLineSignature(
+    geometry,
+    position,
+    uvChannel,
+    uvChannel2,
+    lineDistance,
+    start,
+    end,
+    source.length,
+    object,
+    dashSize,
+    gapSize,
+    scale,
+  )
+  if (!signature.cacheable) {
+    return dashedLineAttributes(positions, uvs, uvs2, colors, source, start, end, object, lineDistance, material)
+  }
+
+  const cacheKey = dashedLineCacheKey(signature)
+  const geometryCache = cache.dashedLines.get(geometry)
+  const cached = geometryCache?.get(cacheKey)
+  if (cached && sameDashedLineSignature(cached.signature, signature)) {
+    return cached.expansion
+  }
+
+  const expansion = dashedLineAttributes(positions, uvs, uvs2, colors, source, start, end, object, lineDistance, material)
+  let writableGeometryCache = geometryCache
+  if (!writableGeometryCache) {
+    writableGeometryCache = new Map()
+    cache.dashedLines.set(geometry, writableGeometryCache)
+  }
+  writableGeometryCache.set(cacheKey, { signature, expansion })
+  return expansion
+}
+
+function dashedLineSignature(
+  geometry: ThreeBufferGeometryLike,
+  position: ThreeBufferAttributeLike,
+  uvChannel: UvChannel | null,
+  uvChannel2: UvChannel | null,
+  lineDistance: ThreeBufferAttributeLike | undefined,
+  start: number,
+  end: number,
+  sourceLength: number,
+  object: ThreeObject3DLike,
+  dashSize: number,
+  gapSize: number,
+  scale: number,
+): DashedLineSignature {
+  const signature: DashedLineSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    position: attributeSignature(position),
+    index: attributeSignature(geometry.index),
+    uv: uvChannelSignature(uvChannel),
+    uv2: uvChannelSignature(uvChannel2),
+    lineDistance: attributeSignature(lineDistance),
+    start,
+    end,
+    sourceLength,
+    isLineSegments: object.isLineSegments,
+    isLineLoop: object.isLineLoop,
+    isLine: object.isLine,
+    dashSize,
+    gapSize,
+    scale,
+  }
+  signature.cacheable = dashedLineSignatureCacheable(signature)
+  return signature
+}
+
+function dashedLineSignatureCacheable(signature: DashedLineSignature): boolean {
+  return attributeSignatureCacheable(signature.position)
+    && attributeSignatureCacheable(signature.index)
+    && attributeSignatureCacheable(signature.uv.attribute)
+    && attributeSignatureCacheable(signature.uv2.attribute)
+    && attributeSignatureCacheable(signature.lineDistance)
+}
+
+function dashedLineCacheKey(signature: DashedLineSignature): string {
+  return [
+    signature.start,
+    signature.end,
+    signature.sourceLength,
+    signature.isLineSegments ? 1 : 0,
+    signature.isLineLoop ? 1 : 0,
+    signature.isLine ? 1 : 0,
+    signature.uv.attribute.ref ? 1 : 0,
+    signature.uv2.attribute.ref ? 1 : 0,
+    signature.dashSize,
+    signature.gapSize,
+    signature.scale,
+  ].join(':')
+}
+
+function sameDashedLineSignature(a: DashedLineSignature, b: DashedLineSignature): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && sameAttributeSignature(a.position, b.position)
+    && sameAttributeSignature(a.index, b.index)
+    && sameUvChannelSignature(a.uv, b.uv)
+    && sameUvChannelSignature(a.uv2, b.uv2)
+    && sameAttributeSignature(a.lineDistance, b.lineDistance)
+    && a.start === b.start
+    && a.end === b.end
+    && a.sourceLength === b.sourceLength
+    && a.isLineSegments === b.isLineSegments
+    && a.isLineLoop === b.isLineLoop
+    && a.isLine === b.isLine
+    && Object.is(a.dashSize, b.dashSize)
+    && Object.is(a.gapSize, b.gapSize)
+    && Object.is(a.scale, b.scale)
 }
 
 function dashedLineAttributesForInstances(

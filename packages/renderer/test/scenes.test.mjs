@@ -23860,6 +23860,73 @@ test('reusable renderer reuses cached static line and point geometry until attri
   assert.equal(lineReads(), lineReadsAfterLineUpdate, 'point invalidation should not force unrelated line geometry extraction')
 })
 
+test('reusable renderer reuses cached dashed-line expansion until dash inputs change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.8, 0, 0,
+    0.8, 0, 0,
+  ], 3))
+  geometry.setAttribute('lineDistance', new THREE.Float32BufferAttribute([0, 1.6], 1))
+
+  const lineDistance = geometry.getAttribute('lineDistance')
+  const originalGetX = lineDistance.getX.bind(lineDistance)
+  let lineDistanceReads = 0
+  lineDistance.getX = (index) => {
+    lineDistanceReads += 1
+    return originalGetX(index)
+  }
+
+  const material = new THREE.LineDashedMaterial({
+    color: 0xff0000,
+    dashSize: 0.25,
+    gapSize: 0,
+    linewidth: 8,
+    scale: 1,
+  })
+  const line = new THREE.Line(geometry, material)
+  line.frustumCulled = false
+  scene.add(line)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const first = renderer.render(scene, camera, options)
+  const firstCenter = meanRegion(first, 64, 64, 28, 28, 36, 36)
+  const readsAfterFirstRender = lineDistanceReads
+  assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial dashed line should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+  assert.ok(readsAfterFirstRender > 0, 'initial render should read lineDistance while expanding dashed line geometry')
+
+  material.color.set(0x00ff00)
+  line.position.x += 0.05
+  const second = renderer.render(scene, camera, options)
+  const secondCenter = meanRegion(second, 64, 64, 28, 28, 36, 36)
+  assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while dashed-line expansion is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
+  assert.equal(lineDistanceReads, readsAfterFirstRender, 'material/transform animation should reuse cached dashed-line expansion')
+
+  material.gapSize = 0.15
+  renderer.render(scene, camera, options)
+  const readsAfterDashStateChange = lineDistanceReads
+  assert.ok(readsAfterDashStateChange > readsAfterFirstRender, 'dash-state changes should invalidate cached dashed-line expansion')
+
+  lineDistance.array[1] = 1.4
+  lineDistance.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(lineDistanceReads > readsAfterDashStateChange, 'lineDistance version changes should invalidate cached dashed-line expansion')
+})
+
 test('reusable renderer reuses cached point billboard expansion until UV attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
