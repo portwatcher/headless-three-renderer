@@ -23506,6 +23506,68 @@ test('reusable renderer reuses cached static line and point geometry until attri
   assert.equal(lineReads(), lineReadsAfterLineUpdate, 'point invalidation should not force unrelated line geometry extraction')
 })
 
+test('reusable renderer reuses cached point billboard expansion until UV attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0], 2))
+  const uv = geometry.getAttribute('uv')
+  const originalGetX = uv.getX.bind(uv)
+  const originalGetY = uv.getY.bind(uv)
+  let uvReads = 0
+  uv.getX = (index) => {
+    uvReads += 1
+    return originalGetX(index)
+  }
+  uv.getY = (index) => {
+    uvReads += 1
+    return originalGetY(index)
+  }
+
+  const texture = rgbaTexture([255, 255, 255, 255], 1, 1)
+  const material = new THREE.PointsMaterial({
+    color: 0xff0000,
+    map: texture,
+    size: 20,
+    sizeAttenuation: false,
+  })
+  const points = new THREE.Points(geometry, material)
+  points.frustumCulled = false
+  scene.add(points)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const first = renderer.render(scene, camera, options)
+  const firstCenter = meanRegion(first, 64, 64, 28, 28, 36, 36)
+  const readsAfterFirstRender = uvReads
+  assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial point billboard should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+  assert.ok(readsAfterFirstRender > 0, 'initial render should read point UVs while expanding billboards')
+
+  material.color.set(0x00ff00)
+  const second = renderer.render(scene, camera, options)
+  const secondCenter = meanRegion(second, 64, 64, 28, 28, 36, 36)
+  assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while point billboard expansion is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
+  assert.equal(uvReads, readsAfterFirstRender, 'material-only animation should reuse cached point billboard expansion')
+
+  uv.array[0] = 0.25
+  uv.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(uvReads > readsAfterFirstRender, 'UV version changes should invalidate cached point billboard expansion')
+})
+
 test('reusable renderer reuses cached BatchedMesh geometry views until packed attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

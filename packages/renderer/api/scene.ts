@@ -110,6 +110,7 @@ export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   texturePayloads: TextureExtractionCache
+  pointBillboards: WeakMap<ThreeObject3DLike, Map<string, CachedPointBillboardExpansion>>
 }
 
 interface CachedMeshGeometryExtraction {
@@ -120,6 +121,51 @@ interface CachedMeshGeometryExtraction {
 interface CachedBatchedGeometryView {
   signature: BatchedGeometryViewSignature
   view: ThreeBufferGeometryLike
+}
+
+interface CachedPointBillboardExpansion {
+  signature: PointBillboardSignature
+  expansion: PointBillboardExpansion
+}
+
+interface PointBillboardExpansion {
+  positions: number[]
+  indices: number[]
+  uvs: number[]
+  uvs2?: number[]
+  colors?: number[]
+  pointRefs: Array<{ pointIndex: number, instance: number }>
+}
+
+interface PointBillboardSignature {
+  cacheable: boolean
+  positions: number[]
+  positionCount: number
+  index: number[] | null
+  groupStart: number
+  groupCount: number
+  instancedGeometryCount: number
+  instancedPositionOffset: AttributeSignature
+  transform: number[]
+  cameraRight: [number, number, number]
+  cameraUp: [number, number, number]
+  cameraProjection: number[] | null
+  cameraView: number[] | null
+  cameraIsPerspective?: boolean
+  viewportHeight: number
+  pointSize: number
+  sizeAttenuation?: boolean
+  uvs: UvChannelSignature
+  uvs2: UvChannelSignature
+  useVertexColors: boolean
+  vertexColors: AttributeSignature
+  baseColor?: Color4
+}
+
+interface UvChannelSignature {
+  attribute: AttributeSignature
+  values?: number[]
+  label?: string
 }
 
 interface BatchedGeometryViewSignature {
@@ -221,6 +267,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     meshGeometry: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     texturePayloads: new WeakMap(),
+    pointBillboards: new WeakMap(),
   }
 }
 
@@ -1161,74 +1208,35 @@ function appendPoints(
 
     const baseColor = materialColor(material)
     const useVertexColors = vertexColors && material?.vertexColors !== false
-    const source = index ?? rangeIndices(position.count)
-    const points = source.slice(group.start, group.start + group.count)
-    if (points.length === 0) continue
-
-    const outputPositions: number[] = []
-    const outputUvs: number[] = []
-    const outputUvs2: number[] | undefined = pointUvStreams?.uvs2 ? [] : undefined
-    const outputColors: number[] | undefined = useVertexColors ? [] : undefined
-    const outputIndices: number[] = []
-    const outputPointRefs: Array<{ pointIndex: number, instance: number }> = []
     const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
+    const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
+    const billboard = pointBillboardExpansion(
+      object,
+      group,
+      position,
+      positions,
+      index,
+      instancedGeometryCount,
+      instancedPositionOffset,
+      transform,
+      axes,
+      camera,
+      viewportHeight,
+      pointSize,
+      sizeAttenuation,
+      pointUvStreams,
+      vertexColors,
+      useVertexColors ? baseColor : undefined,
+      cache,
+    )
 
-    for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
-      const offsetIndex = instancedPositionOffset
-        ? instancedAttributeIndex(instancedPositionOffset.attribute, instance, instancedPositionOffset.label)
-        : 0
-      const offset = instancedPositionOffset
-        ? [
-          attributeComponent(instancedPositionOffset.attribute, offsetIndex, 0, instancedPositionOffset.label),
-          attributeComponent(instancedPositionOffset.attribute, offsetIndex, 1, instancedPositionOffset.label),
-          attributeComponent(instancedPositionOffset.attribute, offsetIndex, 2, instancedPositionOffset.label),
-        ]
-        : [0, 0, 0]
-
-      for (let pointOffset = 0; pointOffset < points.length; pointOffset += 1) {
-        const pointIndex = points[pointOffset]
-        if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= position.count) continue
-
-        const center = transformPoint(transform, [
-          positions[pointIndex * 3] + offset[0],
-          positions[pointIndex * 3 + 1] + offset[1],
-          positions[pointIndex * 3 + 2] + offset[2],
-        ])
-        const worldSize = pointWorldSize(pointSize, center, material, camera, viewportHeight)
-        if (worldSize <= 0) continue
-
-        const vertexBase = outputPositions.length / 3
-        outputPointRefs.push({ pointIndex, instance })
-        const corners = [
-          [-0.5, -0.5, 0, 0],
-          [0.5, -0.5, 1, 0],
-          [0.5, 0.5, 1, 1],
-          [-0.5, 0.5, 0, 1],
-        ]
-        const pointColor = outputColors ? pointVertexColor(vertexColors!, baseColor, pointIndex, instance) : null
-        for (const [x, y, u, v] of corners) {
-          outputPositions.push(
-            center[0] + axes.right[0] * x * worldSize + axes.up[0] * y * worldSize,
-            center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
-            center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
-          )
-          if (pointUvStreams?.uvs) {
-            appendUvForVertex(outputUvs, pointUvStreams.uvs, pointIndex, instance)
-            if (outputUvs2 && pointUvStreams.uvs2) {
-              appendUvForVertex(outputUvs2, pointUvStreams.uvs2, pointIndex, instance)
-            }
-          } else {
-            outputUvs.push(u, v)
-          }
-          if (pointColor) {
-            outputColors!.push(pointColor[0], pointColor[1], pointColor[2], pointColor[3])
-          }
-        }
-        outputIndices.push(vertexBase, vertexBase + 1, vertexBase + 2, vertexBase, vertexBase + 2, vertexBase + 3)
-      }
-    }
-
-    if (outputPositions.length === 0) continue
+    if (billboard.positions.length === 0) continue
+    const outputPositions = billboard.positions
+    const outputUvs = billboard.uvs
+    const outputUvs2 = billboard.uvs2
+    const outputColors = billboard.colors
+    const outputIndices = billboard.indices
+    const outputPointRefs = billboard.pointRefs
 
     const textureInfo = extractTextureData(material, materialContext)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
@@ -1300,6 +1308,282 @@ function appendPoints(
       )
     }
   }
+}
+
+function pointBillboardExpansion(
+  object: ThreeObject3DLike,
+  group: GeometryGroup,
+  position: ThreeBufferAttributeLike,
+  positions: number[],
+  index: number[] | null,
+  instancedGeometryCount: number,
+  instancedPositionOffset: InstancedAttributeRef | null,
+  transform: number[],
+  axes: { right: [number, number, number]; up: [number, number, number] },
+  camera: ThreeCameraLike | undefined,
+  viewportHeight: number,
+  pointSize: number,
+  sizeAttenuation: boolean | undefined,
+  pointUvStreams: TextureUvStreams | null,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  vertexColorBase: Color4 | undefined,
+  cache: SceneExtractionCache | undefined,
+): PointBillboardExpansion {
+  const signature = pointBillboardSignature(
+    group,
+    position,
+    positions,
+    index,
+    instancedGeometryCount,
+    instancedPositionOffset,
+    transform,
+    axes,
+    camera,
+    viewportHeight,
+    pointSize,
+    sizeAttenuation,
+    pointUvStreams,
+    vertexColors,
+    vertexColorBase,
+  )
+  const cacheKey = `${group.start}:${group.count}:${group.materialIndex ?? 0}`
+  if (cache && signature.cacheable) {
+    const objectCache = cache.pointBillboards.get(object)
+    const cached = objectCache?.get(cacheKey)
+    if (cached && samePointBillboardSignature(cached.signature, signature)) {
+      return cached.expansion
+    }
+  }
+
+  const expansion = readPointBillboardExpansion(
+    group,
+    position,
+    positions,
+    index,
+    instancedGeometryCount,
+    instancedPositionOffset,
+    transform,
+    axes,
+    camera,
+    viewportHeight,
+    pointSize,
+    sizeAttenuation,
+    pointUvStreams,
+    vertexColors,
+    vertexColorBase,
+  )
+  if (cache && signature.cacheable) {
+    let objectCache = cache.pointBillboards.get(object)
+    if (!objectCache) {
+      objectCache = new Map()
+      cache.pointBillboards.set(object, objectCache)
+    }
+    objectCache.set(cacheKey, { signature, expansion })
+  }
+  return expansion
+}
+
+function readPointBillboardExpansion(
+  group: GeometryGroup,
+  position: ThreeBufferAttributeLike,
+  positions: number[],
+  index: number[] | null,
+  instancedGeometryCount: number,
+  instancedPositionOffset: InstancedAttributeRef | null,
+  transform: number[],
+  axes: { right: [number, number, number]; up: [number, number, number] },
+  camera: ThreeCameraLike | undefined,
+  viewportHeight: number,
+  pointSize: number,
+  sizeAttenuation: boolean | undefined,
+  pointUvStreams: TextureUvStreams | null,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  vertexColorBase: Color4 | undefined,
+): PointBillboardExpansion {
+  const source = index ?? rangeIndices(position.count)
+  const points = source.slice(group.start, group.start + group.count)
+  const outputPositions: number[] = []
+  const outputUvs: number[] = []
+  const outputUvs2: number[] | undefined = pointUvStreams?.uvs2 ? [] : undefined
+  const outputColors: number[] | undefined = vertexColorBase ? [] : undefined
+  const outputIndices: number[] = []
+  const outputPointRefs: Array<{ pointIndex: number, instance: number }> = []
+  const corners = [
+    [-0.5, -0.5, 0, 0],
+    [0.5, -0.5, 1, 0],
+    [0.5, 0.5, 1, 1],
+    [-0.5, 0.5, 0, 1],
+  ]
+
+  for (let instance = 0; instance < instancedGeometryCount; instance += 1) {
+    const offsetIndex = instancedPositionOffset
+      ? instancedAttributeIndex(instancedPositionOffset.attribute, instance, instancedPositionOffset.label)
+      : 0
+    const offset: [number, number, number] = instancedPositionOffset
+      ? [
+        attributeComponent(instancedPositionOffset.attribute, offsetIndex, 0, instancedPositionOffset.label),
+        attributeComponent(instancedPositionOffset.attribute, offsetIndex, 1, instancedPositionOffset.label),
+        attributeComponent(instancedPositionOffset.attribute, offsetIndex, 2, instancedPositionOffset.label),
+      ]
+      : [0, 0, 0]
+
+    for (let pointOffset = 0; pointOffset < points.length; pointOffset += 1) {
+      const pointIndex = points[pointOffset]
+      if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= position.count) continue
+
+      const center = transformPoint(transform, [
+        positions[pointIndex * 3] + offset[0],
+        positions[pointIndex * 3 + 1] + offset[1],
+        positions[pointIndex * 3 + 2] + offset[2],
+      ])
+      const worldSize = pointWorldSize(pointSize, center, sizeAttenuation, camera, viewportHeight)
+      if (worldSize <= 0) continue
+
+      const vertexBase = outputPositions.length / 3
+      outputPointRefs.push({ pointIndex, instance })
+      const pointColor = outputColors ? pointVertexColor(vertexColors!, vertexColorBase!, pointIndex, instance) : null
+      for (const [x, y, u, v] of corners) {
+        outputPositions.push(
+          center[0] + axes.right[0] * x * worldSize + axes.up[0] * y * worldSize,
+          center[1] + axes.right[1] * x * worldSize + axes.up[1] * y * worldSize,
+          center[2] + axes.right[2] * x * worldSize + axes.up[2] * y * worldSize,
+        )
+        if (pointUvStreams?.uvs) {
+          appendUvForVertex(outputUvs, pointUvStreams.uvs, pointIndex, instance)
+          if (outputUvs2 && pointUvStreams.uvs2) {
+            appendUvForVertex(outputUvs2, pointUvStreams.uvs2, pointIndex, instance)
+          }
+        } else {
+          outputUvs.push(u, v)
+        }
+        if (pointColor) {
+          outputColors!.push(pointColor[0], pointColor[1], pointColor[2], pointColor[3])
+        }
+      }
+      outputIndices.push(vertexBase, vertexBase + 1, vertexBase + 2, vertexBase, vertexBase + 2, vertexBase + 3)
+    }
+  }
+
+  return {
+    positions: outputPositions,
+    indices: outputIndices,
+    uvs: outputUvs,
+    uvs2: outputUvs2,
+    colors: outputColors,
+    pointRefs: outputPointRefs,
+  }
+}
+
+function pointBillboardSignature(
+  group: GeometryGroup,
+  position: ThreeBufferAttributeLike,
+  positions: number[],
+  index: number[] | null,
+  instancedGeometryCount: number,
+  instancedPositionOffset: InstancedAttributeRef | null,
+  transform: number[],
+  axes: { right: [number, number, number]; up: [number, number, number] },
+  camera: ThreeCameraLike | undefined,
+  viewportHeight: number,
+  pointSize: number,
+  sizeAttenuation: boolean | undefined,
+  pointUvStreams: TextureUvStreams | null,
+  vertexColors: ThreeBufferAttributeLike | undefined,
+  vertexColorBase: Color4 | undefined,
+): PointBillboardSignature {
+  const signature: PointBillboardSignature = {
+    cacheable: true,
+    positions,
+    positionCount: position.count,
+    index,
+    groupStart: group.start,
+    groupCount: group.count,
+    instancedGeometryCount,
+    instancedPositionOffset: attributeSignature(instancedPositionOffset?.attribute),
+    transform: transform.slice(0, 16),
+    cameraRight: axes.right.slice() as [number, number, number],
+    cameraUp: axes.up.slice() as [number, number, number],
+    cameraProjection: matrixValues(camera?.projectionMatrix?.elements),
+    cameraView: matrixValues(camera?.matrixWorldInverse?.elements),
+    cameraIsPerspective: camera?.isPerspectiveCamera,
+    viewportHeight,
+    pointSize,
+    sizeAttenuation,
+    uvs: uvChannelSignature(pointUvStreams?.uvs),
+    uvs2: uvChannelSignature(pointUvStreams?.uvs2),
+    useVertexColors: !!vertexColorBase,
+    vertexColors: attributeSignature(vertexColorBase ? vertexColors : undefined),
+    baseColor: vertexColorBase ? vertexColorBase.slice() as Color4 : undefined,
+  }
+  signature.cacheable = pointBillboardSignatureCacheable(signature)
+  return signature
+}
+
+function pointBillboardSignatureCacheable(signature: PointBillboardSignature): boolean {
+  return attributeSignatureCacheable(signature.instancedPositionOffset)
+    && attributeSignatureCacheable(signature.uvs.attribute)
+    && attributeSignatureCacheable(signature.uvs2.attribute)
+    && attributeSignatureCacheable(signature.vertexColors)
+}
+
+function uvChannelSignature(channel: UvChannel | null | undefined): UvChannelSignature {
+  if (!channel) return { attribute: {} }
+  return {
+    attribute: attributeSignature(channel.attribute),
+    values: channel.values,
+    label: channel.label,
+  }
+}
+
+function matrixValues(matrix: ArrayLike<number> | undefined): number[] | null {
+  if (!matrix || matrix.length < 16) return null
+  const out = new Array<number>(16)
+  for (let i = 0; i < 16; i += 1) out[i] = matrix[i]
+  return out
+}
+
+function samePointBillboardSignature(a: PointBillboardSignature, b: PointBillboardSignature): boolean {
+  return a.cacheable === b.cacheable
+    && a.positions === b.positions
+    && a.positionCount === b.positionCount
+    && a.index === b.index
+    && a.groupStart === b.groupStart
+    && a.groupCount === b.groupCount
+    && a.instancedGeometryCount === b.instancedGeometryCount
+    && sameAttributeSignature(a.instancedPositionOffset, b.instancedPositionOffset)
+    && sameNumberArray(a.transform, b.transform)
+    && sameNumberArray(a.cameraRight, b.cameraRight)
+    && sameNumberArray(a.cameraUp, b.cameraUp)
+    && sameOptionalNumberArray(a.cameraProjection, b.cameraProjection)
+    && sameOptionalNumberArray(a.cameraView, b.cameraView)
+    && a.cameraIsPerspective === b.cameraIsPerspective
+    && a.viewportHeight === b.viewportHeight
+    && a.pointSize === b.pointSize
+    && a.sizeAttenuation === b.sizeAttenuation
+    && sameUvChannelSignature(a.uvs, b.uvs)
+    && sameUvChannelSignature(a.uvs2, b.uvs2)
+    && a.useVertexColors === b.useVertexColors
+    && sameAttributeSignature(a.vertexColors, b.vertexColors)
+    && sameOptionalNumberArray(a.baseColor, b.baseColor)
+}
+
+function sameUvChannelSignature(a: UvChannelSignature, b: UvChannelSignature): boolean {
+  return sameAttributeSignature(a.attribute, b.attribute)
+    && a.values === b.values
+    && a.label === b.label
+}
+
+function sameOptionalNumberArray(a: ArrayLike<number> | null | undefined, b: ArrayLike<number> | null | undefined): boolean {
+  if (a == null || b == null) return a == null && b == null
+  return sameNumberArray(a, b)
+}
+
+function sameNumberArray(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (!Object.is(a[i], b[i])) return false
+  }
+  return true
 }
 
 function expandPointBillboardUvStream(
@@ -2250,7 +2534,7 @@ function pointBillboardCullRadius(
     const sizeAttenuation = typeof material?.sizeAttenuation === 'boolean'
       ? material.sizeAttenuation
       : undefined
-    const worldSize = pointWorldSize(pointSize, center, { sizeAttenuation }, camera, viewportHeight)
+    const worldSize = pointWorldSize(pointSize, center, sizeAttenuation, camera, viewportHeight)
     radius = Math.max(radius, worldSize * Math.SQRT1_2)
   }
   return radius
@@ -2362,14 +2646,13 @@ function transformPoint(matrix: ArrayLike<number>, point: [number, number, numbe
 function pointWorldSize(
   pointSize: number,
   worldPosition: [number, number, number],
-  material: { sizeAttenuation?: boolean } | undefined,
+  sizeAttenuation: boolean | undefined,
   camera: ThreeCameraLike | undefined,
   viewportHeight: number,
 ): number {
   const projectionY = Math.abs(finiteOrDefault(camera?.projectionMatrix?.elements?.[5], 1))
   if (projectionY <= 0) return 0
 
-  const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
   if (camera?.isPerspectiveCamera === true && sizeAttenuation !== false) {
     const viewZ = viewSpaceZ(worldPosition, camera)
     const depth = Number.isFinite(viewZ) ? Math.max(0.0001, Math.abs(viewZ)) : 1
