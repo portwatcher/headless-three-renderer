@@ -17360,6 +17360,19 @@ test('unsupported texture inputs fail clearly for background and environment slo
     image: { width: 4, height: 4 },
     mipmaps: [{ data: new Uint8Array(16), width: 4, height: 4 }],
   }
+  function compressedArrayTexture() {
+    return new THREE.CompressedArrayTexture([
+      { data: new Uint8Array(16), width: 4, height: 4 },
+    ], 4, 4, 1, THREE.RGBAFormat)
+  }
+  function compressedCubeTexture() {
+    const images = Array.from({ length: 6 }, () => ({
+      width: 4,
+      height: 4,
+      mipmaps: [{ data: new Uint8Array(16), width: 4, height: 4 }],
+    }))
+    return new THREE.CompressedCubeTexture(images, THREE.RGBAFormat)
+  }
   function compressedFormatTexture() {
     const texture = new THREE.DataTexture(new Uint8Array(16), 4, 4, THREE.RGBA_S3TC_DXT5_Format)
     texture.needsUpdate = true
@@ -17398,6 +17411,16 @@ test('unsupported texture inputs fail clearly for background and environment slo
     }, /compressed texture.*pre-decode/i],
     ['compressed reflection probe', (scene) => {
       scene.userData.headlessThreeRenderer = { reflectionProbe: { texture: compressedTexture } }
+    }, /compressed texture.*pre-decode/i],
+    ['compressed array material map', (scene) => {
+      scene.background = new THREE.Color(0, 0, 0)
+      scene.add(new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ map: compressedArrayTexture() }),
+      ))
+    }, /compressed texture.*pre-decode/i],
+    ['compressed cube environment', (scene) => {
+      scene.environment = compressedCubeTexture()
     }, /compressed texture.*pre-decode/i],
     ['compressed-format material map', (scene) => {
       scene.background = new THREE.Color(0, 0, 0)
