@@ -660,6 +660,10 @@ class RendererBackendState {
 
   constructor(readonly renderer: Renderer) {}
 
+  get domElement(): RendererDomElementState {
+    return this.renderer.domElement
+  }
+
   async init(_renderer: unknown = this.renderer): Promise<void> {}
 
   beginRender(_renderContext?: unknown): void {}

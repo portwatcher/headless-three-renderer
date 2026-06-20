@@ -33412,6 +33412,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.backend.isWebGPUBackend, false)
   assert.equal(renderer.backend.coordinateSystem, THREE.WebGLCoordinateSystem)
   assert.deepEqual(renderer.backend.parameters, {})
+  assert.equal(renderer.backend.domElement, renderer.domElement)
   assert.equal(renderer.backend.getDomElement(), renderer.domElement)
   assert.equal(renderer.backend.getMaxAnisotropy(), 0)
   assert.equal(renderer.backend.hasFeature('timestamp-query'), false)
