@@ -1679,6 +1679,22 @@ export class Renderer {
     // Each render call owns its native pass, so there is no persistent framebuffer to clear.
   }
 
+  clearTarget(target: RenderTargetLike | null, color = true, depth = true, stencil = true): void {
+    if (target !== null) {
+      assertRenderTargetLike(target, 'Renderer.clearTarget target')
+    }
+    assertOptionalBoolean(color, 'Renderer.clearTarget color')
+    assertOptionalBoolean(depth, 'Renderer.clearTarget depth')
+    assertOptionalBoolean(stencil, 'Renderer.clearTarget stencil')
+
+    const previousTarget = this.currentRenderTarget
+    const previousActiveCubeFace = this.currentActiveCubeFace
+    const previousActiveMipmapLevel = this.currentActiveMipmapLevel
+    this.setRenderTarget(target)
+    this.clear(color, depth, stencil)
+    this.setRenderTarget(previousTarget, previousActiveCubeFace, previousActiveMipmapLevel)
+  }
+
   clearColor(): void {
     // Color buffers are created and cleared inside each native render pass.
   }

@@ -30988,6 +30988,18 @@ test('Renderer clear methods are no-op compatibility hooks', () => {
   renderer.clearColor()
   renderer.clearDepth()
   renderer.clearStencil()
+  const previousTarget = { texture: {} }
+  const clearTarget = { texture: {} }
+  renderer.setRenderTarget(previousTarget, 2, 1)
+  assert.equal(renderer.clearTarget(clearTarget, true, false, true), undefined)
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+  assert.equal(renderer.getActiveCubeFace(), 2)
+  assert.equal(renderer.getActiveMipmapLevel(), 1)
+  assert.equal(renderer.clearTarget(null), undefined)
+  assert.strictEqual(renderer.getRenderTarget(), previousTarget)
+  assert.equal(renderer.getActiveCubeFace(), 2)
+  assert.equal(renderer.getActiveMipmapLevel(), 1)
+  renderer.setRenderTarget(null)
   assert.equal(renderer.getClearDepth(), 0.25)
   assert.equal(renderer.getClearStencil(), 7)
 
@@ -31006,6 +31018,22 @@ test('Renderer clear methods are no-op compatibility hooks', () => {
   assert.throws(
     () => renderer.clear(true, true, 'stencil'),
     /Renderer\.clear stencil must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.clearTarget('target'),
+    /Renderer\.clearTarget target must be a target-like object/i,
+  )
+  assert.throws(
+    () => renderer.clearTarget(clearTarget, 'yes'),
+    /Renderer\.clearTarget color must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.clearTarget(clearTarget, true, 'depth'),
+    /Renderer\.clearTarget depth must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.clearTarget(clearTarget, true, true, 'stencil'),
+    /Renderer\.clearTarget stencil must be a boolean/i,
   )
 })
 
