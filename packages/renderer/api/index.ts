@@ -720,6 +720,18 @@ class RendererBackendState {
 
   destroyProgram(): void {}
 
+  _handleSource(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._handleSource', 'backend shader source diagnostics')
+  }
+
+  _getShaderErrors(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._getShaderErrors', 'backend shader error diagnostics')
+  }
+
+  _logProgramError(): never {
+    throw unsupportedBackendOperationError('Renderer.backend._logProgramError', 'backend shader program diagnostics')
+  }
+
   _completeCompile(): never {
     throw unsupportedBackendOperationError('Renderer.backend._completeCompile', 'backend shader program compilation')
   }
