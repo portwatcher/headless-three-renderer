@@ -881,6 +881,128 @@ class RendererBackendState {
   }
 }
 
+class RendererNodesState {
+  modelViewMatrix: unknown = null
+  modelNormalViewMatrix: unknown = null
+}
+
+class RendererNodeLibraryState {
+  readonly lightNodes = new WeakMap<object, (...args: unknown[]) => unknown>()
+  readonly materialNodes = new Map<string, new (...args: unknown[]) => Record<string, unknown>>()
+  readonly toneMappingNodes = new Map<number, (...args: unknown[]) => unknown>()
+
+  fromMaterial(material: unknown): unknown {
+    if (material == null || typeof material !== 'object' || Array.isArray(material)) {
+      throw new TypeError('Renderer.library.fromMaterial material must be a material-like object.')
+    }
+    if ((material as { isNodeMaterial?: unknown }).isNodeMaterial === true) return material
+    const materialType = (material as { type?: unknown }).type
+    if (typeof materialType !== 'string' || materialType.length === 0) return null
+    const NodeMaterialClass = this.getMaterialNodeClass(materialType)
+    if (NodeMaterialClass === null) return null
+    const nodeMaterial = new NodeMaterialClass()
+    Object.assign(nodeMaterial, material)
+    return nodeMaterial
+  }
+
+  addToneMapping(toneMappingNode: unknown, toneMapping: unknown): void {
+    assertFunction(toneMappingNode, 'Renderer.library.addToneMapping toneMappingNode')
+    assertFiniteInteger(toneMapping, 'Renderer.library.addToneMapping toneMapping')
+    this.addType(toneMappingNode, toneMapping, this.toneMappingNodes)
+  }
+
+  getToneMappingFunction(toneMapping: unknown): ((...args: unknown[]) => unknown) | null {
+    assertFiniteInteger(toneMapping, 'Renderer.library.getToneMappingFunction toneMapping')
+    return this.toneMappingNodes.get(toneMapping as number) ?? null
+  }
+
+  getMaterialNodeClass(materialType: unknown): (new (...args: unknown[]) => Record<string, unknown>) | null {
+    assertNonEmptyString(materialType, 'Renderer.library.getMaterialNodeClass materialType')
+    return this.materialNodes.get(materialType) ?? null
+  }
+
+  addMaterial(materialNodeClass: unknown, materialClassType: unknown): void {
+    assertConstructorFunction(materialNodeClass, 'Renderer.library.addMaterial materialNodeClass')
+    assertNonEmptyString(materialClassType, 'Renderer.library.addMaterial materialClassType')
+    this.addType(materialNodeClass, materialClassType, this.materialNodes)
+  }
+
+  getLightNodeClass(light: unknown): ((...args: unknown[]) => unknown) | null {
+    assertWeakMapKey(light, 'Renderer.library.getLightNodeClass light')
+    return this.lightNodes.get(light) ?? null
+  }
+
+  addLight(lightNodeClass: unknown, lightClass: unknown): void {
+    assertFunction(lightNodeClass, 'Renderer.library.addLight lightNodeClass')
+    assertConstructorFunction(lightClass, 'Renderer.library.addLight lightClass')
+    this.addClass(lightNodeClass, lightClass, this.lightNodes)
+  }
+
+  addType<T>(nodeClass: unknown, type: unknown, library: Map<any, T>): void {
+    assertFunction(nodeClass, 'Renderer.library.addType nodeClass')
+    if ((typeof type !== 'string' && typeof type !== 'number') || (typeof type === 'string' && type.length === 0)) {
+      throw new TypeError('Renderer.library.addType type must be a non-empty string or integer.')
+    }
+    if (typeof type === 'number') assertFiniteInteger(type, 'Renderer.library.addType type')
+    if (!library.has(type)) {
+      library.set(type, nodeClass as T)
+    }
+  }
+
+  addClass<T>(nodeClass: unknown, baseClass: unknown, library: WeakMap<object, T>): void {
+    assertFunction(nodeClass, 'Renderer.library.addClass nodeClass')
+    assertConstructorFunction(baseClass, 'Renderer.library.addClass baseClass')
+    if (!library.has(baseClass)) {
+      library.set(baseClass, nodeClass as T)
+    }
+  }
+}
+
+class RendererLightingNodeState {
+  readonly isLightsNode = true
+  private lightsValue: unknown[] = []
+
+  constructor(lights: unknown[] = []) {
+    this.setLights(lights)
+  }
+
+  setLights(lights: unknown[] = []): this {
+    if (!Array.isArray(lights)) {
+      throw new TypeError('Renderer.lighting lights must be an array.')
+    }
+    this.lightsValue = [...lights]
+    return this
+  }
+
+  getLights(): unknown[] {
+    return [...this.lightsValue]
+  }
+}
+
+class RendererLightingState {
+  private readonly nodes = new WeakMap<object, WeakMap<object, RendererLightingNodeState>>()
+
+  createNode(lights: unknown[] = []): RendererLightingNodeState {
+    return new RendererLightingNodeState(lights)
+  }
+
+  getNode(scene: unknown, camera: unknown): RendererLightingNodeState {
+    assertWeakMapKey(scene, 'Renderer.lighting.getNode scene')
+    assertWeakMapKey(camera, 'Renderer.lighting.getNode camera')
+    let cameraMap = this.nodes.get(scene)
+    if (cameraMap === undefined) {
+      cameraMap = new WeakMap()
+      this.nodes.set(scene, cameraMap)
+    }
+    let node = cameraMap.get(camera)
+    if (node === undefined) {
+      node = this.createNode()
+      cameraMap.set(camera, node)
+    }
+    return node
+  }
+}
+
 class RendererDomElementState {
   width = 0
   height = 0
@@ -1716,6 +1838,9 @@ export class Renderer {
   readonly domElement = new RendererDomElementState()
   readonly extensions = new RendererExtensionsState()
   readonly info = new RendererInfoState()
+  readonly library = new RendererNodeLibraryState()
+  readonly lighting = new RendererLightingState()
+  readonly nodes = new RendererNodesState()
   readonly properties = new RendererPropertiesState()
   readonly renderLists = new RendererRenderListsState()
   readonly reversedDepthBuffer = false
@@ -5974,6 +6099,24 @@ function assertWeakMapKey(value: unknown, label: string): asserts value is objec
 function assertPropertyKey(value: unknown, label: string): asserts value is string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(`${label} must be a non-empty string.`)
+  }
+}
+
+function assertNonEmptyString(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
+  }
+}
+
+function assertFunction(value: unknown, label: string): asserts value is (...args: unknown[]) => unknown {
+  if (typeof value !== 'function') {
+    throw new TypeError(`${label} must be a function.`)
+  }
+}
+
+function assertConstructorFunction(value: unknown, label: string): asserts value is new (...args: unknown[]) => Record<string, unknown> {
+  if (typeof value !== 'function') {
+    throw new TypeError(`${label} must be a constructor function.`)
   }
 }
 

@@ -32905,6 +32905,46 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.backend.destroyAttribute({}), undefined)
   assert.equal(renderer.backend.needsRenderUpdate({}), false)
   assert.equal(renderer.backend.getRenderCacheKey({}), 'headless-three-renderer')
+  assert.equal(renderer.nodes.modelViewMatrix, null)
+  assert.equal(renderer.nodes.modelNormalViewMatrix, null)
+  const modelViewMatrixNode = { isNode: true }
+  renderer.nodes.modelViewMatrix = modelViewMatrixNode
+  assert.equal(renderer.nodes.modelViewMatrix, modelViewMatrixNode)
+  renderer.nodes.modelViewMatrix = null
+  function ToneMappingNode() {}
+  class BasicNodeMaterial {
+    constructor() {
+      this.isNodeMaterial = true
+      this.type = 'BasicNodeMaterial'
+    }
+  }
+  class PointLightNode {}
+  class PointLightClass {}
+  renderer.library.addToneMapping(ToneMappingNode, THREE.LinearToneMapping)
+  assert.equal(renderer.library.getToneMappingFunction(THREE.LinearToneMapping), ToneMappingNode)
+  assert.equal(renderer.library.getToneMappingFunction(THREE.ReinhardToneMapping), null)
+  renderer.library.addMaterial(BasicNodeMaterial, 'MeshBasicMaterial')
+  assert.equal(renderer.library.getMaterialNodeClass('MeshBasicMaterial'), BasicNodeMaterial)
+  assert.equal(renderer.library.getMaterialNodeClass('MeshPhongMaterial'), null)
+  const sourceMaterial = new THREE.MeshBasicMaterial({ color: 0x204080 })
+  sourceMaterial.customCompatibilityValue = 7
+  const nodeMaterial = renderer.library.fromMaterial(sourceMaterial)
+  assert.equal(nodeMaterial.isNodeMaterial, true)
+  assert.equal(nodeMaterial.customCompatibilityValue, 7)
+  assert.equal(renderer.library.fromMaterial(nodeMaterial), nodeMaterial)
+  assert.equal(renderer.library.fromMaterial({ type: 'UnregisteredMaterial' }), null)
+  renderer.library.addLight(PointLightNode, PointLightClass)
+  assert.equal(renderer.library.getLightNodeClass(PointLightClass), PointLightNode)
+  renderer.library.addType(ToneMappingNode, 'custom-tone', renderer.library.materialNodes)
+  assert.equal(renderer.library.materialNodes.get('custom-tone'), ToneMappingNode)
+  const lightingNode = renderer.lighting.createNode([scene])
+  assert.equal(lightingNode.isLightsNode, true)
+  assert.deepEqual(lightingNode.getLights(), [scene])
+  assert.equal(lightingNode.setLights([camera]), lightingNode)
+  assert.deepEqual(lightingNode.getLights(), [camera])
+  const cachedLightingNode = renderer.lighting.getNode(scene, camera)
+  assert.equal(renderer.lighting.getNode(scene, camera), cachedLightingNode)
+  assert.deepEqual(cachedLightingNode.getLights(), [])
   assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
   assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
   assert.equal(renderer.extensions.init(), undefined)
@@ -33285,6 +33325,50 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
       new RegExp(`Renderer\\.backend\\.${method}\\(\\) is not supported.*WebGL\\/WebGPU resource state.*Renderer\\.render\\(\\) or renderToTarget\\(\\)`, 'i'),
     )
   }
+  assert.throws(
+    () => renderer.library.fromMaterial(null),
+    /Renderer\.library\.fromMaterial material must be a material-like object/i,
+  )
+  assert.throws(
+    () => renderer.library.addToneMapping('tone', THREE.LinearToneMapping),
+    /Renderer\.library\.addToneMapping toneMappingNode must be a function/i,
+  )
+  assert.throws(
+    () => renderer.library.getToneMappingFunction('linear'),
+    /Renderer\.library\.getToneMappingFunction toneMapping must be an integer/i,
+  )
+  assert.throws(
+    () => renderer.library.addMaterial({}, 'MeshBasicMaterial'),
+    /Renderer\.library\.addMaterial materialNodeClass must be a constructor function/i,
+  )
+  assert.throws(
+    () => renderer.library.getMaterialNodeClass(''),
+    /Renderer\.library\.getMaterialNodeClass materialType must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.library.addLight(PointLightNode, {}),
+    /Renderer\.library\.addLight lightClass must be a constructor function/i,
+  )
+  assert.throws(
+    () => renderer.library.getLightNodeClass(null),
+    /Renderer\.library\.getLightNodeClass light must be an object/i,
+  )
+  assert.throws(
+    () => renderer.library.addType(ToneMappingNode, {}, renderer.library.materialNodes),
+    /Renderer\.library\.addType type must be a non-empty string or integer/i,
+  )
+  assert.throws(
+    () => renderer.library.addClass({}, PointLightClass, renderer.library.lightNodes),
+    /Renderer\.library\.addClass nodeClass must be a function/i,
+  )
+  assert.throws(
+    () => renderer.lighting.createNode({}),
+    /Renderer\.lighting lights must be an array/i,
+  )
+  assert.throws(
+    () => renderer.lighting.getNode(null, camera),
+    /Renderer\.lighting\.getNode scene must be an object/i,
+  )
   await assert.rejects(
     () => renderer.backend.getArrayBufferAsync({ isStorageBufferAttribute: true }),
     /Renderer\.backend\.getArrayBufferAsync\(\) is not supported.*storage-buffer GPU readback.*Renderer\.readRenderTargetPixels\(\)/i,
