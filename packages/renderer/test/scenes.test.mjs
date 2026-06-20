@@ -26048,6 +26048,63 @@ test('reusable renderer reuses cached InstancedBufferGeometry UV expansion until
   assert.ok(uvReads > readsAfterFirstRender, 'instanced UV version changes should invalidate cached UV expansion')
 })
 
+test('reusable renderer reuses cached InstancedBufferGeometry normal expansion until normal attributes change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const base = new THREE.PlaneGeometry(0.4, 0.4)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(
+    new Float32Array([-0.35, 0, 0, 0.35, 0, 0]),
+    3,
+  ))
+  const normal = new THREE.InstancedBufferAttribute(
+    new Float32Array([0, 0, 1, 0, 0, 1]),
+    3,
+  )
+  geometry.setAttribute('normal', normal)
+
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xff0000 }))
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const originalNormalGetX = normal.getX.bind(normal)
+  let normalReads = 0
+  normal.getX = (index) => {
+    normalReads += 1
+    return originalNormalGetX(index)
+  }
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  renderer.render(scene, camera, options)
+  const readsAfterFirstRender = normalReads
+  assert.ok(readsAfterFirstRender > 0, 'initial render should read instanced normals')
+
+  mesh.position.y += 0.1
+  mesh.material.color.set(0x00ff00)
+  renderer.render(scene, camera, options)
+  assert.equal(normalReads, readsAfterFirstRender, 'InstancedBufferGeometry transform/material animation should reuse cached normal expansion')
+
+  normal.array[3] = 0.1
+  normal.needsUpdate = true
+  renderer.render(scene, camera, options)
+  assert.ok(normalReads > readsAfterFirstRender, 'instanced normal version changes should invalidate cached normal expansion')
+})
+
 test('reusable renderer reuses cached static line and point geometry until attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

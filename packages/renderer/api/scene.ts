@@ -130,6 +130,7 @@ export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   instancedMeshes: WeakMap<ThreeObject3DLike, CachedInstancedMeshInstances>
   instancedPositionExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedPositionExpansion>>
+  instancedNormalExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedNormalExpansion>>
   instancedUvExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedUvExpansion>>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
@@ -155,6 +156,11 @@ interface CachedInstancedMeshInstances {
 interface CachedInstancedPositionExpansion {
   signature: InstancedPositionExpansionSignature
   positions: number[]
+}
+
+interface CachedInstancedNormalExpansion {
+  signature: InstancedNormalExpansionSignature
+  normals: number[]
 }
 
 interface CachedInstancedUvExpansion {
@@ -329,6 +335,17 @@ interface InstancedPositionExpansionSignature {
   instancedPositionScale: AttributeSignature
 }
 
+interface InstancedNormalExpansionSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  sourceNormals: number[]
+  start: number
+  count: number
+  instanceCount: number
+  normal: AttributeSignature
+  label: string
+}
+
 interface InstancedUvExpansionSignature {
   cacheable: boolean
   geometryVersion?: number
@@ -399,6 +416,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     meshGeometry: new WeakMap(),
     instancedMeshes: new WeakMap(),
     instancedPositionExpansions: new WeakMap(),
+    instancedNormalExpansions: new WeakMap(),
     instancedUvExpansions: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
@@ -647,7 +665,7 @@ function appendMesh(
         instancedPositionScale,
       )
       const expandedNormals = normalAttribute && normals
-        ? expandNormalValuesForInstances(normalAttribute, normals, 0, position.count, instancedGeometryCount)
+        ? expandNormalValuesForInstancesWithCache(cache, geometry, normalAttribute, normals, 0, position.count, instancedGeometryCount)
         : undefined
       const expandedUvs = uvStreams.uvs
         ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, 0, position.count, instancedGeometryCount)
@@ -708,7 +726,7 @@ function appendMesh(
         instancedPositionScale,
       )
       const expandedGroupNormals = normalAttribute && normals
-        ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
+        ? expandNormalValuesForInstancesWithCache(cache, geometry, normalAttribute, normals, group.start, group.count, instancedGeometryCount)
         : undefined
       const expandedGroupUvs = uvStreams.uvs
         ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, group.start, group.count, instancedGeometryCount)
@@ -1082,7 +1100,7 @@ function appendShadowOnlyMeshGroup(
       instancedPositionScale,
     )
     const expandedNormals = normalAttribute && normals
-      ? expandNormalValuesForInstances(normalAttribute, normals, 0, vertexCount, instancedGeometryCount)
+      ? expandNormalValuesForInstancesWithCache(cache, geometry, normalAttribute, normals, 0, vertexCount, instancedGeometryCount)
       : undefined
     const expandedUvs = uvStreams.uvs
       ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, 0, vertexCount, instancedGeometryCount)
@@ -1146,7 +1164,7 @@ function appendShadowOnlyMeshGroup(
     instancedPositionScale,
   )
   const expandedGroupNormals = normalAttribute && normals
-    ? expandNormalValuesForInstances(normalAttribute, normals, group.start, group.count, instancedGeometryCount)
+    ? expandNormalValuesForInstancesWithCache(cache, geometry, normalAttribute, normals, group.start, group.count, instancedGeometryCount)
     : undefined
   const expandedGroupUvs = uvStreams.uvs
     ? expandUvChannelForInstancesWithCache(cache, geometry, uvStreams.uvs, group.start, group.count, instancedGeometryCount)
@@ -3449,6 +3467,86 @@ function expandNormalValuesForInstances(
     }
   }
   return out
+}
+
+function expandNormalValuesForInstancesWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  attribute: ThreeBufferAttributeLike,
+  values: number[],
+  start: number,
+  count: number,
+  instanceCount: number,
+  label = 'geometry.attributes.normal',
+): number[] {
+  if (instanceCount <= 1 && !isInstancedAttribute(attribute)) {
+    return expandNormalValuesForInstances(attribute, values, start, count, instanceCount, label)
+  }
+
+  const signature = instancedNormalExpansionSignature(
+    geometry,
+    attribute,
+    values,
+    start,
+    count,
+    instanceCount,
+    label,
+  )
+  if (!cache || !signature.cacheable) {
+    return expandNormalValuesForInstances(attribute, values, start, count, instanceCount, label)
+  }
+
+  const key = `${label}:${start}:${count}:${instanceCount}`
+  let geometryCache = cache.instancedNormalExpansions.get(geometry)
+  const cached = geometryCache?.get(key)
+  if (cached && sameInstancedNormalExpansionSignature(cached.signature, signature)) {
+    return cached.normals
+  }
+
+  const normals = expandNormalValuesForInstances(attribute, values, start, count, instanceCount, label)
+  if (!geometryCache) {
+    geometryCache = new Map()
+    cache.instancedNormalExpansions.set(geometry, geometryCache)
+  }
+  geometryCache.set(key, { signature, normals })
+  return normals
+}
+
+function instancedNormalExpansionSignature(
+  geometry: ThreeBufferGeometryLike,
+  attribute: ThreeBufferAttributeLike,
+  values: number[],
+  start: number,
+  count: number,
+  instanceCount: number,
+  label: string,
+): InstancedNormalExpansionSignature {
+  const signature: InstancedNormalExpansionSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    sourceNormals: values,
+    start,
+    count,
+    instanceCount,
+    normal: attributeSignature(attribute),
+    label,
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.normal)
+  return signature
+}
+
+function sameInstancedNormalExpansionSignature(
+  a: InstancedNormalExpansionSignature,
+  b: InstancedNormalExpansionSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && a.sourceNormals === b.sourceNormals
+    && a.start === b.start
+    && a.count === b.count
+    && a.instanceCount === b.instanceCount
+    && sameAttributeSignature(a.normal, b.normal)
+    && a.label === b.label
 }
 
 function expandUvChannelForInstances(channel: UvChannel, start: number, count: number, instanceCount: number): number[] {
