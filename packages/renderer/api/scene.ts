@@ -111,6 +111,7 @@ export interface SceneExtractionCache {
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   texturePayloads: TextureExtractionCache
   pointBillboards: WeakMap<ThreeObject3DLike, Map<string, CachedPointBillboardExpansion>>
+  spriteBillboards: WeakMap<ThreeObject3DLike, CachedSpriteBillboardExpansion>
 }
 
 interface CachedMeshGeometryExtraction {
@@ -126,6 +127,30 @@ interface CachedBatchedGeometryView {
 interface CachedPointBillboardExpansion {
   signature: PointBillboardSignature
   expansion: PointBillboardExpansion
+}
+
+interface CachedSpriteBillboardExpansion {
+  signature: SpriteBillboardSignature
+  expansion: SpriteBillboardExpansion
+}
+
+interface SpriteBillboardExpansion {
+  positions: number[]
+  indices: number[]
+  uvs: number[]
+}
+
+interface SpriteBillboardSignature {
+  matrix: number[]
+  center: [number, number]
+  scaleX: number
+  scaleY: number
+  rotation: number
+  sizeAttenuation?: boolean
+  cameraRight: [number, number, number]
+  cameraUp: [number, number, number]
+  cameraView: number[] | null
+  cameraIsPerspective?: boolean
 }
 
 interface PointBillboardExpansion {
@@ -268,6 +293,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     batchedGeometryViews: new WeakMap(),
     texturePayloads: new WeakMap(),
     pointBillboards: new WeakMap(),
+    spriteBillboards: new WeakMap(),
   }
 }
 
@@ -337,7 +363,7 @@ function visitObject(
         appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
       }
     } else if (object.isSprite === true) {
-      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial)
+      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
     }
   }
 
@@ -1049,6 +1075,7 @@ function appendSprite(
   shadowMaterialMode: ShadowMaterialMode | undefined,
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
+  cache: SceneExtractionCache | undefined,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
@@ -1081,28 +1108,22 @@ function appendSprite(
 
   const axes = cameraBillboardAxes(camera)
   const rotation = finiteMaterialOrObjectNumber(material?.rotation, 'material.rotation', 0)
-  const cos = Math.cos(rotation)
-  const sin = Math.sin(rotation)
-  const corners = [
-    [-0.5, -0.5, 0, 0],
-    [0.5, -0.5, 1, 0],
-    [0.5, 0.5, 1, 1],
-    [-0.5, 0.5, 0, 1],
-  ]
-  const positions: number[] = []
-  const uvs: number[] = []
-  for (const [x, y, u, v] of corners) {
-    const alignedX = (x - (center[0] - 0.5)) * scaleX
-    const alignedY = (y - (center[1] - 0.5)) * scaleY
-    const rotatedX = cos * alignedX - sin * alignedY
-    const rotatedY = sin * alignedX + cos * alignedY
-    positions.push(
-      worldPosition[0] + axes.right[0] * rotatedX + axes.up[0] * rotatedY,
-      worldPosition[1] + axes.right[1] * rotatedX + axes.up[1] * rotatedY,
-      worldPosition[2] + axes.right[2] * rotatedX + axes.up[2] * rotatedY,
-    )
-    uvs.push(u, v)
-  }
+  const billboard = spriteBillboardExpansion(
+    object,
+    matrix,
+    worldPosition,
+    center,
+    scaleX,
+    scaleY,
+    rotation,
+    sizeAttenuation,
+    axes,
+    camera,
+    cache,
+  )
+  const positions = billboard.positions
+  const indices = billboard.indices
+  const uvs = billboard.uvs
 
   const textureInfo = extractTextureData(material, materialContext)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
@@ -1114,7 +1135,7 @@ function appendSprite(
 
   pushMesh(meshes, {
     positions,
-    indices: [0, 1, 2, 0, 2, 3],
+    indices,
     uvs,
     color: materialColor(material),
     texture: textureInfo?.data,
@@ -1150,10 +1171,121 @@ function appendSprite(
       material,
       materialContext,
       positions,
-      [0, 1, 2, 0, 2, 3],
+      indices,
       uvs,
     )
   }
+}
+
+function spriteBillboardExpansion(
+  object: ThreeObject3DLike,
+  matrix: number[],
+  worldPosition: number[],
+  center: [number, number],
+  scaleX: number,
+  scaleY: number,
+  rotation: number,
+  sizeAttenuation: boolean | undefined,
+  axes: { right: [number, number, number]; up: [number, number, number] },
+  camera: ThreeCameraLike | undefined,
+  cache: SceneExtractionCache | undefined,
+): SpriteBillboardExpansion {
+  const signature = spriteBillboardSignature(
+    matrix,
+    center,
+    scaleX,
+    scaleY,
+    rotation,
+    sizeAttenuation,
+    axes,
+    camera,
+  )
+  if (cache) {
+    const cached = cache.spriteBillboards.get(object)
+    if (cached && sameSpriteBillboardSignature(cached.signature, signature)) {
+      return cached.expansion
+    }
+  }
+
+  const expansion = readSpriteBillboardExpansion(worldPosition, center, scaleX, scaleY, rotation, axes)
+  if (cache) {
+    cache.spriteBillboards.set(object, { signature, expansion })
+  }
+  return expansion
+}
+
+function readSpriteBillboardExpansion(
+  worldPosition: number[],
+  center: [number, number],
+  scaleX: number,
+  scaleY: number,
+  rotation: number,
+  axes: { right: [number, number, number]; up: [number, number, number] },
+): SpriteBillboardExpansion {
+  const cos = Math.cos(rotation)
+  const sin = Math.sin(rotation)
+  const corners = [
+    [-0.5, -0.5, 0, 0],
+    [0.5, -0.5, 1, 0],
+    [0.5, 0.5, 1, 1],
+    [-0.5, 0.5, 0, 1],
+  ]
+  const positions: number[] = []
+  const uvs: number[] = []
+  for (const [x, y, u, v] of corners) {
+    const alignedX = (x - (center[0] - 0.5)) * scaleX
+    const alignedY = (y - (center[1] - 0.5)) * scaleY
+    const rotatedX = cos * alignedX - sin * alignedY
+    const rotatedY = sin * alignedX + cos * alignedY
+    positions.push(
+      worldPosition[0] + axes.right[0] * rotatedX + axes.up[0] * rotatedY,
+      worldPosition[1] + axes.right[1] * rotatedX + axes.up[1] * rotatedY,
+      worldPosition[2] + axes.right[2] * rotatedX + axes.up[2] * rotatedY,
+    )
+    uvs.push(u, v)
+  }
+  return {
+    positions,
+    indices: [0, 1, 2, 0, 2, 3],
+    uvs,
+  }
+}
+
+function spriteBillboardSignature(
+  matrix: number[],
+  center: [number, number],
+  scaleX: number,
+  scaleY: number,
+  rotation: number,
+  sizeAttenuation: boolean | undefined,
+  axes: { right: [number, number, number]; up: [number, number, number] },
+  camera: ThreeCameraLike | undefined,
+): SpriteBillboardSignature {
+  return {
+    matrix: matrix.slice(0, 16),
+    center: center.slice() as [number, number],
+    scaleX,
+    scaleY,
+    rotation,
+    sizeAttenuation,
+    cameraRight: axes.right.slice() as [number, number, number],
+    cameraUp: axes.up.slice() as [number, number, number],
+    cameraView: matrixValues(camera?.matrixWorldInverse?.elements),
+    cameraIsPerspective: camera?.isPerspectiveCamera,
+  }
+}
+
+function sameSpriteBillboardSignature(a: SpriteBillboardSignature, b: SpriteBillboardSignature): boolean {
+  return sameNumberArray(a.matrix, b.matrix)
+    && sameNumberArray(a.center, b.center)
+    && a.scaleX === b.scaleX
+    && a.scaleY === b.scaleY
+    && a.rotation === b.rotation
+    && a.sizeAttenuation === b.sizeAttenuation
+    && sameNumberArray(a.cameraRight, b.cameraRight)
+    && sameNumberArray(a.cameraUp, b.cameraUp)
+    && sameOptionalNumberArray(a.cameraView, b.cameraView)
+    && a.cameraIsPerspective === b.cameraIsPerspective
 }
 
 function validateSpriteScale(object: ThreeObject3DLike): void {

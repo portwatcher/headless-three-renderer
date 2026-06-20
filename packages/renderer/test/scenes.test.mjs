@@ -23568,6 +23568,58 @@ test('reusable renderer reuses cached point billboard expansion until UV attribu
   assert.ok(uvReads > readsAfterFirstRender, 'UV version changes should invalidate cached point billboard expansion')
 })
 
+test('reusable renderer reuses cached sprite billboard expansion until sprite inputs change', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const material = new THREE.SpriteMaterial({ color: 0xff0000 })
+  material.rotation = 0.37
+  const sprite = new THREE.Sprite(material)
+  sprite.scale.set(0.75, 0.75, 1)
+  scene.add(sprite)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const originalCos = Math.cos
+  let rotationCosCalls = 0
+  Math.cos = (value) => {
+    if (value === material.rotation) {
+      rotationCosCalls += 1
+    }
+    return originalCos(value)
+  }
+  try {
+    const first = renderer.render(scene, camera, options)
+    const firstCenter = meanRegion(first, 64, 64, 28, 28, 36, 36)
+    const callsAfterFirstRender = rotationCosCalls
+    assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial sprite billboard should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+    assert.ok(callsAfterFirstRender > 0, 'initial render should compute rotated sprite billboard geometry')
+
+    material.color.set(0x00ff00)
+    const second = renderer.render(scene, camera, options)
+    const secondCenter = meanRegion(second, 64, 64, 28, 28, 36, 36)
+    assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while sprite billboard expansion is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
+    assert.equal(rotationCosCalls, callsAfterFirstRender, 'material-only animation should reuse cached sprite billboard expansion')
+
+    material.rotation = 0.61
+    renderer.render(scene, camera, options)
+    assert.ok(rotationCosCalls > callsAfterFirstRender, 'sprite rotation changes should invalidate cached sprite billboard expansion')
+  } finally {
+    Math.cos = originalCos
+  }
+})
+
 test('reusable renderer reuses cached BatchedMesh geometry views until packed attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()
