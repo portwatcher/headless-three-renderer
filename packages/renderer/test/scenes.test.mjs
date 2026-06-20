@@ -23480,6 +23480,58 @@ test('reusable renderer reuses cached material render state until render state c
   }
 })
 
+test('reusable renderer reuses cached material scalar feature state until scalar changes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  material.thickness = 0.42
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const originalMax = Math.max
+  let thicknessMaxCalls = 0
+  Math.max = (...values) => {
+    if (values[0] === 0 && values[1] === material.thickness) {
+      thicknessMaxCalls += 1
+    }
+    return originalMax(...values)
+  }
+  try {
+    const first = renderer.render(scene, camera, options)
+    const firstCenter = meanRegion(first, 64, 64, 24, 24, 40, 40)
+    const callsAfterFirstRender = thicknessMaxCalls
+    assert.ok(firstCenter.r > 180 && firstCenter.g < 40, `initial scalar-feature material should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+    assert.ok(callsAfterFirstRender > 0, 'initial render should extract material scalar feature state')
+
+    material.color.set(0x00ff00)
+    const second = renderer.render(scene, camera, options)
+    const secondCenter = meanRegion(second, 64, 64, 24, 24, 40, 40)
+    assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while scalar feature state is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
+    assert.equal(thicknessMaxCalls, callsAfterFirstRender, 'material-color animation should reuse cached material scalar feature state')
+
+    material.thickness = 0.73
+    renderer.render(scene, camera, options)
+    assert.ok(thicknessMaxCalls > callsAfterFirstRender, 'material scalar changes should invalidate cached scalar feature state')
+  } finally {
+    Math.max = originalMax
+  }
+})
+
 test('reusable renderer reuses cached CSS material color extraction until color changes', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

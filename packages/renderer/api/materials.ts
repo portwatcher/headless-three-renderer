@@ -177,12 +177,14 @@ export interface MaterialExtractionContext {
   materialColorCache?: MaterialColorExtractionCache
   textureStateCache?: TextureStateExtractionCache
   materialRenderStateCache?: MaterialRenderStateExtractionCache
+  materialScalarFeatureCache?: MaterialScalarFeatureExtractionCache
 }
 
 export type TextureExtractionCache = WeakMap<ThreeTextureLike, unknown>
 export type MaterialColorExtractionCache = WeakMap<ThreeMaterialLike, unknown>
 export type TextureStateExtractionCache = WeakMap<ThreeTextureLike, unknown>
 export type MaterialRenderStateExtractionCache = WeakMap<ThreeMaterialLike, unknown>
+export type MaterialScalarFeatureExtractionCache = WeakMap<ThreeMaterialLike, unknown>
 
 export interface EnvironmentMapResolution {
   envMap: EnvironmentMapInfo | null
@@ -698,7 +700,7 @@ export function extractPbrProperties(
   assertCompatiblePackedPhysicalMapSamplers(material)
   optionalBoolean(material.visible, 'material.visible')
   optionalBoolean(material.vertexColors, 'material.vertexColors')
-  const props: PbrProperties = {}
+  const props: PbrProperties = materialScalarFeatureProperties(material, context)
   const textureFromSlot = (slot: ThreeMaterialLike['map'], label: string) => extractTextureFromSlot(
     slot,
     label,
@@ -712,31 +714,6 @@ export function extractPbrProperties(
     context,
   )
 
-  const usesMaterialEnvironmentMap = material.envMap != null
-    && context.materialEnvironmentMaps?.has(material) === true
-  if (usesMaterialEnvironmentMap) {
-    props.useEnvironmentMap = true
-    props.environmentMapIntensity = finiteNumberOrDefault(material.envMapIntensity, 'material.envMapIntensity', 1)
-    props.environmentMapCombine = material.combine ?? MultiplyOperation
-    props.environmentMapReflectivity = finiteNumberOrDefault(material.reflectivity, 'material.reflectivity', 1)
-    props.environmentMapRefraction = isRefractionEnvironmentMapping(material.envMap?.mapping)
-    props.environmentMapRefractionRatio = finiteNumberOrDefault(material.refractionRatio, 'material.refractionRatio', 0.98)
-  } else if (context.materialEnvironmentSource === 'material') {
-    props.useEnvironmentMap = false
-  }
-
-  const metalness = optionalFiniteNumber(material.metalness, 'material.metalness')
-  if (metalness !== undefined) {
-    props.metallic = clamp01(metalness)
-  }
-  const roughness = optionalFiniteNumber(material.roughness, 'material.roughness')
-  if (roughness !== undefined) {
-    props.roughness = clamp01(roughness)
-  }
-  const clearcoat = optionalFiniteNumber(material.clearcoat, 'material.clearcoat')
-  if (clearcoat !== undefined) {
-    props.clearcoat = clamp01(clearcoat)
-  }
   const clearcoatMapInfo = textureFromSlot(material.clearcoatMap, 'material.clearcoatMap')
   if (clearcoatMapInfo) {
     props.clearcoatMap = clearcoatMapInfo.data
@@ -750,10 +727,6 @@ export function extractPbrProperties(
     props.clearcoatMapTransform = textureTransform(material.clearcoatMap, 'material.clearcoatMap')
     props.clearcoatMapColorSpace = textureColorSpace(material.clearcoatMap)
     props.clearcoatMapUsesUv2 = textureUvChannel(material.clearcoatMap) > 0
-  }
-  const clearcoatRoughness = optionalFiniteNumber(material.clearcoatRoughness, 'material.clearcoatRoughness')
-  if (clearcoatRoughness !== undefined) {
-    props.clearcoatRoughness = clamp01(clearcoatRoughness)
   }
   const clearcoatRoughnessMapInfo = textureFromSlot(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
   if (clearcoatRoughnessMapInfo) {
@@ -783,16 +756,6 @@ export function extractPbrProperties(
     props.clearcoatNormalMapColorSpace = textureColorSpace(material.clearcoatNormalMap)
     props.clearcoatNormalMapUsesUv2 = textureUvChannel(material.clearcoatNormalMap) > 0
   }
-  if (material.clearcoatNormalScale != null) {
-    if (typeof material.clearcoatNormalScale !== 'object') {
-      throw new TypeError('material.clearcoatNormalScale must be a Vector2-like object.')
-    }
-    props.clearcoatNormalScale = [
-      finiteNumberOrDefault(material.clearcoatNormalScale.x, 'material.clearcoatNormalScale.x', 1),
-      finiteNumberOrDefault(material.clearcoatNormalScale.y, 'material.clearcoatNormalScale.y', 1),
-    ]
-  }
-
   const sheenColor = colorFromSlot('sheenColor', material.sheenColor, 'material.sheenColor')
   const sheen = clamp01(optionalFiniteNumber(material.sheen, 'material.sheen') ?? 0)
   if (sheenColor && sheen > 0) {
@@ -801,10 +764,6 @@ export function extractPbrProperties(
       sheenColor[1] * sheen,
       sheenColor[2] * sheen,
     ]
-  }
-  const sheenRoughness = optionalFiniteNumber(material.sheenRoughness, 'material.sheenRoughness')
-  if (sheenRoughness !== undefined) {
-    props.sheenRoughness = clamp01(sheenRoughness)
   }
   const sheenColorMapInfo = textureFromSlot(material.sheenColorMap, 'material.sheenColorMap')
   if (sheenColorMapInfo) {
@@ -834,15 +793,6 @@ export function extractPbrProperties(
     props.sheenRoughnessMapColorSpace = textureColorSpace(material.sheenRoughnessMap)
     props.sheenRoughnessMapUsesUv2 = textureUvChannel(material.sheenRoughnessMap) > 0
   }
-
-  const anisotropy = optionalFiniteNumber(material.anisotropy, 'material.anisotropy')
-  if (anisotropy !== undefined) {
-    props.anisotropy = clamp01(Math.abs(anisotropy))
-  }
-  const anisotropyRotation = optionalFiniteNumber(material.anisotropyRotation, 'material.anisotropyRotation')
-  if (anisotropyRotation !== undefined) {
-    props.anisotropyRotation = anisotropyRotation
-  }
   const anisotropyMapInfo = textureFromSlot(material.anisotropyMap, 'material.anisotropyMap')
   if (anisotropyMapInfo) {
     props.anisotropyMap = anisotropyMapInfo.data
@@ -856,11 +806,6 @@ export function extractPbrProperties(
     props.anisotropyMapTransform = textureTransform(material.anisotropyMap, 'material.anisotropyMap')
     props.anisotropyMapColorSpace = textureColorSpace(material.anisotropyMap)
     props.anisotropyMapUsesUv2 = textureUvChannel(material.anisotropyMap) > 0
-  }
-
-  const iridescence = optionalFiniteNumber(material.iridescence, 'material.iridescence')
-  if (iridescence !== undefined) {
-    props.iridescence = clamp01(iridescence)
   }
   const iridescenceMapInfo = textureFromSlot(material.iridescenceMap, 'material.iridescenceMap')
   if (iridescenceMapInfo) {
@@ -876,19 +821,6 @@ export function extractPbrProperties(
     props.iridescenceMapColorSpace = textureColorSpace(material.iridescenceMap)
     props.iridescenceMapUsesUv2 = textureUvChannel(material.iridescenceMap) > 0
   }
-  const iridescenceIor = optionalFiniteNumber(material.iridescenceIOR, 'material.iridescenceIOR')
-  if (iridescenceIor !== undefined) {
-    props.iridescenceIor = Math.max(1, Math.min(2.333, iridescenceIor))
-  }
-  const iridescenceThicknessRange = materialRangePair(
-    material.iridescenceThicknessRange,
-    'material.iridescenceThicknessRange',
-  )
-  if (iridescenceThicknessRange) {
-    const [min, max] = iridescenceThicknessRange
-    props.iridescenceThicknessMin = Math.max(0, min)
-    props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
-  }
   const iridescenceThicknessMapInfo = textureFromSlot(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
   if (iridescenceThicknessMapInfo) {
     props.iridescenceThicknessMap = iridescenceThicknessMapInfo.data
@@ -902,15 +834,6 @@ export function extractPbrProperties(
     props.iridescenceThicknessMapTransform = textureTransform(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
     props.iridescenceThicknessMapColorSpace = textureColorSpace(material.iridescenceThicknessMap)
     props.iridescenceThicknessMapUsesUv2 = textureUvChannel(material.iridescenceThicknessMap) > 0
-  }
-
-  const transmission = optionalFiniteNumber(material.transmission, 'material.transmission')
-  if (transmission !== undefined) {
-    props.transmission = clamp01(transmission)
-  }
-  const dispersion = optionalFiniteNumber(material.dispersion, 'material.dispersion')
-  if (dispersion !== undefined) {
-    props.dispersion = Math.max(0, dispersion)
   }
   const transmissionMapInfo = textureFromSlot(material.transmissionMap, 'material.transmissionMap')
   if (transmissionMapInfo) {
@@ -926,14 +849,6 @@ export function extractPbrProperties(
     props.transmissionMapColorSpace = textureColorSpace(material.transmissionMap)
     props.transmissionMapUsesUv2 = textureUvChannel(material.transmissionMap) > 0
   }
-  const ior = optionalFiniteNumber(material.ior, 'material.ior')
-  if (ior !== undefined) {
-    props.ior = Math.max(1, Math.min(2.333, ior))
-  }
-  const thickness = optionalFiniteNumber(material.thickness, 'material.thickness')
-  if (thickness !== undefined) {
-    props.thickness = Math.max(0, thickness)
-  }
   const thicknessMapInfo = textureFromSlot(material.thicknessMap, 'material.thicknessMap')
   if (thicknessMapInfo) {
     props.thicknessMap = thicknessMapInfo.data
@@ -948,13 +863,6 @@ export function extractPbrProperties(
     props.thicknessMapColorSpace = textureColorSpace(material.thicknessMap)
     props.thicknessMapUsesUv2 = textureUvChannel(material.thicknessMap) > 0
   }
-  const attenuationDistance = optionalFiniteNumberOrInfinityDefault(
-    material.attenuationDistance,
-    'material.attenuationDistance',
-  )
-  if (attenuationDistance !== undefined) {
-    props.attenuationDistance = Math.max(0, attenuationDistance)
-  }
   const attenuationColor = colorFromSlot('attenuationColor', material.attenuationColor, 'material.attenuationColor')
   if (attenuationColor) {
     props.attenuationColor = [attenuationColor[0], attenuationColor[1], attenuationColor[2]]
@@ -966,10 +874,6 @@ export function extractPbrProperties(
       physicalSpecularColor[1],
       physicalSpecularColor[2],
     ]
-  }
-  const specularIntensity = optionalFiniteNumber(material.specularIntensity, 'material.specularIntensity')
-  if (specularIntensity !== undefined) {
-    props.physicalSpecularIntensity = clamp01(specularIntensity)
   }
   const specularColorMapInfo = textureFromSlot(material.specularColorMap, 'material.specularColorMap')
   if (specularColorMapInfo) {
@@ -1005,12 +909,6 @@ export function extractPbrProperties(
     const color = specularColor ?? [17 / 255, 17 / 255, 17 / 255, 1]
     props.specularColor = [color[0], color[1], color[2]]
   }
-  const shininess = material.isMeshPhongMaterial
-    ? finiteNumberOrDefault(material.shininess, 'material.shininess', 30)
-    : optionalFiniteNumber(material.shininess, 'material.shininess')
-  if (shininess !== undefined) {
-    props.shininess = Math.max(0.0001, shininess)
-  }
 
   const emissive = colorFromSlot('emissive', material.emissive, 'material.emissive')
   if (emissive) {
@@ -1032,15 +930,6 @@ export function extractPbrProperties(
     props.normalMapColorSpace = textureColorSpace(material.normalMap)
     props.normalMapUsesUv2 = textureUvChannel(material.normalMap) > 0
     props.normalMapType = materialNormalMapType(material)
-  }
-  if (material.normalScale != null) {
-    if (typeof material.normalScale !== 'object') {
-      throw new TypeError('material.normalScale must be a Vector2-like object.')
-    }
-    props.normalScale = [
-      finiteNumberOrDefault(material.normalScale.x, 'material.normalScale.x', 1),
-      finiteNumberOrDefault(material.normalScale.y, 'material.normalScale.y', 1),
-    ]
   }
   const bumpMapInfo = textureFromSlot(material.bumpMap, 'material.bumpMap')
   if (bumpMapInfo) {
@@ -1073,39 +962,6 @@ export function extractPbrProperties(
       props.matcapMapUsesUv2 = textureUvChannel(material.map) > 0
     }
   }
-  if (material.isMeshDepthMaterial) {
-    props.depthPacking = materialDepthPacking(material) ?? BasicDepthPacking
-  }
-  if (material.isMeshDistanceMaterial) {
-    const hintBag = materialRendererHints(material.userData)
-    const hints = hintBag?.value ?? {}
-    const hintsLabel = hintBag?.label ?? 'material.userData.headlessThreeRenderer'
-    const referencePosition = firstOptionalVector3LikeToArray([
-      [material.referencePosition, 'material.referencePosition'],
-      [hints.referencePosition, `${hintsLabel}.referencePosition`],
-      [hints.distanceReferencePosition, `${hintsLabel}.distanceReferencePosition`],
-    ])
-    if (referencePosition) {
-      props.distanceReferencePosition = referencePosition
-    }
-    const nearDistance = firstOptionalFiniteNumber([
-      [material.nearDistance, 'material.nearDistance'],
-      [hints.nearDistance, `${hintsLabel}.nearDistance`],
-      [hints.distanceNear, `${hintsLabel}.distanceNear`],
-    ])
-    if (nearDistance !== undefined) {
-      props.distanceNear = nearDistance
-    }
-    const farDistance = firstOptionalFiniteNumber([
-      [material.farDistance, 'material.farDistance'],
-      [hints.farDistance, `${hintsLabel}.farDistance`],
-      [hints.distanceFar, `${hintsLabel}.distanceFar`],
-    ])
-    if (farDistance !== undefined) {
-      props.distanceFar = farDistance
-    }
-  }
-
   const gradientMapInfo = textureFromSlot(material.gradientMap, 'material.gradientMap')
   if (gradientMapInfo) {
     props.gradientMap = gradientMapInfo.data
@@ -1239,6 +1095,300 @@ export function extractPbrProperties(
   Object.assign(props, materialRenderStateProperties(material, customFragmentShader, context))
 
   return props
+}
+
+interface CachedMaterialScalarFeatureExtraction {
+  signature: MaterialScalarFeatureSignature
+  props: PbrProperties
+}
+
+interface MaterialScalarFeatureSignature {
+  values: unknown[]
+}
+
+function materialScalarFeatureProperties(
+  material: ThreeMaterialLike,
+  context: MaterialExtractionContext,
+): PbrProperties {
+  const signature = context.materialScalarFeatureCache
+    ? materialScalarFeatureSignature(material, context)
+    : null
+  if (signature) {
+    const cached = context.materialScalarFeatureCache?.get(material) as CachedMaterialScalarFeatureExtraction | undefined
+    if (cached && sameMaterialScalarFeatureSignature(cached.signature, signature)) {
+      return copyMaterialScalarFeatureProperties(cached.props)
+    }
+  }
+
+  const props: PbrProperties = {}
+  const usesMaterialEnvironmentMap = material.envMap != null
+    && context.materialEnvironmentMaps?.has(material) === true
+  if (usesMaterialEnvironmentMap) {
+    props.useEnvironmentMap = true
+    props.environmentMapIntensity = finiteNumberOrDefault(material.envMapIntensity, 'material.envMapIntensity', 1)
+    props.environmentMapCombine = material.combine ?? MultiplyOperation
+    props.environmentMapReflectivity = finiteNumberOrDefault(material.reflectivity, 'material.reflectivity', 1)
+    props.environmentMapRefraction = isRefractionEnvironmentMapping(material.envMap?.mapping)
+    props.environmentMapRefractionRatio = finiteNumberOrDefault(material.refractionRatio, 'material.refractionRatio', 0.98)
+  } else if (context.materialEnvironmentSource === 'material') {
+    props.useEnvironmentMap = false
+  }
+
+  const metalness = optionalFiniteNumber(material.metalness, 'material.metalness')
+  if (metalness !== undefined) {
+    props.metallic = clamp01(metalness)
+  }
+  const roughness = optionalFiniteNumber(material.roughness, 'material.roughness')
+  if (roughness !== undefined) {
+    props.roughness = clamp01(roughness)
+  }
+  const clearcoat = optionalFiniteNumber(material.clearcoat, 'material.clearcoat')
+  if (clearcoat !== undefined) {
+    props.clearcoat = clamp01(clearcoat)
+  }
+  const clearcoatRoughness = optionalFiniteNumber(material.clearcoatRoughness, 'material.clearcoatRoughness')
+  if (clearcoatRoughness !== undefined) {
+    props.clearcoatRoughness = clamp01(clearcoatRoughness)
+  }
+  if (material.clearcoatNormalScale != null) {
+    if (typeof material.clearcoatNormalScale !== 'object') {
+      throw new TypeError('material.clearcoatNormalScale must be a Vector2-like object.')
+    }
+    props.clearcoatNormalScale = [
+      finiteNumberOrDefault(material.clearcoatNormalScale.x, 'material.clearcoatNormalScale.x', 1),
+      finiteNumberOrDefault(material.clearcoatNormalScale.y, 'material.clearcoatNormalScale.y', 1),
+    ]
+  }
+
+  const sheenRoughness = optionalFiniteNumber(material.sheenRoughness, 'material.sheenRoughness')
+  if (sheenRoughness !== undefined) {
+    props.sheenRoughness = clamp01(sheenRoughness)
+  }
+  const anisotropy = optionalFiniteNumber(material.anisotropy, 'material.anisotropy')
+  if (anisotropy !== undefined) {
+    props.anisotropy = clamp01(Math.abs(anisotropy))
+  }
+  const anisotropyRotation = optionalFiniteNumber(material.anisotropyRotation, 'material.anisotropyRotation')
+  if (anisotropyRotation !== undefined) {
+    props.anisotropyRotation = anisotropyRotation
+  }
+  const iridescence = optionalFiniteNumber(material.iridescence, 'material.iridescence')
+  if (iridescence !== undefined) {
+    props.iridescence = clamp01(iridescence)
+  }
+  const iridescenceIor = optionalFiniteNumber(material.iridescenceIOR, 'material.iridescenceIOR')
+  if (iridescenceIor !== undefined) {
+    props.iridescenceIor = Math.max(1, Math.min(2.333, iridescenceIor))
+  }
+  const iridescenceThicknessRange = materialRangePair(
+    material.iridescenceThicknessRange,
+    'material.iridescenceThicknessRange',
+  )
+  if (iridescenceThicknessRange) {
+    const [min, max] = iridescenceThicknessRange
+    props.iridescenceThicknessMin = Math.max(0, min)
+    props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
+  }
+  const transmission = optionalFiniteNumber(material.transmission, 'material.transmission')
+  if (transmission !== undefined) {
+    props.transmission = clamp01(transmission)
+  }
+  const dispersion = optionalFiniteNumber(material.dispersion, 'material.dispersion')
+  if (dispersion !== undefined) {
+    props.dispersion = Math.max(0, dispersion)
+  }
+  const ior = optionalFiniteNumber(material.ior, 'material.ior')
+  if (ior !== undefined) {
+    props.ior = Math.max(1, Math.min(2.333, ior))
+  }
+  const thickness = optionalFiniteNumber(material.thickness, 'material.thickness')
+  if (thickness !== undefined) {
+    props.thickness = Math.max(0, thickness)
+  }
+  const attenuationDistance = optionalFiniteNumberOrInfinityDefault(
+    material.attenuationDistance,
+    'material.attenuationDistance',
+  )
+  if (attenuationDistance !== undefined) {
+    props.attenuationDistance = Math.max(0, attenuationDistance)
+  }
+  const specularIntensity = optionalFiniteNumber(material.specularIntensity, 'material.specularIntensity')
+  if (specularIntensity !== undefined) {
+    props.physicalSpecularIntensity = clamp01(specularIntensity)
+  }
+
+  const shininess = material.isMeshPhongMaterial
+    ? finiteNumberOrDefault(material.shininess, 'material.shininess', 30)
+    : optionalFiniteNumber(material.shininess, 'material.shininess')
+  if (shininess !== undefined) {
+    props.shininess = Math.max(0.0001, shininess)
+  }
+  if (material.normalScale != null) {
+    if (typeof material.normalScale !== 'object') {
+      throw new TypeError('material.normalScale must be a Vector2-like object.')
+    }
+    props.normalScale = [
+      finiteNumberOrDefault(material.normalScale.x, 'material.normalScale.x', 1),
+      finiteNumberOrDefault(material.normalScale.y, 'material.normalScale.y', 1),
+    ]
+  }
+  if (material.isMeshDepthMaterial) {
+    props.depthPacking = materialDepthPacking(material) ?? BasicDepthPacking
+  }
+  if (material.isMeshDistanceMaterial) {
+    const hintBag = materialRendererHints(material.userData)
+    const hints = hintBag?.value ?? {}
+    const hintsLabel = hintBag?.label ?? 'material.userData.headlessThreeRenderer'
+    const referencePosition = firstOptionalVector3LikeToArray([
+      [material.referencePosition, 'material.referencePosition'],
+      [hints.referencePosition, `${hintsLabel}.referencePosition`],
+      [hints.distanceReferencePosition, `${hintsLabel}.distanceReferencePosition`],
+    ])
+    if (referencePosition) {
+      props.distanceReferencePosition = referencePosition
+    }
+    const nearDistance = firstOptionalFiniteNumber([
+      [material.nearDistance, 'material.nearDistance'],
+      [hints.nearDistance, `${hintsLabel}.nearDistance`],
+      [hints.distanceNear, `${hintsLabel}.distanceNear`],
+    ])
+    if (nearDistance !== undefined) {
+      props.distanceNear = nearDistance
+    }
+    const farDistance = firstOptionalFiniteNumber([
+      [material.farDistance, 'material.farDistance'],
+      [hints.farDistance, `${hintsLabel}.farDistance`],
+      [hints.distanceFar, `${hintsLabel}.distanceFar`],
+    ])
+    if (farDistance !== undefined) {
+      props.distanceFar = farDistance
+    }
+  }
+
+  if (signature) {
+    context.materialScalarFeatureCache?.set(material, {
+      signature,
+      props: copyMaterialScalarFeatureProperties(props),
+    })
+  }
+  return props
+}
+
+function materialScalarFeatureSignature(
+  material: ThreeMaterialLike,
+  context: MaterialExtractionContext,
+): MaterialScalarFeatureSignature {
+  const iridescenceThicknessRange = material.iridescenceThicknessRange as ArrayLike<unknown> | undefined
+  const hintInfo = material.isMeshDistanceMaterial ? materialHintSignatureInfo(material.userData) : []
+  return {
+    values: [
+      context.materialEnvironmentSource,
+      context.materialEnvironmentMaps?.has(material),
+      material.envMap,
+      material.envMap?.mapping,
+      material.envMapIntensity,
+      material.combine,
+      material.reflectivity,
+      material.refractionRatio,
+      material.metalness,
+      material.roughness,
+      material.clearcoat,
+      material.clearcoatRoughness,
+      ...vector2SignatureValues(material.clearcoatNormalScale),
+      material.sheenRoughness,
+      material.anisotropy,
+      material.anisotropyRotation,
+      material.iridescence,
+      material.iridescenceIOR,
+      iridescenceThicknessRange,
+      iridescenceThicknessRange?.length,
+      iridescenceThicknessRange?.[0],
+      iridescenceThicknessRange?.[1],
+      material.transmission,
+      material.dispersion,
+      material.ior,
+      material.thickness,
+      material.attenuationDistance,
+      material.specularIntensity,
+      material.isMeshPhongMaterial,
+      material.shininess,
+      ...vector2SignatureValues(material.normalScale),
+      material.isMeshDepthMaterial,
+      material.depthPacking,
+      material.isMeshDistanceMaterial,
+      material.referencePosition,
+      ...vector3SignatureValues(material.referencePosition),
+      material.nearDistance,
+      material.farDistance,
+      ...hintInfo,
+    ],
+  }
+}
+
+function materialHintSignatureInfo(userData: Record<string, any> | undefined): unknown[] {
+  const values: unknown[] = [userData]
+  if (userData && typeof userData === 'object' && !Array.isArray(userData)) {
+    const hints = userData.headlessThreeRenderer ?? userData.headlessRenderer
+    values.push(hints)
+    if (hints && typeof hints === 'object' && !Array.isArray(hints)) {
+      const hintRecord = hints as Record<string, unknown>
+      values.push(
+        hintRecord.referencePosition,
+        ...vector3SignatureValues(hintRecord.referencePosition),
+        hintRecord.distanceReferencePosition,
+        ...vector3SignatureValues(hintRecord.distanceReferencePosition),
+        hintRecord.nearDistance,
+        hintRecord.distanceNear,
+        hintRecord.farDistance,
+        hintRecord.distanceFar,
+      )
+    }
+  }
+  return values
+}
+
+function vector2SignatureValues(value: unknown): unknown[] {
+  if (!value || typeof value !== 'object') return [value]
+  const arrayLike = value as ArrayLike<unknown>
+  return [
+    value,
+    arrayLike.length,
+    arrayLike[0],
+    arrayLike[1],
+    (value as { x?: unknown }).x,
+    (value as { y?: unknown }).y,
+  ]
+}
+
+function vector3SignatureValues(value: unknown): unknown[] {
+  if (!value || typeof value !== 'object') return [value]
+  const arrayLike = value as ArrayLike<unknown>
+  return [
+    value,
+    arrayLike.length,
+    arrayLike[0],
+    arrayLike[1],
+    arrayLike[2],
+    (value as { x?: unknown }).x,
+    (value as { y?: unknown }).y,
+    (value as { z?: unknown }).z,
+  ]
+}
+
+function copyMaterialScalarFeatureProperties(props: PbrProperties): PbrProperties {
+  return {
+    ...props,
+    clearcoatNormalScale: props.clearcoatNormalScale ? props.clearcoatNormalScale.slice() : undefined,
+    normalScale: props.normalScale ? props.normalScale.slice() : undefined,
+    distanceReferencePosition: props.distanceReferencePosition ? props.distanceReferencePosition.slice() : undefined,
+  }
+}
+
+function sameMaterialScalarFeatureSignature(
+  a: MaterialScalarFeatureSignature,
+  b: MaterialScalarFeatureSignature,
+): boolean {
+  return sameUnknownArray(a.values, b.values)
 }
 
 interface CachedMaterialRenderStateExtraction {
