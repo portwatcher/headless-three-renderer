@@ -287,6 +287,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "line-dashed-material-uv-channel-selection.png",
+      "name": "line-dashed-material-uv-channel-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "points-material-textured-alpha.png",
       "name": "points-material-textured-alpha",
       "width": 96,

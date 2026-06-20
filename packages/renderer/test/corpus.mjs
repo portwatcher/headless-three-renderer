@@ -4110,7 +4110,6 @@ function dashedLineMaterialUvChannelCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.001,
-    browserReference: false,
     validate(rgba, { width, height }) {
       const greenPixels = countRegionPixels(
         rgba,
