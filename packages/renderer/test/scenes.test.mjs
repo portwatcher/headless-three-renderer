@@ -19019,7 +19019,7 @@ test('LightProbe contributes diffuse lighting across lit material models', () =>
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
     camera.position.set(0, 0, 3)
     camera.lookAt(0, 0, 0)
-    return meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
   }
 
   const cases = [
@@ -19033,6 +19033,7 @@ test('LightProbe contributes diffuse lighting across lit material models', () =>
     const mean = renderMaterial(material)
     assert.ok(mean.r > mean.g + 25, `${name} should receive red LightProbe diffuse lighting (${mean.r} vs ${mean.g})`)
     assert.ok(mean.r > mean.b + 25, `${name} should receive red LightProbe diffuse lighting (${mean.r} vs ${mean.b})`)
+    assert.ok(mean.r < 220, `${name} should apply Lambert diffuse scaling to LightProbe irradiance (${mean.r})`)
   }
 })
 

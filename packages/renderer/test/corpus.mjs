@@ -672,7 +672,7 @@ function lightProbeCorpus() {
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 40, 40, 56, 56)
-      if (!(center.r > 180 && center.g > 160 && center.r > center.b + 40 && center.g > center.b + 20)) {
+      if (!(center.r > 140 && center.r < 210 && center.g > 110 && center.r > center.b + 40 && center.g > center.b + 20)) {
         throw new Error(`LightProbe diffuse corpus should render a warm lit sphere, got ${JSON.stringify(center)}`)
       }
     },

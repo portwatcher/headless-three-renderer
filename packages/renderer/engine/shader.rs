@@ -1458,7 +1458,7 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       lo = lo + ambient * ao;
     }
     if has_light_probe {
-      lo = lo + albedo * light_probe_diffuse * ao;
+      lo = lo + albedo * light_probe_diffuse * (1.0 / PI) * ao;
     }
     lo = lo + light_map_diffuse;
   }

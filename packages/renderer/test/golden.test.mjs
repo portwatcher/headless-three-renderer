@@ -25,7 +25,6 @@ const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map([
   ['array-camera-viewport-split', 58],
   ['alpha-to-coverage-msaa-plane', 44],
   ['material-env-map-pbr', 43],
-  ['light-probe-lit-material-models', 24],
 ])
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
