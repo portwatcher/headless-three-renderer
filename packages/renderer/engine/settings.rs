@@ -1055,4 +1055,36 @@ mod tests {
         assert!((background.blurriness - 0.25).abs() < f32::EPSILON);
         assert!(settings.ibl.is_none());
     }
+
+    #[test]
+    fn rejects_non_finite_background_texture_anisotropy() {
+        let scene = RenderScene {
+            width: Some(16),
+            height: Some(16),
+            background_texture: Some(vec![64u8, 128, 255, 255].into()),
+            background_texture_width: Some(1),
+            background_texture_height: Some(1),
+            background_texture_anisotropy: Some(f64::NAN),
+            ..RenderScene::default()
+        };
+        let camera = Camera::default();
+        let limits = wgpu::Limits {
+            max_texture_dimension_2d: 8192,
+            ..wgpu::Limits::default()
+        };
+
+        let error = match RenderSettings::from_scene(&scene, &camera, limits) {
+            Ok(_) => panic!("background texture anisotropy should fail"),
+            Err(error) => error.to_string(),
+        };
+
+        assert!(
+            error.contains("scene.backgroundTextureAnisotropy"),
+            "error should name background texture anisotropy, got: {error}",
+        );
+        assert!(
+            error.contains("must contain finite f32-compatible numbers"),
+            "error should reject non-finite anisotropy, got: {error}",
+        );
+    }
 }
