@@ -25,6 +25,7 @@ export type VrmAnimationClipFactory = (vrmAnimation: unknown, vrm: unknown) => u
 type KeyframeTrackConstructor = new (name: string, times: ArrayLike<number>, values: ArrayLike<number>, interpolation?: number) => unknown
 export type ApplyVrmAnimationOptions = {
   AnimationMixer?: AnimationMixerConstructor
+  animationIndex?: number
   createVRMAnimationClip?: VrmAnimationClipFactory
   time?: number
   updateDelta?: number
@@ -340,7 +341,8 @@ export async function applyVrmAnimation(
 ): Promise<AppliedVrmAnimation> {
   const helperOptions = objectOptions(options, 'options') as ApplyVrmAnimationOptions
   const model = resolveVrmModelInput(vrm)
-  const animation = resolveVrmAnimationInput(vrmAnimation)
+  const animationIndex = optionalNonNegativeInteger(helperOptions.animationIndex, 'options.animationIndex') ?? 0
+  const animation = resolveVrmAnimationInput(vrmAnimation, animationIndex)
 
   const time = optionalNonNegativeNumber(helperOptions.time, 'options.time') ?? 0
   const updateDelta = optionalNonNegativeNumber(helperOptions.updateDelta, 'options.updateDelta') ?? 0
@@ -390,7 +392,7 @@ function resolveVrmModelInput(vrm: unknown): VrmLike {
   return model
 }
 
-function resolveVrmAnimationInput(vrmAnimation: unknown): unknown {
+function resolveVrmAnimationInput(vrmAnimation: unknown, animationIndex = 0): unknown {
   const input = objectOptions(vrmAnimation, 'vrmAnimation') as Record<string, unknown>
   const userData = input.userData
   if (userData == null || typeof userData !== 'object' || Array.isArray(userData) || !('vrmAnimations' in userData)) {
@@ -401,8 +403,8 @@ function resolveVrmAnimationInput(vrmAnimation: unknown): unknown {
   if (!Array.isArray(animations)) {
     throw new TypeError('vrmAnimation.userData.vrmAnimations must be an array.')
   }
-  objectOptions(animations[0], 'vrmAnimation.userData.vrmAnimations[0]')
-  return animations[0]
+  objectOptions(animations[animationIndex], `vrmAnimation.userData.vrmAnimations[${animationIndex}]`)
+  return animations[animationIndex]
 }
 
 function encodedImageDataUriBuffer(url: string): Buffer | null {
@@ -874,6 +876,12 @@ function optionalNonNegativeNumber(value: unknown, label: string): number | unde
   if (value == null) return undefined
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value
   throw new TypeError(`${label} must be a finite non-negative number.`)
+}
+
+function optionalNonNegativeInteger(value: unknown, label: string): number | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value
+  throw new TypeError(`${label} must be a non-negative integer.`)
 }
 
 function validateNodeGltfLoaderOptions(options: NodeGltfLoaderOptions): {

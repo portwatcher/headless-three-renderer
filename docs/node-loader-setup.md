@@ -63,8 +63,10 @@ For VRMA clips, use `loadVrmAnimationFromFile()` with
 VRMA clip from either direct VRM/VRMA objects or the glTF wrappers returned by
 the local VRM helpers, seek an animation mixer to a still-frame time with
 `setTime()` or the `update()` fallback, and update the avatar before rendering.
-Pass `updateDelta` to control the VRM update step, or `updateVrm: false` when
-the caller will update the avatar manually.
+Wrapper inputs use `userData.vrmAnimations[0]` by default and accept
+`animationIndex` for multi-animation VRMA files. Pass `updateDelta` to control
+the VRM update step, or `updateVrm: false` when the caller will update the
+avatar manually.
 
 For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
 configured `{ loader, manager, encodedImages }` bundle so callers can add more

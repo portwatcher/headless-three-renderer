@@ -461,6 +461,55 @@ test('VRM animation helper accepts loaded VRM and VRMA glTF wrappers', async () 
   ])
 })
 
+test('VRM animation helper selects VRMA wrapper animations by index', async () => {
+  const calls = []
+  const scene = { name: 'indexed-avatar-scene' }
+  const vrm = { scene }
+  const idleAnimation = { name: 'idle' }
+  const danceAnimation = { name: 'dance' }
+  const vrmGltf = { userData: { vrm } }
+  const animationGltf = { userData: { vrmAnimations: [idleAnimation, danceAnimation] } }
+
+  class FakeAnimationMixer {
+    constructor(root) {
+      calls.push(['mixer.constructor', root])
+    }
+
+    clipAction(clip) {
+      calls.push(['mixer.clipAction', clip])
+      return {
+        play() {
+          calls.push(['action.play'])
+        },
+      }
+    }
+
+    setTime(time) {
+      calls.push(['mixer.setTime', time])
+    }
+  }
+
+  const result = await applyVrmAnimation(vrmGltf, animationGltf, {
+    AnimationMixer: FakeAnimationMixer,
+    animationIndex: 1,
+    createVRMAnimationClip(animation, model) {
+      calls.push(['createVRMAnimationClip', animation, model])
+      return { animation, model }
+    },
+    time: 0.5,
+  })
+
+  assert.equal(result.clip.animation, danceAnimation)
+  assert.equal(result.clip.model, vrm)
+  assert.deepEqual(calls, [
+    ['createVRMAnimationClip', danceAnimation, vrm],
+    ['mixer.constructor', scene],
+    ['mixer.clipAction', result.clip],
+    ['action.play'],
+    ['mixer.setTime', 0.5],
+  ])
+})
+
 test('Node loader helper path and option containers fail clearly', async () => {
   assert.throws(
     () => createEncodedImageTextureLoader(123),
@@ -636,6 +685,22 @@ test('Node loader helper path and option containers fail clearly', async () => {
       createVRMAnimationClip() {},
     }),
     /vrmAnimation\.userData\.vrmAnimations\[0\] must be an object/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, { userData: { vrmAnimations: [{}] } }, {
+      AnimationMixer: ValidAnimationMixer,
+      animationIndex: 1,
+      createVRMAnimationClip() {},
+    }),
+    /vrmAnimation\.userData\.vrmAnimations\[1\] must be an object/i,
+  )
+  await assert.rejects(
+    () => applyVrmAnimation({ scene: {} }, {}, {
+      AnimationMixer: ValidAnimationMixer,
+      animationIndex: 1.5,
+      createVRMAnimationClip() {},
+    }),
+    /options\.animationIndex must be a non-negative integer/i,
   )
   await assert.rejects(
     () => applyVrmAnimation({ scene: {} }, {}, {

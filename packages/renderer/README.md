@@ -73,7 +73,7 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 It also exports Node loader helpers:
 
-- `applyVrmAnimation(vrm, vrmAnimation, options)`: creates a VRMA animation clip with `createVRMAnimationClip`, accepting either direct VRM/VRMA objects or the glTF wrappers returned by `loadVrmFromFile()`/`loadVrmAnimationFromFile()`, seeks a `THREE.AnimationMixer` to `options.time` through `setTime()` or `update()` fallback, and updates the VRM scene for still-frame rendering unless `updateVrm: false` is passed.
+- `applyVrmAnimation(vrm, vrmAnimation, options)`: creates a VRMA animation clip with `createVRMAnimationClip`, accepting either direct VRM/VRMA objects or the glTF wrappers returned by `loadVrmFromFile()`/`loadVrmAnimationFromFile()`, selects wrapper animations with `options.animationIndex`, seeks a `THREE.AnimationMixer` to `options.time` through `setTime()` or `update()` fallback, and updates the VRM scene for still-frame rendering unless `updateVrm: false` is passed.
 - `loadGltfFromFile(filePath, options)`: loads local `.gltf` or `.glb` files from relative paths, absolute paths, or `file://` URLs with encoded texture handlers and local `file://` buffer support already installed; malformed helper paths, option containers, and glTF image metadata fail clearly.
 - `loadVrmFromFile(filePath, options)`: loads local VRM files with `@pixiv/three-vrm`'s `VRMLoaderPlugin` registered. The Pixiv package remains an optional dependency in your project.
 - `loadVrmAnimationFromFile(filePath, options)`: loads local VRMA files with `@pixiv/three-vrm-animation`'s `VRMAnimationLoaderPlugin` registered. The animation package remains optional.
@@ -224,7 +224,7 @@ Compatible with:
 
 The repository includes runnable local examples for [glTF/GLB](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs) and [VRM/VRMA](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs) assets. The VRM example resolves optional Pixiv packages from the current working project when they are not installed next to the example script.
 
-Use `applyVrmAnimation()` or your own `AnimationMixer`, then call `scene.updateMatrixWorld(true)` before `render()` to bake the current pose. `applyVrmAnimation()` accepts the glTF objects returned by the local VRM/VRMA helpers or direct `vrm`/`vrmAnimation` objects; it updates the avatar by default, and accepts `updateVrm: false` if your render pipeline performs that update separately.
+Use `applyVrmAnimation()` or your own `AnimationMixer`, then call `scene.updateMatrixWorld(true)` before `render()` to bake the current pose. `applyVrmAnimation()` accepts the glTF objects returned by the local VRM/VRMA helpers or direct `vrm`/`vrmAnimation` objects; it selects `userData.vrmAnimations[0]` by default for wrappers, accepts `animationIndex` for multi-animation VRMA wrappers, updates the avatar by default, and accepts `updateVrm: false` if your render pipeline performs that update separately.
 
 ```js
 import * as THREE from 'three'
