@@ -1822,6 +1822,18 @@ export class Renderer {
           this.currentActiveMipmapLevel,
         )
       }
+      if (stencil) {
+        clearRenderTargetStencil(
+          this.currentRenderTarget,
+          this.currentClearStencil,
+          this.currentClearDepth,
+          this.currentSize,
+          this.currentScissor,
+          this.currentScissorTest,
+          this.currentActiveCubeFace,
+          this.currentActiveMipmapLevel,
+        )
+      }
     }
   }
 
@@ -5265,6 +5277,72 @@ function clearRenderTargetDepth(
   )
 }
 
+function clearRenderTargetStencil(
+  target: RenderTargetLike,
+  stencil: number,
+  fallbackDepth: number,
+  fallbackSize: PixelSize | null,
+  rendererScissor: PixelRect | null,
+  rendererScissorTest: boolean,
+  activeCubeFace: number,
+  activeMipmapLevel: number,
+): void {
+  if (!target.depthTexture || target.depthTexture.type !== UnsignedInt248Type) return
+  const size = renderTargetClearSize(target, fallbackSize)
+  if (!size) return
+
+  if (isCubeRenderTarget(target)) {
+    const resolvedMipmapLevel = resolveActiveMipmapLevel(activeMipmapLevel, size.width, 'Renderer activeMipmapLevel')
+    const mipSize = cubeMipmapSize(size.width, size.height, resolvedMipmapLevel)
+    const scissor = renderTargetClearScissor(
+      target,
+      rendererScissor,
+      rendererScissorTest,
+      mipSize.width,
+      mipSize.height,
+      resolvedMipmapLevel,
+    )
+    writeCubeTextureFace(
+      target.depthTexture,
+      clearPackedDepthStencilData(
+        fallbackDepth,
+        stencil,
+        mipSize.width,
+        mipSize.height,
+        scissor,
+        renderTargetTextureFaceImage(target.depthTexture, activeCubeFace, resolvedMipmapLevel)?.data,
+      ),
+      mipSize.width,
+      mipSize.height,
+      activeCubeFace,
+      resolvedMipmapLevel,
+      'target.depthTexture',
+    )
+    return
+  }
+
+  const scissor = renderTargetClearScissor(
+    target,
+    rendererScissor,
+    rendererScissorTest,
+    size.width,
+    size.height,
+  )
+  writeRenderTargetTexture(
+    target.depthTexture,
+    clearPackedDepthStencilData(
+      fallbackDepth,
+      stencil,
+      size.width,
+      size.height,
+      scissor,
+      renderTargetDepthImage(target.depthTexture)?.data,
+    ),
+    size.width,
+    size.height,
+  )
+}
+
 function renderTargetClearScissor(
   target: RenderTargetLike,
   rendererScissor: PixelRect | null,
@@ -5393,7 +5471,7 @@ function clearDepthTextureData(
     return clearScalarDepthData(Uint32Array, existing, width, height, rect, Math.round(clampedDepth * 0xffffffff))
   }
   if (texture.type === UnsignedInt248Type) {
-    return clearScalarDepthData(Uint32Array, existing, width, height, rect, Math.round(clampedDepth * 0xffffff) * 0x100)
+    return clearPackedDepthData(clampedDepth, width, height, rect, existing)
   }
   if (texture.type === FloatType) {
     return clearScalarDepthData(Float32Array, existing, width, height, rect, clampedDepth)
@@ -5402,6 +5480,54 @@ function clearDepthTextureData(
     return clearScalarDepthData(Uint16Array, existing, width, height, rect, normalizedFloatToHalf(clampedDepth))
   }
   return clearDepthRgbaBuffer(clampedDepth, width, height, rect, existing)
+}
+
+function clearPackedDepthData(
+  depth: number,
+  width: number,
+  height: number,
+  rect: PixelRect | undefined,
+  existing: NonNullable<RenderTargetImageLike['data']> | undefined,
+): Uint32Array {
+  const pixelCount = width * height
+  const data = existing instanceof Uint32Array && existing.length === pixelCount
+    ? new Uint32Array(existing)
+    : new Uint32Array(pixelCount)
+  const value = Math.round(clamp01(depth) * 0xffffff) * 0x100
+  const clearRect = rect ?? { x: 0, y: 0, width, height }
+  for (let row = 0; row < clearRect.height; row += 1) {
+    const rowStart = (clearRect.y + row) * width + clearRect.x
+    const rowEnd = rowStart + clearRect.width
+    for (let offset = rowStart; offset < rowEnd; offset += 1) {
+      data[offset] = value + (data[offset] & 0xff)
+    }
+  }
+  return data
+}
+
+function clearPackedDepthStencilData(
+  fallbackDepth: number,
+  stencil: number,
+  width: number,
+  height: number,
+  rect: PixelRect | undefined,
+  existing: NonNullable<RenderTargetImageLike['data']> | undefined,
+): Uint32Array {
+  const pixelCount = width * height
+  const fallbackValue = Math.round(clamp01(fallbackDepth) * 0xffffff) * 0x100
+  const data = existing instanceof Uint32Array && existing.length === pixelCount
+    ? new Uint32Array(existing)
+    : new Uint32Array(pixelCount).fill(fallbackValue)
+  const value = stencil & 0xff
+  const clearRect = rect ?? { x: 0, y: 0, width, height }
+  for (let row = 0; row < clearRect.height; row += 1) {
+    const rowStart = (clearRect.y + row) * width + clearRect.x
+    const rowEnd = rowStart + clearRect.width
+    for (let offset = rowStart; offset < rowEnd; offset += 1) {
+      data[offset] = Math.floor(data[offset] / 0x100) * 0x100 + value
+    }
+  }
+  return data
 }
 
 function clearScalarDepthData<T extends ScalarDepthArray>(

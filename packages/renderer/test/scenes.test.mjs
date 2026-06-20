@@ -32259,6 +32259,55 @@ test('Renderer clear writes active render target depth textures', () => {
   renderer.setRenderTarget(null)
 })
 
+test('Renderer clear writes packed depth-stencil stencil bytes', () => {
+  const renderer = new Renderer()
+  const initialDepth = Math.round(0.5 * 0xffffff) * 0x100
+  const initialData = new Uint32Array(4 * 4)
+  initialData.fill(initialDepth + 3)
+  const depthTexture = {
+    type: THREE.UnsignedInt248Type,
+    format: THREE.DepthStencilFormat,
+    image: { data: initialData, width: 4, height: 4 },
+    source: { data: { data: initialData, width: 4, height: 4 } },
+  }
+  const target = { width: 4, height: 4, texture: {}, depthTexture }
+
+  renderer.setRenderTarget(target)
+  renderer.setScissor(1, 1, 2, 2)
+  renderer.setScissorTest(true)
+  renderer.setClearStencil(9)
+  renderer.clearStencil()
+
+  const stencilData = depthTexture.image.data
+  assert.ok(stencilData instanceof Uint32Array, 'packed depth-stencil clear should keep Uint32Array data')
+  for (let y = 0; y < 4; y += 1) {
+    for (let x = 0; x < 4; x += 1) {
+      const value = stencilData[y * 4 + x]
+      const inside = x >= 1 && x < 3 && y >= 1 && y < 3
+      assert.equal(value & 0xff, inside ? 9 : 3, `stencil byte should ${inside ? 'clear' : 'preserve'} at ${x},${y}`)
+      assert.equal(Math.floor(value / 0x100) * 0x100, initialDepth, `stencil-only clear should preserve depth bits at ${x},${y}`)
+    }
+  }
+
+  renderer.setScissorTest(false)
+  renderer.setClearDepth(0.25)
+  renderer.clearDepth()
+
+  const depthCleared = depthTexture.image.data
+  const expectedDepth = Math.round(0.25 * 0xffffff) * 0x100
+  for (let y = 0; y < 4; y += 1) {
+    for (let x = 0; x < 4; x += 1) {
+      const value = depthCleared[y * 4 + x]
+      const wasStencilCleared = x >= 1 && x < 3 && y >= 1 && y < 3
+      assert.equal(Math.floor(value / 0x100) * 0x100, expectedDepth, `depth clear should update depth bits at ${x},${y}`)
+      assert.equal(value & 0xff, wasStencilCleared ? 9 : 3, `depth-only clear should preserve stencil byte at ${x},${y}`)
+    }
+  }
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.needsUpdate, true)
+  renderer.setRenderTarget(null)
+})
+
 test('Renderer clear methods validate compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
