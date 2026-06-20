@@ -11,6 +11,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
@@ -2668,6 +2669,25 @@ test('EffectComposer SavePass copies read buffer into its save target', () => {
   renderer.readRenderTargetPixels(saveTarget, 0, 0, 32, 32, pixels)
   const mean = meanRegion(pixels, 32, 32, 10, 10, 22, 22)
   assert.ok(mean.r > mean.b + 80, `SavePass target should contain copied red output (${mean.r} vs ${mean.b})`)
+})
+
+test('MaskPass requiring a WebGL context fails clearly', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  ))
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+  camera.position.z = 2
+  const renderer = new Renderer()
+  const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+  const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+
+  assert.equal(new ClearMaskPass().render(renderer, writeBuffer, readBuffer, 0, true), undefined)
+  assert.throws(
+    () => new MaskPass(scene, camera).render(renderer, writeBuffer, readBuffer, 0, false),
+    /Renderer\.getContext\(\) is not supported.*browser WebGL context/i,
+  )
 })
 
 test('EffectComposer SSAARenderPass accumulates CopyShader samples into the active target', () => {
