@@ -2605,6 +2605,32 @@ test('Renderer clear preserves active cube mip face scissor data', () => {
   const positiveFace = meanRegion(cubeTarget.texture.mipmaps[1].image[0].data, 16, 16, 5, 5, 11, 11)
   assert.ok(positiveFace.r > positiveFace.g + 80 && positiveFace.r > positiveFace.b + 80, `cube clear should not alter other active mip faces (${positiveFace.r}, ${positiveFace.g}, ${positiveFace.b})`)
   renderer.setRenderTarget(null)
+
+  const packedDepth = Math.round(0.5 * 0xffffff) * 0x100
+  const packedFaces = Array.from({ length: 6 }, () => ({
+    data: new Uint32Array(16 * 16).fill(packedDepth + 5),
+    width: 16,
+    height: 16,
+  }))
+  const packedCubeTarget = {
+    width: 32,
+    height: 32,
+    texture: { isCubeTexture: true, image: Array.from({ length: 6 }, () => ({ width: 32, height: 32 })) },
+    depthTexture: {
+      isCubeTexture: true,
+      type: THREE.UnsignedInt248Type,
+      format: THREE.DepthStencilFormat,
+      mipmaps: [{}, { image: packedFaces }],
+    },
+  }
+  renderer.setClearStencil(11)
+  renderer.setRenderTarget(packedCubeTarget, 2, 1)
+  renderer.clearStencil()
+  const clearedPackedFace = packedCubeTarget.depthTexture.mipmaps[1].image[2].data
+  assert.equal(clearedPackedFace[0] & 0xff, 11, 'packed cube mip stencil clear should write the active face')
+  assert.equal(Math.floor(clearedPackedFace[0] / 0x100) * 0x100, packedDepth, 'packed cube mip stencil clear should preserve active face depth bits')
+  assert.equal(packedCubeTarget.depthTexture.mipmaps[1].image[0].data[0] & 0xff, 5, 'packed cube mip stencil clear should not alter inactive faces')
+  renderer.setRenderTarget(null)
 })
 
 test('CubeCamera captured target textures can be reused as cube inputs', () => {
