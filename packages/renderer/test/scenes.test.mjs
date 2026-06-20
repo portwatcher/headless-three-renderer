@@ -23427,6 +23427,59 @@ test('reusable renderer reuses cached CSS material color extraction until color 
   }
 })
 
+test('reusable renderer reuses cached PBR CSS color slots until color changes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const material = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, metalness: 0 })
+  material.emissive = 'rgb(255, 0, 0)'
+  material.emissiveIntensity = 1
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.frustumCulled = false
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const { Color: RequiredThreeColor } = cjsRequire('three')
+  const originalSetStyle = RequiredThreeColor.prototype.setStyle
+  let emissiveParseCalls = 0
+  RequiredThreeColor.prototype.setStyle = function setStyle(style, ...args) {
+    if (style === material.emissive) {
+      emissiveParseCalls += 1
+    }
+    return originalSetStyle.call(this, style, ...args)
+  }
+  try {
+    const first = renderer.render(scene, camera, options)
+    const firstCenter = meanRegion(first, 64, 64, 24, 24, 40, 40)
+    const parseCallsAfterFirstRender = emissiveParseCalls
+    assert.ok(firstCenter.r > 120 && firstCenter.g < 40, `initial emissive CSS color should render red (${firstCenter.r}, ${firstCenter.g}, ${firstCenter.b})`)
+    assert.ok(parseCallsAfterFirstRender > 0, 'initial render should parse CSS emissive color')
+
+    renderer.render(scene, camera, options)
+    assert.equal(emissiveParseCalls, parseCallsAfterFirstRender, 'unchanged CSS emissive color should reuse cached PBR color extraction')
+
+    material.emissive = 'rgb(0, 255, 0)'
+    const third = renderer.render(scene, camera, options)
+    const thirdCenter = meanRegion(third, 64, 64, 24, 24, 40, 40)
+    assert.ok(thirdCenter.g > thirdCenter.r + 60, `CSS emissive color changes should render updated green (${thirdCenter.r}, ${thirdCenter.g}, ${thirdCenter.b})`)
+    assert.ok(emissiveParseCalls > parseCallsAfterFirstRender, 'CSS emissive color changes should invalidate cached PBR color extraction')
+  } finally {
+    RequiredThreeColor.prototype.setStyle = originalSetStyle
+  }
+})
+
 test('reusable renderer reuses cached static mesh geometry until attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

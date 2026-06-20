@@ -555,6 +555,11 @@ interface CachedMaterialColorExtraction {
   color: Color4
 }
 
+interface MaterialColorCacheEntry {
+  base?: CachedMaterialColorExtraction
+  slots?: Map<string, CachedMaterialColorExtraction>
+}
+
 interface MaterialColorSignature {
   color: unknown
   colorLength?: unknown
@@ -574,25 +579,69 @@ export function materialColor(
     ? materialColorSignature(material)
     : null
   if (material && signature) {
-    const cached = context.materialColorCache?.get(material) as CachedMaterialColorExtraction | undefined
+    const cached = materialColorCacheEntry(context, material)?.base
     if (cached && sameMaterialColorSignature(cached.signature, signature)) {
-      return cached.color.slice() as Color4
+      return copyColor(cached.color)
     }
   }
 
   const color = validatedColorLikeToArray(material?.color, 'material.color') ?? [1, 1, 1, 1] as Color4
   color[3] = clamp01(optionalFiniteNumber(material?.opacity, 'material.opacity') ?? color[3] ?? 1)
   if (material && signature) {
-    context.materialColorCache?.set(material, { signature, color: color.slice() as Color4 })
+    materialColorCacheEntry(context, material, true)!.base = { signature, color: copyColor(color) }
   }
   return color
 }
 
 function materialColorSignature(material: ThreeMaterialLike): MaterialColorSignature {
-  const color = material.color
+  return materialSlotColorSignature(material.color, material.opacity)
+}
+
+function materialSlotColor(
+  material: ThreeMaterialLike,
+  slot: string,
+  value: unknown,
+  label: string,
+  context: MaterialExtractionContext,
+): Color4 | null {
+  const signature = context.materialColorCache
+    ? materialSlotColorSignature(value)
+    : null
+  if (signature) {
+    const cached = materialColorCacheEntry(context, material)?.slots?.get(slot)
+    if (cached && sameMaterialColorSignature(cached.signature, signature)) {
+      return copyColor(cached.color)
+    }
+  }
+
+  const color = validatedColorLikeToArray(value, label)
+  if (signature && color) {
+    const entry = materialColorCacheEntry(context, material, true)!
+    entry.slots ??= new Map()
+    entry.slots.set(slot, { signature, color: copyColor(color) })
+  }
+  return color
+}
+
+function materialColorCacheEntry(
+  context: MaterialExtractionContext,
+  material: ThreeMaterialLike,
+  create = false,
+): MaterialColorCacheEntry | undefined {
+  const cache = context.materialColorCache
+  if (!cache) return undefined
+  let entry = cache.get(material) as MaterialColorCacheEntry | undefined
+  if (!entry && create) {
+    entry = {}
+    cache.set(material, entry)
+  }
+  return entry
+}
+
+function materialSlotColorSignature(color: unknown, opacity?: unknown): MaterialColorSignature {
   const signature: MaterialColorSignature = {
     color,
-    opacity: material.opacity,
+    opacity,
   }
   if (Array.isArray(color)) {
     signature.colorLength = color.length
@@ -605,6 +654,10 @@ function materialColorSignature(material: ThreeMaterialLike): MaterialColorSigna
     signature.a = shaped.a
   }
   return signature
+}
+
+function copyColor(color: Color4): Color4 {
+  return color.slice() as Color4
 }
 
 function sameMaterialColorSignature(a: MaterialColorSignature, b: MaterialColorSignature): boolean {
@@ -646,6 +699,13 @@ export function extractPbrProperties(
     slot,
     label,
     context.textureCache,
+  )
+  const colorFromSlot = (slot: string, value: unknown, label: string) => materialSlotColor(
+    material,
+    slot,
+    value,
+    label,
+    context,
   )
 
   const usesMaterialEnvironmentMap = material.envMap != null
@@ -729,7 +789,7 @@ export function extractPbrProperties(
     ]
   }
 
-  const sheenColor = validatedColorLikeToArray(material.sheenColor, 'material.sheenColor')
+  const sheenColor = colorFromSlot('sheenColor', material.sheenColor, 'material.sheenColor')
   const sheen = clamp01(optionalFiniteNumber(material.sheen, 'material.sheen') ?? 0)
   if (sheenColor && sheen > 0) {
     props.sheenColor = [
@@ -891,11 +951,11 @@ export function extractPbrProperties(
   if (attenuationDistance !== undefined) {
     props.attenuationDistance = Math.max(0, attenuationDistance)
   }
-  const attenuationColor = validatedColorLikeToArray(material.attenuationColor, 'material.attenuationColor')
+  const attenuationColor = colorFromSlot('attenuationColor', material.attenuationColor, 'material.attenuationColor')
   if (attenuationColor) {
     props.attenuationColor = [attenuationColor[0], attenuationColor[1], attenuationColor[2]]
   }
-  const physicalSpecularColor = validatedColorLikeToArray(material.specularColor, 'material.specularColor')
+  const physicalSpecularColor = colorFromSlot('specularColor', material.specularColor, 'material.specularColor')
   if (physicalSpecularColor) {
     props.physicalSpecularColor = [
       physicalSpecularColor[0],
@@ -936,7 +996,7 @@ export function extractPbrProperties(
     props.specularIntensityMapUsesUv2 = textureUvChannel(material.specularIntensityMap) > 0
   }
 
-  const specularColor = validatedColorLikeToArray(material.specular, 'material.specular')
+  const specularColor = colorFromSlot('specular', material.specular, 'material.specular')
   if (specularColor || material.isMeshPhongMaterial) {
     const color = specularColor ?? [17 / 255, 17 / 255, 17 / 255, 1]
     props.specularColor = [color[0], color[1], color[2]]
@@ -948,7 +1008,7 @@ export function extractPbrProperties(
     props.shininess = Math.max(0.0001, shininess)
   }
 
-  const emissive = validatedColorLikeToArray(material.emissive, 'material.emissive')
+  const emissive = colorFromSlot('emissive', material.emissive, 'material.emissive')
   if (emissive) {
     props.emissive = [emissive[0], emissive[1], emissive[2]]
     props.emissiveIntensity = finiteNumberOrDefault(material.emissiveIntensity, 'material.emissiveIntensity', 1)
@@ -1211,7 +1271,7 @@ export function extractPbrProperties(
       if (material.blendDstAlpha != null) {
         props.blendDstAlpha = materialBlendFactor(material.blendDstAlpha, 'material.blendDstAlpha')
       }
-      const blendColor = validatedColorLikeToArray(material.blendColor, 'material.blendColor')
+      const blendColor = colorFromSlot('blendColor', material.blendColor, 'material.blendColor')
       if (blendColor) {
         props.blendColor = [blendColor[0], blendColor[1], blendColor[2]]
       }
