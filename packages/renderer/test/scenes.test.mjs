@@ -32359,6 +32359,48 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
     /Renderer\.state\.setBlending blending normal is not supported/i,
   )
   assert.throws(
+    () => renderer.state.setBlending(
+      THREE.NormalBlending,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      1,
+    ),
+    /Renderer\.state\.setBlending blendColor must be a color-like object/i,
+  )
+  assert.throws(
+    () => renderer.state.setBlending(
+      THREE.NormalBlending,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'opaque',
+    ),
+    /Renderer\.state\.setBlending blendAlpha must be a finite number/i,
+  )
+  assert.throws(
+    () => renderer.state.setBlending(
+      THREE.NormalBlending,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      1,
+    ),
+    /Renderer\.state\.setBlending premultipliedAlpha must be a boolean/i,
+  )
+  assert.throws(
     () => renderer.state.setMaterial(null),
     /Renderer\.state\.setMaterial material must be a material-like object/i,
   )
