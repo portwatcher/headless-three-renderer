@@ -31449,6 +31449,60 @@ test('Renderer compile hooks return validated material sets', async () => {
   )
 })
 
+test('Renderer invokes WebGLRenderer-style object render callbacks', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const camera = makeCamera()
+  const geometry = new THREE.PlaneGeometry(4, 4)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  const mesh = new THREE.Mesh(geometry, material)
+  scene.add(mesh)
+
+  let beforeCalls = 0
+  let afterCalls = 0
+  mesh.onBeforeRender = function (rendererArg, sceneArg, cameraArg, geometryArg, materialArg, groupArg) {
+    beforeCalls += 1
+    assert.equal(this, mesh)
+    assert.equal(rendererArg, renderer)
+    assert.equal(sceneArg, scene)
+    assert.equal(cameraArg, camera)
+    assert.equal(geometryArg, geometry)
+    assert.equal(materialArg, material)
+    assert.equal(groupArg.start, 0)
+    materialArg.color.set(0x00ff00)
+  }
+  mesh.onAfterRender = function (rendererArg, sceneArg, cameraArg, geometryArg, materialArg, groupArg) {
+    afterCalls += 1
+    assert.equal(this, mesh)
+    assert.equal(rendererArg, renderer)
+    assert.equal(sceneArg, scene)
+    assert.equal(cameraArg, camera)
+    assert.equal(geometryArg, geometry)
+    assert.equal(materialArg, material)
+    assert.equal(groupArg.count, 6)
+    materialArg.color.set(0xff0000)
+  }
+
+  const rgba = renderer.render(scene, camera, {
+    width: 32,
+    height: 32,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+  const mean = meanRegion(rgba, 32, 32, 10, 10, 22, 22)
+  assert.equal(beforeCalls, 1)
+  assert.equal(afterCalls, 1)
+  assert.ok(mean.g > mean.r + 80, `onBeforeRender material mutation should affect queued draw (${mean.r}, ${mean.g}, ${mean.b})`)
+  assert.equal(material.color.getHex(), 0xff0000, 'onAfterRender should be able to restore material state after extraction')
+
+  mesh.onBeforeRender = 'callback'
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' }),
+    /THREE\.Object3D\.onBeforeRender must be a function when provided/i,
+  )
+})
+
 test('Renderer setEffects is an inert validated compatibility hook', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)

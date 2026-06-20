@@ -381,6 +381,8 @@ export interface ThreeObject3DLike {
   computeBoundingSphere?(): void
   geometry?: ThreeBufferGeometryLike
   material?: ThreeMaterialLike | ThreeMaterialLike[]
+  onBeforeRender?: (...args: unknown[]) => unknown
+  onAfterRender?: (...args: unknown[]) => unknown
   clippingPlanes?: ThreePlaneLike[] | null
   enabled?: boolean
   clipIntersection?: boolean

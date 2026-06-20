@@ -311,6 +311,11 @@ interface SceneSortOptions {
   transparentSort?: RenderSortFunction | null
 }
 
+interface RenderCallbackContext {
+  renderer: unknown
+  scene: ThreeObject3DLike
+}
+
 interface MeshSortInfo {
   keys: Pick<NativeSceneMesh, 'groupOrder' | 'renderOrder' | 'sortZ' | 'sortIndex' | 'materialSortKey' | 'materialVariant'>
   item: RenderSortItem
@@ -346,6 +351,7 @@ export function flattenScene(
   sortOptions: SceneSortOptions = {},
   overrideMaterial?: ThreeMaterialLike,
   cache?: SceneExtractionCache,
+  callbackContext?: RenderCallbackContext,
 ): NativeSceneMesh[] {
   const meshes: FlattenedMesh[] = []
   const clippingContext: ClippingContext = {
@@ -353,7 +359,7 @@ export function flattenScene(
     intersectionPlanes: [],
     clipShadows: false,
   }
-  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
+  visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
   return sortFlattenedMeshes(meshes, sortOptions)
     .map(({ mesh }) => mesh)
 }
@@ -370,6 +376,7 @@ function visitObject(
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
   cache: SceneExtractionCache | undefined,
+  callbackContext: RenderCallbackContext | undefined,
 ): void {
   if (!object) return
   if (optionalObjectBoolean(object.visible, 'object.visible') === false) return
@@ -386,27 +393,27 @@ function visitObject(
 
     if (object.isBatchedMesh === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
+        appendBatchedMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
       }
     } else if (object.isMesh === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
+        appendMesh(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, undefined, undefined, undefined, callbackContext)
       }
     } else if ((object.isLineSegments === true || object.isLineLoop === true || object.isLine === true) && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera)) {
-        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext, overrideMaterial, cache)
+        appendLineOrPoints(object, camera, meshes, 'lines', nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, materialContext, overrideMaterial, cache, callbackContext)
       }
     } else if (object.isPoints === true && object.geometry) {
       if (!renderableObjectOutsideFrustum(object, camera, viewportHeight, overrideMaterial)) {
-        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
+        appendPoints(object, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
       }
     } else if (object.isSprite === true) {
-      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
+      appendSprite(object, camera, meshes, nextGroupOrder, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
     }
   }
 
   for (const child of objectChildren(object)) {
-    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache)
+    visitObject(child, camera, meshes, nextGroupOrder, viewportHeight, nextClippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
   }
 }
 
@@ -421,6 +428,7 @@ function appendBatchedMesh(
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
   cache: SceneExtractionCache | undefined,
+  callbackContext: RenderCallbackContext | undefined,
 ): void {
   const geometry = object.geometry!
   const draws = batchedMeshDraws(object, camera, geometry)
@@ -455,6 +463,7 @@ function appendBatchedMesh(
       [draw.instance],
       sortKeyOverride,
       object,
+      callbackContext,
     )
   }
 }
@@ -473,6 +482,7 @@ function appendMesh(
   instanceOverride?: MeshInstance[],
   sortKeyOverride?: SortKeyOverride,
   sortItemObject?: ThreeObject3DLike,
+  callbackContext?: RenderCallbackContext,
 ): void {
   const geometry = object.geometry!
   const geometryExtraction = meshGeometryExtraction(geometry, cache)
@@ -517,10 +527,13 @@ function appendMesh(
   if (instances.length === 0) return
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   const objectReceivesShadow = optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow') === true
+  const callbackObject = sortItemObject ?? object
 
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
+
+    invokeObjectRenderCallback(callbackObject.onBeforeRender, 'onBeforeRender', callbackContext, callbackObject, camera, geometry, material, group)
 
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
     const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
@@ -684,6 +697,8 @@ function appendMesh(
         instances,
       )
     }
+
+    invokeObjectRenderCallback(callbackObject.onAfterRender, 'onAfterRender', callbackContext, callbackObject, camera, geometry, material, group)
   }
 }
 
@@ -1089,6 +1104,24 @@ function materialForObjectGroup(
   return materialForGroup(object.material, materialIndex)
 }
 
+function invokeObjectRenderCallback(
+  callback: unknown,
+  name: 'onBeforeRender' | 'onAfterRender',
+  context: RenderCallbackContext | undefined,
+  object: ThreeObject3DLike,
+  camera: ThreeCameraLike | undefined,
+  geometry: ThreeBufferGeometryLike | undefined,
+  material: ThreeMaterialLike | undefined,
+  group?: GeometryGroup,
+): void {
+  if (callback == null) return
+  if (typeof callback !== 'function') {
+    throw new TypeError(`THREE.Object3D.${name} must be a function when provided.`)
+  }
+  if (!context) return
+  callback.call(object, context.renderer, context.scene, camera, geometry, material, group)
+}
+
 function shadowOnlyMainPassState(): Pick<
   NativeSceneMesh,
   'blending' | 'colorWrite' | 'depthTest' | 'depthWrite' | 'stencilWrite' | 'transparent'
@@ -1114,6 +1147,7 @@ function appendSprite(
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
   cache: SceneExtractionCache | undefined,
+  callbackContext: RenderCallbackContext | undefined,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
@@ -1128,6 +1162,8 @@ function appendSprite(
     finiteMaterialOrObjectNumber(object.center?.y, 'Sprite.center.y', 0.5),
   ]
   if (spriteOutsideFrustum(object, camera, matrix, center)) return
+
+  invokeObjectRenderCallback(object.onBeforeRender, 'onBeforeRender', callbackContext, object, camera, object.geometry, material)
 
   const worldPosition = [matrix[12], matrix[13], matrix[14]]
   let scaleX = columnLength3(matrix, 0)
@@ -1213,6 +1249,8 @@ function appendSprite(
       uvs,
     )
   }
+
+  invokeObjectRenderCallback(object.onAfterRender, 'onAfterRender', callbackContext, object, camera, object.geometry, material)
 }
 
 function spriteBillboardExpansion(
@@ -1344,6 +1382,7 @@ function appendPoints(
   materialContext: MaterialExtractionContext,
   overrideMaterial: ThreeMaterialLike | undefined,
   cache: SceneExtractionCache | undefined,
+  callbackContext: RenderCallbackContext | undefined,
 ): void {
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
@@ -1369,6 +1408,7 @@ function appendPoints(
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
+    invokeObjectRenderCallback(object.onBeforeRender, 'onBeforeRender', callbackContext, object, camera, geometry, material, group)
     const pointUvStreams = primaryPointUvs && (material?.map || material?.alphaMap)
       ? textureUvStreamsForMapAlphaMaterial(pointUvChannels, {
         map: material.map,
@@ -1477,6 +1517,7 @@ function appendPoints(
         pointShadowUvStreams?.alphaMapUsesUv2 ?? false,
       )
     }
+    invokeObjectRenderCallback(object.onAfterRender, 'onAfterRender', callbackContext, object, camera, geometry, material, group)
   }
 }
 
@@ -2020,6 +2061,7 @@ function appendLineOrPoints(
   materialContext: MaterialExtractionContext,
   overrideMaterial?: ThreeMaterialLike,
   cache?: SceneExtractionCache,
+  callbackContext?: RenderCallbackContext,
 ): void {
   validateObjectShadowFlags(object)
   const objectCastsShadow = topology === 'lines' && optionalObjectBoolean(object.castShadow, 'object.castShadow') === true
@@ -2044,6 +2086,8 @@ function appendLineOrPoints(
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
     if (material?.visible === false) continue
+
+    invokeObjectRenderCallback(object.onBeforeRender, 'onBeforeRender', callbackContext, object, camera, geometry, material, group)
 
     const uvStreams: TextureUvStreams = topology === 'lines'
       ? textureUvStreamsForMapAlphaMaterial(uvChannels, material)
@@ -2209,6 +2253,7 @@ function appendLineOrPoints(
       ...clipping,
       ...sortInfo.keys,
     }, sortInfo.item)
+    invokeObjectRenderCallback(object.onAfterRender, 'onAfterRender', callbackContext, object, camera, geometry, material, group)
   }
 }
 

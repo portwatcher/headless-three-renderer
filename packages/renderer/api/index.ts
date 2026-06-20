@@ -2145,6 +2145,7 @@ export class Renderer {
       __headlessThreeRendererToneMapping: this.toneMapping,
       __headlessThreeRendererToneMappingExposure: this.toneMappingExposure,
       __headlessThreeRendererTransmissionResolutionScale: this.transmissionResolutionScale,
+      __headlessThreeRenderer: this,
     }
   }
 
@@ -2361,6 +2362,9 @@ function toNativeInput(
   const rendererShadowMapType = (options as InternalRenderOptions).__headlessThreeRendererShadowMapType ?? PCFShadowMap
   const rendererToneMapping = (options as InternalRenderOptions).__headlessThreeRendererToneMapping ?? ACESFilmicToneMapping
   const toneMappingExposure = (options as InternalRenderOptions).__headlessThreeRendererToneMappingExposure ?? 1
+  const rendererCallbackContext = colorMode && (options as InternalRenderOptions).__headlessThreeRenderer !== undefined
+    ? { renderer: (options as InternalRenderOptions).__headlessThreeRenderer, scene }
+    : undefined
   const extractedLights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
   const lights = rendererShadowMapEnabled ? extractedLights : nativeLightsWithoutShadows(extractedLights)
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
@@ -2387,6 +2391,7 @@ function toNativeInput(
     },
     overrideMaterial,
     sceneExtractionCache,
+    rendererCallbackContext,
   )
   const objectIdEntries = renderMode === 'object-id' ? objectIdEntriesForMeshes(flattenedMeshes) : undefined
   const meshes = applyRendererToneMapping(applyRenderMode(flattenedMeshes, renderMode), rendererToneMapping)
@@ -2885,6 +2890,7 @@ type InternalRenderOptions = RenderOptions & {
   __headlessThreeRendererToneMapping?: number
   __headlessThreeRendererToneMappingExposure?: number
   __headlessThreeRendererTransmissionResolutionScale?: number
+  __headlessThreeRenderer?: unknown
 }
 
 const CUBE_FACE_COUNT = 6
