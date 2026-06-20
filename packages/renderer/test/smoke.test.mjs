@@ -261,7 +261,9 @@ test('local VRM example resolves optional Pixiv packages from the caller project
   try {
     const projectDir = path.join(dir, 'project')
     const pixivDir = path.join(projectDir, 'node_modules', '@pixiv', 'three-vrm')
+    const pixivAnimationDir = path.join(projectDir, 'node_modules', '@pixiv', 'three-vrm-animation')
     await mkdir(pixivDir, { recursive: true })
+    await mkdir(pixivAnimationDir, { recursive: true })
     await writeFile(path.join(projectDir, 'package.json'), '{"type":"commonjs"}\n')
     await writeFile(path.join(pixivDir, 'package.json'), '{"main":"index.cjs"}\n')
     await writeFile(path.join(pixivDir, 'index.cjs'), `
@@ -287,21 +289,55 @@ const VRMUtils = {
 
 module.exports = { VRMLoaderPlugin, VRMUtils }
 `)
+    await writeFile(path.join(pixivAnimationDir, 'package.json'), '{"main":"index.cjs"}\n')
+    await writeFile(path.join(pixivAnimationDir, 'index.cjs'), `
+class VRMAnimationLoaderPlugin {
+  constructor(parser) {
+    this.parser = parser
+    this.name = 'FakeVRMAnimationLoaderPlugin'
+  }
+
+  afterRoot(gltf) {
+    gltf.userData = gltf.userData || {}
+    gltf.userData.vrmAnimations = [
+      { name: 'idle' },
+      { name: 'dance' },
+    ]
+  }
+}
+
+function createVRMAnimationClip(animation) {
+  if (!animation || animation.name !== 'dance') {
+    throw new Error('Expected render-vrm.mjs to select animation index 1.')
+  }
+  return { name: 'selected-dance', tracks: [], duration: 0 }
+}
+
+module.exports = { VRMAnimationLoaderPlugin, createVRMAnimationClip }
+`)
 
     const outputPath = path.join(dir, 'vrm-render.png')
+    const animationPath = path.join(dir, 'fake-animation.vrma')
+    await writeFile(
+      animationPath,
+      await readFile(path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'fixtures', 'simple-triangle.gltf')),
+    )
     const { stdout } = await execFileAsync(process.execPath, [
       path.join(REPO_ROOT, 'examples', 'render-vrm.mjs'),
       path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'fixtures', 'simple-triangle.gltf'),
+      animationPath,
       outputPath,
     ], {
       cwd: projectDir,
       env: {
         ...process.env,
+        ANIMATION_INDEX: '1',
+        TIME: '0.25',
         WIDTH: '64',
         HEIGHT: '48',
       },
     })
-    assert.match(stdout, /Rendered .*simple-triangle\.gltf.* \(64x48\)/)
+    assert.match(stdout, /Rendered .*simple-triangle\.gltf.*fake-animation\.vrma animation #1 at 0\.25s.* \(64x48\)/)
 
     const image = await readFile(outputPath)
     assertValidPng(image, { width: 64, height: 48 })

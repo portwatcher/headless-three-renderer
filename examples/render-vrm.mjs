@@ -25,6 +25,7 @@ const animationTime = Number.isFinite(Number(process.env.TIME)) ? Number(process
 
 const THREE = await importThree()
 try {
+  const animationIndex = nonNegativeInteger(process.env.ANIMATION_INDEX, 0, 'ANIMATION_INDEX')
   const packages = await importVrmPackages(Boolean(animationPath))
   const modelGltf = await loadVrmFromFile(modelPath, {
     VRMLoaderPlugin: packages.VRMLoaderPlugin,
@@ -43,11 +44,13 @@ try {
       VRMLoaderPlugin: packages.VRMLoaderPlugin,
       VRMAnimationLoaderPlugin: packages.VRMAnimationLoaderPlugin,
     })
-    const vrmAnimation = animationGltf.userData?.vrmAnimations?.[0]
+    const vrmAnimations = animationGltf.userData?.vrmAnimations
+    const vrmAnimation = Array.isArray(vrmAnimations) ? vrmAnimations[animationIndex] : null
     if (!vrmAnimation) {
-      throw new Error(`No VRMA animation was found in ${animationPath}. Confirm that the file is a VRM Animation asset.`)
+      throw new Error(`No VRMA animation was found at index ${animationIndex} in ${animationPath}. Confirm that the file is a VRM Animation asset.`)
     }
     await applyVrmAnimation(modelGltf, animationGltf, {
+      animationIndex,
       createVRMAnimationClip: packages.createVRMAnimationClip,
       time: animationTime,
     })
@@ -68,7 +71,7 @@ try {
 
   const image = render(scene, camera, { width, height })
   await fs.writeFile(outputPath, image)
-  const animationLabel = animationPath ? ` with ${animationPath} at ${animationTime}s` : ''
+  const animationLabel = animationPath ? ` with ${animationPath} animation #${animationIndex} at ${animationTime}s` : ''
   console.log(`Rendered ${modelPath}${animationLabel} to ${outputPath} (${width}x${height})`)
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error))
@@ -163,6 +166,13 @@ function frameSceneCamera(scene, aspect) {
 function positiveInteger(value, fallback) {
   const parsed = Number.parseInt(value ?? '', 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function nonNegativeInteger(value, fallback, label) {
+  if (value == null || value === '') return fallback
+  const parsed = Number(value)
+  if (Number.isInteger(parsed) && parsed >= 0) return parsed
+  throw new Error(`${label} must be a non-negative integer.`)
 }
 
 async function importThree() {

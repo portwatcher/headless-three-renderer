@@ -222,7 +222,7 @@ Compatible with:
 - **@pixiv/three-vrm** — VRM humanoid avatars
 - **VRMA** — VRM Animation files via `VRMAnimationLoaderPlugin` + `createVRMAnimationClip`
 
-The repository includes runnable local examples for [glTF/GLB](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs) and [VRM/VRMA](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs) assets. The VRM example resolves optional Pixiv packages from the current working project when they are not installed next to the example script.
+The repository includes runnable local examples for [glTF/GLB](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs) and [VRM/VRMA](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs) assets. The VRM example resolves optional Pixiv packages from the current working project when they are not installed next to the example script, and accepts `TIME` plus `ANIMATION_INDEX` environment variables for VRMA still-frame selection.
 
 Use `applyVrmAnimation()` or your own `AnimationMixer`, then call `scene.updateMatrixWorld(true)` before `render()` to bake the current pose. `applyVrmAnimation()` accepts the glTF objects returned by the local VRM/VRMA helpers or direct `vrm`/`vrmAnimation` objects; it selects `userData.vrmAnimations[0]` by default for wrappers, accepts `animationIndex` for multi-animation VRMA wrappers, updates the avatar by default, and accepts `updateVrm: false` if your render pipeline performs that update separately.
 
@@ -247,6 +247,7 @@ const animGltf = await loadVrmAnimationFromFile('./dance.vrma', {
 
 // Animate to a specific time
 await applyVrmAnimation(modelGltf, animGltf, {
+  animationIndex: 0,
   createVRMAnimationClip,
   time: 1.5,
 })
