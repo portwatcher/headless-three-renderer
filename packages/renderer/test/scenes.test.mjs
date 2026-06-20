@@ -2223,6 +2223,35 @@ test('CubeCamera renders cube target faces', () => {
   )
 })
 
+test('WebGLCubeRenderTarget.clear uses Renderer target state for all faces', () => {
+  const renderer = new Renderer()
+  const cubeTarget = new THREE.WebGLCubeRenderTarget(8)
+  const previousTarget = {
+    width: 4,
+    height: 4,
+    texture: {
+      image: {
+        width: 4,
+        height: 4,
+        data: Buffer.alloc(4 * 4 * 4),
+      },
+    },
+  }
+
+  renderer.setRenderTarget(previousTarget)
+  renderer.setClearColor(0x123456, 0.5)
+  assert.equal(cubeTarget.clear(renderer), undefined)
+  assert.equal(renderer.getRenderTarget(), previousTarget)
+
+  for (let face = 0; face < 6; face += 1) {
+    const data = Buffer.alloc(8 * 8 * 4)
+    renderer.readRenderTargetPixels(cubeTarget, 0, 0, 8, 8, data, face)
+    const mean = meanRgba(data)
+    assertRgbClose(mean, [0x12, 0x34, 0x56], `cleared cube face ${face}`)
+    assert.ok(Math.abs(mean.a - 128) <= 1, `cleared cube face ${face} should preserve clear alpha (${mean.a})`)
+  }
+})
+
 test('LightProbeGenerator reads cube targets through the WebGLRenderer marker path', async () => {
   const scene = makeCubeCaptureScene()
   const cubeTarget = new THREE.WebGLCubeRenderTarget(16)
