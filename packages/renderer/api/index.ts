@@ -1007,6 +1007,7 @@ class RendererLightingNodeState {
 
 class RendererLightingState {
   private readonly nodes = new WeakMap<object, WeakMap<object, RendererLightingNodeState>>()
+  private readonly defaultLightsNode = new RendererLightingNodeState()
 
   createNode(lights: unknown[] = []): RendererLightingNodeState {
     return new RendererLightingNodeState(lights)
@@ -1014,6 +1015,7 @@ class RendererLightingState {
 
   getNode(scene: unknown, camera: unknown): RendererLightingNodeState {
     assertWeakMapKey(scene, 'Renderer.lighting.getNode scene')
+    if ((scene as { isQuadMesh?: unknown }).isQuadMesh === true) return this.defaultLightsNode
     assertWeakMapKey(camera, 'Renderer.lighting.getNode camera')
     let cameraMap = this.nodes.get(scene)
     if (cameraMap === undefined) {
