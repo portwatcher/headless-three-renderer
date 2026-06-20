@@ -32848,6 +32848,34 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.capabilities.textureFormatReadable(THREE.DepthFormat), false)
   assert.equal(renderer.capabilities.textureTypeReadable(THREE.UnsignedByteType), true)
   assert.equal(renderer.capabilities.textureTypeReadable(THREE.UnsignedInt248Type), false)
+  assert.equal(renderer.backend.renderer, renderer)
+  assert.equal(renderer.backend.isWebGLBackend, false)
+  assert.equal(renderer.backend.isWebGPUBackend, false)
+  assert.equal(renderer.backend.coordinateSystem, THREE.WebGLCoordinateSystem)
+  assert.deepEqual(renderer.backend.parameters, {})
+  assert.equal(renderer.backend.getDomElement(), renderer.domElement)
+  assert.equal(renderer.backend.getMaxAnisotropy(), 0)
+  assert.equal(renderer.backend.hasFeature('timestamp-query'), false)
+  assert.equal(await renderer.backend.hasFeatureAsync('timestamp-query'), false)
+  assert.equal(renderer.backend.getDrawingBufferSize(), null)
+  const backendSizeTarget = new THREE.Vector2()
+  assert.equal(renderer.backend.getDrawingBufferSize(backendSizeTarget), null)
+  renderer.setSize(20, 10)
+  assert.strictEqual(renderer.backend.getDrawingBufferSize(backendSizeTarget), backendSizeTarget)
+  assert.deepEqual(backendSizeTarget.toArray(), [20, 10])
+  const backendKey = {}
+  assert.equal(renderer.backend.has(backendKey), false)
+  const backendData = renderer.backend.get(backendKey)
+  backendData.ready = true
+  assert.deepEqual(renderer.backend.get(backendKey), { ready: true })
+  assert.equal(renderer.backend.has(backendKey), true)
+  renderer.backend.set(backendKey, { slot: 3 })
+  assert.deepEqual(renderer.backend.get(backendKey), { slot: 3 })
+  renderer.backend.delete(backendKey)
+  assert.equal(renderer.backend.has(backendKey), false)
+  renderer.backend.set(backendKey, { reset: false })
+  renderer.backend.dispose()
+  assert.equal(renderer.backend.has(backendKey), false)
   assert.equal(renderer.extensions.has('EXT_texture_filter_anisotropic'), false)
   assert.equal(renderer.extensions.get('EXT_texture_filter_anisotropic'), null)
   assert.equal(renderer.extensions.init(), undefined)
@@ -33175,6 +33203,42 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   await assert.rejects(
     () => renderer.hasFeatureAsync(1),
     /Renderer\.hasFeature name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.backend.getContext(),
+    /Renderer\.backend\.getContext\(\) is not supported.*WebGL or WebGPU context/i,
+  )
+  assert.throws(
+    () => renderer.backend.hasFeature(''),
+    /Renderer\.backend\.hasFeature name must be a non-empty string/i,
+  )
+  assert.throws(
+    () => renderer.backend.get(null),
+    /Renderer\.backend\.get object must be an object/i,
+  )
+  assert.throws(
+    () => renderer.backend.set({}, null),
+    /Renderer\.backend\.set value must be an object/i,
+  )
+  await assert.rejects(
+    () => renderer.backend.getArrayBufferAsync({ isStorageBufferAttribute: true }),
+    /Renderer\.backend\.getArrayBufferAsync\(\) is not supported.*storage-buffer GPU readback.*Renderer\.readRenderTargetPixels\(\)/i,
+  )
+  await assert.rejects(
+    () => renderer.backend.getArrayBufferAsync({}),
+    /Renderer\.backend\.getArrayBufferAsync attribute must be a storage buffer attribute-like object/i,
+  )
+  await assert.rejects(
+    () => renderer.backend.resolveTimestampAsync({}, 'render'),
+    /Renderer\.backend\.resolveTimestampAsync\(\) is not supported.*timestamp queries/i,
+  )
+  await assert.rejects(
+    () => renderer.backend.resolveTimestampAsync({}, 'frame'),
+    /Renderer\.backend\.resolveTimestampAsync type must be "render" or "compute"; received "frame"/i,
+  )
+  await assert.rejects(
+    () => renderer.backend.waitForGPU(),
+    /Renderer\.backend\.waitForGPU\(\) is not supported.*GPU task synchronization/i,
   )
   assert.throws(
     () => renderer.hasCompatibility(null),

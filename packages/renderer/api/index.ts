@@ -651,6 +651,97 @@ class RendererInspectorState implements RendererInspectorLike {
   copyFramebufferToTexture(_framebufferTexture: unknown): void {}
 }
 
+class RendererBackendState {
+  readonly isWebGLBackend = false
+  readonly isWebGPUBackend = false
+  readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
+  readonly parameters: Record<string, never> = Object.freeze({})
+  private data = new WeakMap<object, Record<string, unknown>>()
+
+  constructor(readonly renderer: Renderer) {}
+
+  getDomElement(): RendererDomElementState {
+    return this.renderer.domElement
+  }
+
+  getDrawingBufferSize(): RenderSizeLike | null
+  getDrawingBufferSize<T extends RenderSizeLike>(target: T): T | null
+  getDrawingBufferSize(target?: RenderSizeLike): RenderSizeLike | null {
+    return this.renderer.getDrawingBufferSize(target as RenderSizeLike)
+  }
+
+  hasFeature(name: unknown): boolean {
+    assertRendererProbeName(name, 'Renderer.backend.hasFeature name')
+    return false
+  }
+
+  async hasFeatureAsync(name: unknown): Promise<boolean> {
+    return this.hasFeature(name)
+  }
+
+  getMaxAnisotropy(): number {
+    return 0
+  }
+
+  getContext(): never {
+    throw new Error(
+      'Renderer.backend.getContext() is not supported by @headless-three/renderer because it does not expose a browser WebGL or WebGPU context. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
+    )
+  }
+
+  async getArrayBufferAsync(attribute: unknown): Promise<ArrayBuffer> {
+    assertStorageBufferAttributeLike(attribute, 'Renderer.backend.getArrayBufferAsync attribute')
+    throw new Error(
+      'Renderer.backend.getArrayBufferAsync() is not supported by @headless-three/renderer because storage-buffer GPU readback requires backend WebGPU state that this package does not expose. Use Renderer.readRenderTargetPixels() for render-target CPU readback.',
+    )
+  }
+
+  async resolveTimestampAsync(_renderContext: unknown, type: unknown = 'render'): Promise<number> {
+    assertTimestampQueryType(type, 'Renderer.backend.resolveTimestampAsync type')
+    throw new Error(
+      'Renderer.backend.resolveTimestampAsync() is not supported by @headless-three/renderer because timestamp queries require backend GPU query pools that are outside the scene-oriented API.',
+    )
+  }
+
+  async waitForGPU(): Promise<void> {
+    throw new Error(
+      'Renderer.backend.waitForGPU() is not supported by @headless-three/renderer because it does not expose direct GPU task synchronization. Renderer.render() and renderToTarget() return after native scene output readback or target writeback has completed.',
+    )
+  }
+
+  set(object: unknown, value: unknown): void {
+    assertWeakMapKey(object, 'Renderer.backend.set object')
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new TypeError('Renderer.backend.set value must be an object.')
+    }
+    this.data.set(object, value as Record<string, unknown>)
+  }
+
+  get(object: unknown): Record<string, unknown> {
+    assertWeakMapKey(object, 'Renderer.backend.get object')
+    let map = this.data.get(object)
+    if (map === undefined) {
+      map = {}
+      this.data.set(object, map)
+    }
+    return map
+  }
+
+  has(object: unknown): boolean {
+    assertWeakMapKey(object, 'Renderer.backend.has object')
+    return this.data.has(object)
+  }
+
+  delete(object: unknown): void {
+    assertWeakMapKey(object, 'Renderer.backend.delete object')
+    this.data.delete(object)
+  }
+
+  dispose(): void {
+    this.data = new WeakMap()
+  }
+}
+
 class RendererDomElementState {
   width = 0
   height = 0
@@ -1479,6 +1570,7 @@ export class Renderer {
   readonly depth: boolean
   readonly stencil: boolean
   readonly logarithmicDepthBuffer = false
+  readonly backend: RendererBackendState
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
   readonly debug = new RendererDebugState()
@@ -1498,6 +1590,7 @@ export class Renderer {
     this.alpha = this.contextAttributes.alpha
     this.depth = this.contextAttributes.depth
     this.stencil = this.contextAttributes.stencil
+    this.backend = new RendererBackendState(this)
     this.native = new native.NativeRenderer()
     this.inspectorValue.setRenderer(this)
   }
