@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs'
-import { mkdir, writeFile, stat } from 'node:fs/promises'
+import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -102,6 +102,9 @@ async function writeBrowserReferences(result, outputDir) {
   await mkdir(outputDir, { recursive: true })
 
   const fixtureDataUrls = new Map(result.fixtures.map((fixture) => [fixture.name, fixture.dataUrl]))
+  const expectedPngFiles = new Set(result.manifest.fixtures.map((fixture) => fixture.file))
+  await removeStaleReferencePngs(outputDir, expectedPngFiles)
+
   for (const fixture of result.manifest.fixtures) {
     const dataUrl = fixtureDataUrls.get(fixture.name)
     if (!dataUrl) {
@@ -114,6 +117,14 @@ async function writeBrowserReferences(result, outputDir) {
     path.join(outputDir, BROWSER_REFERENCE_MANIFEST_FILE),
     `${JSON.stringify(result.manifest, null, 2)}\n`,
   )
+}
+
+async function removeStaleReferencePngs(outputDir, expectedPngFiles) {
+  const entries = await readdir(outputDir)
+  await Promise.all(entries.map(async (entry) => {
+    if (!entry.endsWith('.png') || expectedPngFiles.has(entry)) return
+    await unlink(path.join(outputDir, entry))
+  }))
 }
 
 function assertBrowserReferenceResult(result) {
