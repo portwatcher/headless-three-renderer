@@ -11,7 +11,7 @@ if (options.help) {
 }
 
 const renderer = new Renderer()
-const { scene, camera, meshes, materials } = createScene(options.meshes)
+const { scene, camera, meshes, materials } = createScene(options)
 const renderOptions = {
   width: options.width,
   height: options.height,
@@ -100,10 +100,10 @@ function parseArgs(args) {
 }
 
 function profileMode(value) {
-  if (['mixed', 'transform', 'material', 'static'].includes(value)) {
+  if (['mixed', 'transform', 'material', 'static', 'instanced'].includes(value)) {
     return value
   }
-  throw new Error('--mode must be "mixed", "transform", "material", or "static".')
+  throw new Error('--mode must be "mixed", "transform", "material", "static", or "instanced".')
 }
 
 function positiveInteger(value, label) {
@@ -122,7 +122,14 @@ function nonNegativeInteger(value, label) {
   return parsed
 }
 
-function createScene(meshCount) {
+function createScene(options) {
+  if (options.mode === 'instanced') {
+    return createInstancedScene(options.meshes)
+  }
+  return createSeparateMeshScene(options.meshes)
+}
+
+function createSeparateMeshScene(meshCount) {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.025, 0.035)
 
@@ -176,8 +183,96 @@ function createScene(meshCount) {
   return { scene, camera, meshes, materials }
 }
 
+function createInstancedScene(instanceCount) {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.025, 0.035)
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
+  camera.position.set(0, 0, 14)
+  camera.lookAt(0, 0, 0)
+
+  const light = new THREE.DirectionalLight(0xffffff, 2.5)
+  light.position.set(3, 5, 8)
+  scene.add(light)
+  scene.add(new THREE.AmbientLight(0x404050, 1.5))
+
+  const textureData = new Uint8Array([
+    255, 255, 255, 255,
+    120, 180, 255, 255,
+  ])
+  const texture = new THREE.DataTexture(textureData, 2, 1, THREE.RGBAFormat)
+  texture.colorSpace = THREE.LinearSRGBColorSpace
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.channel = 1
+  texture.needsUpdate = true
+
+  const base = new THREE.PlaneGeometry(0.48, 0.48)
+  const geometry = new THREE.InstancedBufferGeometry()
+  geometry.index = base.index
+  geometry.setAttribute('position', base.getAttribute('position'))
+  geometry.setAttribute('uv', base.getAttribute('uv'))
+
+  const offsets = new Float32Array(instanceCount * 3)
+  const scales = new Float32Array(instanceCount)
+  const colors = new Float32Array(instanceCount * 3)
+  const normals = new Float32Array(instanceCount * 3)
+  const uvs = new Float32Array(instanceCount * 2)
+  const columns = Math.ceil(Math.sqrt(instanceCount))
+  const spacing = 0.72
+  const color = new THREE.Color()
+  for (let index = 0; index < instanceCount; index += 1) {
+    const x = index % columns
+    const y = Math.floor(index / columns)
+    offsets[index * 3] = (x - (columns - 1) / 2) * spacing
+    offsets[index * 3 + 1] = (y - (columns - 1) / 2) * spacing
+    offsets[index * 3 + 2] = 0
+    scales[index] = 0.85 + (index % 5) * 0.04
+    color.setHSL((index % 31) / 31, 0.72, 0.58)
+    colors[index * 3] = color.r
+    colors[index * 3 + 1] = color.g
+    colors[index * 3 + 2] = color.b
+    normals[index * 3] = 0
+    normals[index * 3 + 1] = 0
+    normals[index * 3 + 2] = 1
+    uvs[index * 2] = index % 2 === 0 ? 0.25 : 0.75
+    uvs[index * 2 + 1] = 0.5
+  }
+
+  geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(offsets, 3))
+  geometry.setAttribute('instanceScale', new THREE.InstancedBufferAttribute(scales, 1))
+  geometry.setAttribute('color', new THREE.InstancedBufferAttribute(colors, 3))
+  geometry.setAttribute('normal', new THREE.InstancedBufferAttribute(normals, 3))
+  geometry.setAttribute('uv1', new THREE.InstancedBufferAttribute(uvs, 2))
+  geometry.instanceCount = instanceCount
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.7,
+    metalness: 0.05,
+    map: texture,
+    vertexColors: true,
+  })
+  const mesh = new THREE.Mesh(geometry, material)
+  mesh.userData.profileBaseX = 0
+  mesh.userData.profileBaseY = 0
+  scene.add(mesh)
+
+  return { scene, camera, meshes: [mesh], materials: [material] }
+}
+
 function updateScene(scene, meshes, materials, frame) {
   const time = frame * 0.071
+  if (options.mode === 'instanced') {
+    const mesh = meshes[0]
+    mesh.position.x = mesh.userData.profileBaseX + Math.sin(time) * 0.08
+    mesh.position.y = mesh.userData.profileBaseY + Math.cos(time * 0.73) * 0.08
+    mesh.rotation.z = time * 0.18
+    mesh.scale.setScalar(0.92 + Math.sin(time * 0.47) * 0.05)
+    scene.updateMatrixWorld(true)
+    return
+  }
+
   const updateTransforms = options.mode === 'mixed' || options.mode === 'transform'
   const updateMaterials = options.mode === 'mixed' || options.mode === 'material'
   for (let index = 0; index < meshes.length; index += 1) {
@@ -257,10 +352,10 @@ function printHelp() {
 Options:
   --frames=N   Measured frames to render. Default: 60
   --warmup=N   Warmup frames rendered before measurement. Default: 5
-  --meshes=N   Animated mesh count. Default: 256
+  --meshes=N   Animated mesh count, or instance count for --mode=instanced. Default: 256
   --width=N    Output width in pixels. Default: 128
   --height=N   Output height in pixels. Default: 128
-  --mode=NAME  Workload: mixed, transform, material, or static. Default: mixed
+  --mode=NAME  Workload: mixed, transform, material, static, or instanced. Default: mixed
   --json       Print machine-readable JSON.
   --help       Show this message.
 `)
