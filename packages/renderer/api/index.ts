@@ -97,6 +97,7 @@ const SupportedRendererToneMappings = new Set([
   NeutralToneMapping,
 ])
 const SupportedRendererPowerPreferences = new Set(['default', 'high-performance', 'low-power'])
+const SupportedTimestampQueryTypes = new Set(['render', 'compute'])
 const RendererBooleanParameters = [
   'alpha',
   'depth',
@@ -1501,6 +1502,38 @@ export class Renderer {
   renderObject(): never {
     throw new Error(
       'Renderer.renderObject() is not supported by @headless-three/renderer because it does not expose renderer-internal render-object dispatch or direct material program dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().',
+    )
+  }
+
+  compute(computeNodes: unknown, dispatchSize: unknown = null): never {
+    assertComputeNodesLike(computeNodes, 'Renderer.compute computeNodes')
+    assertComputeDispatchSize(dispatchSize, 'Renderer.compute dispatchSize')
+    throw unsupportedComputeError('Renderer.compute')
+  }
+
+  async computeAsync(computeNodes: unknown, dispatchSize: unknown = null): Promise<never> {
+    assertComputeNodesLike(computeNodes, 'Renderer.computeAsync computeNodes')
+    assertComputeDispatchSize(dispatchSize, 'Renderer.computeAsync dispatchSize')
+    throw unsupportedComputeError('Renderer.computeAsync')
+  }
+
+  async getArrayBufferAsync(attribute: unknown): Promise<ArrayBuffer> {
+    assertStorageBufferAttributeLike(attribute, 'Renderer.getArrayBufferAsync attribute')
+    throw new Error(
+      'Renderer.getArrayBufferAsync() is not supported by @headless-three/renderer because storage-buffer GPU readback requires WebGPU backend state that this package does not expose. Use Renderer.readRenderTargetPixels() for render-target CPU readback.',
+    )
+  }
+
+  async resolveTimestampsAsync(type: unknown = 'render'): Promise<number> {
+    assertTimestampQueryType(type, 'Renderer.resolveTimestampsAsync type')
+    throw new Error(
+      'Renderer.resolveTimestampsAsync() is not supported by @headless-three/renderer because timestamp queries require backend GPU query pools that are outside the scene-oriented API.',
+    )
+  }
+
+  async waitForGPU(): Promise<void> {
+    throw new Error(
+      'Renderer.waitForGPU() is not supported by @headless-three/renderer because it does not expose direct GPU task synchronization. Renderer.render() and renderToTarget() return after native scene output readback or target writeback has completed.',
     )
   }
 
@@ -4464,6 +4497,81 @@ function assertTextureBindingSlot(value: unknown, label: string): asserts value 
 function unsupportedTextureBindingError(method: string): Error {
   return new Error(
     `${method}() is not supported by @headless-three/renderer because it does not expose browser WebGL texture units or direct texture binding. Use material, background, environment, or render-target texture inputs instead.`,
+  )
+}
+
+function assertComputeNodesLike(value: unknown, label: string): void {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      throw new TypeError(`${label} must contain at least one ComputeNode-like object.`)
+    }
+    for (const [index, node] of value.entries()) {
+      assertComputeNodeLike(node, `${label}[${index}]`)
+    }
+    return
+  }
+  assertComputeNodeLike(value, label)
+}
+
+function assertComputeNodeLike(value: unknown, label: string): void {
+  if (value == null || typeof value !== 'object' || Array.isArray(value) || (value as { isComputeNode?: unknown }).isComputeNode !== true) {
+    throw new TypeError(`${label} must be a ComputeNode-like object.`)
+  }
+}
+
+function assertComputeDispatchSize(value: unknown, label: string): void {
+  if (value == null) return
+  if (typeof value === 'number') {
+    assertPositiveInteger(value, label)
+    return
+  }
+  if (Array.isArray(value)) {
+    if (value.length < 1 || value.length > 3) {
+      throw new TypeError(`${label} array must contain 1, 2, or 3 positive integer dimensions.`)
+    }
+    for (const [index, dimension] of value.entries()) {
+      assertPositiveInteger(dimension, `${label}[${index}]`)
+    }
+    return
+  }
+  if (typeof value === 'object' && (value as { isIndirectStorageBufferAttribute?: unknown }).isIndirectStorageBufferAttribute === true) {
+    return
+  }
+  throw new TypeError(`${label} must be a positive integer, [x, y, z] positive integer array, indirect storage buffer attribute, or null.`)
+}
+
+function assertPositiveInteger(value: unknown, label: string): void {
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value <= 0) {
+    throw new TypeError(`${label} must be a positive integer.`)
+  }
+}
+
+function assertStorageBufferAttributeLike(value: unknown, label: string): void {
+  if (
+    value == null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || (
+      (value as { isStorageBufferAttribute?: unknown }).isStorageBufferAttribute !== true
+      && (value as { isStorageInstancedBufferAttribute?: unknown }).isStorageInstancedBufferAttribute !== true
+    )
+  ) {
+    throw new TypeError(`${label} must be a storage buffer attribute-like object.`)
+  }
+}
+
+function assertTimestampQueryType(value: unknown, label: string): void {
+  if (typeof value !== 'string') {
+    throw new TypeError(`${label} must be "render" or "compute".`)
+  }
+  if (!SupportedTimestampQueryTypes.has(value)) {
+    throw new TypeError(`${label} must be "render" or "compute"; received "${value}".`)
+  }
+}
+
+function unsupportedComputeError(method: string): Error {
+  return new Error(
+    `${method}() is not supported by @headless-three/renderer because it does not expose WebGPU compute pipelines, storage buffers, or GPU dispatch. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().`,
   )
 }
 

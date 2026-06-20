@@ -31922,6 +31922,100 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
   }
 })
 
+test('Renderer common compute and GPU readback APIs fail clearly as unsupported', async () => {
+  const renderer = new Renderer()
+  const computeNode = { isComputeNode: true }
+  const storageBuffer = { isStorageBufferAttribute: true }
+  const storageInstancedBuffer = { isStorageInstancedBufferAttribute: true }
+  const indirectDispatch = { isIndirectStorageBufferAttribute: true }
+
+  assert.throws(
+    () => renderer.compute(computeNode, 1),
+    /Renderer\.compute\(\) is not supported.*WebGPU compute pipelines.*Renderer\.render\(\) or renderToTarget\(\)/i,
+  )
+  assert.throws(
+    () => renderer.compute([computeNode], [1, 2, 3]),
+    /Renderer\.compute\(\) is not supported.*WebGPU compute pipelines/i,
+  )
+  assert.throws(
+    () => renderer.compute(computeNode, indirectDispatch),
+    /Renderer\.compute\(\) is not supported.*WebGPU compute pipelines/i,
+  )
+  await assert.rejects(
+    () => renderer.computeAsync(computeNode, 1),
+    /Renderer\.computeAsync\(\) is not supported.*WebGPU compute pipelines/i,
+  )
+  await assert.rejects(
+    () => renderer.getArrayBufferAsync(storageBuffer),
+    /Renderer\.getArrayBufferAsync\(\) is not supported.*storage-buffer GPU readback.*Renderer\.readRenderTargetPixels\(\)/i,
+  )
+  await assert.rejects(
+    () => renderer.getArrayBufferAsync(storageInstancedBuffer),
+    /Renderer\.getArrayBufferAsync\(\) is not supported.*storage-buffer GPU readback/i,
+  )
+  await assert.rejects(
+    () => renderer.resolveTimestampsAsync('render'),
+    /Renderer\.resolveTimestampsAsync\(\) is not supported.*timestamp queries/i,
+  )
+  await assert.rejects(
+    () => renderer.resolveTimestampsAsync('compute'),
+    /Renderer\.resolveTimestampsAsync\(\) is not supported.*timestamp queries/i,
+  )
+  await assert.rejects(
+    () => renderer.waitForGPU(),
+    /Renderer\.waitForGPU\(\) is not supported.*GPU task synchronization/i,
+  )
+
+  assert.throws(
+    () => renderer.compute(null, 1),
+    /Renderer\.compute computeNodes must be a ComputeNode-like object/i,
+  )
+  assert.throws(
+    () => renderer.compute([], 1),
+    /Renderer\.compute computeNodes must contain at least one ComputeNode-like object/i,
+  )
+  assert.throws(
+    () => renderer.compute([{}], 1),
+    /Renderer\.compute computeNodes\[0\] must be a ComputeNode-like object/i,
+  )
+  assert.throws(
+    () => renderer.compute(computeNode, 0),
+    /Renderer\.compute dispatchSize must be a positive integer/i,
+  )
+  assert.throws(
+    () => renderer.compute(computeNode, [1, 2, 3, 4]),
+    /Renderer\.compute dispatchSize array must contain 1, 2, or 3 positive integer dimensions/i,
+  )
+  assert.throws(
+    () => renderer.compute(computeNode, [1, 0, 1]),
+    /Renderer\.compute dispatchSize\[1\] must be a positive integer/i,
+  )
+  assert.throws(
+    () => renderer.compute(computeNode, { count: 1 }),
+    /Renderer\.compute dispatchSize must be a positive integer, \[x, y, z\] positive integer array, indirect storage buffer attribute, or null/i,
+  )
+  await assert.rejects(
+    () => renderer.computeAsync({}, 1),
+    /Renderer\.computeAsync computeNodes must be a ComputeNode-like object/i,
+  )
+  await assert.rejects(
+    () => renderer.getArrayBufferAsync({}),
+    /Renderer\.getArrayBufferAsync attribute must be a storage buffer attribute-like object/i,
+  )
+  await assert.rejects(
+    () => renderer.getArrayBufferAsync(null),
+    /Renderer\.getArrayBufferAsync attribute must be a storage buffer attribute-like object/i,
+  )
+  await assert.rejects(
+    () => renderer.resolveTimestampsAsync('frame'),
+    /Renderer\.resolveTimestampsAsync type must be "render" or "compute"; received "frame"/i,
+  )
+  await assert.rejects(
+    () => renderer.resolveTimestampsAsync(1),
+    /Renderer\.resolveTimestampsAsync type must be "render" or "compute"/i,
+  )
+})
+
 test('Renderer resource init hooks are validated no-op compatibility hooks', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
