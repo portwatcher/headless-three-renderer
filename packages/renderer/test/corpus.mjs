@@ -888,7 +888,6 @@ function sceneOverrideMaterialCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const leftMean = meanRegion(rgba, width, 24, 30, 42, 66)
       const rightMean = meanRegion(rgba, width, 54, 30, 72, 66)

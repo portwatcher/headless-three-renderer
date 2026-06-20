@@ -196,6 +196,13 @@
       "outputColorSpace": "srgb-linear"
     },
     {
+      "file": "scene-override-material.png",
+      "name": "scene-override-material",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mask-render-mode-plane.png",
       "name": "mask-render-mode-plane",
       "width": 96,
