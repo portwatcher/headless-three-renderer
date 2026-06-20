@@ -32092,6 +32092,41 @@ test('Renderer clear honors active render target scissor state', () => {
   renderer.setRenderTarget(null)
 })
 
+test('Renderer clear writes active render target depth textures', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const depthTexture = { type: THREE.FloatType, source: { data: {} } }
+  const target = { texture: {}, depthTexture }
+  renderer.setRenderTarget(target)
+  renderer.render(scene, camera, {
+    width: 32,
+    height: 32,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  renderer.setClearColor(0x00ff00, 1)
+  renderer.setClearDepth(0.25)
+  renderer.clear(false, true, false)
+
+  const colorMean = meanRegion(target.data, 32, 32, 10, 10, 22, 22)
+  const depthMean = meanScalarRegion(depthTexture.image.data, 32, 32, 10, 10, 22, 22)
+  assert.ok(colorMean.r > colorMean.g + 80, `depth-only clear should preserve color output (${colorMean.r}, ${colorMean.g})`)
+  assert.ok(Math.abs(depthMean - 0.25) < 1e-6, `depth-only clear should write configured clear depth (${depthMean})`)
+  assert.equal(depthTexture.source.data.data, depthTexture.image.data)
+  assert.equal(depthTexture.needsUpdate, true)
+
+  renderer.setRenderTarget(null)
+})
+
 test('Renderer clear methods validate compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()

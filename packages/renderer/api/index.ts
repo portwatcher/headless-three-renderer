@@ -1793,16 +1793,29 @@ export class Renderer {
     assertOptionalBoolean(color, 'Renderer.clear color')
     assertOptionalBoolean(depth, 'Renderer.clear depth')
     assertOptionalBoolean(stencil, 'Renderer.clear stencil')
-    if (color && this.currentRenderTarget) {
-      clearRenderTargetColor(
-        this.currentRenderTarget,
-        this.currentClearColor,
-        this.currentSize,
-        this.currentScissor,
-        this.currentScissorTest,
-        this.currentActiveCubeFace,
-        this.currentActiveMipmapLevel,
-      )
+    if (this.currentRenderTarget) {
+      if (color) {
+        clearRenderTargetColor(
+          this.currentRenderTarget,
+          this.currentClearColor,
+          this.currentSize,
+          this.currentScissor,
+          this.currentScissorTest,
+          this.currentActiveCubeFace,
+          this.currentActiveMipmapLevel,
+        )
+      }
+      if (depth) {
+        clearRenderTargetDepth(
+          this.currentRenderTarget,
+          this.currentClearDepth,
+          this.currentSize,
+          this.currentScissor,
+          this.currentScissorTest,
+          this.currentActiveCubeFace,
+          this.currentActiveMipmapLevel,
+        )
+      }
     }
   }
 
@@ -5157,6 +5170,71 @@ function clearRenderTargetColor(
   writeRenderTarget(target, data, size.width, size.height, undefined, undefined, attachments)
 }
 
+function clearRenderTargetDepth(
+  target: RenderTargetLike,
+  depth: number,
+  fallbackSize: PixelSize | null,
+  rendererScissor: PixelRect | null,
+  rendererScissorTest: boolean,
+  activeCubeFace: number,
+  activeMipmapLevel: number,
+): void {
+  if (!target.depthTexture) return
+  const size = renderTargetClearSize(target, fallbackSize)
+  if (!size) return
+
+  if (isCubeRenderTarget(target)) {
+    const resolvedMipmapLevel = resolveActiveMipmapLevel(activeMipmapLevel, size.width, 'Renderer activeMipmapLevel')
+    const mipSize = cubeMipmapSize(size.width, size.height, resolvedMipmapLevel)
+    const scissor = renderTargetClearScissor(
+      target,
+      rendererScissor,
+      rendererScissorTest,
+      mipSize.width,
+      mipSize.height,
+      resolvedMipmapLevel,
+    )
+    writeCubeTextureFace(
+      target.depthTexture,
+      clearDepthTextureData(
+        target.depthTexture,
+        depth,
+        mipSize.width,
+        mipSize.height,
+        scissor,
+        renderTargetTextureFaceImage(target.depthTexture, activeCubeFace)?.data,
+      ),
+      mipSize.width,
+      mipSize.height,
+      activeCubeFace,
+      resolvedMipmapLevel,
+      'target.depthTexture',
+    )
+    return
+  }
+
+  const scissor = renderTargetClearScissor(
+    target,
+    rendererScissor,
+    rendererScissorTest,
+    size.width,
+    size.height,
+  )
+  writeRenderTargetTexture(
+    target.depthTexture,
+    clearDepthTextureData(
+      target.depthTexture,
+      depth,
+      size.width,
+      size.height,
+      scissor,
+      renderTargetDepthImage(target.depthTexture)?.data,
+    ),
+    size.width,
+    size.height,
+  )
+}
+
 function renderTargetClearScissor(
   target: RenderTargetLike,
   rendererScissor: PixelRect | null,
@@ -5204,6 +5282,14 @@ function renderTargetClearImage(target: RenderTargetLike): RenderTargetImageLike
   return target.image
 }
 
+function renderTargetDepthImage(texture: RenderTargetTextureLike): RenderTargetImageLike | undefined {
+  if (Array.isArray(texture.image)) return texture.image[0]
+  if (texture.image?.data) return texture.image
+  const sourceData = texture.source?.data
+  if (Array.isArray(sourceData)) return sourceData[0]
+  return sourceData
+}
+
 function renderTargetClearDimension(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null
 }
@@ -5233,6 +5319,90 @@ function clearColorBuffer(
       data[offset + 1] = g
       data[offset + 2] = b
       data[offset + 3] = a
+    }
+  }
+  return data
+}
+
+type ScalarDepthArray = Uint8Array | Uint16Array | Uint32Array | Float32Array
+type ScalarDepthArrayConstructor<T extends ScalarDepthArray> = {
+  new(length: number): T
+  new(array: ArrayLike<number>): T
+}
+
+function clearDepthTextureData(
+  texture: RenderTargetTextureLike,
+  depth: number,
+  width: number,
+  height: number,
+  rect?: PixelRect,
+  existing?: NonNullable<RenderTargetImageLike['data']>,
+): NonNullable<RenderTargetImageLike['data']> {
+  const clampedDepth = clamp01(depth)
+  if (texture.type === UnsignedByteType) {
+    return clearScalarDepthData(Uint8Array, existing, width, height, rect, Math.round(clampedDepth * 0xff))
+  }
+  if (texture.type === UnsignedShortType) {
+    return clearScalarDepthData(Uint16Array, existing, width, height, rect, Math.round(clampedDepth * 0xffff))
+  }
+  if (texture.type === UnsignedIntType) {
+    return clearScalarDepthData(Uint32Array, existing, width, height, rect, Math.round(clampedDepth * 0xffffffff))
+  }
+  if (texture.type === UnsignedInt248Type) {
+    return clearScalarDepthData(Uint32Array, existing, width, height, rect, Math.round(clampedDepth * 0xffffff) * 0x100)
+  }
+  if (texture.type === FloatType) {
+    return clearScalarDepthData(Float32Array, existing, width, height, rect, clampedDepth)
+  }
+  if (texture.type === HalfFloatType) {
+    return clearScalarDepthData(Uint16Array, existing, width, height, rect, normalizedFloatToHalf(clampedDepth))
+  }
+  return clearDepthRgbaBuffer(clampedDepth, width, height, rect, existing)
+}
+
+function clearScalarDepthData<T extends ScalarDepthArray>(
+  ctor: ScalarDepthArrayConstructor<T>,
+  existing: NonNullable<RenderTargetImageLike['data']> | undefined,
+  width: number,
+  height: number,
+  rect: PixelRect | undefined,
+  value: number,
+): T {
+  const pixelCount = width * height
+  const data = existing instanceof ctor && existing.length === pixelCount
+    ? new ctor(existing)
+    : new ctor(pixelCount)
+  const clearRect = rect ?? { x: 0, y: 0, width, height }
+  for (let row = 0; row < clearRect.height; row += 1) {
+    const rowStart = (clearRect.y + row) * width + clearRect.x
+    const rowEnd = rowStart + clearRect.width
+    for (let offset = rowStart; offset < rowEnd; offset += 1) {
+      data[offset] = value
+    }
+  }
+  return data
+}
+
+function clearDepthRgbaBuffer(
+  depth: number,
+  width: number,
+  height: number,
+  rect?: PixelRect,
+  existing?: NonNullable<RenderTargetImageLike['data']>,
+): Buffer {
+  const data = Buffer.isBuffer(existing) && existing.length === width * height * 4
+    ? Buffer.from(existing)
+    : Buffer.alloc(width * height * 4)
+  const value = Math.round(depth * 255)
+  const clearRect = rect ?? { x: 0, y: 0, width, height }
+  for (let row = 0; row < clearRect.height; row += 1) {
+    const rowStart = ((clearRect.y + row) * width + clearRect.x) * 4
+    const rowEnd = rowStart + clearRect.width * 4
+    for (let offset = rowStart; offset < rowEnd; offset += 4) {
+      data[offset] = value
+      data[offset + 1] = value
+      data[offset + 2] = value
+      data[offset + 3] = 255
     }
   }
   return data
