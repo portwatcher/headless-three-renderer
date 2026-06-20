@@ -1983,6 +1983,21 @@ export class Renderer {
     this.inspector.copyTextureToTexture?.(srcTexture, dstTexture)
   }
 
+  copyTextureToTexture3D(
+    srcTexture: ThreeTextureLike,
+    dstTexture: ThreeTextureLike,
+    _srcRegion: unknown = null,
+    _dstPosition: unknown = null,
+    level = 0,
+  ): never {
+    assertThreeTextureLike(srcTexture, 'Renderer.copyTextureToTexture3D source texture')
+    assertThreeTextureLike(dstTexture, 'Renderer.copyTextureToTexture3D destination texture')
+    assertTextureCopyLevel(level, 'Renderer.copyTextureToTexture3D level')
+    throw new Error(
+      'Renderer.copyTextureToTexture3D() is not supported by @headless-three/renderer because 3D and array texture GPU copies require backend texture-layer state that this package does not expose. Use Renderer.copyTextureToTexture() for supported readable 2D raw texture copies.',
+    )
+  }
+
   setAnimationLoop(callback: RenderAnimationLoopCallback | null): void {
     if (callback !== null && typeof callback !== 'function') {
       throw new TypeError('Renderer.setAnimationLoop callback must be a function or null.')

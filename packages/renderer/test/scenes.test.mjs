@@ -33116,6 +33116,22 @@ test('Renderer framebuffer and texture handle APIs fail clearly', () => {
     () => renderer.copyTextureToTexture(source, canvasDestination),
     /Renderer\.copyTextureToTexture destination texture must provide a readable raw image object/i,
   )
+  assert.throws(
+    () => renderer.copyTextureToTexture3D(source, destination),
+    /Renderer\.copyTextureToTexture3D\(\) is not supported.*3D and array texture GPU copies.*Renderer\.copyTextureToTexture\(\)/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture3D(null, destination),
+    /Renderer\.copyTextureToTexture3D source texture must be a texture-like object/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture3D(source, null),
+    /Renderer\.copyTextureToTexture3D destination texture must be a texture-like object/i,
+  )
+  assert.throws(
+    () => renderer.copyTextureToTexture3D(source, destination, null, null, -1),
+    /Renderer\.copyTextureToTexture3D level must be a non-negative integer/i,
+  )
 })
 
 test('Renderer copyTextureToTexture copies readable raw texture data on the CPU', () => {
