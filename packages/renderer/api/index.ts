@@ -911,6 +911,10 @@ class RendererState {
   uniformBlockBinding(): never {
     throwUnsupportedRendererStateWebGl('uniformBlockBinding', 'WebGL uniform-buffer binding')
   }
+
+  bindBufferBase(): never {
+    throwUnsupportedRendererStateWebGl('bindBufferBase', 'WebGL uniform-buffer binding')
+  }
 }
 
 class RendererExtensionsState {

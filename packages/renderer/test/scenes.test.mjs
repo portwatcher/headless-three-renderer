@@ -31280,6 +31280,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', () => {
     ['compressedTexSubImage3D', /WebGL texture uploads/i],
     ['updateUBOMapping', /WebGL uniform-buffer binding/i],
     ['uniformBlockBinding', /WebGL uniform-buffer binding/i],
+    ['bindBufferBase', /WebGL uniform-buffer binding/i],
   ]) {
     assert.throws(
       () => renderer.state[method](),
