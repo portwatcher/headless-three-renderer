@@ -336,7 +336,10 @@ fn prepare_background_texture(
                 TextureFilter::from_min_filter_str(scene.background_texture_min_filter.as_deref());
             texture.mipmap_filter =
                 MipmapFilter::from_min_filter_str(scene.background_texture_min_filter.as_deref());
-            texture.anisotropy = texture_anisotropy(scene.background_texture_anisotropy);
+            texture.anisotropy = texture_anisotropy(
+                scene.background_texture_anisotropy,
+                "scene.backgroundTextureAnisotropy",
+            )?;
             Ok(Some(BackgroundTexture {
                 texture,
                 transform: parse_texture_transform(

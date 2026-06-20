@@ -255,6 +255,67 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_finite_texture_anisotropy_inputs() {
+        let cases: Vec<(&str, &str, Box<dyn Fn(&mut SceneMesh)>)> = vec![
+            (
+                "base map",
+                "scene.meshes[0].textureAnisotropy",
+                Box::new(|mesh| {
+                    mesh.texture = Some(vec![255u8, 255, 255, 255].into());
+                    mesh.texture_width = Some(1);
+                    mesh.texture_height = Some(1);
+                    mesh.texture_anisotropy = Some(f64::NAN);
+                }),
+            ),
+            (
+                "normal map",
+                "scene.meshes[0].normalMapAnisotropy",
+                Box::new(|mesh| {
+                    mesh.normal_map = Some(vec![128u8, 128, 255, 255].into());
+                    mesh.normal_map_width = Some(1);
+                    mesh.normal_map_height = Some(1);
+                    mesh.normal_map_anisotropy = Some(f64::INFINITY);
+                }),
+            ),
+            (
+                "physical map",
+                "scene.meshes[0].clearcoatMapAnisotropy",
+                Box::new(|mesh| {
+                    mesh.clearcoat_map = Some(vec![255u8, 255, 255, 255].into());
+                    mesh.clearcoat_map_width = Some(1);
+                    mesh.clearcoat_map_height = Some(1);
+                    mesh.clearcoat_map_anisotropy = Some(f64::NEG_INFINITY);
+                }),
+            ),
+        ];
+
+        for (label, expected_field, mutate) in cases {
+            let mut mesh = SceneMesh {
+                positions: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                uvs: Some(vec![0.0, 0.0, 1.0, 0.0, 0.0, 1.0]),
+                ..SceneMesh::default()
+            };
+            mutate(&mut mesh);
+            let scene = RenderScene {
+                meshes: Some(vec![mesh]),
+                ..RenderScene::default()
+            };
+            let error = match prepare_meshes(&scene) {
+                Ok(_) => panic!("{label} should fail"),
+                Err(error) => error.to_string(),
+            };
+            assert!(
+                error.contains("must contain finite f32-compatible numbers"),
+                "{label} should fail with a finite anisotropy error, got: {error}",
+            );
+            assert!(
+                error.contains(expected_field),
+                "{label} should name {expected_field}, got: {error}",
+            );
+        }
+    }
+
+    #[test]
     fn rejects_non_finite_material_scalar_inputs() {
         let cases: Vec<(&str, Box<dyn Fn(&mut SceneMesh)>)> = vec![
             ("metallic", Box::new(|mesh| mesh.metallic = Some(f64::NAN))),

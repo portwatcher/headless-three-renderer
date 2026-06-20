@@ -653,10 +653,17 @@ fn prepare_mesh_slice(meshes: &[SceneMesh]) -> Result<Vec<PreparedMesh>> {
     Ok(prepared)
 }
 
-pub fn texture_anisotropy(value: Option<f64>) -> u16 {
+pub fn texture_anisotropy(value: Option<f64>, field: &str) -> Result<u16> {
     match value {
-        Some(value) if value.is_finite() && value > 1.0 => value.floor().clamp(1.0, 16.0) as u16,
-        _ => 1,
+        Some(value) => {
+            let value = finite_f32(value, field)?;
+            Ok(if value > 1.0 {
+                value.floor().clamp(1.0, 16.0) as u16
+            } else {
+                1
+            })
+        }
+        None => Ok(1),
     }
 }
 
@@ -1706,10 +1713,19 @@ fn decode_optional_texture_with_sampling(
     mag_filter: Option<&str>,
     min_filter: Option<&str>,
     anisotropy: Option<f64>,
+    anisotropy_field: &str,
 ) -> Result<Option<PreparedTexture>> {
     let mut texture = decode_optional_texture(data, width_hint, height_hint, mesh_index)?;
     if let Some(tex) = texture.as_mut() {
-        apply_texture_sampling(tex, wrap_s, wrap_t, mag_filter, min_filter, anisotropy);
+        apply_texture_sampling(
+            tex,
+            wrap_s,
+            wrap_t,
+            mag_filter,
+            min_filter,
+            anisotropy,
+            anisotropy_field,
+        )?;
     }
     Ok(texture)
 }
@@ -1721,13 +1737,15 @@ fn apply_texture_sampling(
     mag_filter: Option<&str>,
     min_filter: Option<&str>,
     anisotropy: Option<f64>,
-) {
+    anisotropy_field: &str,
+) -> Result<()> {
     texture.wrap_s = WrapMode::from_str_opt(wrap_s);
     texture.wrap_t = WrapMode::from_str_opt(wrap_t);
     texture.mag_filter = TextureFilter::from_str_opt(mag_filter);
     texture.min_filter = TextureFilter::from_min_filter_str(min_filter);
     texture.mipmap_filter = MipmapFilter::from_min_filter_str(min_filter);
-    texture.anisotropy = texture_anisotropy(anisotropy);
+    texture.anisotropy = texture_anisotropy(anisotropy, anisotropy_field)?;
+    Ok(())
 }
 
 struct SurfaceTextureInputs {
@@ -1785,6 +1803,7 @@ fn prepare_surface_texture_inputs(
                     mesh.texture_mag_filter.as_deref(),
                     mesh.texture_min_filter.as_deref(),
                     mesh.texture_anisotropy,
+                    &format!("scene.meshes[{mesh_index}].textureAnisotropy"),
                 )
             })
         });
@@ -1800,6 +1819,7 @@ fn prepare_surface_texture_inputs(
                     mesh.alpha_map_mag_filter.as_deref(),
                     mesh.alpha_map_min_filter.as_deref(),
                     mesh.alpha_map_anisotropy,
+                    &format!("scene.meshes[{mesh_index}].alphaMapAnisotropy"),
                 )
             })
         });
@@ -1997,6 +2017,7 @@ fn prepare_common_texture_inputs(
                 mesh.normal_map_mag_filter.as_deref(),
                 mesh.normal_map_min_filter.as_deref(),
                 mesh.normal_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].normalMapAnisotropy"),
             )
         });
         let bump_map = scope.spawn(|| {
@@ -2010,6 +2031,7 @@ fn prepare_common_texture_inputs(
                 mesh.bump_map_mag_filter.as_deref(),
                 mesh.bump_map_min_filter.as_deref(),
                 mesh.bump_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].bumpMapAnisotropy"),
             )
         });
         let displacement_map = scope.spawn(|| {
@@ -2023,6 +2045,7 @@ fn prepare_common_texture_inputs(
                 mesh.displacement_map_mag_filter.as_deref(),
                 mesh.displacement_map_min_filter.as_deref(),
                 mesh.displacement_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].displacementMapAnisotropy"),
             )
         });
         let gradient_map = scope.spawn(|| {
@@ -2036,6 +2059,7 @@ fn prepare_common_texture_inputs(
                 mesh.gradient_map_mag_filter.as_deref(),
                 mesh.gradient_map_min_filter.as_deref(),
                 mesh.gradient_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].gradientMapAnisotropy"),
             )
         });
         let matcap_map = scope.spawn(|| {
@@ -2049,6 +2073,7 @@ fn prepare_common_texture_inputs(
                 mesh.matcap_map_mag_filter.as_deref(),
                 mesh.matcap_map_min_filter.as_deref(),
                 mesh.matcap_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].matcapMapAnisotropy"),
             )
         });
         let metallic_roughness_texture = scope.spawn(|| {
@@ -2062,6 +2087,7 @@ fn prepare_common_texture_inputs(
                 mesh.metallic_roughness_texture_mag_filter.as_deref(),
                 mesh.metallic_roughness_texture_min_filter.as_deref(),
                 mesh.metallic_roughness_texture_anisotropy,
+                &format!("scene.meshes[{mesh_index}].metallicRoughnessTextureAnisotropy"),
             )
         });
         let specular_map = scope.spawn(|| {
@@ -2075,6 +2101,7 @@ fn prepare_common_texture_inputs(
                 mesh.specular_map_mag_filter.as_deref(),
                 mesh.specular_map_min_filter.as_deref(),
                 mesh.specular_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].specularMapAnisotropy"),
             )
         });
         let emissive_map = scope.spawn(|| {
@@ -2088,6 +2115,7 @@ fn prepare_common_texture_inputs(
                 mesh.emissive_map_mag_filter.as_deref(),
                 mesh.emissive_map_min_filter.as_deref(),
                 mesh.emissive_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].emissiveMapAnisotropy"),
             )
         });
         let ao_map = scope.spawn(|| {
@@ -2101,6 +2129,7 @@ fn prepare_common_texture_inputs(
                 mesh.ao_map_mag_filter.as_deref(),
                 mesh.ao_map_min_filter.as_deref(),
                 mesh.ao_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].aoMapAnisotropy"),
             )
         });
         let light_map = scope.spawn(|| {
@@ -2114,6 +2143,7 @@ fn prepare_common_texture_inputs(
                 mesh.light_map_mag_filter.as_deref(),
                 mesh.light_map_min_filter.as_deref(),
                 mesh.light_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].lightMapAnisotropy"),
             )
         });
         let mut normal_map = join_texture_worker(normal_map, "normal map worker")?;
@@ -2236,6 +2266,7 @@ fn prepare_physical_texture_inputs(
                 mesh.clearcoat_map_mag_filter.as_deref(),
                 mesh.clearcoat_map_min_filter.as_deref(),
                 mesh.clearcoat_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].clearcoatMapAnisotropy"),
             )
         });
         let clearcoat_roughness_map = scope.spawn(|| {
@@ -2249,6 +2280,7 @@ fn prepare_physical_texture_inputs(
                 mesh.clearcoat_roughness_map_mag_filter.as_deref(),
                 mesh.clearcoat_roughness_map_min_filter.as_deref(),
                 mesh.clearcoat_roughness_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].clearcoatRoughnessMapAnisotropy"),
             )
         });
         let clearcoat_normal_map = scope.spawn(|| {
@@ -2262,6 +2294,7 @@ fn prepare_physical_texture_inputs(
                 mesh.clearcoat_normal_map_mag_filter.as_deref(),
                 mesh.clearcoat_normal_map_min_filter.as_deref(),
                 mesh.clearcoat_normal_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].clearcoatNormalMapAnisotropy"),
             )
         });
         let sheen_color_map = scope.spawn(|| {
@@ -2275,6 +2308,7 @@ fn prepare_physical_texture_inputs(
                 mesh.sheen_color_map_mag_filter.as_deref(),
                 mesh.sheen_color_map_min_filter.as_deref(),
                 mesh.sheen_color_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].sheenColorMapAnisotropy"),
             )
         });
         let sheen_roughness_map = scope.spawn(|| {
@@ -2288,6 +2322,7 @@ fn prepare_physical_texture_inputs(
                 mesh.sheen_roughness_map_mag_filter.as_deref(),
                 mesh.sheen_roughness_map_min_filter.as_deref(),
                 mesh.sheen_roughness_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].sheenRoughnessMapAnisotropy"),
             )
         });
         let anisotropy_map = scope.spawn(|| {
@@ -2301,6 +2336,7 @@ fn prepare_physical_texture_inputs(
                 mesh.anisotropy_map_mag_filter.as_deref(),
                 mesh.anisotropy_map_min_filter.as_deref(),
                 mesh.anisotropy_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].anisotropyMapAnisotropy"),
             )
         });
         let iridescence_map = scope.spawn(|| {
@@ -2314,6 +2350,7 @@ fn prepare_physical_texture_inputs(
                 mesh.iridescence_map_mag_filter.as_deref(),
                 mesh.iridescence_map_min_filter.as_deref(),
                 mesh.iridescence_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].iridescenceMapAnisotropy"),
             )
         });
         let iridescence_thickness_map = scope.spawn(|| {
@@ -2327,6 +2364,7 @@ fn prepare_physical_texture_inputs(
                 mesh.iridescence_thickness_map_mag_filter.as_deref(),
                 mesh.iridescence_thickness_map_min_filter.as_deref(),
                 mesh.iridescence_thickness_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].iridescenceThicknessMapAnisotropy"),
             )
         });
         let transmission_map = scope.spawn(|| {
@@ -2340,6 +2378,7 @@ fn prepare_physical_texture_inputs(
                 mesh.transmission_map_mag_filter.as_deref(),
                 mesh.transmission_map_min_filter.as_deref(),
                 mesh.transmission_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].transmissionMapAnisotropy"),
             )
         });
         let thickness_map = scope.spawn(|| {
@@ -2353,6 +2392,7 @@ fn prepare_physical_texture_inputs(
                 mesh.thickness_map_mag_filter.as_deref(),
                 mesh.thickness_map_min_filter.as_deref(),
                 mesh.thickness_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].thicknessMapAnisotropy"),
             )
         });
         let specular_color_map = scope.spawn(|| {
@@ -2366,6 +2406,7 @@ fn prepare_physical_texture_inputs(
                 mesh.specular_color_map_mag_filter.as_deref(),
                 mesh.specular_color_map_min_filter.as_deref(),
                 mesh.specular_color_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].specularColorMapAnisotropy"),
             )
         });
         let specular_intensity_map = scope.spawn(|| {
@@ -2379,6 +2420,7 @@ fn prepare_physical_texture_inputs(
                 mesh.specular_intensity_map_mag_filter.as_deref(),
                 mesh.specular_intensity_map_min_filter.as_deref(),
                 mesh.specular_intensity_map_anisotropy,
+                &format!("scene.meshes[{mesh_index}].specularIntensityMapAnisotropy"),
             )
         });
 
