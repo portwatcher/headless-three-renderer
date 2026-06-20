@@ -465,6 +465,7 @@ function appendBatchedMesh(
       sortKeyOverride,
       object,
       callbackContext,
+      draw.z,
     )
   }
 }
@@ -484,6 +485,7 @@ function appendMesh(
   sortKeyOverride?: SortKeyOverride,
   sortItemObject?: ThreeObject3DLike,
   callbackContext?: RenderCallbackContext,
+  sortItemZOverride?: number,
 ): void {
   const geometry = object.geometry!
   const geometryExtraction = meshGeometryExtraction(geometry, cache)
@@ -579,7 +581,7 @@ function appendMesh(
 
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
-        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group, sortItemObject)
+        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group, sortItemObject, sortItemZOverride)
         const sortKeys = mergeSortKeys(sortInfo.keys, sortKeyOverride)
         pushMesh(meshes, {
           positions: expandedPositions,
@@ -638,7 +640,7 @@ function appendMesh(
         : undefined
       for (const instance of instances) {
         const color = instanceColor(baseColor, instance)
-        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group, sortItemObject)
+        const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, instance.transform, geometry, group, sortItemObject, sortItemZOverride)
         const sortKeys = mergeSortKeys(sortInfo.keys, sortKeyOverride)
         pushMesh(meshes, {
           positions: expandedGroupPositions,
@@ -2503,9 +2505,11 @@ function sortInfoForObject(
   geometry?: ThreeBufferGeometryLike,
   group?: GeometryGroup,
   sortItemObject?: ThreeObject3DLike,
+  sortItemZOverride?: number,
 ): MeshSortInfo {
   const renderOrder = finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
   const z = camera ? projectedObjectZ(object, camera, transform) : 0
+  const itemZ = sortItemZOverride ?? z
   const id = unsignedSortKey(object.id, sortIndex)
   const materialSortKey = finiteOrDefault(material?.id, 0)
   const materialVariant = materialVariantForObject(object)
@@ -2526,7 +2530,7 @@ function sortInfoForObject(
       group,
       groupOrder,
       renderOrder,
-      z,
+      z: itemZ,
       materialVariant,
     },
   }

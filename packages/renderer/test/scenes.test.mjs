@@ -1684,6 +1684,61 @@ test('BatchedMesh renderer sort callbacks receive the source object', () => {
   assert.ok(calls > 0, 'transparentSort should compare BatchedMesh-expanded draw items')
 })
 
+test('BatchedMesh renderer sort callbacks receive range-local depth values', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const nearGeometry = new THREE.PlaneGeometry(2, 2)
+  nearGeometry.translate(0, 0, 0.35)
+  const farGeometry = new THREE.PlaneGeometry(2, 2)
+  farGeometry.translate(0, 0, -0.35)
+
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    depthWrite: false,
+    transparent: true,
+  })
+  const batched = new THREE.BatchedMesh(
+    2,
+    nearGeometry.getAttribute('position').count + farGeometry.getAttribute('position').count,
+    nearGeometry.index.count + farGeometry.index.count,
+    material,
+  )
+  const nearGeometryId = batched.addGeometry(nearGeometry)
+  const farGeometryId = batched.addGeometry(farGeometry)
+  const near = batched.addInstance(nearGeometryId)
+  const far = batched.addInstance(farGeometryId)
+  batched.setMatrixAt(near, new THREE.Matrix4())
+  batched.setMatrixAt(far, new THREE.Matrix4())
+  batched.setColorAt(near, new THREE.Color(1, 0, 0))
+  batched.setColorAt(far, new THREE.Color(0, 0, 1))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const seenZ = new Set()
+  let calls = 0
+  const rgba = renderRgbaIsolated(scene, camera, {
+    width: 64,
+    height: 64,
+    transparentSort: (a, b) => {
+      calls += 1
+      assert.equal(a.object, batched)
+      assert.equal(b.object, batched)
+      seenZ.add(a.z)
+      seenZ.add(b.z)
+      return a.z - b.z
+    },
+  })
+
+  assert.ok(calls > 0, 'transparentSort should compare BatchedMesh-expanded draw depths')
+  assert.equal(seenZ.size, 2, 'BatchedMesh-expanded render items should expose per-range z values')
+  const mean = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+  assert.ok(mean.b > mean.r + 80, `custom renderer sort should draw farther blue BatchedMesh range last (${mean.b} vs ${mean.r})`)
+})
+
 test('BatchedMesh sort callbacks receive packed geometry group render items', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
