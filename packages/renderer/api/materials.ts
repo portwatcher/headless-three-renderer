@@ -173,7 +173,10 @@ export interface EnvironmentMapInfo {
 export interface MaterialExtractionContext {
   materialEnvironmentSource?: 'material'
   materialEnvironmentMaps?: WeakSet<ThreeMaterialLike>
+  textureCache?: TextureExtractionCache
 }
+
+export type TextureExtractionCache = WeakMap<ThreeTextureLike, unknown>
 
 export interface EnvironmentMapResolution {
   envMap: EnvironmentMapInfo | null
@@ -565,6 +568,11 @@ export function extractPbrProperties(
   optionalBoolean(material.visible, 'material.visible')
   optionalBoolean(material.vertexColors, 'material.vertexColors')
   const props: PbrProperties = {}
+  const textureFromSlot = (slot: ThreeMaterialLike['map'], label: string) => extractTextureFromSlot(
+    slot,
+    label,
+    context.textureCache,
+  )
 
   const usesMaterialEnvironmentMap = material.envMap != null
     && context.materialEnvironmentMaps?.has(material) === true
@@ -591,7 +599,7 @@ export function extractPbrProperties(
   if (clearcoat !== undefined) {
     props.clearcoat = clamp01(clearcoat)
   }
-  const clearcoatMapInfo = extractTextureFromSlot(material.clearcoatMap, 'material.clearcoatMap')
+  const clearcoatMapInfo = textureFromSlot(material.clearcoatMap, 'material.clearcoatMap')
   if (clearcoatMapInfo) {
     props.clearcoatMap = clearcoatMapInfo.data
     props.clearcoatMapWidth = clearcoatMapInfo.width
@@ -609,7 +617,7 @@ export function extractPbrProperties(
   if (clearcoatRoughness !== undefined) {
     props.clearcoatRoughness = clamp01(clearcoatRoughness)
   }
-  const clearcoatRoughnessMapInfo = extractTextureFromSlot(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
+  const clearcoatRoughnessMapInfo = textureFromSlot(material.clearcoatRoughnessMap, 'material.clearcoatRoughnessMap')
   if (clearcoatRoughnessMapInfo) {
     props.clearcoatRoughnessMap = clearcoatRoughnessMapInfo.data
     props.clearcoatRoughnessMapWidth = clearcoatRoughnessMapInfo.width
@@ -623,7 +631,7 @@ export function extractPbrProperties(
     props.clearcoatRoughnessMapColorSpace = textureColorSpace(material.clearcoatRoughnessMap)
     props.clearcoatRoughnessMapUsesUv2 = textureUvChannel(material.clearcoatRoughnessMap) > 0
   }
-  const clearcoatNormalMapInfo = extractTextureFromSlot(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
+  const clearcoatNormalMapInfo = textureFromSlot(material.clearcoatNormalMap, 'material.clearcoatNormalMap')
   if (clearcoatNormalMapInfo) {
     props.clearcoatNormalMap = clearcoatNormalMapInfo.data
     props.clearcoatNormalMapWidth = clearcoatNormalMapInfo.width
@@ -660,7 +668,7 @@ export function extractPbrProperties(
   if (sheenRoughness !== undefined) {
     props.sheenRoughness = clamp01(sheenRoughness)
   }
-  const sheenColorMapInfo = extractTextureFromSlot(material.sheenColorMap, 'material.sheenColorMap')
+  const sheenColorMapInfo = textureFromSlot(material.sheenColorMap, 'material.sheenColorMap')
   if (sheenColorMapInfo) {
     props.sheenColorMap = sheenColorMapInfo.data
     props.sheenColorMapWidth = sheenColorMapInfo.width
@@ -674,7 +682,7 @@ export function extractPbrProperties(
     props.sheenColorMapColorSpace = textureColorSpace(material.sheenColorMap)
     props.sheenColorMapUsesUv2 = textureUvChannel(material.sheenColorMap) > 0
   }
-  const sheenRoughnessMapInfo = extractTextureFromSlot(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
+  const sheenRoughnessMapInfo = textureFromSlot(material.sheenRoughnessMap, 'material.sheenRoughnessMap')
   if (sheenRoughnessMapInfo) {
     props.sheenRoughnessMap = sheenRoughnessMapInfo.data
     props.sheenRoughnessMapWidth = sheenRoughnessMapInfo.width
@@ -697,7 +705,7 @@ export function extractPbrProperties(
   if (anisotropyRotation !== undefined) {
     props.anisotropyRotation = anisotropyRotation
   }
-  const anisotropyMapInfo = extractTextureFromSlot(material.anisotropyMap, 'material.anisotropyMap')
+  const anisotropyMapInfo = textureFromSlot(material.anisotropyMap, 'material.anisotropyMap')
   if (anisotropyMapInfo) {
     props.anisotropyMap = anisotropyMapInfo.data
     props.anisotropyMapWidth = anisotropyMapInfo.width
@@ -716,7 +724,7 @@ export function extractPbrProperties(
   if (iridescence !== undefined) {
     props.iridescence = clamp01(iridescence)
   }
-  const iridescenceMapInfo = extractTextureFromSlot(material.iridescenceMap, 'material.iridescenceMap')
+  const iridescenceMapInfo = textureFromSlot(material.iridescenceMap, 'material.iridescenceMap')
   if (iridescenceMapInfo) {
     props.iridescenceMap = iridescenceMapInfo.data
     props.iridescenceMapWidth = iridescenceMapInfo.width
@@ -743,7 +751,7 @@ export function extractPbrProperties(
     props.iridescenceThicknessMin = Math.max(0, min)
     props.iridescenceThicknessMax = Math.max(props.iridescenceThicknessMin, max)
   }
-  const iridescenceThicknessMapInfo = extractTextureFromSlot(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
+  const iridescenceThicknessMapInfo = textureFromSlot(material.iridescenceThicknessMap, 'material.iridescenceThicknessMap')
   if (iridescenceThicknessMapInfo) {
     props.iridescenceThicknessMap = iridescenceThicknessMapInfo.data
     props.iridescenceThicknessMapWidth = iridescenceThicknessMapInfo.width
@@ -766,7 +774,7 @@ export function extractPbrProperties(
   if (dispersion !== undefined) {
     props.dispersion = Math.max(0, dispersion)
   }
-  const transmissionMapInfo = extractTextureFromSlot(material.transmissionMap, 'material.transmissionMap')
+  const transmissionMapInfo = textureFromSlot(material.transmissionMap, 'material.transmissionMap')
   if (transmissionMapInfo) {
     props.transmissionMap = transmissionMapInfo.data
     props.transmissionMapWidth = transmissionMapInfo.width
@@ -788,7 +796,7 @@ export function extractPbrProperties(
   if (thickness !== undefined) {
     props.thickness = Math.max(0, thickness)
   }
-  const thicknessMapInfo = extractTextureFromSlot(material.thicknessMap, 'material.thicknessMap')
+  const thicknessMapInfo = textureFromSlot(material.thicknessMap, 'material.thicknessMap')
   if (thicknessMapInfo) {
     props.thicknessMap = thicknessMapInfo.data
     props.thicknessMapWidth = thicknessMapInfo.width
@@ -825,7 +833,7 @@ export function extractPbrProperties(
   if (specularIntensity !== undefined) {
     props.physicalSpecularIntensity = clamp01(specularIntensity)
   }
-  const specularColorMapInfo = extractTextureFromSlot(material.specularColorMap, 'material.specularColorMap')
+  const specularColorMapInfo = textureFromSlot(material.specularColorMap, 'material.specularColorMap')
   if (specularColorMapInfo) {
     props.specularColorMap = specularColorMapInfo.data
     props.specularColorMapWidth = specularColorMapInfo.width
@@ -839,7 +847,7 @@ export function extractPbrProperties(
     props.specularColorMapColorSpace = textureColorSpace(material.specularColorMap)
     props.specularColorMapUsesUv2 = textureUvChannel(material.specularColorMap) > 0
   }
-  const specularIntensityMapInfo = extractTextureFromSlot(material.specularIntensityMap, 'material.specularIntensityMap')
+  const specularIntensityMapInfo = textureFromSlot(material.specularIntensityMap, 'material.specularIntensityMap')
   if (specularIntensityMapInfo) {
     props.specularIntensityMap = specularIntensityMapInfo.data
     props.specularIntensityMapWidth = specularIntensityMapInfo.width
@@ -872,7 +880,7 @@ export function extractPbrProperties(
     props.emissiveIntensity = finiteNumberOrDefault(material.emissiveIntensity, 'material.emissiveIntensity', 1)
   }
 
-  const normalMapInfo = extractTextureFromSlot(material.normalMap, 'material.normalMap')
+  const normalMapInfo = textureFromSlot(material.normalMap, 'material.normalMap')
   if (normalMapInfo) {
     props.normalMap = normalMapInfo.data
     props.normalMapWidth = normalMapInfo.width
@@ -896,7 +904,7 @@ export function extractPbrProperties(
       finiteNumberOrDefault(material.normalScale.y, 'material.normalScale.y', 1),
     ]
   }
-  const bumpMapInfo = extractTextureFromSlot(material.bumpMap, 'material.bumpMap')
+  const bumpMapInfo = textureFromSlot(material.bumpMap, 'material.bumpMap')
   if (bumpMapInfo) {
     props.bumpMap = bumpMapInfo.data
     props.bumpMapWidth = bumpMapInfo.width
@@ -912,7 +920,7 @@ export function extractPbrProperties(
     props.bumpScale = finiteNumberOrDefault(material.bumpScale, 'material.bumpScale', 1)
   }
   if (material.isMeshMatcapMaterial) {
-    const matcapMapInfo = extractTextureFromSlot(material.map, 'material.map')
+    const matcapMapInfo = textureFromSlot(material.map, 'material.map')
     if (matcapMapInfo) {
       props.matcapMap = matcapMapInfo.data
       props.matcapMapWidth = matcapMapInfo.width
@@ -960,7 +968,7 @@ export function extractPbrProperties(
     }
   }
 
-  const gradientMapInfo = extractTextureFromSlot(material.gradientMap, 'material.gradientMap')
+  const gradientMapInfo = textureFromSlot(material.gradientMap, 'material.gradientMap')
   if (gradientMapInfo) {
     props.gradientMap = gradientMapInfo.data
     props.gradientMapWidth = gradientMapInfo.width
@@ -973,7 +981,7 @@ export function extractPbrProperties(
     props.gradientMapColorSpace = textureColorSpace(material.gradientMap)
   }
 
-  const displacementMapInfo = extractTextureFromSlot(material.displacementMap, 'material.displacementMap')
+  const displacementMapInfo = textureFromSlot(material.displacementMap, 'material.displacementMap')
   if (displacementMapInfo) {
     props.displacementMap = displacementMapInfo.data
     props.displacementMapWidth = displacementMapInfo.width
@@ -992,7 +1000,7 @@ export function extractPbrProperties(
 
   const mrMap = material.metalnessMap ?? material.roughnessMap
   const mrMapLabel = material.metalnessMap ? 'material.metalnessMap' : 'material.roughnessMap'
-  const mrMapInfo = extractTextureFromSlot(mrMap, mrMapLabel)
+  const mrMapInfo = textureFromSlot(mrMap, mrMapLabel)
   if (mrMapInfo) {
     props.metallicRoughnessTexture = mrMapInfo.data
     props.metallicRoughnessTextureWidth = mrMapInfo.width
@@ -1013,7 +1021,7 @@ export function extractPbrProperties(
     props.metallicRoughnessTextureUsesUv2 = textureUvChannel(mrMap) > 0
   }
 
-  const specularMapInfo = extractTextureFromSlot(material.specularMap, 'material.specularMap')
+  const specularMapInfo = textureFromSlot(material.specularMap, 'material.specularMap')
   if (specularMapInfo) {
     props.specularMap = specularMapInfo.data
     props.specularMapWidth = specularMapInfo.width
@@ -1028,7 +1036,7 @@ export function extractPbrProperties(
     props.specularMapUsesUv2 = textureUvChannel(material.specularMap) > 0
   }
 
-  const emissiveMapInfo = extractTextureFromSlot(material.emissiveMap, 'material.emissiveMap')
+  const emissiveMapInfo = textureFromSlot(material.emissiveMap, 'material.emissiveMap')
   if (emissiveMapInfo) {
     props.emissiveMap = emissiveMapInfo.data
     props.emissiveMapWidth = emissiveMapInfo.width
@@ -1043,7 +1051,7 @@ export function extractPbrProperties(
     props.emissiveMapUsesUv2 = textureUvChannel(material.emissiveMap) > 0
   }
 
-  const aoMapInfo = extractTextureFromSlot(material.aoMap, 'material.aoMap')
+  const aoMapInfo = textureFromSlot(material.aoMap, 'material.aoMap')
   if (aoMapInfo) {
     props.aoMap = aoMapInfo.data
     props.aoMapWidth = aoMapInfo.width
@@ -1059,7 +1067,7 @@ export function extractPbrProperties(
     props.aoMapIntensity = finiteNumberOrDefault(material.aoMapIntensity, 'material.aoMapIntensity', 1)
   }
 
-  const lightMapInfo = extractTextureFromSlot(material.lightMap, 'material.lightMap')
+  const lightMapInfo = textureFromSlot(material.lightMap, 'material.lightMap')
   if (lightMapInfo) {
     props.lightMap = lightMapInfo.data
     props.lightMapWidth = lightMapInfo.width
@@ -1075,7 +1083,7 @@ export function extractPbrProperties(
     props.lightMapIntensity = finiteNumberOrDefault(material.lightMapIntensity, 'material.lightMapIntensity', 1)
   }
 
-  const alphaMapInfo = extractTextureFromSlot(material.alphaMap, 'material.alphaMap')
+  const alphaMapInfo = textureFromSlot(material.alphaMap, 'material.alphaMap')
   if (alphaMapInfo) {
     props.alphaMap = alphaMapInfo.data
     props.alphaMapWidth = alphaMapInfo.width
@@ -1834,10 +1842,13 @@ function shaderMaterialKind(material: ThreeMaterialLike): string | undefined {
   return undefined
 }
 
-export function extractTextureData(material: ThreeMaterialLike | undefined): TextureInfo | null {
+export function extractTextureData(
+  material: ThreeMaterialLike | undefined,
+  context: MaterialExtractionContext = {},
+): TextureInfo | null {
   const slot = material?.isMeshMatcapMaterial ? material.matcap : material?.map
   const label = material?.isMeshMatcapMaterial ? 'material.matcap' : 'material.map'
-  const base = extractTextureFromSlot(slot, label)
+  const base = extractTextureFromSlot(slot, label, context.textureCache)
   if (!base) return null
 
   const map = slot as ThreeTextureLike | null | undefined
@@ -2365,7 +2376,45 @@ function minFilterModeToString(texture: ThreeTextureLike | null | undefined): st
   )
 }
 
-function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'): TextureInfo | null {
+interface CachedTextureExtraction {
+  signature: TexturePayloadSignature
+  info: TextureInfo
+}
+
+interface TexturePayloadSignature {
+  version: number
+  image: unknown
+  sourceData: unknown
+  imageData?: TextureDataSignature
+  imageWidth?: unknown
+  imageHeight?: unknown
+  type?: unknown
+  format?: unknown
+  premultiplyAlpha?: unknown
+  generateMipmaps?: unknown
+  mipmaps: TextureMipmapSignature[]
+}
+
+interface TextureMipmapSignature {
+  image: unknown
+  data?: TextureDataSignature
+  width?: unknown
+  height?: unknown
+}
+
+interface TextureDataSignature {
+  data: unknown
+  length?: unknown
+  buffer?: ArrayBufferLike
+  byteOffset?: number
+  byteLength?: number
+}
+
+function extractTextureFromSlot(
+  map: ThreeMaterialLike['map'],
+  label = 'texture',
+  cache?: TextureExtractionCache,
+): TextureInfo | null {
   if (!map) return null
   assertSupportedTextureInput(map, label, { allowMipmaps: true })
   assertSupportedTwoDimensionalTextureSlot(map, label)
@@ -2374,6 +2423,19 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   const sourceData = textureSourceData(map, label)
   const image = (map as any).image ?? sourceData
   if (!image) return null
+  const signature = cache ? texturePayloadSignature(map, image, sourceData, label) : null
+  if (signature) {
+    const cached = cache?.get(map) as CachedTextureExtraction | undefined
+    if (cached && texturePayloadSignaturesEqual(cached.signature, signature)) {
+      return cached.info
+    }
+  }
+  const cacheInfo = (info: TextureInfo): TextureInfo => {
+    if (signature) {
+      cache?.set(map, { signature, info })
+    }
+    return info
+  }
 
   // DataTexture style: { data: TypedArray, width, height }
   if (image.data && image.width > 0 && image.height > 0) {
@@ -2381,7 +2443,7 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
     const rgba = toRgba8(image.data, image.width, image.height, { type: map.type })
     if (rgba) {
       const data = textureBytesWithExplicitMipmaps(map, label, rgba, image.width, image.height)
-      return { data: Buffer.from(data.buffer, data.byteOffset, data.byteLength), width: image.width, height: image.height }
+      return cacheInfo({ data: Buffer.from(data.buffer, data.byteOffset, data.byteLength), width: image.width, height: image.height })
     }
     throw unsupportedRawTextureDataError(label, 'texture rendering')
   }
@@ -2390,35 +2452,138 @@ function extractTextureFromSlot(map: ThreeMaterialLike['map'], label = 'texture'
   if (Buffer.isBuffer(image)) {
     assertNoEncodedExplicitMipmaps(map, label)
     assertNoEncodedPremultiplyAlpha(map, label)
-    return { data: image, width: 0, height: 0 }
+    return cacheInfo({ data: image, width: 0, height: 0 })
   }
   if (image instanceof Uint8Array && !((image as any).width > 0)) {
     assertNoEncodedExplicitMipmaps(map, label)
     assertNoEncodedPremultiplyAlpha(map, label)
-    return { data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0 }
+    return cacheInfo({ data: Buffer.from(image.buffer, image.byteOffset, image.byteLength), width: 0, height: 0 })
   }
 
   // ImageData (canvas-based polyfill): { data: Uint8ClampedArray, width, height }
   if (image.data instanceof Uint8ClampedArray && image.width > 0 && image.height > 0) {
     const data = textureBytesWithExplicitMipmaps(map, label, image.data, image.width, image.height)
-    return {
+    return cacheInfo({
       data: Buffer.from(data.buffer, data.byteOffset, data.byteLength),
       width: image.width,
       height: image.height,
-    }
+    })
   }
 
   const canvasImage = canvasLikeImageToRgba(image, label)
   if (canvasImage) {
     const data = textureBytesWithExplicitMipmaps(map, label, canvasImage.rgba, canvasImage.width, canvasImage.height)
-    return {
+    return cacheInfo({
       data: Buffer.from(data.buffer, data.byteOffset, data.byteLength),
       width: canvasImage.width,
       height: canvasImage.height,
-    }
+    })
   }
 
   throw unsupportedTextureImageError(label, 'texture rendering')
+}
+
+function texturePayloadSignature(
+  map: ThreeTextureLike,
+  image: unknown,
+  sourceData: unknown,
+  label: string,
+): TexturePayloadSignature | null {
+  const version = map.version
+  if (typeof version !== 'number' || !Number.isFinite(version)) return null
+
+  return {
+    version,
+    image,
+    sourceData,
+    imageData: textureImageDataSignature(image),
+    imageWidth: textureImageDimension(image, 'width'),
+    imageHeight: textureImageDimension(image, 'height'),
+    type: map.type,
+    format: map.format,
+    premultiplyAlpha: map.premultiplyAlpha,
+    generateMipmaps: map.generateMipmaps,
+    mipmaps: textureMipmapSignatures(map, label),
+  }
+}
+
+function textureImageDataSignature(image: unknown): TextureDataSignature | undefined {
+  if (Buffer.isBuffer(image) || image instanceof Uint8Array) {
+    return textureDataSignature(image)
+  }
+  if (!image || typeof image !== 'object') return undefined
+  return textureDataSignature((image as { data?: unknown }).data)
+}
+
+function textureDataSignature(data: unknown): TextureDataSignature | undefined {
+  if (data == null) return undefined
+  const arrayLike = data as { length?: unknown }
+  const view = ArrayBuffer.isView(data) ? data as ArrayBufferView : undefined
+  return {
+    data,
+    length: arrayLike.length,
+    buffer: view?.buffer,
+    byteOffset: view?.byteOffset,
+    byteLength: view?.byteLength,
+  }
+}
+
+function textureImageDimension(image: unknown, key: 'width' | 'height'): unknown {
+  if (!image || typeof image !== 'object') return undefined
+  return (image as Record<'width' | 'height', unknown>)[key]
+}
+
+function textureMipmapSignatures(map: ThreeTextureLike, label: string): TextureMipmapSignature[] {
+  const mipmaps = map.mipmaps
+  if (mipmaps == null) return []
+  if (!Array.isArray(mipmaps)) {
+    throw new TypeError(`${label}.mipmaps must be an array of image-like mip levels.`)
+  }
+  return mipmaps.map((image) => ({
+    image,
+    data: image && typeof image === 'object' ? textureDataSignature((image as { data?: unknown }).data) : undefined,
+    width: image && typeof image === 'object' ? (image as { width?: unknown }).width : undefined,
+    height: image && typeof image === 'object' ? (image as { height?: unknown }).height : undefined,
+  }))
+}
+
+function texturePayloadSignaturesEqual(a: TexturePayloadSignature, b: TexturePayloadSignature): boolean {
+  return a.version === b.version
+    && a.image === b.image
+    && a.sourceData === b.sourceData
+    && textureDataSignaturesEqual(a.imageData, b.imageData)
+    && a.imageWidth === b.imageWidth
+    && a.imageHeight === b.imageHeight
+    && a.type === b.type
+    && a.format === b.format
+    && a.premultiplyAlpha === b.premultiplyAlpha
+    && a.generateMipmaps === b.generateMipmaps
+    && textureMipmapSignaturesEqual(a.mipmaps, b.mipmaps)
+}
+
+function textureMipmapSignaturesEqual(a: TextureMipmapSignature[], b: TextureMipmapSignature[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (
+      a[i].image !== b[i].image ||
+      !textureDataSignaturesEqual(a[i].data, b[i].data) ||
+      a[i].width !== b[i].width ||
+      a[i].height !== b[i].height
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
+function textureDataSignaturesEqual(a: TextureDataSignature | undefined, b: TextureDataSignature | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return a.data === b.data
+    && a.length === b.length
+    && a.buffer === b.buffer
+    && a.byteOffset === b.byteOffset
+    && a.byteLength === b.byteLength
 }
 
 function hasExplicitMipmaps(texture: ThreeTextureLike | null | undefined, label = 'texture'): boolean {

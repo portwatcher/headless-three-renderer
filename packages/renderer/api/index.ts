@@ -36,7 +36,7 @@ import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPositio
 import { DEFAULT_BACKGROUND_COLOR, cssColorStringToArray, resolveBackground, validatedColorLikeToArray } from './color'
 import { createSceneExtractionCache, flattenScene, type SceneExtractionCache, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
-import { canvasLikeImageToRgba, extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial } from './materials'
+import { canvasLikeImageToRgba, extractBackgroundTexture, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial, type MaterialExtractionContext } from './materials'
 import { extractClippingPlanes } from './clipping'
 import { validateObjectChildrenTree } from './objects'
 import { clamp01, matrixElements } from './math'
@@ -2333,6 +2333,10 @@ function toNativeInput(
   const extractedLights: NativeSceneLight[] | undefined = colorMode ? extractLights(scene, camera) : []
   const lights = rendererShadowMapEnabled ? extractedLights : nativeLightsWithoutShadows(extractedLights)
   const shadowMaterialMode = colorMode ? shadowMaterialModeForLights(lights) : undefined
+  const materialContext: MaterialExtractionContext = {
+    ...(environment.materialContext ?? {}),
+    textureCache: sceneExtractionCache?.texturePayloads,
+  }
   const flattenedMeshes = flattenScene(
     scene,
     camera,
@@ -2340,7 +2344,7 @@ function toNativeInput(
     clippingPlanes,
     options.localClippingEnabled !== false,
     shadowMaterialMode,
-    environment.materialContext,
+    materialContext,
     {
       sortObjects: options.sortObjects,
       opaqueSort: options.opaqueSort,

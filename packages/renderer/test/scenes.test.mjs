@@ -23311,6 +23311,68 @@ test('reusable renderer reflects mutated mesh material texture and transform sta
   assert.ok(thirdRight.r < 20 && thirdRight.g < 20 && thirdRight.b < 20, `updated transform should clear the previous right region (${thirdRight.r}, ${thirdRight.g}, ${thirdRight.b})`)
 })
 
+test('reusable renderer reuses cached material texture payload until texture version changes', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const sourceData = new Uint8Array([255, 255, 255])
+  let textureReads = 0
+  const trackedData = new Proxy(sourceData, {
+    get(target, property) {
+      if (typeof property === 'string' && /^(0|[1-9]\d*)$/.test(property)) {
+        textureReads += 1
+      }
+      return Reflect.get(target, property, target)
+    },
+    set(target, property, value) {
+      return Reflect.set(target, property, value, target)
+    },
+  })
+  const texture = new THREE.DataTexture(trackedData, 1, 1, THREE.RGBFormat)
+  texture.needsUpdate = true
+
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000, map: texture })
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.75), material)
+  mesh.frustumCulled = false
+  mesh.position.x = -0.5
+  scene.add(mesh)
+
+  const options = {
+    width: 64,
+    height: 64,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    sortObjects: false,
+  }
+
+  const first = renderer.render(scene, camera, options)
+  const firstLeft = meanRegion(first, 64, 64, 8, 24, 28, 40)
+  const readsAfterFirstRender = textureReads
+  assert.ok(firstLeft.r > 180 && firstLeft.g < 40, `initial cached texture render should be red (${firstLeft.r}, ${firstLeft.g}, ${firstLeft.b})`)
+  assert.ok(readsAfterFirstRender > 0, 'initial render should extract texture payload bytes')
+
+  material.color.set(0x00ff00)
+  mesh.position.x = 0.5
+  const second = renderer.render(scene, camera, options)
+  const secondRight = meanRegion(second, 64, 64, 36, 24, 56, 40)
+  assert.ok(secondRight.g > secondRight.r + 80, `material and transform animation should remain live while texture payload is cached (${secondRight.r}, ${secondRight.g}, ${secondRight.b})`)
+  assert.equal(textureReads, readsAfterFirstRender, 'material and transform animation should reuse cached texture payload extraction')
+
+  sourceData.set([0, 0, 255])
+  texture.needsUpdate = true
+  material.color.set(0xffffff)
+  mesh.position.x = -0.5
+  const third = renderer.render(scene, camera, options)
+  const thirdLeft = meanRegion(third, 64, 64, 8, 24, 28, 40)
+  assert.ok(thirdLeft.b > thirdLeft.r + 120, `texture version changes should render updated blue payload (${thirdLeft.r}, ${thirdLeft.g}, ${thirdLeft.b})`)
+  assert.ok(textureReads > readsAfterFirstRender, 'texture version changes should invalidate cached texture payload extraction')
+})
+
 test('reusable renderer reuses cached static mesh geometry until attributes change', () => {
   const renderer = new Renderer()
   const scene = new THREE.Scene()

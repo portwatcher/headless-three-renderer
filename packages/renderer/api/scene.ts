@@ -32,6 +32,7 @@ import {
   textureUvChannel,
   assertMaterialLike,
   type MaterialExtractionContext,
+  type TextureExtractionCache,
 } from './materials'
 import { applyCpuSkinning } from './skinning'
 import { applyMorphTargets } from './morphs'
@@ -108,6 +109,7 @@ interface TextureUvStreams {
 export interface SceneExtractionCache {
   meshGeometry: WeakMap<ThreeBufferGeometryLike, unknown>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
+  texturePayloads: TextureExtractionCache
 }
 
 interface CachedMeshGeometryExtraction {
@@ -218,6 +220,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
   return {
     meshGeometry: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
+    texturePayloads: new WeakMap(),
   }
 }
 
@@ -418,7 +421,7 @@ function appendMesh(
       pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
     }
     applyPbrUvStreamFlags(pbrProps, uvStreams)
-    const textureInfo = extractTextureData(material)
+    const textureInfo = extractTextureData(material, materialContext)
     const castShadow = objectCastsShadow && !usesCustomShadowMaterial ? true : undefined
     const receiveShadow = objectReceivesShadow ? true : undefined
     const clipping = clippingState(clippingContext, material, localClippingEnabled)
@@ -818,7 +821,7 @@ function appendShadowOnlyMeshGroup(
     pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
   }
   applyPbrUvStreamFlags(pbrProps, uvStreams)
-  const textureInfo = extractTextureData(shadowMaterial)
+  const textureInfo = extractTextureData(shadowMaterial, materialContext)
   const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
   const wireframe = isDepthDistanceWireframeMaterial(shadowMaterial)
   const hiddenMainPass = shadowOnlyMainPassState()
@@ -1054,7 +1057,7 @@ function appendSprite(
     uvs.push(u, v)
   }
 
-  const textureInfo = extractTextureData(material)
+  const textureInfo = extractTextureData(material, materialContext)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const pbrProps = extractPbrProperties(material, materialContext)
   pbrProps.alphaMapUsesUv2 = false
@@ -1227,7 +1230,7 @@ function appendPoints(
 
     if (outputPositions.length === 0) continue
 
-    const textureInfo = extractTextureData(material)
+    const textureInfo = extractTextureData(material, materialContext)
     const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder, undefined, geometry, group)
     const pbrProps = extractPbrProperties(material, materialContext)
     pbrProps.alphaMapUsesUv2 = pointUvStreams?.alphaMapUsesUv2 ?? false
@@ -1330,7 +1333,7 @@ function appendShadowOnlyBillboardMesh(
   alphaMapUsesUv2 = false,
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
-  const textureInfo = extractTextureData(shadowMaterial)
+  const textureInfo = extractTextureData(shadowMaterial, materialContext)
   const sortInfo = sortInfoForObject(object, material, camera, meshes.length, groupOrder)
   const clipping = clippingState(clippingContext, shadowMaterial, localClippingEnabled)
   const hiddenMainPass = shadowOnlyMainPassState()
@@ -1603,7 +1606,7 @@ function appendLineOrPoints(
     if (topology === 'lines') {
       pbrProps.alphaMapUsesUv2 = uvStreams.alphaMapUsesUv2
     }
-    const textureInfo = extractTextureData(material)
+    const textureInfo = extractTextureData(material, materialContext)
     const drawStart = group.start
     const drawEnd = group.start + group.count
     if (topology === 'lines') {
