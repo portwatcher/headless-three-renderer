@@ -559,6 +559,109 @@ test('BatchedMesh budget renders 2,048 packed colored instances', () => {
   assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `BatchedMesh instance colors should survive expansion (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('CPU deformation budget renders a 4,096-vertex morphed skinned mesh', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const panelColumns = 32
+  const rows = 64
+  const panelCount = 2
+  const vertexCount = panelColumns * rows * panelCount
+  const positions = new Float32Array(vertexCount * 3)
+  const normals = new Float32Array(vertexCount * 3)
+  const colors = new Float32Array(vertexCount * 3)
+  const skinIndices = new Uint16Array(vertexCount * 4)
+  const skinWeights = new Float32Array(vertexCount * 4)
+  const morphPositions = new Float32Array(vertexCount * 3)
+  const morphNormals = new Float32Array(vertexCount * 3)
+  const indices = []
+
+  let vertex = 0
+  for (let panel = 0; panel < panelCount; panel += 1) {
+    const boneIndex = panel
+    for (let row = 0; row < rows; row += 1) {
+      const v = row / (rows - 1)
+      for (let column = 0; column < panelColumns; column += 1) {
+        const u = column / (panelColumns - 1)
+        const baseX = panel === 0 ? -2.85 + u : 1.85 + u
+        const baseY = -3.0 + v * 1.2
+        const wave = Math.sin((u * 5 + v * 7 + panel) * Math.PI) * 0.06
+        const offset = vertex * 3
+
+        positions[offset] = baseX
+        positions[offset + 1] = baseY
+        positions[offset + 2] = 0
+        normals[offset] = 0
+        normals[offset + 1] = 0
+        normals[offset + 2] = 1
+        colors[offset] = panel === 0 ? 1 - v * 0.4 : 0.25 + u * 0.5
+        colors[offset + 1] = 0.25 + v * 0.7
+        colors[offset + 2] = panel === 0 ? 0.35 + u * 0.55 : 0.95 - v * 0.35
+        skinIndices[vertex * 4] = boneIndex
+        skinWeights[vertex * 4] = 1
+        morphPositions[offset + 1] = 2.25 + wave
+        morphPositions[offset + 2] = wave
+        morphNormals[offset + 2] = 0.02
+        vertex += 1
+      }
+    }
+  }
+
+  for (let panel = 0; panel < panelCount; panel += 1) {
+    const panelStart = panel * panelColumns * rows
+    for (let row = 0; row < rows - 1; row += 1) {
+      for (let column = 0; column < panelColumns - 1; column += 1) {
+        const a = panelStart + row * panelColumns + column
+        const b = a + 1
+        const c = a + panelColumns
+        const d = c + 1
+        indices.push(a, c, b, b, c, d)
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  geometry.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndices, 4))
+  geometry.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeights, 4))
+  geometry.setIndex(indices)
+  geometry.morphTargetsRelative = true
+  geometry.morphAttributes.position = [new THREE.BufferAttribute(morphPositions, 3)]
+  geometry.morphAttributes.normal = [new THREE.BufferAttribute(morphNormals, 3)]
+
+  const mesh = new THREE.SkinnedMesh(
+    geometry,
+    new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+  )
+  mesh.frustumCulled = false
+  mesh.morphTargetInfluences = [1]
+
+  const leftBone = new THREE.Bone()
+  const rightBone = new THREE.Bone()
+  mesh.add(leftBone)
+  mesh.add(rightBone)
+  mesh.bind(new THREE.Skeleton([leftBone, rightBone]))
+  leftBone.position.x = 2.35
+  rightBone.position.x = -2.35
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  assert.equal(vertexCount, 4096)
+  assert.equal(indices.length, (panelColumns - 1) * (rows - 1) * panelCount * 6)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.22, `morphed skinned scale scene should render after CPU deformation (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 35 && mean.g > 35 && mean.b > 35, `deformed vertex colors should survive CPU baking (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('points billboard budget renders 4,096 colored points', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
