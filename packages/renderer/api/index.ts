@@ -246,6 +246,14 @@ class RendererShadowMapState {
   set type(value: number) {
     this.typeValue = rendererStateShadowMapType(value)
   }
+
+  render(lights: unknown, scene: unknown, camera: unknown): void {
+    if (!Array.isArray(lights)) {
+      throw new TypeError('Renderer.shadowMap.render lights must be an array.')
+    }
+    validateThreeSceneRoot(scene)
+    validateTopLevelRenderCamera(camera)
+  }
 }
 
 class RendererInfoState {

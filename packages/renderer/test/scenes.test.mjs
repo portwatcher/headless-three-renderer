@@ -27595,6 +27595,9 @@ test('Renderer shadowMap enabled gates reusable renderer shadows', () => {
   assert.equal(renderer.shadowMap.needsUpdate, true)
   assert.equal(renderer.shadowMap.transmitted, true)
   assert.equal(renderer.shadowMap.type, THREE.PCFSoftShadowMap)
+  const shadowScene = new THREE.Scene()
+  const shadowCamera = makeCamera()
+  assert.equal(renderer.shadowMap.render([], shadowScene, shadowCamera), undefined)
 
   for (const [property, value, pattern] of [
     ['enabled', 'yes', /Renderer\.shadowMap\.enabled must be a boolean/i],
@@ -27609,6 +27612,18 @@ test('Renderer shadowMap enabled gates reusable renderer shadows', () => {
       pattern,
     )
   }
+  assert.throws(
+    () => renderer.shadowMap.render(null, shadowScene, shadowCamera),
+    /Renderer\.shadowMap\.render lights must be an array/i,
+  )
+  assert.throws(
+    () => renderer.shadowMap.render([], null, shadowCamera),
+    /render\(scene, camera\) expects scene to be a THREE\.Scene or THREE\.Object3D root/i,
+  )
+  assert.throws(
+    () => renderer.shadowMap.render([], shadowScene, null),
+    /render\(scene, camera\) expects camera to be a THREE\.Camera, THREE\.ArrayCamera, or THREE\.CubeCamera/i,
+  )
 
   const defaultShadowed = renderWithShadowMap(undefined)
   const explicitShadowed = renderWithShadowMap(true)
