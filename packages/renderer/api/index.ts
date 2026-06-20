@@ -966,8 +966,281 @@ class RendererBackendState {
 }
 
 class RendererNodesState {
+  readonly nodeBuilderCache = new Map<unknown, unknown>()
+  readonly callHashCache = new Map<unknown, unknown>()
+  readonly groupsData = new WeakMap<object, Record<string, unknown>>()
+  readonly cacheLib: Record<string, WeakMap<object, unknown>> = {}
   modelViewMatrix: unknown = null
   modelNormalViewMatrix: unknown = null
+  private data = new WeakMap<object, Record<string, unknown>>()
+  private nodeFrameValue = rendererNodeFrame()
+  private outputNodeCacheKeys = new WeakMap<object, string>()
+
+  constructor(readonly renderer: Renderer, readonly backend: RendererBackendState) {}
+
+  get nodeFrame(): Record<string, unknown> {
+    return this.nodeFrameValue
+  }
+
+  set nodeFrame(value: Record<string, unknown>) {
+    if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new TypeError('Renderer.nodes.nodeFrame must be an object.')
+    }
+    this.nodeFrameValue = value
+  }
+
+  get(object: unknown): Record<string, unknown> {
+    assertWeakMapKey(object, 'Renderer.nodes.get object')
+    let map = this.data.get(object)
+    if (map === undefined) {
+      map = {}
+      this.data.set(object, map)
+    }
+    return map
+  }
+
+  has(object: unknown): boolean {
+    assertWeakMapKey(object, 'Renderer.nodes.has object')
+    return this.data.has(object)
+  }
+
+  delete(object: unknown): Record<string, unknown> | null {
+    assertWeakMapKey(object, 'Renderer.nodes.delete object')
+    const map = this.data.get(object) ?? null
+    this.data.delete(object)
+    return map
+  }
+
+  dispose(): void {
+    this.data = new WeakMap()
+    this.nodeBuilderCache.clear()
+    this.callHashCache.clear()
+    for (const key of Object.keys(this.cacheLib)) {
+      delete this.cacheLib[key]
+    }
+    this.nodeFrameValue = rendererNodeFrame()
+    this.outputNodeCacheKeys = new WeakMap()
+  }
+
+  updateGroup(nodeUniformsGroup: unknown): boolean {
+    if (nodeUniformsGroup == null || typeof nodeUniformsGroup !== 'object' || Array.isArray(nodeUniformsGroup)) {
+      throw new TypeError('Renderer.nodes.updateGroup nodeUniformsGroup must be an object.')
+    }
+    const groupNode = (nodeUniformsGroup as { groupNode?: unknown }).groupNode
+    if (groupNode == null || typeof groupNode !== 'object' || Array.isArray(groupNode)) {
+      throw new TypeError('Renderer.nodes.updateGroup nodeUniformsGroup.groupNode must be an object.')
+    }
+    const name = (groupNode as { name?: unknown }).name
+    if (name === 'object') return true
+    const groupData = this.get(nodeUniformsGroup)
+    if (name === 'render') {
+      const renderId = this.nodeFrameValue.renderId
+      if (groupData.renderId !== renderId) {
+        groupData.renderId = renderId
+        return true
+      }
+      return false
+    }
+    if (name === 'frame') {
+      const frameId = this.nodeFrameValue.frameId
+      if (groupData.frameId !== frameId) {
+        groupData.frameId = frameId
+        return true
+      }
+      return false
+    }
+    const version = (groupNode as { version?: unknown }).version
+    if (groupData.version !== version) {
+      groupData.version = version
+      return true
+    }
+    return false
+  }
+
+  getForRenderCacheKey(renderObject: unknown): unknown {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.getForRenderCacheKey renderObject')
+    return (renderObject as { initialCacheKey?: unknown }).initialCacheKey
+      ?? this.backend.getRenderCacheKey(renderObject)
+  }
+
+  getForRender(renderObject: unknown): never {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.getForRender renderObject')
+    throw unsupportedNodeOperationError('Renderer.nodes.getForRender', 'render-object shader-node builder creation')
+  }
+
+  getForCompute(computeNode: unknown): never {
+    assertComputeNodeLike(computeNode, 'Renderer.nodes.getForCompute computeNode')
+    throw unsupportedNodeOperationError('Renderer.nodes.getForCompute', 'compute shader-node builder creation')
+  }
+
+  _createNodeBuilderState(_nodeBuilder: unknown): never {
+    throw unsupportedNodeOperationError('Renderer.nodes._createNodeBuilderState', 'shader-node builder state creation')
+  }
+
+  updateEnvironment(scene: unknown): void {
+    const sceneData = this.getSceneNodeData(scene, 'Renderer.nodes.updateEnvironment scene')
+    const environmentNode = (scene as { environmentNode?: unknown }).environmentNode
+    if (isNodeLike(environmentNode)) {
+      sceneData.environmentNode = environmentNode
+    } else {
+      delete sceneData.environmentNode
+    }
+  }
+
+  updateBackground(scene: unknown): void {
+    const sceneData = this.getSceneNodeData(scene, 'Renderer.nodes.updateBackground scene')
+    const backgroundNode = (scene as { backgroundNode?: unknown }).backgroundNode
+    if (isNodeLike(backgroundNode)) {
+      sceneData.backgroundNode = backgroundNode
+    } else {
+      delete sceneData.backgroundNode
+    }
+  }
+
+  updateFog(scene: unknown): void {
+    const sceneData = this.getSceneNodeData(scene, 'Renderer.nodes.updateFog scene')
+    const fogNode = (scene as { fogNode?: unknown }).fogNode
+    if (isNodeLike(fogNode)) {
+      sceneData.fogNode = fogNode
+    } else {
+      delete sceneData.fogNode
+    }
+  }
+
+  getEnvironmentNode(scene: unknown): unknown {
+    this.updateEnvironment(scene)
+    return (scene as { environmentNode?: unknown }).environmentNode
+      ?? this.get(scene).environmentNode
+      ?? null
+  }
+
+  getBackgroundNode(scene: unknown): unknown {
+    this.updateBackground(scene)
+    return (scene as { backgroundNode?: unknown }).backgroundNode
+      ?? this.get(scene).backgroundNode
+      ?? null
+  }
+
+  getFogNode(scene: unknown): unknown {
+    this.updateFog(scene)
+    return (scene as { fogNode?: unknown }).fogNode
+      ?? this.get(scene).fogNode
+      ?? null
+  }
+
+  getCacheKey(scene: unknown, lightsNode: unknown = null): number {
+    assertWeakMapKey(scene, 'Renderer.nodes.getCacheKey scene')
+    let key = this.renderer.shadowMap.enabled ? 1 : 0
+    if (lightsNode != null) {
+      assertWeakMapKey(lightsNode, 'Renderer.nodes.getCacheKey lightsNode')
+      const lightCacheKey = (lightsNode as { getCacheKey?: unknown }).getCacheKey
+      if (typeof lightCacheKey === 'function') {
+        key = rendererSimpleHash(`${key}:${String(lightCacheKey.call(lightsNode, true))}`)
+      }
+    }
+    return key
+  }
+
+  get isToneMappingState(): boolean {
+    return this.renderer.getRenderTarget() == null
+  }
+
+  getCacheNode(type: unknown, object: unknown, callback: unknown, forceUpdate: unknown = false): unknown {
+    assertNonEmptyString(type, 'Renderer.nodes.getCacheNode type')
+    assertWeakMapKey(object, 'Renderer.nodes.getCacheNode object')
+    assertFunction(callback, 'Renderer.nodes.getCacheNode callback')
+    const shouldForceUpdate = rendererStateBoolean(forceUpdate, 'Renderer.nodes.getCacheNode forceUpdate')
+    let nodeCache = this.cacheLib[type]
+    if (nodeCache === undefined) {
+      nodeCache = new WeakMap()
+      this.cacheLib[type] = nodeCache
+    }
+    let node = nodeCache.get(object)
+    if (node === undefined || shouldForceUpdate) {
+      node = callback()
+      nodeCache.set(object, node)
+    }
+    return node
+  }
+
+  getNodeFrame(
+    renderer: unknown = this.renderer,
+    scene: unknown = null,
+    object: unknown = null,
+    camera: unknown = null,
+    material: unknown = null,
+  ): Record<string, unknown> {
+    const nodeFrame = this.nodeFrameValue
+    nodeFrame.renderer = renderer
+    nodeFrame.scene = scene
+    nodeFrame.object = object
+    nodeFrame.camera = camera
+    nodeFrame.material = material
+    return nodeFrame
+  }
+
+  getNodeFrameForRender(renderObject: unknown): Record<string, unknown> {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.getNodeFrameForRender renderObject')
+    return this.getNodeFrame(
+      (renderObject as { renderer?: unknown }).renderer ?? this.renderer,
+      (renderObject as { scene?: unknown }).scene ?? null,
+      (renderObject as { object?: unknown }).object ?? null,
+      (renderObject as { camera?: unknown }).camera ?? null,
+      (renderObject as { material?: unknown }).material ?? null,
+    )
+  }
+
+  getOutputCacheKey(): string {
+    return `${this.renderer.toneMapping},${this.renderer.currentColorSpace}`
+  }
+
+  hasOutputChange(outputTarget: unknown): boolean {
+    assertWeakMapKey(outputTarget, 'Renderer.nodes.hasOutputChange outputTarget')
+    return this.outputNodeCacheKeys.get(outputTarget) !== this.getOutputCacheKey()
+  }
+
+  getOutputNode(outputTarget: unknown): Record<string, unknown> {
+    assertWeakMapKey(outputTarget, 'Renderer.nodes.getOutputNode outputTarget')
+    const cacheKey = this.getOutputCacheKey()
+    this.outputNodeCacheKeys.set(outputTarget, cacheKey)
+    return {
+      isNode: true,
+      isHeadlessRendererOutputNode: true,
+      outputTarget,
+      toneMapping: this.renderer.toneMapping,
+      outputColorSpace: this.renderer.currentColorSpace,
+    }
+  }
+
+  updateBefore(renderObject: unknown): never {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.updateBefore renderObject')
+    throw unsupportedNodeOperationError('Renderer.nodes.updateBefore', 'shader-node updateBefore lifecycle dispatch')
+  }
+
+  updateAfter(renderObject: unknown): never {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.updateAfter renderObject')
+    throw unsupportedNodeOperationError('Renderer.nodes.updateAfter', 'shader-node updateAfter lifecycle dispatch')
+  }
+
+  updateForCompute(computeNode: unknown): never {
+    assertComputeNodeLike(computeNode, 'Renderer.nodes.updateForCompute computeNode')
+    throw unsupportedNodeOperationError('Renderer.nodes.updateForCompute', 'compute shader-node update lifecycle dispatch')
+  }
+
+  updateForRender(renderObject: unknown): never {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.updateForRender renderObject')
+    throw unsupportedNodeOperationError('Renderer.nodes.updateForRender', 'render shader-node update lifecycle dispatch')
+  }
+
+  needsRefresh(renderObject: unknown): boolean {
+    assertWeakMapKey(renderObject, 'Renderer.nodes.needsRefresh renderObject')
+    return false
+  }
+
+  private getSceneNodeData(scene: unknown, label: string): Record<string, unknown> {
+    assertWeakMapKey(scene, label)
+    return this.get(scene)
+  }
 }
 
 class RendererNodeLibraryState {
@@ -2045,7 +2318,7 @@ export class Renderer {
   readonly info = new RendererInfoState()
   readonly library = new RendererNodeLibraryState()
   readonly lighting = new RendererLightingState()
-  readonly nodes = new RendererNodesState()
+  readonly nodes: RendererNodesState
   readonly properties = new RendererPropertiesState()
   readonly renderLists = new RendererRenderListsState()
   readonly renderStates = new RendererRenderStatesState()
@@ -2061,6 +2334,7 @@ export class Renderer {
     this.depth = this.contextAttributes.depth
     this.stencil = this.contextAttributes.stencil
     this.backend = new RendererBackendState(this)
+    this.nodes = new RendererNodesState(this, this.backend)
     this.native = new native.NativeRenderer()
     this.inspectorValue.setRenderer(this)
   }
@@ -2982,6 +3256,7 @@ export class Renderer {
 
   dispose(): void {
     this.info.dispose()
+    this.nodes.dispose()
     this.properties.dispose()
     this.renderLists.dispose()
     this.renderStates.dispose()
@@ -5659,6 +5934,12 @@ function unsupportedInternalRenderDispatchError(method: string): Error {
   )
 }
 
+function unsupportedNodeOperationError(method: string, operation: string): Error {
+  return new Error(
+    `${method}() is not supported by @headless-three/renderer because ${operation} requires Three.js shader-node graph translation and backend shader builder state that are outside the scene-oriented API. Use material.userData.headlessThreeRenderer.fragmentWgsl or material.customFragmentWgsl for the supported custom WGSL fragment path.`,
+  )
+}
+
 function unsupportedBackendOperationError(method: string, operation: string): Error {
   return new Error(
     `${method}() is not supported by @headless-three/renderer because ${operation} would require backend WebGL/WebGPU resource state that is outside the scene-oriented API. Render normal Three.js scene graphs with Renderer.render() or renderToTarget().`,
@@ -6344,6 +6625,33 @@ function assertConstructorFunction(value: unknown, label: string): asserts value
   if (typeof value !== 'function') {
     throw new TypeError(`${label} must be a constructor function.`)
   }
+}
+
+function isNodeLike(value: unknown): boolean {
+  return value != null && typeof value === 'object' && !Array.isArray(value) && (value as { isNode?: unknown }).isNode === true
+}
+
+function rendererNodeFrame(): Record<string, unknown> {
+  return {
+    frameId: 0,
+    renderId: 0,
+    renderer: null,
+    scene: null,
+    object: null,
+    camera: null,
+    material: null,
+    updateNode() {},
+    updateBeforeNode() {},
+    updateAfterNode() {},
+  }
+}
+
+function rendererSimpleHash(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0
+  }
+  return hash
 }
 
 function assertFiniteInteger(value: unknown, label: string): asserts value is number {

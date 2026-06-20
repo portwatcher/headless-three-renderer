@@ -33502,10 +33502,68 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.backend.getRenderCacheKey({}), 'headless-three-renderer')
   assert.equal(renderer.nodes.modelViewMatrix, null)
   assert.equal(renderer.nodes.modelNormalViewMatrix, null)
+  assert.equal(renderer.nodes.renderer, renderer)
+  assert.equal(renderer.nodes.backend, renderer.backend)
   const modelViewMatrixNode = { isNode: true }
   renderer.nodes.modelViewMatrix = modelViewMatrixNode
   assert.equal(renderer.nodes.modelViewMatrix, modelViewMatrixNode)
   renderer.nodes.modelViewMatrix = null
+  const nodeKey = {}
+  assert.equal(renderer.nodes.has(nodeKey), false)
+  const nodeData = renderer.nodes.get(nodeKey)
+  nodeData.ready = true
+  assert.deepEqual(renderer.nodes.get(nodeKey), { ready: true })
+  assert.equal(renderer.nodes.has(nodeKey), true)
+  assert.deepEqual(renderer.nodes.delete(nodeKey), { ready: true })
+  assert.equal(renderer.nodes.has(nodeKey), false)
+  assert.equal(renderer.nodes.delete(nodeKey), null)
+  const renderGroup = { groupNode: { name: 'render' } }
+  assert.equal(renderer.nodes.updateGroup(renderGroup), true)
+  assert.equal(renderer.nodes.updateGroup(renderGroup), false)
+  renderer.nodes.nodeFrame.renderId = 1
+  assert.equal(renderer.nodes.updateGroup(renderGroup), true)
+  assert.equal(renderer.nodes.getForRenderCacheKey({ initialCacheKey: 'cache-1' }), 'cache-1')
+  let cacheNodeCalls = 0
+  const cacheNodeObject = {}
+  const cachedNode = renderer.nodes.getCacheNode('background', cacheNodeObject, () => ({ id: ++cacheNodeCalls }))
+  assert.equal(renderer.nodes.getCacheNode('background', cacheNodeObject, () => ({ id: ++cacheNodeCalls })), cachedNode)
+  const forcedCachedNode = renderer.nodes.getCacheNode('background', cacheNodeObject, () => ({ id: ++cacheNodeCalls }), true)
+  assert.notEqual(forcedCachedNode, cachedNode)
+  assert.equal(cacheNodeCalls, 2)
+  const frameMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  const nodeFrame = renderer.nodes.getNodeFrame(renderer, scene, scene.children[0], camera, frameMaterial)
+  assert.equal(nodeFrame.renderer, renderer)
+  assert.equal(nodeFrame.scene, scene)
+  assert.equal(nodeFrame.object, scene.children[0])
+  assert.equal(nodeFrame.camera, camera)
+  assert.equal(nodeFrame.material, frameMaterial)
+  assert.equal(renderer.nodes.getNodeFrameForRender({
+    renderer,
+    scene,
+    object: scene.children[0],
+    camera,
+    material: frameMaterial,
+  }), nodeFrame)
+  assert.equal(renderer.nodes.getOutputCacheKey(), `${renderer.toneMapping},${renderer.currentColorSpace}`)
+  const outputTarget = {}
+  assert.equal(renderer.nodes.hasOutputChange(outputTarget), true)
+  const outputNode = renderer.nodes.getOutputNode(outputTarget)
+  assert.equal(outputNode.isNode, true)
+  assert.equal(outputNode.isHeadlessRendererOutputNode, true)
+  assert.equal(outputNode.outputTarget, outputTarget)
+  assert.equal(renderer.nodes.hasOutputChange(outputTarget), false)
+  const environmentNode = { isNode: true }
+  const backgroundNode = { isNode: true }
+  const fogNode = { isNode: true }
+  scene.environmentNode = environmentNode
+  scene.backgroundNode = backgroundNode
+  scene.fogNode = fogNode
+  assert.equal(renderer.nodes.getEnvironmentNode(scene), environmentNode)
+  assert.equal(renderer.nodes.getBackgroundNode(scene), backgroundNode)
+  assert.equal(renderer.nodes.getFogNode(scene), fogNode)
+  assert.equal(typeof renderer.nodes.getCacheKey(scene, { getCacheKey: () => 'lights' }), 'number')
+  assert.equal(renderer.nodes.isToneMappingState, true)
+  assert.equal(renderer.nodes.needsRefresh({}), false)
   function ToneMappingNode() {}
   class BasicNodeMaterial {
     constructor() {
@@ -33876,7 +33934,11 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.deepEqual(renderState.state.shadowsArray, [])
   renderState.state.transmissionRenderTarget[camera.id] = { texture: true }
   assert.deepEqual(renderState.state.transmissionRenderTarget[camera.id], { texture: true })
+  const disposableNodeKey = {}
+  renderer.nodes.get(disposableNodeKey).value = true
+  assert.equal(renderer.nodes.has(disposableNodeKey), true)
   renderer.dispose()
+  assert.equal(renderer.nodes.has(disposableNodeKey), false)
   assert.equal(renderer.properties.has(object), false)
   assert.equal(renderer.renderLists.get(scene, 0) === renderList, false)
   assert.equal(renderer.renderStates.get(scene, 0) === renderState, false)
@@ -33920,6 +33982,50 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderer.backend.setScissorTest(1),
     /Renderer\.backend\.setScissorTest value must be a boolean/i,
+  )
+  assert.throws(
+    () => renderer.nodes.get(null),
+    /Renderer\.nodes\.get object must be an object/i,
+  )
+  assert.throws(
+    () => { renderer.nodes.nodeFrame = null },
+    /Renderer\.nodes\.nodeFrame must be an object/i,
+  )
+  assert.throws(
+    () => renderer.nodes.updateGroup({}),
+    /Renderer\.nodes\.updateGroup nodeUniformsGroup\.groupNode must be an object/i,
+  )
+  assert.throws(
+    () => renderer.nodes.getForRender({}),
+    /Renderer\.nodes\.getForRender\(\) is not supported.*shader-node builder creation.*custom WGSL fragment path/i,
+  )
+  assert.throws(
+    () => renderer.nodes.getForCompute({ isComputeNode: true }),
+    /Renderer\.nodes\.getForCompute\(\) is not supported.*compute shader-node builder creation/i,
+  )
+  assert.throws(
+    () => renderer.nodes._createNodeBuilderState({}),
+    /Renderer\.nodes\._createNodeBuilderState\(\) is not supported.*shader-node builder state creation/i,
+  )
+  assert.throws(
+    () => renderer.nodes.updateBefore({}),
+    /Renderer\.nodes\.updateBefore\(\) is not supported.*updateBefore lifecycle dispatch/i,
+  )
+  assert.throws(
+    () => renderer.nodes.updateAfter({}),
+    /Renderer\.nodes\.updateAfter\(\) is not supported.*updateAfter lifecycle dispatch/i,
+  )
+  assert.throws(
+    () => renderer.nodes.updateForCompute({ isComputeNode: true }),
+    /Renderer\.nodes\.updateForCompute\(\) is not supported.*compute shader-node update lifecycle dispatch/i,
+  )
+  assert.throws(
+    () => renderer.nodes.updateForRender({}),
+    /Renderer\.nodes\.updateForRender\(\) is not supported.*render shader-node update lifecycle dispatch/i,
+  )
+  assert.throws(
+    () => renderer.nodes.getCacheNode('', {}, () => {}),
+    /Renderer\.nodes\.getCacheNode type must be a non-empty string/i,
   )
   assert.throws(
     () => renderer.backend.isOccluded({}, null),
