@@ -596,6 +596,10 @@ export interface RenderOptions {
   localClippingEnabled?: boolean
   format?: RenderOutputFormat
   outputColorSpace?: RenderOutputColorSpace
+  /** Per-render tone-mapping mode. Defaults to Renderer.toneMapping. */
+  toneMapping?: number
+  /** Per-render tone-mapping exposure. Defaults to Renderer.toneMappingExposure. */
+  toneMappingExposure?: number
   /** Alternate flat render passes. Defaults to normal color rendering. */
   renderMode?: RenderMode
   /** Whether render-list sorting is enabled. Defaults to true. */

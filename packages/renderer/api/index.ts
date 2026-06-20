@@ -3312,8 +3312,8 @@ export class Renderer {
       __headlessThreeRendererScissorTest: this.currentScissorTest,
       __headlessThreeRendererShadowMapEnabled: this.shadowMap.enabled,
       __headlessThreeRendererShadowMapType: this.shadowMap.type,
-      __headlessThreeRendererToneMapping: this.toneMapping,
-      __headlessThreeRendererToneMappingExposure: this.toneMappingExposure,
+      __headlessThreeRendererToneMapping: sizeOptions.toneMapping ?? this.toneMapping,
+      __headlessThreeRendererToneMappingExposure: sizeOptions.toneMappingExposure ?? this.toneMappingExposure,
       __headlessThreeRendererTransmissionResolutionScale: sizeOptions.transmissionResolutionScale ?? this.transmissionResolutionScale,
       __headlessThreeRenderer: this,
     }
@@ -5133,13 +5133,13 @@ function rendererStateShadowMapType(value: unknown): number {
   return value
 }
 
-function rendererStateToneMapping(value: unknown): number {
+function rendererStateToneMapping(value: unknown, label = 'Renderer.toneMapping'): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new TypeError(`Renderer.toneMapping must be a Three.js tone mapping constant; received ${String(value)}.`)
+    throw new TypeError(`${label} must be a Three.js tone mapping constant; received ${String(value)}.`)
   }
   if (!Number.isInteger(value) || !SupportedRendererToneMappings.has(value)) {
     throw new TypeError(
-      `Renderer.toneMapping ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.NoToneMapping, THREE.LinearToneMapping, THREE.ReinhardToneMapping, THREE.CineonToneMapping, THREE.ACESFilmicToneMapping, THREE.CustomToneMapping, THREE.AgXToneMapping, or THREE.NeutralToneMapping.`,
+      `${label} ${String(value)} is not supported by @headless-three/renderer yet. Use THREE.NoToneMapping, THREE.LinearToneMapping, THREE.ReinhardToneMapping, THREE.CineonToneMapping, THREE.ACESFilmicToneMapping, THREE.CustomToneMapping, THREE.AgXToneMapping, or THREE.NeutralToneMapping.`,
     )
   }
   return value
@@ -5473,6 +5473,8 @@ function hasNonZeroEulerRotation(rotation: EulerComponents): boolean {
 function validateUnsupportedRenderOptions(options: RenderOptions): void {
   assertSupportedOutputFormat(options.format, 'options.format')
   assertSupportedOutputColorSpace(options.outputColorSpace)
+  if (options.toneMapping != null) rendererStateToneMapping(options.toneMapping, 'options.toneMapping')
+  if (options.toneMappingExposure != null) finiteNonNegativeNumber(options.toneMappingExposure, 'options.toneMappingExposure')
   assertNonNegativeNumberOption(options.backgroundIntensity, 'options.backgroundIntensity')
   assertNormalizedNumberOption(options.backgroundBlurriness, 'options.backgroundBlurriness')
   assertFiniteNumberOption(options.environmentIntensity, 'options.environmentIntensity')

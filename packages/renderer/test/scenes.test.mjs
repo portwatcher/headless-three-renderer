@@ -19242,11 +19242,12 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
   camera.lookAt(0, 0, 0)
 
   const renderer = new Renderer()
-  const renderToneMappingState = () => meanRgba(renderer.render(scene, camera, {
+  const renderToneMappingState = (options = {}) => meanRgba(renderer.render(scene, camera, {
     width: 64,
     height: 64,
     format: 'rgba',
     outputColorSpace: THREE.LinearSRGBColorSpace,
+    ...options,
   }))
 
   assert.equal(renderer.toneMapping, THREE.ACESFilmicToneMapping)
@@ -19260,15 +19261,27 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
     `Renderer.toneMapping=NoToneMapping should keep brighter linear white (${unmapped.r} vs ${mapped.r})`,
   )
   assert.ok(unmapped.r > 245, `Renderer.toneMapping=NoToneMapping should preserve white output (${unmapped.r})`)
+  const optionMapped = renderToneMappingState({ toneMapping: THREE.ACESFilmicToneMapping })
+  assert.equal(renderer.toneMapping, THREE.NoToneMapping)
+  assert.ok(
+    unmapped.r > optionMapped.r + 35,
+    `options.toneMapping should override NoToneMapping renderer state for one render (${unmapped.r} vs ${optionMapped.r})`,
+  )
 
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 0.25
   const dimmed = renderToneMappingState()
+  const optionBrightened = renderToneMappingState({ toneMappingExposure: 2 })
+  assert.equal(renderer.toneMappingExposure, 0.25)
   renderer.toneMappingExposure = 2
   const brightened = renderToneMappingState()
   assert.ok(
     brightened.r > dimmed.r + 60,
     `Renderer.toneMappingExposure should scale ACES tone mapping (${brightened.r} vs ${dimmed.r})`,
+  )
+  assert.ok(
+    optionBrightened.r > dimmed.r + 60,
+    `options.toneMappingExposure should scale ACES tone mapping without mutating renderer state (${optionBrightened.r} vs ${dimmed.r})`,
   )
 
   renderer.toneMappingExposure = 1
@@ -19321,6 +19334,22 @@ test('Renderer toneMapping state controls material tone mapping exposure', () =>
   assert.throws(
     () => { renderer.toneMappingExposure = -0.1 },
     /Renderer\.toneMappingExposure must be non-negative/i,
+  )
+  assert.throws(
+    () => renderToneMappingState({ toneMapping: 'aces' }),
+    /options\.toneMapping must be a Three\.js tone mapping constant/i,
+  )
+  assert.throws(
+    () => renderToneMappingState({ toneMapping: 99 }),
+    /options\.toneMapping 99 is not supported.*NoToneMapping.*LinearToneMapping.*ReinhardToneMapping.*CineonToneMapping.*ACESFilmicToneMapping.*CustomToneMapping.*AgXToneMapping.*NeutralToneMapping/i,
+  )
+  assert.throws(
+    () => renderToneMappingState({ toneMappingExposure: Number.NaN }),
+    /options\.toneMappingExposure must be a finite number/i,
+  )
+  assert.throws(
+    () => renderToneMappingState({ toneMappingExposure: -0.1 }),
+    /options\.toneMappingExposure must be non-negative/i,
   )
 })
 
