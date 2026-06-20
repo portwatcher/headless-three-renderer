@@ -32047,6 +32047,51 @@ test('Renderer copyFramebufferToTexture copies active render target color data o
   renderer.setRenderTarget(null)
 })
 
+test('Renderer clear honors active render target scissor state', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const target = { texture: {} }
+  renderer.setRenderTarget(target)
+  renderer.render(scene, camera, {
+    width: 32,
+    height: 32,
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  })
+
+  target.scissorTest = true
+  target.scissor = { x: 16, y: 0, width: 16, height: 32 }
+  renderer.setClearColor(0x00ff00, 1)
+  renderer.clear()
+
+  const targetLeft = meanRegion(target.data, 32, 32, 4, 10, 12, 22)
+  const targetRight = meanRegion(target.data, 32, 32, 20, 10, 28, 22)
+  assert.ok(targetLeft.r > targetLeft.g + 80, `target scissor clear should preserve red outside the rectangle (${targetLeft.r}, ${targetLeft.g})`)
+  assert.ok(targetRight.g > targetRight.r + 80, `target scissor clear should write green inside the rectangle (${targetRight.r}, ${targetRight.g})`)
+
+  target.scissorTest = false
+  renderer.setScissor(0, 0, 16, 32)
+  renderer.setScissorTest(true)
+  renderer.setClearColor(0x0000ff, 1)
+  renderer.clear()
+
+  const rendererLeft = meanRegion(target.data, 32, 32, 4, 10, 12, 22)
+  const rendererRight = meanRegion(target.data, 32, 32, 20, 10, 28, 22)
+  assert.ok(rendererLeft.b > rendererLeft.r + 80, `renderer scissor clear should write blue inside fallback rectangle (${rendererLeft.r}, ${rendererLeft.b})`)
+  assert.ok(rendererRight.g > rendererRight.b + 80, `renderer scissor clear should preserve green outside fallback rectangle (${rendererRight.g}, ${rendererRight.b})`)
+
+  renderer.setScissorTest(false)
+  renderer.setRenderTarget(null)
+})
+
 test('Renderer clear methods validate compatibility hooks', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()

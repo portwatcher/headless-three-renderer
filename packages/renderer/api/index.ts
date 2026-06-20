@@ -1798,6 +1798,8 @@ export class Renderer {
         this.currentRenderTarget,
         this.currentClearColor,
         this.currentSize,
+        this.currentScissor,
+        this.currentScissorTest,
         this.currentActiveCubeFace,
         this.currentActiveMipmapLevel,
       )
@@ -5093,6 +5095,8 @@ function clearRenderTargetColor(
   target: RenderTargetLike,
   color: Color4,
   fallbackSize: PixelSize | null,
+  rendererScissor: PixelRect | null,
+  rendererScissorTest: boolean,
   activeCubeFace: number,
   activeMipmapLevel: number,
 ): void {
@@ -5103,7 +5107,21 @@ function clearRenderTargetColor(
   if (isCubeRenderTarget(target)) {
     const resolvedMipmapLevel = resolveActiveMipmapLevel(activeMipmapLevel, size.width, 'Renderer activeMipmapLevel')
     const mipSize = cubeMipmapSize(size.width, size.height, resolvedMipmapLevel)
-    const face = clearColorBuffer(color, mipSize.width, mipSize.height)
+    const scissor = renderTargetClearScissor(
+      target,
+      rendererScissor,
+      rendererScissorTest,
+      mipSize.width,
+      mipSize.height,
+      resolvedMipmapLevel,
+    )
+    const face = clearColorBuffer(
+      color,
+      mipSize.width,
+      mipSize.height,
+      scissor,
+      renderTargetExistingColorBuffer(target.data, mipSize.width, mipSize.height),
+    )
     const attachments = colorTextures.slice(1).map((texture) => ({ texture, data: face }))
     writeCubeRenderTargetFace(
       target,
@@ -5121,9 +5139,42 @@ function clearRenderTargetColor(
     return
   }
 
-  const data = clearColorBuffer(color, size.width, size.height)
+  const scissor = renderTargetClearScissor(
+    target,
+    rendererScissor,
+    rendererScissorTest,
+    size.width,
+    size.height,
+  )
+  const data = clearColorBuffer(
+    color,
+    size.width,
+    size.height,
+    scissor,
+    renderTargetExistingColorBuffer(target.data, size.width, size.height),
+  )
   const attachments = colorTextures.slice(1).map((texture) => ({ texture, data }))
   writeRenderTarget(target, data, size.width, size.height, undefined, undefined, attachments)
+}
+
+function renderTargetClearScissor(
+  target: RenderTargetLike,
+  rendererScissor: PixelRect | null,
+  rendererScissorTest: boolean,
+  width: number,
+  height: number,
+  activeMipmapLevel = 0,
+): PixelRect | undefined {
+  if (target.scissorTest === true) {
+    const scissor = activeMipmapLevel > 0
+      ? cubeMipmapRect(target.scissor, activeMipmapLevel)
+      : target.scissor
+    return normalizeOptionalPixelRect(scissor, width, height, 'target.scissor')
+  }
+  if (rendererScissorTest && rendererScissor) {
+    return normalizePixelRect(rendererScissor, width, height, 'Renderer.scissor')
+  }
+  return undefined
 }
 
 function renderTargetClearSize(
@@ -5157,17 +5208,32 @@ function renderTargetClearDimension(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null
 }
 
-function clearColorBuffer(color: Color4, width: number, height: number): Buffer {
-  const data = Buffer.alloc(width * height * 4)
+function renderTargetExistingColorBuffer(data: Buffer | undefined, width: number, height: number): Buffer | undefined {
+  return Buffer.isBuffer(data) && data.length === width * height * 4 ? data : undefined
+}
+
+function clearColorBuffer(
+  color: Color4,
+  width: number,
+  height: number,
+  rect?: PixelRect,
+  existing?: Buffer,
+): Buffer {
+  const data = existing ? Buffer.from(existing) : Buffer.alloc(width * height * 4)
   const r = Math.round(clamp01(color[0]) * 255)
   const g = Math.round(clamp01(color[1]) * 255)
   const b = Math.round(clamp01(color[2]) * 255)
   const a = Math.round(clamp01(color[3]) * 255)
-  for (let offset = 0; offset < data.length; offset += 4) {
-    data[offset] = r
-    data[offset + 1] = g
-    data[offset + 2] = b
-    data[offset + 3] = a
+  const clearRect = rect ?? { x: 0, y: 0, width, height }
+  for (let row = 0; row < clearRect.height; row += 1) {
+    const rowStart = ((clearRect.y + row) * width + clearRect.x) * 4
+    const rowEnd = rowStart + clearRect.width * 4
+    for (let offset = rowStart; offset < rowEnd; offset += 4) {
+      data[offset] = r
+      data[offset + 1] = g
+      data[offset + 2] = b
+      data[offset + 3] = a
+    }
   }
   return data
 }
