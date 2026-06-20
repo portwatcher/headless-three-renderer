@@ -36,6 +36,8 @@ async function renderBrowserReferenceCorpus() {
     renderer.setPixelRatio(1)
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFShadowMap
+    renderer.toneMapping = THREE.NoToneMapping
+    renderer.toneMappingExposure = 1
     RectAreaLightUniformsLib.init()
 
     const fixtures = createBrowserReferenceFixtures(createSceneCorpus())

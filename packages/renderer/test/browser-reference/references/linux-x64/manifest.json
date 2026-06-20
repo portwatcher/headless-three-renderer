@@ -3,6 +3,8 @@
   "generator": "@headless-three/renderer/test/browser-reference",
   "renderer": "THREE.WebGLRenderer",
   "threeRevision": "183",
+  "toneMapping": 0,
+  "toneMappingExposure": 1,
   "fixtures": [
     {
       "file": "transparent-layer-stack.png",

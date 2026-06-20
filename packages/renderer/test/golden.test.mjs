@@ -21,9 +21,7 @@ const referenceDir = resolveBrowserReferenceDir()
 const referencesRequired = areBrowserReferencesRequired()
 
 const DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF = 18
-const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map([
-  ['alpha-to-coverage-msaa-plane', 26],
-])
+const BROWSER_REFERENCE_MAX_MEAN_DIFF_BY_FIXTURE = new Map()
 
 test('browser reference manifest normalizes outputColorSpace aliases', () => {
   const fixtures = [
@@ -36,6 +34,8 @@ test('browser reference manifest normalizes outputColorSpace aliases', () => {
   ]
   const manifest = createBrowserReferenceManifest(fixtures)
 
+  assert.equal(manifest.toneMapping, THREE.NoToneMapping)
+  assert.equal(manifest.toneMappingExposure, 1)
   assert.deepEqual(
     manifest.fixtures.map((fixture) => [fixture.name, fixture.outputColorSpace]),
     [
@@ -84,7 +84,7 @@ test('browser reference tolerance policy scopes known parity gaps to fixture nam
   }
 
   assert.equal(getBrowserReferenceMaxMeanDiff('mesh-depth-material-basic', {}), DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF)
-  assert.equal(getBrowserReferenceMaxMeanDiff('alpha-to-coverage-msaa-plane', {}), 26)
+  assert.equal(getBrowserReferenceMaxMeanDiff('alpha-to-coverage-msaa-plane', {}), DEFAULT_BROWSER_REFERENCE_MAX_MEAN_DIFF)
   assert.equal(
     getBrowserReferenceMaxMeanDiff(
       'alpha-to-coverage-msaa-plane',
@@ -118,6 +118,8 @@ test('generated corpus matches browser WebGLRenderer golden references', {
   validateReferenceManifest(manifest, createBrowserReferenceManifest(fixtures))
 
   const renderer = new Renderer()
+  renderer.toneMapping = THREE.NoToneMapping
+  renderer.toneMappingExposure = 1
   for (const fixture of fixtures) {
     await t.test(fixture.name, async () => {
       const referencePath = path.join(referenceDir, `${fixture.name}.png`)
@@ -167,6 +169,8 @@ function validateReferenceManifest(actual, expected) {
   assert.equal(actual.schemaVersion, expected.schemaVersion, 'browser reference manifest schemaVersion mismatch')
   assert.equal(actual.generator, expected.generator, 'browser reference manifest generator mismatch')
   assert.equal(actual.renderer, expected.renderer, 'browser reference manifest renderer mismatch')
+  assert.equal(actual.toneMapping, expected.toneMapping, 'browser reference manifest toneMapping mismatch')
+  assert.equal(actual.toneMappingExposure, expected.toneMappingExposure, 'browser reference manifest toneMappingExposure mismatch')
   assert.equal(
     actual.threeRevision,
     expected.threeRevision,

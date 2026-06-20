@@ -14,6 +14,8 @@ export function createBrowserReferenceManifest(fixtures = createSceneCorpus()) {
     generator: '@headless-three/renderer/test/browser-reference',
     renderer: 'THREE.WebGLRenderer',
     threeRevision: THREE.REVISION,
+    toneMapping: THREE.NoToneMapping,
+    toneMappingExposure: 1,
     fixtures: browserFixtures.map((fixture) => ({
       file: `${fixture.name}.png`,
       name: fixture.name,
