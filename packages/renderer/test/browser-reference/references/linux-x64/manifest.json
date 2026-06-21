@@ -105,6 +105,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "camera-layer-filtering.png",
+      "name": "camera-layer-filtering",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "custom-opaque-sort-group-items.png",
       "name": "custom-opaque-sort-group-items",
       "width": 96,
@@ -457,6 +464,13 @@
     {
       "file": "shadow-material-receiver.png",
       "name": "shadow-material-receiver",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "shadow-material-opacity-scaling.png",
+      "name": "shadow-material-opacity-scaling",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"

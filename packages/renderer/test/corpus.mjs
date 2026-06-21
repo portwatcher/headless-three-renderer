@@ -25,6 +25,7 @@ export function createSceneCorpus() {
     cubeCameraCaptureCorpus(),
     cubeCameraUpdateCorpus(),
     viewportScissorCorpus(),
+    cameraLayerFilteringCorpus(),
     customSortGroupCorpus(),
     customTransparentSortGroupCorpus(),
     rendererBucketFlagsCorpus(),
@@ -4588,6 +4589,66 @@ function viewportScissorCorpus() {
   }
 }
 
+function cameraLayerFilteringCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const filteredObject = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.95, 1.35),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  filteredObject.position.set(-0.55, 0, 0.1)
+  scene.add(filteredObject)
+
+  const visibleObject = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.95, 1.35),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  )
+  visibleObject.position.set(-0.55, 0, 0)
+  visibleObject.layers.set(1)
+  scene.add(visibleObject)
+
+  const litObject = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.95, 1.35),
+    new THREE.MeshLambertMaterial({ color: 0xffffff }),
+  )
+  litObject.position.set(0.55, 0, 0)
+  litObject.layers.set(1)
+  scene.add(litObject)
+
+  const filteredLight = new THREE.DirectionalLight(0xff0000, 8)
+  filteredLight.position.set(0, 0, 3)
+  filteredLight.layers.set(0)
+  scene.add(filteredLight)
+
+  const visibleLight = new THREE.DirectionalLight(0x00ff00, 4)
+  visibleLight.position.set(0, 0, 3)
+  visibleLight.layers.set(1)
+  scene.add(visibleLight)
+
+  const camera = makeCamera([0, 0, 3])
+  camera.layers.set(1)
+
+  return {
+    name: 'camera-layer-filtering',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.12,
+    validate(rgba, { width }) {
+      const objectPanel = meanRegion(rgba, width, 18, 28, 42, 68)
+      const lightPanel = meanRegion(rgba, width, 54, 28, 78, 68)
+      if (!(objectPanel.g > objectPanel.r + 80 && objectPanel.g > objectPanel.b + 80)) {
+        throw new Error(`camera layer corpus should hide the red layer-0 object and show green layer-1 object, got ${JSON.stringify(objectPanel)}`)
+      }
+      if (!(lightPanel.g > lightPanel.r + 45 && lightPanel.g > lightPanel.b + 45)) {
+        throw new Error(`camera layer corpus should hide the red layer-0 light and apply green layer-1 light, got ${JSON.stringify(lightPanel)}`)
+      }
+    },
+  }
+}
+
 function arrayCameraViewportCorpus() {
   const width = CORPUS_RENDER_SIZE
   const height = CORPUS_RENDER_SIZE
@@ -6617,12 +6678,11 @@ function shadowMaterialOpacityCorpus() {
 
   return {
     name: 'shadow-material-opacity-scaling',
-    scene: makeScene(1),
+    scene: makeScene(0.35),
     camera,
     options,
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.01,
-    browserReference: false,
     render(renderer) {
       const opaque = renderer.render(makeScene(1), camera, options)
       const translucent = renderer.render(makeScene(0.35), camera, options)
