@@ -83,6 +83,7 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { BVHLoader } from 'three/examples/jsm/loaders/BVHLoader.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
+import { IESLoader } from 'three/examples/jsm/loaders/IESLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { LUT3dlLoader } from 'three/examples/jsm/loaders/LUT3dlLoader.js'
 import { LUTCubeLoader } from 'three/examples/jsm/loaders/LUTCubeLoader.js'
@@ -4473,6 +4474,45 @@ test('examples LUT loaders parse 3D LUT textures and fail clearly as material ma
     material.dispose()
     lut3dl.texture3D.dispose()
     cube.texture3D.dispose()
+  }
+})
+
+test('examples IESLoader parses photometric textures and fails clearly as material maps', () => {
+  const texture = new IESLoader().parse([
+    'IESNA:LM-63-1995',
+    'TILT=NONE',
+    '1 1000 1 2 2 1 1 1 1 1',
+    '1 1 1',
+    '0 90',
+    '0 90',
+    '1 0.5',
+    '0.5 0.25',
+  ].join('\n'))
+
+  const geometry = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({ map: texture })
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(geometry, material))
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.z = 2
+  camera.updateMatrixWorld(true)
+
+  try {
+    assert.equal(texture.isDataTexture, true)
+    assert.equal(texture.format, THREE.RedFormat)
+    assert.equal(texture.type, THREE.HalfFloatType)
+    assert.equal(texture.image.width, 180)
+    assert.equal(texture.image.height, 1)
+    assert.equal(texture.image.data instanceof Uint16Array, true)
+    assert.equal(texture.image.data.length, 360 * 180)
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 64, height: 64 }),
+      /material\.map raw texture data must contain one-channel, two-channel, RGB, or RGBA numeric pixel data.*mismatched data lengths/i,
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
+    texture.dispose()
   }
 })
 
