@@ -18,7 +18,9 @@ import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { BoxLineGeometry } from 'three/examples/jsm/geometries/BoxLineGeometry.js'
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
+import InstancedPointsGeometry from 'three/examples/jsm/geometries/InstancedPointsGeometry.js'
 import { ParametricGeometry } from 'three/examples/jsm/geometries/ParametricGeometry.js'
+import { ParametricGeometries } from 'three/examples/jsm/geometries/ParametricGeometries.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { TeapotGeometry } from 'three/examples/jsm/geometries/TeapotGeometry.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
@@ -3591,6 +3593,95 @@ test('TextGeometry renders parsed example fonts through built-in mesh materials'
   } finally {
     geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples InstancedPointsGeometry and ParametricGeometries render generated geometry paths', () => {
+  const instancedGeometry = new InstancedPointsGeometry()
+  instancedGeometry.setPositions([
+    -2.2, 1.6, 0,
+    0, 1.6, 0,
+    2.2, 1.6, 0,
+  ])
+  const instancedMaterial = new THREE.MeshBasicMaterial({ color: 0x44ffff, side: THREE.DoubleSide })
+  const instancedMesh = new THREE.Mesh(instancedGeometry, instancedMaterial)
+  instancedMesh.position.x = -1.12
+  instancedMesh.scale.setScalar(0.16)
+
+  const entries = [
+    {
+      label: 'ParametricGeometries.klein',
+      geometry: new ParametricGeometry(ParametricGeometries.klein, 10, 10),
+      color: 0xff44ff,
+      x: -0.3,
+      scale: 0.07,
+      isColor: (r, g, b) => r > 120 && b > 120 && g < 120,
+    },
+    {
+      label: 'ParametricGeometries.TorusKnotGeometry',
+      geometry: new ParametricGeometries.TorusKnotGeometry(0.28, 0.06, 28, 8),
+      color: 0x55ff66,
+      x: 0.58,
+      scale: 1,
+      isColor: (r, g, b) => g > 130 && g > r + 40 && g > b + 40,
+    },
+    {
+      label: 'ParametricGeometries.SphereGeometry',
+      geometry: new ParametricGeometries.SphereGeometry(0.32, 12, 8),
+      color: 0x4488ff,
+      x: 1.25,
+      scale: 1,
+      isColor: (r, g, b) => b > 130 && b > r + 50 && b > g + 20,
+    },
+  ]
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(instancedMesh)
+  const materials = [instancedMaterial]
+  const meshes = [instancedMesh]
+  for (const entry of entries) {
+    const material = new THREE.MeshBasicMaterial({ color: entry.color, side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(entry.geometry, material)
+    mesh.position.x = entry.x
+    mesh.scale.setScalar(entry.scale)
+    scene.add(mesh)
+    materials.push(material)
+    meshes.push(mesh)
+  }
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.equal(instancedGeometry.isInstancedPointsGeometry, true)
+    assert.equal(instancedGeometry.isInstancedBufferGeometry, true)
+    assert.equal(instancedGeometry.instanceCount, 3)
+    assert.ok(instancedGeometry.getAttribute('instancePosition'), 'InstancedPointsGeometry should expose instance positions')
+    assert.ok(instancedGeometry.getAttribute('uv'), 'InstancedPointsGeometry should expose quad UVs')
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && b > 120 && r < 120) > 200,
+      'InstancedPointsGeometry should render repeated cyan point quads',
+    )
+    for (const entry of entries) {
+      assert.equal(entry.geometry.isBufferGeometry, true, `${entry.label} should produce BufferGeometry`)
+      assert.ok(entry.geometry.getAttribute('position')?.count > 0, `${entry.label} should generate vertices`)
+      assert.ok(entry.geometry.getAttribute('normal'), `${entry.label} should generate normals`)
+      assert.ok(
+        countRegionPixels(rgba, width, height, 0, 0, width, height, entry.isColor) > 30,
+        `${entry.label} should render visible material color`,
+      )
+    }
+  } finally {
+    for (const mesh of meshes) scene.remove(mesh)
+    instancedGeometry.dispose()
+    for (const entry of entries) entry.geometry.dispose()
+    for (const material of materials) material.dispose()
   }
 })
 
