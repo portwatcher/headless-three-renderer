@@ -24440,6 +24440,141 @@ test('anisotropyMap samples selected uv1-uv3 texture channels', () => {
   }
 })
 
+test('physical scalar RGB maps decode sRGB colorSpace before shading', () => {
+  function frontCamera() {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+
+  function renderAnisotropy(colorSpace) {
+    const anisotropyMap = solidTexture(192, 64, 192)
+    anisotropyMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.SphereGeometry(1, 64, 32),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x080808,
+        roughness: 0.22,
+        metalness: 0,
+        specularIntensity: 1,
+        anisotropy: 1,
+        anisotropyMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 450)
+    light.position.set(0.65, 0.45, 2.2)
+    scene.add(light)
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace })
+  }
+
+  function renderIridescence(colorSpace) {
+    const iridescenceMap = solidTexture(128, 0, 0)
+    iridescenceMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceMap,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace })
+  }
+
+  function renderIridescenceThickness(colorSpace) {
+    const iridescenceThicknessMap = solidTexture(0, 128, 0)
+    iridescenceThicknessMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [120, 760],
+        iridescenceThicknessMap,
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64, outputColorSpace: THREE.LinearSRGBColorSpace })
+  }
+
+  function renderThickness(colorSpace) {
+    const thicknessMap = solidTexture(0, 128, 0)
+    thicknessMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        ior: 1.5,
+        thickness: 2,
+        thicknessMap,
+        attenuationColor: new THREE.Color(0.1, 0.1, 1),
+        attenuationDistance: 1,
+      }),
+    ))
+    return meanRgba(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))
+  }
+
+  assert.ok(
+    meanAbsDiff(renderAnisotropy(THREE.LinearSRGBColorSpace), renderAnisotropy(THREE.SRGBColorSpace)) > 0.5,
+    'sRGB-decoded anisotropyMap should alter anisotropy direction/strength before shading',
+  )
+  assert.ok(
+    meanAbsDiff(renderIridescence(THREE.LinearSRGBColorSpace), renderIridescence(THREE.SRGBColorSpace)) > 0.5,
+    'sRGB-decoded iridescenceMap should alter iridescence factor before shading',
+  )
+  assert.ok(
+    meanAbsDiff(renderIridescenceThickness(THREE.LinearSRGBColorSpace), renderIridescenceThickness(THREE.SRGBColorSpace)) > 0.5,
+    'sRGB-decoded iridescenceThicknessMap should alter film thickness before shading',
+  )
+
+  const linearThickness = renderThickness(THREE.LinearSRGBColorSpace)
+  const srgbThickness = renderThickness(THREE.SRGBColorSpace)
+  assert.ok(
+    srgbThickness.r > linearThickness.r + 25,
+    `sRGB-decoded thicknessMap should leave the volume thinner and less attenuated (${srgbThickness.r.toFixed(1)} vs ${linearThickness.r.toFixed(1)})`,
+  )
+  assert.ok(
+    linearThickness.b > linearThickness.r + 60,
+    `linear thicknessMap should preserve stronger blue attenuation (${linearThickness.b.toFixed(1)} vs ${linearThickness.r.toFixed(1)})`,
+  )
+})
+
 test('thicknessMap samples selected uv1-uv3 texture channels', () => {
   function renderWithChannel(channel) {
     const thicknessMap = rgbaTexture([
