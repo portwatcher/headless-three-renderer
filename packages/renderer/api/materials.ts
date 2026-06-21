@@ -2073,6 +2073,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeAfterimagePassShaderMaterial(material)) {
+    throw new Error(
+      'THREE.AfterimagePass internal ShaderMaterial is not translated by @headless-three/renderer yet. Use the covered CopyShader/OutputPass fullscreen helpers for simple copies, provide a custom WGSL fragment for an equivalent pass, or compose the afterimage effect outside this helper.',
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2123,6 +2129,22 @@ function isThreeParallaxBarrierEffectShaderMaterial(material: ThreeMaterialLike)
     compact.includes('mod(gl_FragCoord.y,2.0)') &&
     compact.includes('gl_FragColor=texture2D(mapLeft,uv);') &&
     compact.includes('gl_FragColor=texture2D(mapRight,uv);')
+}
+
+function isThreeAfterimagePassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.damp == null || values.tOld == null || values.tNew == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatdamp;') &&
+    compact.includes('uniformsampler2DtOld;') &&
+    compact.includes('uniformsampler2DtNew;') &&
+    compact.includes('texelOld*=damp*when_gt(texelOld,0.1);') &&
+    compact.includes('gl_FragColor=max(texelNew,texelOld);')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

@@ -14,6 +14,7 @@ import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
+import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
@@ -2817,6 +2818,32 @@ test('MaskPass requiring a WebGL context fails clearly', () => {
     () => new MaskPass(scene, camera).render(renderer, writeBuffer, readBuffer, 0, false),
     /Renderer\.getContext\(\) is not supported.*browser WebGL context/i,
   )
+})
+
+test('EffectComposer AfterimagePass internal shader pass fails clearly', () => {
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
+  const previousWindow = globalThis.window
+  let pass
+  globalThis.window = { innerWidth: 16, innerHeight: 16 }
+
+  try {
+    const renderer = new Renderer()
+    const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+    pass = new AfterimagePass(0.9)
+
+    assert.throws(
+      () => pass.render(renderer, writeBuffer, readBuffer, 0.016),
+      /AfterimagePass internal ShaderMaterial.*not translated.*CopyShader.*OutputPass/i,
+    )
+  } finally {
+    pass?.dispose()
+    if (hadWindow) {
+      globalThis.window = previousWindow
+    } else {
+      delete globalThis.window
+    }
+  }
 })
 
 test('EffectComposer SSAARenderPass accumulates CopyShader samples into the active target', () => {
