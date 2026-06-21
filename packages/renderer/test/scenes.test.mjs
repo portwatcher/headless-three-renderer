@@ -70,12 +70,18 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js'
 import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.js'
+import { Line2 as WebGPULine2 } from 'three/examples/jsm/lines/webgpu/Line2.js'
+import { LineSegments2 as WebGPULineSegments2 } from 'three/examples/jsm/lines/webgpu/LineSegments2.js'
+import { Wireframe as WebGPUWireframe } from 'three/examples/jsm/lines/webgpu/Wireframe.js'
 import { TiledLighting } from 'three/examples/jsm/lighting/TiledLighting.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { RectAreaLightTexturesLib } from 'three/examples/jsm/lights/RectAreaLightTexturesLib.js'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
+import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
+import { MeshPostProcessingMaterial } from 'three/examples/jsm/materials/MeshPostProcessingMaterial.js'
 import { Capsule } from 'three/examples/jsm/math/Capsule.js'
 import { ColorConverter } from 'three/examples/jsm/math/ColorConverter.js'
 import { DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearRec2020ColorSpace } from 'three/examples/jsm/math/ColorSpaces.js'
@@ -3871,6 +3877,86 @@ test('examples Line2, LineSegments2, and Wireframe LineMaterial shaders fail cle
         () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
         /LineMaterial ShaderMaterial.*not translated.*LineBasicMaterial.*LineDashedMaterial/i,
         `${label} should fail with built-in line-material guidance`,
+      )
+    } finally {
+      line.geometry.dispose()
+      line.material.dispose()
+    }
+  }
+})
+
+test('examples custom material helpers fail clearly on shader customization boundaries', () => {
+  const cases = [
+    ['MeshGouraudMaterial', () => new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new MeshGouraudMaterial({ color: 0xff5533 }),
+    ), /ShaderMaterial.*fragmentWgsl/i],
+    ['LDrawConditionalLineMaterial', () => new THREE.LineSegments(
+      new THREE.BufferGeometry().setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0], 3),
+      ),
+      new LDrawConditionalLineMaterial({ color: 0x33ff66 }),
+    ), /ShaderMaterial.*fragmentWgsl/i],
+    ['MeshPostProcessingMaterial', () => new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new MeshPostProcessingMaterial({ color: 0x3355ff }),
+    ), /onBeforeCompile customizations.*fragmentWgsl/i],
+  ]
+
+  for (const [label, makeObject, pattern] of cases) {
+    const scene = new THREE.Scene()
+    const object = makeObject()
+    scene.add(object)
+
+    try {
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 16, height: 16 }),
+        pattern,
+        `${label} should fail with custom material guidance`,
+      )
+    } finally {
+      object.geometry.dispose()
+      object.material.dispose()
+    }
+  }
+})
+
+test('WebGPU Line2, LineSegments2, and Wireframe helpers fail clearly on NodeMaterial paths', () => {
+  const cases = [
+    ['WebGPU Line2', () => {
+      const geometry = new LineGeometry()
+      geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
+      return new WebGPULine2(geometry)
+    }],
+    ['WebGPU LineSegments2', () => {
+      const geometry = new LineSegmentsGeometry()
+      geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
+      return new WebGPULineSegments2(geometry)
+    }],
+    ['WebGPU Wireframe', () => {
+      const geometry = new LineSegmentsGeometry()
+      geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
+      return new WebGPUWireframe(geometry)
+    }],
+  ]
+
+  for (const [label, makeLine] of cases) {
+    const line = makeLine()
+    line.computeLineDistances()
+    const distanceStart = line.geometry.getAttribute('instanceDistanceStart')
+    const distanceEnd = line.geometry.getAttribute('instanceDistanceEnd')
+    assert.equal(distanceStart.getX(0), 0)
+    assert.equal(distanceEnd.getX(0), 1)
+
+    const scene = new THREE.Scene()
+    scene.add(line)
+
+    try {
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+        /NodeMaterial is not supported directly.*fragmentWgsl/i,
+        `${label} should fail with NodeMaterial guidance`,
       )
     } finally {
       line.geometry.dispose()
