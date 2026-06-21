@@ -6,6 +6,7 @@ import path from 'node:path'
 import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
+import { AnimationClipCreator } from 'three/examples/jsm/animation/AnimationClipCreator.js'
 import { CSM } from 'three/examples/jsm/csm/CSM.js'
 import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
@@ -4302,6 +4303,70 @@ test('examples SkeletonUtils.clone preserves renderable skinned mesh hierarchies
     geometry.dispose()
     placeholderMaterial.dispose()
     clonedMaterial.dispose()
+  }
+})
+
+test('examples AnimationClipCreator clips apply renderable still-frame state', () => {
+  function playClipAt(root, clip, time) {
+    const mixer = new THREE.AnimationMixer(root)
+    const action = mixer.clipAction(clip)
+    action.setLoop(THREE.LoopOnce, 1)
+    action.clampWhenFinished = true
+    action.play()
+    mixer.setTime(time)
+    return mixer
+  }
+
+  const colorGeometry = new THREE.PlaneGeometry(0.7, 0.7)
+  const colorMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
+  const colorMesh = new THREE.Mesh(colorGeometry, colorMaterial)
+  colorMesh.position.x = -0.45
+  const colorClip = AnimationClipCreator.CreateMaterialColorAnimation(1, [
+    new THREE.Color(0xff0000),
+    new THREE.Color(0x00ff66),
+  ])
+  const colorMixer = playClipAt(colorMesh, colorClip, 1)
+
+  const hiddenGeometry = new THREE.PlaneGeometry(0.7, 0.7)
+  const hiddenMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444, side: THREE.DoubleSide })
+  const hiddenMesh = new THREE.Mesh(hiddenGeometry, hiddenMaterial)
+  hiddenMesh.position.x = 0.45
+  const visibilityClip = AnimationClipCreator.CreateVisibilityAnimation(1)
+  const visibilityMixer = playClipAt(hiddenMesh, visibilityClip, 0.5)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(colorMesh, hiddenMesh)
+
+  const camera = new THREE.OrthographicCamera(-1.3, 1.3, 0.8, -0.8, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.equal(colorClip.tracks[0].ValueTypeName, 'color')
+    assert.equal(colorMaterial.color.getHex(), 0x00ff66)
+    assert.equal(visibilityClip.tracks[0].ValueTypeName, 'bool')
+    assert.equal(hiddenMesh.visible, false)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 140 && g > r + 40 && g > b + 20) > 700,
+      'AnimationClipCreator material color clip should render green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, width / 2, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 120) < 20,
+      'AnimationClipCreator visibility clip should hide the red mesh before rendering',
+    )
+  } finally {
+    colorMixer.stopAllAction()
+    visibilityMixer.stopAllAction()
+    colorGeometry.dispose()
+    colorMaterial.dispose()
+    hiddenGeometry.dispose()
+    hiddenMaterial.dispose()
   }
 })
 
