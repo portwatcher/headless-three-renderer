@@ -65,7 +65,7 @@ import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
 import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
 import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
-import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
+import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry, SkyGeometry, TreesGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
 import { FixedTimer, Timer } from 'three/examples/jsm/misc/Timer.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
@@ -3887,6 +3887,78 @@ test('examples RollerCoaster geometries render generated track, lifter, and shad
     trackMaterial.dispose()
     liftersMaterial.dispose()
     shadowMaterial.dispose()
+  }
+})
+
+test('examples RollerCoaster sky and tree geometries render seeded generated meshes', () => {
+  const originalRandom = Math.random
+  const seededRandom = () => {
+    let seed = 1234
+    return () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return seed / 0x100000000
+    }
+  }
+
+  let skyGeometry
+  let treesGeometry
+  const landscapeGeometry = new THREE.PlaneGeometry(600, 600)
+  const landscapeMaterial = new THREE.MeshBasicMaterial()
+  const landscape = new THREE.Mesh(landscapeGeometry, landscapeMaterial)
+  landscape.rotation.x = -Math.PI / 2
+  landscape.updateMatrixWorld(true)
+
+  try {
+    Math.random = seededRandom()
+    skyGeometry = new SkyGeometry()
+    treesGeometry = new TreesGeometry(landscape)
+  } finally {
+    Math.random = originalRandom
+  }
+
+  const skyMaterial = new THREE.MeshBasicMaterial({ color: 0x3366ff, side: THREE.DoubleSide })
+  const treesMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
+  const sky = new THREE.Mesh(skyGeometry, skyMaterial)
+  sky.scale.setScalar(0.005)
+  sky.position.y = 0.15
+  const trees = new THREE.Mesh(treesGeometry, treesMaterial)
+  trees.scale.set(0.004, 0.06, 0.004)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(sky, trees)
+
+  const camera = new THREE.OrthographicCamera(-1.5, 1.5, 1.0, -0.35, 0.01, 10)
+  camera.position.set(0, 1.2, 3.2)
+  camera.lookAt(0, 0.2, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 88
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.equal(skyGeometry.getAttribute('position').count, 600)
+    assert.equal(treesGeometry.getAttribute('position').count, 12000)
+    assert.equal(treesGeometry.getAttribute('color').count, treesGeometry.getAttribute('position').count)
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.5,
+      'RollerCoaster SkyGeometry and TreesGeometry should render visible generated meshes',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 140 && r < 120 && g > 70 && g < 180) > 300,
+      'SkyGeometry should render blue sky pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 70 && g > r + 20 && g > b + 20) > 300,
+      'TreesGeometry vertex colors should render green tree pixels',
+    )
+  } finally {
+    skyGeometry.dispose()
+    treesGeometry.dispose()
+    landscapeGeometry.dispose()
+    landscapeMaterial.dispose()
+    skyMaterial.dispose()
+    treesMaterial.dispose()
   }
 })
 
