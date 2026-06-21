@@ -129,6 +129,7 @@ export function createSceneCorpus() {
     batchedMeshPartialGroupRangeCorpus(),
     batchedMeshSparseMaterialGroupsCorpus(),
     batchedMeshCullingCorpus(),
+    batchedMeshCullingOptOutCorpus(),
     batchedMeshCustomSortCorpus(),
     lodAndGroupsCorpus(),
     lodZoomCorpus(),
@@ -7654,6 +7655,83 @@ function batchedMeshCullingCorpus() {
       const b = rgba[offset + 2]
       if (g <= r + 60 || g <= b + 80) {
         throw new Error(`batched culling should leave the center green, got rgb(${r}, ${g}, ${b})`)
+      }
+    },
+  }
+}
+
+function batchedMeshCullingOptOutCorpus() {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeScene({ frustumCulled, perObjectFrustumCulled }) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const source = new THREE.PlaneGeometry(2, 2)
+    source.boundingSphere = new THREE.Sphere(new THREE.Vector3(4, 0, 0), 0.1)
+    const batch = new THREE.BatchedMesh(
+      1,
+      source.getAttribute('position').count,
+      source.index.count,
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    const geometryId = batch.addGeometry(source)
+    const instanceId = batch.addInstance(geometryId)
+    batch.setMatrixAt(instanceId, new THREE.Matrix4())
+    batch.frustumCulled = frustumCulled
+    batch.perObjectFrustumCulled = perObjectFrustumCulled
+    scene.add(batch)
+
+    return scene
+  }
+
+  function centerMean(rgba) {
+    return meanRegion(rgba, options.width, 32, 32, 64, 64)
+  }
+
+  return {
+    name: 'batched-mesh-culling-opt-outs',
+    scene: makeScene({ frustumCulled: false, perObjectFrustumCulled: false }),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.5,
+    browserReference: false,
+    render(renderer) {
+      const perObjectCulled = renderer.render(
+        makeScene({ frustumCulled: false, perObjectFrustumCulled: true }),
+        camera,
+        options,
+      )
+      const perObjectOptOut = renderer.render(
+        makeScene({ frustumCulled: false, perObjectFrustumCulled: false }),
+        camera,
+        options,
+      )
+      const aggregateCulled = renderer.render(
+        makeScene({ frustumCulled: true, perObjectFrustumCulled: false }),
+        camera,
+        options,
+      )
+      stats.perObjectCulled = centerMean(perObjectCulled)
+      stats.perObjectOptOut = centerMean(perObjectOptOut)
+      stats.aggregateCulled = centerMean(aggregateCulled)
+      return perObjectOptOut
+    },
+    validate() {
+      if (!(stats.perObjectCulled.r < 5 && stats.perObjectCulled.g < 5 && stats.perObjectCulled.b < 5)) {
+        throw new Error(`BatchedMesh per-object bounds should cull the off-frustum geometry, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.perObjectOptOut.r > 200 && stats.perObjectOptOut.g < 40 && stats.perObjectOptOut.b < 40)) {
+        throw new Error(`BatchedMesh perObjectFrustumCulled=false should render the geometry, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.aggregateCulled.r < 5 && stats.aggregateCulled.g < 5 && stats.aggregateCulled.b < 5)) {
+        throw new Error(`BatchedMesh aggregate frustum culling should still cull with object frustumCulled=true, stats=${JSON.stringify(stats)}`)
       }
     },
   }
