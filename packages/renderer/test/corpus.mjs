@@ -79,6 +79,7 @@ export function createSceneCorpus() {
     spriteMaterialCorpus(),
     spriteAlphaMapCorpus(),
     billboardAlphaCutoutCorpus(),
+    billboardReceiveShadowNoopCorpus(),
     spriteShadowCorpus(),
     billboardCustomShadowCutoutCorpus(),
     pointSpotLightCorpus(),
@@ -1858,6 +1859,84 @@ function billboardAlphaCutoutCorpus() {
         }
         if (!(result.opaque.r > 170 && result.a2c.r > 30 && result.a2c.r < result.opaque.r - 80)) {
           throw new Error(`${kind} alphaToCoverage should resolve partial billboard coverage, got opaque=${JSON.stringify(result.opaque)} a2c=${JSON.stringify(result.a2c)}`)
+        }
+      }
+    },
+  }
+}
+
+function billboardReceiveShadowNoopCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = { diffs: {}, means: {}, visiblePixels: {} }
+
+  function makeScene(kind, receiveShadow = false) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+      sprite.receiveShadow = receiveShadow
+      sprite.scale.set(1.2, 1.2, 1)
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      const points = new THREE.Points(geometry, new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 48,
+        sizeAttenuation: false,
+      }))
+      points.receiveShadow = receiveShadow
+      scene.add(points)
+    }
+    return scene
+  }
+
+  function renderBillboard(renderer, kind, receiveShadow = false) {
+    return renderer.render(makeScene(kind, receiveShadow), camera, options)
+  }
+
+  return {
+    name: 'billboard-receive-shadow-noop',
+    scene: makeScene('sprite'),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.04,
+    browserReference: false,
+    render(renderer) {
+      let returned
+      for (const kind of ['sprite', 'points']) {
+        const baseline = renderBillboard(renderer, kind)
+        const receiveShadow = renderBillboard(renderer, kind, true)
+        stats.diffs[kind] = meanAbsDiff(baseline, receiveShadow)
+        stats.means[kind] = meanRegion(baseline, options.width, 36, 36, 60, 60)
+        stats.visiblePixels[kind] = countRegionPixels(
+          baseline,
+          options.width,
+          0,
+          0,
+          options.width,
+          options.height,
+          (r, g, b) => r > 160 && g > 160 && b > 160,
+        )
+        if (kind === 'sprite') {
+          returned = baseline
+        }
+      }
+      return returned
+    },
+    validate() {
+      for (const kind of ['sprite', 'points']) {
+        if (!(stats.visiblePixels[kind] > 1000)) {
+          throw new Error(`${kind} receiveShadow no-op corpus should render a visible white billboard, stats=${JSON.stringify(stats)}`)
+        }
+        const mean = stats.means[kind]
+        if (!(mean.r > 180 && mean.g > 180 && mean.b > 180)) {
+          throw new Error(`${kind} receiveShadow no-op corpus should keep the unlit billboard bright, stats=${JSON.stringify(stats)}`)
+        }
+        if (!(stats.diffs[kind] < 0.1)) {
+          throw new Error(`${kind} receiveShadow should be accepted as an unlit billboard no-op, stats=${JSON.stringify(stats)}`)
         }
       }
     },
