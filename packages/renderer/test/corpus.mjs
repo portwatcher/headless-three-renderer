@@ -7354,7 +7354,6 @@ function lineBasicMaterialUvChannelCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.01,
-    browserReference: false,
     validate(rgba, { width, height }) {
       const greenPixels = countRegionPixels(
         rgba,
@@ -7914,7 +7913,6 @@ function batchedMeshOptimizedRangeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.03,
-    browserReference: false,
     validate(rgba, { width }) {
       if (!(rightRangeAfter.start < rightRangeBefore.start && rightRangeAfter.count === rightRangeBefore.count)) {
         throw new Error(`BatchedMesh optimize should repack the right geometry into the deleted range, before=${JSON.stringify(rightRangeBefore)} after=${JSON.stringify(rightRangeAfter)}`)
@@ -7976,7 +7974,6 @@ function batchedMeshIndexedGroupsCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.025,
-    browserReference: false,
     validate(rgba, { width }) {
       const leftMean = meanRegion(rgba, width, 20, 42, 30, 54)
       const rightMean = meanRegion(rgba, width, 66, 42, 76, 54)
@@ -8040,7 +8037,6 @@ function batchedMeshNonIndexedGroupsCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const left = meanRegion(rgba, width, 20, 42, 30, 54)
       const right = meanRegion(rgba, width, 66, 42, 76, 54)
@@ -8105,7 +8101,6 @@ function batchedMeshPartialGroupRangeCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.015,
-    browserReference: false,
     validate(rgba, { width }) {
       const redPixels = countRegionPixels(rgba, width, 12, 21, 42, 51, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
       const greenPixels = countRegionPixels(rgba, width, 62, 45, 90, 78, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
@@ -8178,7 +8173,6 @@ function batchedMeshSparseMaterialGroupsCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.015,
-    browserReference: false,
     validate(rgba, { width }) {
       const redPixels = countRegionPixels(rgba, width, 10, 16, 40, 80, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
       const greenPixels = countRegionPixels(rgba, width, 58, 16, 88, 80, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)

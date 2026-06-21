@@ -560,6 +560,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "line-basic-material-uv-channel-selection.png",
+      "name": "line-basic-material-uv-channel-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "points-material-textured-alpha.png",
       "name": "points-material-textured-alpha",
       "width": 96,
@@ -604,6 +611,41 @@
     {
       "file": "batched-mesh-inactive-geometry.png",
       "name": "batched-mesh-inactive-geometry",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-optimized-ranges.png",
+      "name": "batched-mesh-optimized-ranges",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-indexed-groups.png",
+      "name": "batched-mesh-indexed-groups",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-non-indexed-groups.png",
+      "name": "batched-mesh-non-indexed-groups",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-partial-group-range.png",
+      "name": "batched-mesh-partial-group-range",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-sparse-material-groups.png",
+      "name": "batched-mesh-sparse-material-groups",
       "width": 96,
       "height": 96,
       "outputColorSpace": "srgb"
