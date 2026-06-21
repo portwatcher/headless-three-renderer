@@ -122,6 +122,7 @@ export function createSceneCorpus() {
     renderableFrustumCullingCorpus(),
     batchedMeshCorpus(),
     batchedMeshInactiveGeometryCorpus(),
+    batchedMeshOptimizedRangeCorpus(),
     batchedMeshNonIndexedGroupsCorpus(),
     batchedMeshPartialGroupRangeCorpus(),
     batchedMeshSparseMaterialGroupsCorpus(),
@@ -7241,6 +7242,72 @@ function batchedMeshInactiveGeometryCorpus() {
       }
       if (rightR > 8 || rightG > 8 || rightB > 8) {
         throw new Error(`deleted BatchedMesh geometry should remain black, got rgb(${rightR}, ${rightG}, ${rightB})`)
+      }
+    },
+  }
+}
+
+function batchedMeshOptimizedRangeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.45, 0.8)
+  const batch = new THREE.BatchedMesh(
+    3,
+    source.getAttribute('position').count * 3,
+    source.index.count * 3,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  const leftGeometryId = batch.addGeometry(source)
+  const middleGeometryId = batch.addGeometry(source.clone())
+  const rightGeometryId = batch.addGeometry(source.clone())
+  const left = batch.addInstance(leftGeometryId)
+  const middle = batch.addInstance(middleGeometryId)
+  const right = batch.addInstance(rightGeometryId)
+  batch.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
+  batch.setMatrixAt(middle, new THREE.Matrix4())
+  batch.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
+  batch.setColorAt(left, new THREE.Color(1, 0, 0))
+  batch.setColorAt(middle, new THREE.Color(0, 1, 0))
+  batch.setColorAt(right, new THREE.Color(0, 0, 1))
+  batch.frustumCulled = false
+  batch.perObjectFrustumCulled = false
+  batch.sortObjects = false
+
+  const rightRangeBefore = batch.getGeometryRangeAt(rightGeometryId, {})
+  batch.deleteGeometry(middleGeometryId)
+  batch.optimize()
+  const rightRangeAfter = batch.getGeometryRangeAt(rightGeometryId, {})
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-optimized-ranges',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.03,
+    browserReference: false,
+    validate(rgba, { width }) {
+      if (!(rightRangeAfter.start < rightRangeBefore.start && rightRangeAfter.count === rightRangeBefore.count)) {
+        throw new Error(`BatchedMesh optimize should repack the right geometry into the deleted range, before=${JSON.stringify(rightRangeBefore)} after=${JSON.stringify(rightRangeAfter)}`)
+      }
+
+      const leftMean = meanRegion(rgba, width, 20, 42, 30, 54)
+      const centerMean = meanRegion(rgba, width, 43, 42, 53, 54)
+      const rightMean = meanRegion(rgba, width, 66, 42, 76, 54)
+      if (!(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80)) {
+        throw new Error(`left optimized BatchedMesh geometry should remain red, got ${JSON.stringify(leftMean)}`)
+      }
+      if (!(centerMean.r < 5 && centerMean.g < 5 && centerMean.b < 5)) {
+        throw new Error(`deleted optimized BatchedMesh geometry should leave the center empty, got ${JSON.stringify(centerMean)}`)
+      }
+      if (!(rightMean.b > rightMean.r + 80 && rightMean.b > rightMean.g + 80)) {
+        throw new Error(`repacked BatchedMesh geometry should render blue on the right, got ${JSON.stringify(rightMean)}`)
       }
     },
   }
