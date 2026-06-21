@@ -25,6 +25,7 @@ import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js'
 import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass.js'
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { HalftonePass } from 'three/examples/jsm/postprocessing/HalftonePass.js'
+import { LUTPass } from 'three/examples/jsm/postprocessing/LUTPass.js'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
@@ -2899,6 +2900,11 @@ test('EffectComposer lightweight shader passes fail clearly with helper guidance
       'HalftonePass',
       () => new HalftonePass(16, 16, {}),
       /HalftonePass internal HalftoneShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'LUTPass',
+      () => new LUTPass({ intensity: 0.5 }),
+      /LUTPass internal LUTShader ShaderMaterial.*not translated.*color grading.*custom WGSL/i,
     ],
   ]
 

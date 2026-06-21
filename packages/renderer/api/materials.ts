@@ -2109,6 +2109,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeLutPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.LUTPass internal LUTShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported color adjustments, bake color grading into input textures, provide a custom WGSL fragment for an equivalent LUT pass, or compose LUT color grading outside this helper.",
+    )
+  }
+
   if (isThreeBokehPassShaderMaterial(material)) {
     throw new Error(
       "THREE.BokehPass internal BokehShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent depth-of-field pass, or compose the bokeh effect outside this helper.",
@@ -2367,6 +2373,28 @@ function isThreeHalftonePassShaderMaterial(material: ThreeMaterialLike): boolean
     compact.includes('vec4getSample(vec2point)') &&
     compact.includes('CellgetReferenceCell(vec2p,vec2origin,floatgrid_angle,floatstep)') &&
     compact.includes('gl_FragColor=vec4(r,g,b,1.0);')
+}
+
+function isThreeLutPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.lut == null || values.lutSize == null || values.tDiffuse == null || values.intensity == null) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatlutSize;') &&
+    compact.includes('uniformsampler3Dlut;') &&
+    compact.includes('uniformfloatintensity;') &&
+    compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('vec4val=texture2D(tDiffuse,vUv);') &&
+    compact.includes('floatpixelWidth=1.0/lutSize;') &&
+    compact.includes('vec3uvw=vec3(halfPixelWidth)+val.rgb*(1.0-pixelWidth);') &&
+    compact.includes('lutVal=vec4(texture(lut,uvw).rgb,val.a);') &&
+    compact.includes('gl_FragColor=vec4(mix(val,lutVal,intensity));')
 }
 
 function isThreeBokehPassShaderMaterial(material: ThreeMaterialLike): boolean {
