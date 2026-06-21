@@ -1250,7 +1250,6 @@ function phongSpecularMapMatrixCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
-    browserReference: false,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 31, 31, 65, 65)
       if (!(center.r > 80 && center.g > 80 && center.b > 80)) {
@@ -1326,7 +1325,6 @@ function textureSlotMatrixCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 113],
     minNonBackgroundRatio: 0.06,
-    browserReference: false,
     validate(rgba, { width }) {
       const alpha = meanRegion(rgba, width, 8, 34, 26, 62)
       const ao = meanRegion(rgba, width, 38, 34, 56, 62)
@@ -1385,7 +1383,6 @@ function lightMapCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [14, 14, 17],
     minNonBackgroundRatio: 0.16,
-    browserReference: false,
     validate(rgba, { width }) {
       const redPanel = meanRegion(rgba, width, 19, 28, 39, 68)
       const greenPanel = meanRegion(rgba, width, 57, 28, 77, 68)

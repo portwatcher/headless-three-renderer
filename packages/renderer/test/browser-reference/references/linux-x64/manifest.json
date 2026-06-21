@@ -343,6 +343,27 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "phong-specular-map-matrix.png",
+      "name": "phong-specular-map-matrix",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "texture-slot-explicit-matrices.png",
+      "name": "texture-slot-explicit-matrices",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "light-map-material-texture.png",
+      "name": "light-map-material-texture",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "linear-output-color-space.png",
       "name": "linear-output-color-space",
       "width": 96,
