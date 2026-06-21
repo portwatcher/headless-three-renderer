@@ -112,6 +112,7 @@ export function createSceneCorpus() {
     dashedLineMaterialTextureCorpus(),
     dashedLineMaterialUvChannelCorpus(),
     dashedLineMaterialCustomDistanceCorpus(),
+    dashedLineMaterialLineLoopDistanceCorpus(),
     dashedLineMaterialWideLineCorpus(),
     lineMaterialNoopCorpus(),
     lineBasicMaterialUvChannelCorpus(),
@@ -6597,6 +6598,49 @@ function dashedLineMaterialCustomDistanceCorpus() {
       }
       if (descendingGapPixels > 1 || descendingDashPixels < 20) {
         throw new Error(`custom-distance corpus should honor descending lineDistance spans, gap=${descendingGapPixels} dash=${descendingDashPixels}`)
+      }
+    },
+  }
+}
+
+function dashedLineMaterialLineLoopDistanceCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-0.8, -0.8, 0),
+    new THREE.Vector3(0.8, -0.8, 0),
+    new THREE.Vector3(0.8, 0.8, 0),
+    new THREE.Vector3(-0.8, 0.8, 0),
+  ])
+  const line = new THREE.LineLoop(geometry, new THREE.LineDashedMaterial({
+    color: 0x66ddff,
+    dashSize: 2,
+    gapSize: 10,
+    linewidth: 4,
+    scale: 1,
+  }))
+  line.computeLineDistances()
+  scene.add(line)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'line-dashed-material-lineloop-distance',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.002,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const isCyan = (r, g, b) => b > 120 && g > 100 && b > r + 35 && g > r + 25
+      const lowerClosingPixels = countRegionPixels(rgba, width, 12, 48, 22, 76, isCyan)
+      const upperClosingPixels = countRegionPixels(rgba, width, 12, 18, 22, 34, isCyan)
+      if (lowerClosingPixels < 8 || upperClosingPixels > 1) {
+        throw new Error(`LineLoop dashed corpus should interpolate closing lineDistance into lower dash and upper gap, lower=${lowerClosingPixels} upper=${upperClosingPixels}`)
       }
     },
   }
