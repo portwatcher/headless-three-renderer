@@ -68,6 +68,7 @@ export function createSceneCorpus() {
     fogExp2MixedObjectCorpus(),
     textureMatrixColorSpaceCorpus(),
     textureSlotMatrixCorpus(),
+    lightMapCorpus(),
     linearOutputColorSpaceCorpus(),
     toneMappingStateCorpus(),
     postProcessingOptionsCorpus(),
@@ -103,6 +104,7 @@ export function createSceneCorpus() {
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
     dashedLineMaterialUvChannelCorpus(),
+    dashedLineMaterialCustomDistanceCorpus(),
     dashedLineMaterialWideLineCorpus(),
     lineMaterialNoopCorpus(),
     lineBasicMaterialUvChannelCorpus(),
@@ -1276,6 +1278,61 @@ function textureSlotMatrixCorpus() {
       }
       if (!(emissive.g > emissive.r + 35 && emissive.g > emissive.b + 55)) {
         throw new Error(`emissiveMap explicit matrix should light the green panel, got ${JSON.stringify(emissive)}`)
+      }
+    },
+  }
+}
+
+function lightMapCorpus() {
+  const lightMap = new THREE.DataTexture(new Uint8Array([
+    255, 48, 16, 255,
+    24, 255, 96, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  lightMap.magFilter = THREE.NearestFilter
+  lightMap.minFilter = THREE.NearestFilter
+  lightMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.015, 0.015, 0.018)
+
+  const red = new THREE.Mesh(
+    constantUvPlane(0.25, 0.5, 0.78, 1.15),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      lightMap,
+      lightMapIntensity: 1.25,
+    }),
+  )
+  red.position.x = -0.48
+
+  const green = new THREE.Mesh(
+    constantUvPlane(0.75, 0.5, 0.78, 1.15),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      lightMap,
+      lightMapIntensity: 1.25,
+    }),
+  )
+  green.position.x = 0.48
+
+  scene.add(red, green)
+
+  return {
+    name: 'light-map-material-texture',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [14, 14, 17],
+    minNonBackgroundRatio: 0.16,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const redPanel = meanRegion(rgba, width, 19, 28, 39, 68)
+      const greenPanel = meanRegion(rgba, width, 57, 28, 77, 68)
+      if (!(redPanel.r > redPanel.g + 80 && redPanel.r > redPanel.b + 100)) {
+        throw new Error(`lightMap corpus should tint the left panel red, got ${JSON.stringify(redPanel)}`)
+      }
+      if (!(greenPanel.g > greenPanel.r + 80 && greenPanel.g > greenPanel.b + 50)) {
+        throw new Error(`lightMap corpus should tint the right panel green, got ${JSON.stringify(greenPanel)}`)
       }
     },
   }
@@ -5821,6 +5878,85 @@ function dashedLineMaterialUvChannelCorpus() {
       )
       if (!(greenPixels > 80 && redPixels < 5)) {
         throw new Error(`dashed-line UV-channel corpus should render green uv1-selected dashes with uv2 alpha kept opaque, green=${greenPixels} red=${redPixels}`)
+      }
+    },
+  }
+}
+
+function dashedLineMaterialCustomDistanceCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const grouped = new THREE.BufferGeometry()
+  grouped.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1.55, 0.38, 0,
+    -0.35, 0.38, 0,
+    0.35, 0.38, 0,
+    1.55, 0.38, 0,
+  ]), 3))
+  grouped.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    0, 1,
+    0, 1,
+  ]), 1))
+  grouped.addGroup(0, 2, 0)
+  grouped.addGroup(2, 2, 1)
+  scene.add(new THREE.LineSegments(grouped, [
+    new THREE.LineBasicMaterial({ color: 0xff3333, linewidth: 7 }),
+    new THREE.LineDashedMaterial({
+      color: 0x44ff44,
+      dashSize: 0.45,
+      gapSize: 10,
+      linewidth: 7,
+      scale: 1,
+    }),
+  ]))
+
+  const descending = new THREE.BufferGeometry()
+  descending.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -1.2, -0.38, 0,
+    1.2, -0.38, 0,
+  ]), 3))
+  descending.setAttribute('lineDistance', new THREE.BufferAttribute(new Float32Array([
+    2,
+    0,
+  ]), 1))
+  scene.add(new THREE.Line(
+    descending,
+    new THREE.LineDashedMaterial({
+      color: 0xffff66,
+      dashSize: 0.6,
+      gapSize: 10,
+      linewidth: 7,
+      scale: 1,
+    }),
+  ))
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'line-dashed-material-custom-distance',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.002,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const redPixels = countRegionPixels(rgba, width, 9, 25, 42, 37, (r, g, b) => r > g + 45 && r > b + 45)
+      const greenDashPixels = countRegionPixels(rgba, width, 58, 25, 70, 37, (r, g, b) => g > r + 45 && g > b + 45)
+      const greenGapPixels = countRegionPixels(rgba, width, 77, 25, 90, 37, (r, g, b) => g > r + 45 && g > b + 45)
+      const descendingGapPixels = countRegionPixels(rgba, width, 15, 60, 30, 70, (r, g, b) => r > 120 && g > 120 && r > b + 25 && g > b + 25)
+      const descendingDashPixels = countRegionPixels(rgba, width, 56, 60, 80, 70, (r, g, b) => r > 120 && g > 120 && r > b + 25 && g > b + 25)
+      if (redPixels < 20) {
+        throw new Error(`custom-distance corpus should keep the solid red material-array group visible (${redPixels})`)
+      }
+      if (greenDashPixels < 20 || greenGapPixels > 1) {
+        throw new Error(`custom-distance corpus should preserve the dashed material-array gap, dash=${greenDashPixels} gap=${greenGapPixels}`)
+      }
+      if (descendingGapPixels > 1 || descendingDashPixels < 20) {
+        throw new Error(`custom-distance corpus should honor descending lineDistance spans, gap=${descendingGapPixels} dash=${descendingDashPixels}`)
       }
     },
   }
