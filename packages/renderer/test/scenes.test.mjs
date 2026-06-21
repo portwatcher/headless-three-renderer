@@ -101,6 +101,7 @@ import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { hilbert2D } from 'three/examples/jsm/utils/GeometryUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
@@ -4208,6 +4209,99 @@ test('examples GeometryUtils and TubePainter produce renderable geometry paths',
     hilbertMaterial.dispose()
     painter.mesh.geometry.dispose()
     painter.mesh.material.dispose()
+  }
+})
+
+test('examples SkeletonUtils.clone preserves renderable skinned mesh hierarchies', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setIndex([0, 1, 2, 2, 1, 3])
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.35, -0.35, 0,
+    0.35, -0.35, 0,
+    -0.35, 0.35, 0,
+    0.35, 0.35, 0,
+  ]), 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ]), 3))
+  geometry.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array([
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+  ]), 4))
+  geometry.setAttribute('skinWeight', new THREE.BufferAttribute(new Float32Array([
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+    1, 0, 0, 0,
+  ]), 4))
+
+  const placeholderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+  const sourceMesh = new THREE.SkinnedMesh(geometry, placeholderMaterial)
+  sourceMesh.name = 'source-panel'
+
+  const rootBone = new THREE.Bone()
+  rootBone.name = 'root'
+  const tipBone = new THREE.Bone()
+  tipBone.name = 'tip'
+  tipBone.position.y = 0.4
+  rootBone.add(tipBone)
+  sourceMesh.add(rootBone)
+  sourceMesh.bind(new THREE.Skeleton([rootBone, tipBone]))
+
+  const sourceRoot = new THREE.Group()
+  sourceRoot.add(sourceMesh)
+  const clonedRoot = SkeletonUtils.clone(sourceRoot)
+  const clonedMesh = clonedRoot.getObjectByName('source-panel')
+
+  assert.ok(clonedMesh?.isSkinnedMesh, 'SkeletonUtils.clone should preserve the skinned mesh')
+  assert.notStrictEqual(clonedMesh, sourceMesh, 'SkeletonUtils.clone should create a new mesh')
+  assert.notStrictEqual(clonedMesh.skeleton, sourceMesh.skeleton, 'SkeletonUtils.clone should create a new skeleton')
+  assert.notStrictEqual(
+    clonedMesh.skeleton.bones[0],
+    sourceMesh.skeleton.bones[0],
+    'SkeletonUtils.clone should remap skeleton bones to cloned objects',
+  )
+  assert.notStrictEqual(
+    clonedMesh.skeleton.bones[1],
+    sourceMesh.skeleton.bones[1],
+    'SkeletonUtils.clone should remap child skeleton bones to cloned objects',
+  )
+  assert.strictEqual(clonedMesh.skeleton.bones[1].parent, clonedMesh.skeleton.bones[0])
+  assert.deepEqual(clonedMesh.skeleton.bones.map((bone) => bone.name), ['root', 'tip'])
+
+  const clonedMaterial = new THREE.MeshBasicMaterial({ color: 0x44ff88, side: THREE.DoubleSide })
+  clonedMesh.material = clonedMaterial
+  clonedMesh.skeleton.bones[1].position.x = 0.15
+  assert.equal(sourceMesh.skeleton.bones[1].position.x, 0)
+  clonedRoot.updateMatrixWorld(true)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(clonedRoot)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 0.8, -0.8, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 180 && g > r + 40 && g > b + 40) > 500,
+      'SkeletonUtils clone should render green pixels',
+    )
+  } finally {
+    geometry.dispose()
+    placeholderMaterial.dispose()
+    clonedMaterial.dispose()
   }
 })
 
