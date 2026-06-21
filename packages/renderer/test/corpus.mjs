@@ -6408,7 +6408,6 @@ function shadowMapTypeFilteringCorpus() {
     options,
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.02,
-    browserReference: false,
     render(renderer) {
       const previousType = renderer.shadowMap.type
       const previousRadius = light.shadow.radius

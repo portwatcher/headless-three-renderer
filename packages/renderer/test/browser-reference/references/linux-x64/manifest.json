@@ -539,6 +539,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "shadow-map-type-filtering.png",
+      "name": "shadow-map-type-filtering",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "shadow-material-receiver.png",
       "name": "shadow-material-receiver",
       "width": 96,
