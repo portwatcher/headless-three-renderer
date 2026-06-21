@@ -2055,9 +2055,21 @@ function assertSupportedShaderMaterial(
   const kind = shaderMaterialKind(material)
   if (!kind || customFragmentShader || copyShaderMaterialInfo(material)) return
 
+  if (isThreePmremShaderMaterial(material)) {
+    throw new Error(
+      `${material.name} is a Three.js PMREMGenerator internal ShaderMaterial and is not translated by @headless-three/renderer yet. Use readable scene.environment, scene.background, material.envMap, or reflection-probe textures directly so the renderer can run its native CPU IBL precompute path, or precompute PMREM/CubeUV assets before rendering.`,
+    )
+  }
+
   throw new Error(
     `${kind} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
   )
+}
+
+function isThreePmremShaderMaterial(material: ThreeMaterialLike): material is ThreeMaterialLike & { name: string } {
+  return material.name === 'EquirectangularToCubeUV' ||
+    material.name === 'CubemapToCubeUV' ||
+    material.name === 'SphericalGaussianBlur'
 }
 
 function assertSupportedOnBeforeCompile(

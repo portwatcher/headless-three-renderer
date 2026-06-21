@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import * as THREE from 'three'
+import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
@@ -23425,6 +23426,24 @@ test('ShaderMaterial without headless WGSL override fails clearly', () => {
       pattern,
       name,
     )
+  }
+})
+
+test('PMREMGenerator shader passes fail with native IBL guidance', () => {
+  const renderer = new Renderer()
+  const data = new Uint8Array(64 * 32 * 4)
+  data.fill(255)
+  const texture = new THREE.DataTexture(data, 64, 32, THREE.RGBAFormat)
+  texture.needsUpdate = true
+  const pmrem = new PMREMGenerator(renderer)
+
+  try {
+    assert.throws(
+      () => pmrem.fromEquirectangular(texture),
+      /EquirectangularToCubeUV.*PMREMGenerator internal ShaderMaterial.*native CPU IBL precompute path/i,
+    )
+  } finally {
+    pmrem.dispose()
   }
 })
 
