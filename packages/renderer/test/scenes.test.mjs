@@ -122,6 +122,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
+import * as GeometryCompressionUtils from 'three/examples/jsm/utils/GeometryCompressionUtils.js'
 import { hilbert2D } from 'three/examples/jsm/utils/GeometryUtils.js'
 import { LDrawUtils } from 'three/examples/jsm/utils/LDrawUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
@@ -4881,6 +4882,44 @@ test('examples geometry modifiers and BufferGeometryUtils render CPU-transformed
     mergeRightGeometry.dispose()
     mergedGeometry.dispose()
     mergedMaterial.dispose()
+  }
+})
+
+test('examples GeometryCompressionUtils packed attributes fail clearly', () => {
+  const camera = makeCamera()
+  const cases = [
+    ['positions', (geometry) => {
+      GeometryCompressionUtils.compressPositions(geometry)
+      return new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide })
+    }, /geometry\.attributes\.position uses packed GeometryCompressionUtils data.*Decode packed position, normal, or UV attributes/i],
+    ['normals', (geometry) => {
+      GeometryCompressionUtils.compressNormals(geometry, 'DEFAULT')
+      return new THREE.MeshLambertMaterial({ color: 0xff0000, side: THREE.DoubleSide })
+    }, /geometry\.attributes\.normal uses packed GeometryCompressionUtils data \(DEFAULT\).*Decode packed position, normal, or UV attributes/i],
+    ['uvs', (geometry) => {
+      GeometryCompressionUtils.compressUvs(geometry)
+      return new THREE.MeshBasicMaterial({ map: solidTexture(255, 0, 0), side: THREE.DoubleSide })
+    }, /geometry\.attributes\.uv uses packed GeometryCompressionUtils data.*Decode packed position, normal, or UV attributes/i],
+  ]
+
+  for (const [name, configure, pattern] of cases) {
+    const geometry = new THREE.PlaneGeometry(1, 1)
+    const material = configure(geometry)
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(geometry, material))
+    scene.add(new THREE.AmbientLight(0xffffff, 1))
+
+    try {
+      assert.throws(
+        () => renderRgba(scene, camera, { width: 16, height: 16 }),
+        pattern,
+        `${name} should fail with packed-attribute decode guidance`,
+      )
+    } finally {
+      geometry.dispose()
+      material.map?.dispose?.()
+      material.dispose()
+    }
   }
 })
 

@@ -85,6 +85,7 @@ export function attributeComponent(
   component: number,
   label = 'THREE.BufferAttribute',
 ): number {
+  rejectPackedAttribute(attribute, label)
   const itemSize = attributeItemSize(attribute, label) ?? 1
   if (component >= itemSize) return 0
 
@@ -152,4 +153,14 @@ function normalizeAttributeValue(value: number, array: ArrayLike<number> | undef
   if (array instanceof Int8Array) return Math.max(value / 127, -1)
   if (array instanceof Int16Array) return Math.max(value / 32767, -1)
   return value
+}
+
+function rejectPackedAttribute(attribute: ThreeBufferAttributeLike, label: string): void {
+  if (attribute.isPacked !== true) return
+  const method = typeof attribute.packingMethod === 'string' && attribute.packingMethod.length > 0
+    ? ` (${attribute.packingMethod})`
+    : ''
+  throw new Error(
+    `${label} uses packed GeometryCompressionUtils data${method}, which is not supported by @headless-three/renderer. Decode packed position, normal, or UV attributes before rendering, or provide an explicit custom WGSL material path that performs the required attribute decode.`,
+  )
 }

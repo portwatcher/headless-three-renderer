@@ -81,6 +81,8 @@ export interface ThreeBufferAttributeLike {
   version?: number
   itemSize?: number
   normalized?: boolean
+  isPacked?: boolean
+  packingMethod?: unknown
   isInstancedBufferAttribute?: boolean
   meshPerAttribute?: number
   array?: ArrayLike<number>
