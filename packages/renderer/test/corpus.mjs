@@ -63,6 +63,7 @@ export function createSceneCorpus() {
     nestedClippingGroupCorpus(),
     lightProbeCorpus(),
     lightProbeMaterialModelsCorpus(),
+    lightProbeEnvironmentMaterialModelsCorpus(),
     linearFogCorpus(),
     fogExp2MixedObjectCorpus(),
     textureMatrixColorSpaceCorpus(),
@@ -975,6 +976,67 @@ function lightProbeMaterialModelsCorpus() {
       for (const [label, mean] of regions) {
         if (!(mean.r > mean.g + 20 && mean.r > mean.b + 20)) {
           throw new Error(`LightProbe should tint ${label} corpus material red (${mean.r}, ${mean.g}, ${mean.b})`)
+        }
+      }
+    },
+  }
+}
+
+function lightProbeEnvironmentMaterialModelsCorpus() {
+  function makeGreenEnvironment() {
+    const texture = solidTexture(0, 255, 0)
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    return texture
+  }
+
+  function makeRedProbe() {
+    const probe = new THREE.LightProbe(undefined, 1.5)
+    for (const coefficient of probe.sh.coefficients) {
+      coefficient.set(0, 0, 0)
+    }
+    probe.sh.coefficients[0].set(1, 0, 0)
+    return probe
+  }
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.environment = makeGreenEnvironment()
+  scene.environmentIntensity = 2.5
+  scene.add(makeRedProbe())
+
+  const materials = [
+    ['standard', new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })],
+    ['physical', new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 1, metalness: 0 })],
+    ['lambert', new THREE.MeshLambertMaterial({ color: 0xffffff })],
+    ['phong', new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 20 })],
+    ['toon', new THREE.MeshToonMaterial({ color: 0xffffff })],
+  ]
+
+  for (const [index, [, material]] of materials.entries()) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 1.2), material)
+    mesh.position.x = (index - 2) * 0.42
+    scene.add(mesh)
+  }
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'light-probe-environment-material-models',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.1,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const sampleXs = [16, 32, 48, 64, 80]
+      for (const [index, [label]] of materials.entries()) {
+        const x = sampleXs[index]
+        const mean = meanRegion(rgba, width, x - 4, 30, x + 4, 66)
+        if (!(mean.r > 180 && mean.g > 200 && mean.g > mean.b + 65)) {
+          throw new Error(`LightProbe/environment corpus should light ${label} with red probe plus green environment, got ${JSON.stringify(mean)}`)
         }
       }
     },
@@ -5078,7 +5140,6 @@ function mixedShadowLightTypesCorpus() {
     options,
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.04,
-    browserReference: false,
     render(renderer) {
       const unshadowedMixed = renderer.render(makeScene(lightTypes, false), camera, options)
       const shadowedMixed = renderer.render(mixedScene, camera, options)
