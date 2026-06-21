@@ -14,6 +14,7 @@ import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
+import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js'
 import { PositionalAudioHelper } from 'three/examples/jsm/helpers/PositionalAudioHelper.js'
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
@@ -2759,6 +2760,46 @@ test('PositionalAudioHelper renders grouped cone line geometry', () => {
     assert.ok(
       nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
       'PositionalAudioHelper should render visible grouped line geometry',
+    )
+  } finally {
+    helper.dispose()
+  }
+})
+
+test('OctreeHelper renders generated box line geometry', () => {
+  const octree = {
+    subTrees: [
+      {
+        box: new THREE.Box3(
+          new THREE.Vector3(-0.6, -0.35, -0.25),
+          new THREE.Vector3(0.6, 0.35, 0.25),
+        ),
+        subTrees: [
+          {
+            box: new THREE.Box3(
+              new THREE.Vector3(-0.25, -0.15, -0.1),
+              new THREE.Vector3(0.25, 0.15, 0.1),
+            ),
+            subTrees: [],
+          },
+        ],
+      },
+    ],
+  }
+  const helper = new OctreeHelper(octree, 0xffff00)
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(helper)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(1.3, 1.2, 2.4)
+  camera.lookAt(0, 0, 0)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
+      'OctreeHelper should render visible generated box line geometry',
     )
   } finally {
     helper.dispose()
