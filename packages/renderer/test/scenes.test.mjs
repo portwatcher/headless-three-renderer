@@ -101,6 +101,7 @@ import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 import { hilbert2D } from 'three/examples/jsm/utils/GeometryUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -4448,6 +4449,43 @@ test('examples CCDIKSolver updates and renders supported helper geometry', () =>
     helper.dispose()
     geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples CameraUtils.frameCorners renders off-axis framed scene content', () => {
+  const width = 96
+  const height = 64
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const planeGeometry = new THREE.PlaneGeometry(1, 0.6)
+  const planeMaterial = new THREE.MeshBasicMaterial({ color: 0x44aaff, side: THREE.DoubleSide })
+  scene.add(new THREE.Mesh(planeGeometry, planeMaterial))
+
+  const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 10)
+  camera.position.set(0, 0, 1)
+  frameCorners(
+    camera,
+    new THREE.Vector3(-0.5, -0.3, 0),
+    new THREE.Vector3(0.5, -0.3, 0),
+    new THREE.Vector3(-0.5, 0.3, 0),
+    true,
+  )
+  camera.updateMatrixWorld(true)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width, height })
+    const projectionIdentity = camera.projectionMatrix.clone().multiply(camera.projectionMatrixInverse)
+
+    assert.ok(camera.fov > 0 && camera.fov < 90, `frameCorners should estimate a usable culling fov (${camera.fov})`)
+    assert.ok(Math.abs(projectionIdentity.elements[0] - 1) < 1e-6)
+    assert.ok(Math.abs(projectionIdentity.elements[5] - 1) < 1e-6)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && g > 100 && r < 120) > 5800,
+      'CameraUtils.frameCorners should frame the blue plane across the render target',
+    )
+  } finally {
+    planeGeometry.dispose()
+    planeMaterial.dispose()
   }
 })
 
