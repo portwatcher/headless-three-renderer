@@ -965,7 +965,7 @@ fn resolve_shadow_maps(scene: &RenderScene, shadow_map_type: f32) -> Result<Opti
         atlas_width = atlas_width.max(map_width);
         atlas_height = atlas_height.max(map_height);
     }
-    if casters.is_empty() {
+    if casters.is_empty() || !scene_has_shadow_caster_mesh(scene) {
         Ok(None)
     } else {
         Ok(Some(ShadowMapSet {
@@ -975,6 +975,13 @@ fn resolve_shadow_maps(scene: &RenderScene, shadow_map_type: f32) -> Result<Opti
             map_height: atlas_height,
         }))
     }
+}
+
+fn scene_has_shadow_caster_mesh(scene: &RenderScene) -> bool {
+    scene
+        .meshes
+        .as_deref()
+        .is_some_and(|meshes| meshes.iter().any(|mesh| mesh.cast_shadow.unwrap_or(false)))
 }
 
 fn shadow_radius(
@@ -1111,5 +1118,33 @@ mod tests {
             error.contains("must contain finite f32-compatible numbers"),
             "error should reject non-finite anisotropy, got: {error}",
         );
+    }
+
+    #[test]
+    fn skips_shadow_maps_when_scene_has_shadow_lights_but_no_shadow_casters() {
+        let scene = RenderScene {
+            width: Some(16),
+            height: Some(16),
+            lights: Some(vec![crate::types::SceneLight {
+                light_type: "directional".into(),
+                cast_shadow: Some(true),
+                ..crate::types::SceneLight::default()
+            }]),
+            meshes: Some(vec![crate::types::SceneMesh {
+                positions: vec![-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 0.0, 1.0, 0.0],
+                receive_shadow: Some(true),
+                ..crate::types::SceneMesh::default()
+            }]),
+            ..RenderScene::default()
+        };
+        let camera = Camera::default();
+        let limits = wgpu::Limits {
+            max_texture_dimension_2d: 8192,
+            ..wgpu::Limits::default()
+        };
+
+        let settings = RenderSettings::from_scene(&scene, &camera, limits).unwrap();
+
+        assert!(settings.shadow.is_none());
     }
 }

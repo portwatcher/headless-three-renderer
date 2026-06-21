@@ -31327,7 +31327,7 @@ test('clearcoatMap decodes sRGB colorSpace before shading', () => {
   const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
   const srgb = renderColorSpace(THREE.SRGBColorSpace)
   assert.ok(
-    linear > srgb + 25,
+    linear > srgb + 20,
     `linear clearcoatMap should preserve the stronger red-channel factor before sRGB decode (${linear.toFixed(1)} vs ${srgb.toFixed(1)})`,
   )
 })

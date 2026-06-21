@@ -119,7 +119,7 @@ test('node loader setup docs name every exported loader helper', async () => {
     readFile(NODE_LOADER_SETUP_DOC, 'utf8'),
     readFile(API_INDEX, 'utf8'),
   ])
-  const loaderExportBlock = apiIndex.match(/export \{\n([\s\S]*?)\n\} from '\.\/loaders'/)
+  const loaderExportBlock = apiIndex.match(/export \{\r?\n([\s\S]*?)\r?\n\} from '\.\/loaders'/)
   assert.ok(loaderExportBlock, 'api/index.ts should re-export public loader helpers from ./loaders')
   const exportedLoaderNames = loaderExportBlock[1]
     .split('\n')
