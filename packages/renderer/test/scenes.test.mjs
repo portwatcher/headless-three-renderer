@@ -18326,6 +18326,60 @@ test('metallicRoughness maps decode sRGB colorSpace before shading', () => {
   assert.ok(srgb > linear + 10, `sRGB roughnessMap samples should decode before shading (${srgb} vs ${linear})`)
 })
 
+test('metallicRoughness maps honor nearest and linear filters', () => {
+  function renderWithFilter(slot, filter) {
+    const map = slot === 'roughnessMap'
+      ? rgbaTexture([
+        0, 255, 0, 255,
+        0, 0, 0, 255,
+      ], 2, 1)
+      : rgbaTexture([
+        0, 0, 255, 255,
+        0, 0, 0, 255,
+      ], 2, 1)
+    map.magFilter = filter
+    map.minFilter = filter
+
+    const materialProps = {
+      color: slot === 'roughnessMap' ? 0x000000 : 0xffffff,
+      metalness: slot === 'roughnessMap' ? 0 : 1,
+      roughness: 1,
+      [slot]: map,
+    }
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.45, 0.5),
+      new THREE.MeshStandardMaterial(materialProps),
+    ))
+
+    const light = new THREE.DirectionalLight(0xffffff, 12)
+    light.position.set(0, 0, 3)
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return maxLuminance(renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }))
+  }
+
+  const nearestRoughness = renderWithFilter('roughnessMap', THREE.NearestFilter)
+  const linearRoughness = renderWithFilter('roughnessMap', THREE.LinearFilter)
+  assert.ok(nearestRoughness < 20, `NearestFilter roughnessMap should choose the rough texel (${nearestRoughness})`)
+  assert.ok(linearRoughness > nearestRoughness + 60, `LinearFilter roughnessMap should blend in the smoother texel (${linearRoughness} vs ${nearestRoughness})`)
+
+  const nearestMetalness = renderWithFilter('metalnessMap', THREE.NearestFilter)
+  const linearMetalness = renderWithFilter('metalnessMap', THREE.LinearFilter)
+  assert.ok(nearestMetalness < 30, `NearestFilter metalnessMap should choose the metallic texel (${nearestMetalness})`)
+  assert.ok(linearMetalness > nearestMetalness + 100, `LinearFilter metalnessMap should blend in the non-metal texel (${linearMetalness} vs ${nearestMetalness})`)
+})
+
 test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () => {
   const renderer = new Renderer()
 
