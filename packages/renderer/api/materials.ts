@@ -2067,6 +2067,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeParallaxBarrierEffectShaderMaterial(material)) {
+    throw new Error(
+      'THREE.ParallaxBarrierEffect internal ShaderMaterial is not translated by @headless-three/renderer yet. Use StereoEffect or PeppersGhostEffect for covered stereo helper renders, or render the left and right eye targets separately and compose the parallax-barrier image outside this helper.',
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2101,6 +2107,22 @@ function isThreeAnaglyphEffectShaderMaterial(material: ThreeMaterialLike): boole
     compact.includes('uniformmat3colorMatrixRight;') &&
     compact.includes('colorMatrixLeft*colorL.rgb+') &&
     compact.includes('colorMatrixRight*colorR.rgb')
+}
+
+function isThreeParallaxBarrierEffectShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.mapLeft == null || values.mapRight == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DmapLeft;') &&
+    compact.includes('uniformsampler2DmapRight;') &&
+    compact.includes('mod(gl_FragCoord.y,2.0)') &&
+    compact.includes('gl_FragColor=texture2D(mapLeft,uv);') &&
+    compact.includes('gl_FragColor=texture2D(mapRight,uv);')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

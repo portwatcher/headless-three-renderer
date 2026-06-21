@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
+import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
 import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
@@ -2591,6 +2592,32 @@ test('AnaglyphEffect internal shader pass fails clearly', () => {
     assert.throws(
       () => effect.render(scene, camera),
       /AnaglyphEffect internal ShaderMaterial.*not translated.*StereoEffect.*PeppersGhostEffect/i,
+    )
+  } finally {
+    effect.dispose()
+  }
+})
+
+test('ParallaxBarrierEffect internal shader pass fails clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const effect = new ParallaxBarrierEffect(renderer)
+  effect.setSize(32, 32)
+
+  try {
+    assert.throws(
+      () => effect.render(scene, camera),
+      /ParallaxBarrierEffect internal ShaderMaterial.*not translated.*StereoEffect.*PeppersGhostEffect/i,
     )
   } finally {
     effect.dispose()
