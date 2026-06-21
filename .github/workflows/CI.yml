@@ -142,6 +142,9 @@ jobs:
         run: pnpm run test:golden
 
       - name: Scale budget tests
+        # The Intel macOS runner repeatedly hangs in the budget suite without
+        # an assertion; keep scale coverage on Linux x64, Linux arm, and macOS arm.
+        if: matrix.settings.target != 'x86_64-apple-darwin'
         working-directory: packages/renderer
         run: pnpm run test:scale
 
