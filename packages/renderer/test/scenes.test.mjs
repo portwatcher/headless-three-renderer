@@ -8,6 +8,8 @@ import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { AnimationClipCreator } from 'three/examples/jsm/animation/AnimationClipCreator.js'
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
+import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
+import WebGPU from 'three/examples/jsm/capabilities/WebGPU.js'
 import { ArcballControls } from 'three/examples/jsm/controls/ArcballControls.js'
 import { DragControls } from 'three/examples/jsm/controls/DragControls.js'
 import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls.js'
@@ -20,6 +22,7 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { CSM } from 'three/examples/jsm/csm/CSM.js'
 import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
+import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
 import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
@@ -3128,6 +3131,85 @@ test('WebGLTextureUtils decompression shader path fails clearly', () => {
   } finally {
     renderer.dispose?.()
     texture.dispose()
+  }
+})
+
+test('examples WebGL and WebGPU capability helpers expose browser-context boundaries', () => {
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
+  const previousWindow = globalThis.window
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+  const previousWarn = console.warn
+  const warnings = []
+
+  try {
+    delete globalThis.window
+    delete globalThis.document
+    console.warn = (message) => warnings.push(String(message))
+
+    assert.equal(WebGL.isWebGL2Available(), false)
+    assert.equal(WebGL.isColorSpaceAvailable('display-p3'), false)
+    assert.equal(WebGL.isWebGLAvailable(), false)
+    assert.equal(WebGPU.isAvailable(), false)
+    assert.equal(WebGPU.getStaticAdapter(), false)
+    assert.ok(warnings.some((message) => message.includes('isWebGLAvailable() has been deprecated')))
+
+    const elements = []
+    const makeElement = (tagName) => ({
+      tagName,
+      style: {},
+      children: [],
+      id: '',
+      innerHTML: '',
+      appendChild(child) {
+        this.children.push(child)
+      },
+      getContext(type) {
+        if (tagName !== 'canvas') return null
+        if (type === 'webgl2' || type === 'webgl' || type === 'experimental-webgl') {
+          return { drawingBufferColorSpace: 'srgb' }
+        }
+        return null
+      },
+    })
+    globalThis.window = {
+      WebGLRenderingContext: function WebGLRenderingContext() {},
+      WebGL2RenderingContext: function WebGL2RenderingContext() {},
+    }
+    globalThis.document = {
+      createElement(tagName) {
+        const element = makeElement(tagName)
+        elements.push(element)
+        return element
+      },
+    }
+
+    assert.equal(WebGL.isWebGL2Available(), true)
+    assert.equal(WebGL.isColorSpaceAvailable('display-p3'), true)
+    assert.equal(WebGL.isWebGLAvailable(), true)
+
+    const webglMessage = WebGL.getWebGL2ErrorMessage()
+    assert.equal(webglMessage.id, 'webglmessage')
+    assert.match(webglMessage.innerHTML, /graphics card.*WebGL 2/)
+    assert.equal(webglMessage.style.fontFamily, 'monospace')
+
+    const webgpuMessage = WebGPU.getErrorMessage()
+    assert.equal(webgpuMessage.id, 'webgpumessage')
+    assert.match(webgpuMessage.innerHTML, /WebGPU/)
+    assert.equal(webgpuMessage.style.maxWidth, '400px')
+    assert.ok(elements.some((element) => element.tagName === 'canvas'))
+  } finally {
+    console.warn = previousWarn
+    if (hadWindow) {
+      globalThis.window = previousWindow
+    } else {
+      delete globalThis.window
+    }
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
   }
 })
 
@@ -6864,6 +6946,100 @@ test('examples DOM-backed interactive helpers require browser DOM APIs', () => {
       /document is not defined/i,
       'HTMLMesh should require browser document/canvas APIs for html2canvas texture extraction',
     )
+  } finally {
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
+  }
+})
+
+test('AsciiEffect delegates rendering and writes browser-style DOM output', () => {
+  function makeDocument() {
+    return {
+      createElement(type) {
+        if (type === 'canvas') {
+          return {
+            width: 0,
+            height: 0,
+            getContext(contextType) {
+              if (contextType !== '2d') return null
+              return {
+                clearRect() {},
+                drawImage() {},
+                getImageData(_x, _y, width, height) {
+                  const data = new Uint8ClampedArray(width * height * 4)
+                  for (let y = 0; y < height; y += 1) {
+                    for (let x = 0; x < width; x += 1) {
+                      const offset = (y * width + x) * 4
+                      const value = x < width / 2 ? 0 : 255
+                      data[offset] = value
+                      data[offset + 1] = value
+                      data[offset + 2] = value
+                      data[offset + 3] = 255
+                    }
+                  }
+                  return { data, width, height }
+                },
+              }
+            },
+          }
+        }
+
+        return {
+          type,
+          style: {},
+          children: [],
+          rows: [],
+          innerHTML: '',
+          appendChild(child) {
+            this.children.push(child)
+          },
+        }
+      },
+    }
+  }
+
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+
+  try {
+    delete globalThis.document
+    assert.throws(
+      () => new AsciiEffect({ domElement: { style: {} } }),
+      /document is not defined/i,
+      'AsciiEffect should require browser-style document creation',
+    )
+
+    globalThis.document = makeDocument()
+    const sizes = []
+    let renderCalls = 0
+    const renderer = {
+      domElement: { style: {} },
+      setSize(width, height) {
+        sizes.push([width, height])
+      },
+      render(scene, camera) {
+        assert.equal(scene.isScene, true)
+        assert.equal(camera.isCamera, true)
+        renderCalls += 1
+      },
+    }
+
+    const effect = new AsciiEffect(renderer, ' .#', { resolution: 0.5 })
+    const scene = new THREE.Scene()
+    const camera = makeCamera()
+    effect.setSize(8, 4)
+    effect.render(scene, camera)
+
+    const table = effect.domElement.children[0]
+    assert.deepEqual(sizes, [[8, 4]])
+    assert.equal(renderCalls, 1)
+    assert.equal(table.type, 'table')
+    assert.match(table.innerHTML, /<tr><td/)
+    assert.match(table.innerHTML, /#/)
+    assert.match(table.innerHTML, /&nbsp;/)
   } finally {
     if (hadDocument) {
       globalThis.document = previousDocument
