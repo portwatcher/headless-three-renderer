@@ -57,6 +57,7 @@ export function createSceneCorpus() {
     meshToonAlphaMapCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
+    rendererClippingStateCorpus(),
     nestedClippingGroupCorpus(),
     lightProbeCorpus(),
     lightProbeMaterialModelsCorpus(),
@@ -1899,6 +1900,95 @@ function materialLocalClippingCorpus() {
       const clippedMatchesBackground = Math.abs(clipped.r - 39) <= 1 && Math.abs(clipped.g - 39) <= 1 && Math.abs(clipped.b - 80) <= 1
       if (!(visible.b > visible.r + 90 && visible.g > visible.r + 80 && clippedMatchesBackground)) {
         throw new Error(`local clipping corpus should keep only the cyan top half, got visible=${JSON.stringify(visible)} clipped=${JSON.stringify(clipped)}`)
+      }
+    },
+  }
+}
+
+function rendererClippingStateCorpus() {
+  const globalScene = new THREE.Scene()
+  globalScene.background = new THREE.Color(0, 0, 1)
+  globalScene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  ))
+
+  const localMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  localMaterial.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)]
+  const localScene = new THREE.Scene()
+  localScene.background = new THREE.Color(0, 0, 1)
+  localScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), localMaterial))
+
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function regions(rgba) {
+    return {
+      top: meanRegion(rgba, options.width, 33, 18, 63, 36),
+      bottom: meanRegion(rgba, options.width, 33, 60, 63, 78),
+      left: meanRegion(rgba, options.width, 18, 33, 36, 63),
+      right: meanRegion(rgba, options.width, 60, 33, 78, 63),
+    }
+  }
+
+  function isGreen(mean) {
+    return mean.g > mean.b + 80 && mean.g > mean.r + 80
+  }
+
+  function isRed(mean) {
+    return mean.r > mean.b + 80 && mean.r > mean.g + 80
+  }
+
+  function isBlue(mean) {
+    return mean.b > mean.r + 80 && mean.b > mean.g + 80
+  }
+
+  return {
+    name: 'renderer-clipping-state-options',
+    scene: globalScene,
+    camera,
+    options,
+    background: [0, 0, 255],
+    minNonBackgroundRatio: 0.2,
+    browserReference: false,
+    render(renderer) {
+      const previousClippingPlanes = renderer.clippingPlanes
+      const previousLocalClippingEnabled = renderer.localClippingEnabled
+      try {
+        renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)]
+        const fallback = renderer.render(globalScene, camera, options)
+        stats.globalFallback = regions(fallback)
+
+        const explicitEmpty = renderer.render(globalScene, camera, { ...options, clippingPlanes: [] })
+        stats.globalExplicitEmpty = regions(explicitEmpty)
+
+        renderer.clippingPlanes = []
+        renderer.localClippingEnabled = false
+        const localDisabled = renderer.render(localScene, camera, options)
+        stats.localDisabled = regions(localDisabled)
+
+        const localExplicitEnabled = renderer.render(localScene, camera, { ...options, localClippingEnabled: true })
+        stats.localExplicitEnabled = regions(localExplicitEnabled)
+
+        return fallback
+      } finally {
+        renderer.clippingPlanes = previousClippingPlanes
+        renderer.localClippingEnabled = previousLocalClippingEnabled
+      }
+    },
+    validate() {
+      if (!(isGreen(stats.globalFallback.top) && isBlue(stats.globalFallback.bottom))) {
+        throw new Error(`Renderer clippingPlanes fallback should clip the bottom half, stats=${JSON.stringify(stats.globalFallback)}`)
+      }
+      if (!isGreen(stats.globalExplicitEmpty.bottom)) {
+        throw new Error(`explicit empty clippingPlanes should override renderer state, stats=${JSON.stringify(stats.globalExplicitEmpty)}`)
+      }
+      if (!(isRed(stats.localDisabled.left) && isRed(stats.localDisabled.right))) {
+        throw new Error(`Renderer localClippingEnabled=false should disable material-local clipping, stats=${JSON.stringify(stats.localDisabled)}`)
+      }
+      if (!(isBlue(stats.localExplicitEnabled.left) && isRed(stats.localExplicitEnabled.right))) {
+        throw new Error(`explicit localClippingEnabled=true should restore material-local clipping, stats=${JSON.stringify(stats.localExplicitEnabled)}`)
       }
     },
   }
