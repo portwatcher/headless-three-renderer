@@ -16478,6 +16478,152 @@ test('source material displacement applies to custom shadow material casters', (
   assert.ok(distanceDiff > 5, `source material displacement should move the customDistanceMaterial shadow, diff=${distanceDiff.toFixed(3)}`)
 })
 
+test('custom and source shadow displacement maps sample selected uv1-uv3 channels', () => {
+  function displacementMapForChannel(channel) {
+    const displacementMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    displacementMap.magFilter = THREE.NearestFilter
+    displacementMap.minFilter = THREE.NearestFilter
+    displacementMap.channel = channel
+    return displacementMap
+  }
+
+  function casterGeometry(channel) {
+    const geometry = new THREE.PlaneGeometry(2.5, 2.5, 8, 8)
+    setConstantUvAttribute(geometry, 'uv', 0.25, 0.5)
+    if (channel > 0) {
+      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+    }
+    return geometry
+  }
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function sourceMaterialWithDisplacement(channel) {
+    return new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      displacementMap: displacementMapForChannel(channel),
+      displacementScale: 2,
+      displacementBias: 0,
+      colorWrite: false,
+      depthWrite: false,
+    })
+  }
+
+  function renderDirectionalCustomDepthDisplacementChannel(channel, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const caster = new THREE.Mesh(
+      casterGeometry(channel),
+      inheritFromSource
+        ? sourceMaterialWithDisplacement(channel)
+        : new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.set(0, 1.7, 0)
+    caster.rotation.x = -Math.PI / 2
+    caster.castShadow = true
+    caster.customDepthMaterial = inheritFromSource
+      ? new THREE.MeshDepthMaterial()
+      : new THREE.MeshDepthMaterial({
+        displacementMap: displacementMapForChannel(channel),
+        displacementScale: 2,
+        displacementBias: 0,
+      })
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.castShadow = true
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  function renderPointCustomDistanceDisplacementChannel(channel, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+
+    const caster = new THREE.Mesh(
+      casterGeometry(channel),
+      inheritFromSource
+        ? sourceMaterialWithDisplacement(channel)
+        : new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.set(0, 1.7, 0)
+    caster.rotation.x = -Math.PI / 2
+    caster.castShadow = true
+    caster.customDistanceMaterial = inheritFromSource
+      ? new THREE.MeshDistanceMaterial()
+      : new THREE.MeshDistanceMaterial({
+        displacementMap: displacementMapForChannel(channel),
+        displacementScale: 2,
+        displacementBias: 0,
+      })
+    scene.add(caster)
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const inheritFromSource of [false, true]) {
+    const label = inheritFromSource ? 'source material' : 'custom shadow material'
+    const primaryDepth = renderDirectionalCustomDepthDisplacementChannel(0, inheritFromSource)
+    for (const channel of [1, 2, 3]) {
+      const selectedDepth = renderDirectionalCustomDepthDisplacementChannel(channel, inheritFromSource)
+      const diff = meanAbsDiff(primaryDepth, selectedDepth)
+      assert.ok(
+        diff > 5,
+        `${label} displacementMap channel=${channel} should move the customDepthMaterial caster shadow, diff=${diff.toFixed(3)}`,
+      )
+    }
+
+    const primaryDistance = renderPointCustomDistanceDisplacementChannel(0, inheritFromSource)
+    for (const channel of [1, 2, 3]) {
+      const selectedDistance = renderPointCustomDistanceDisplacementChannel(channel, inheritFromSource)
+      const diff = meanAbsDiff(primaryDistance, selectedDistance)
+      assert.ok(
+        diff > 5,
+        `${label} displacementMap channel=${channel} should move the customDistanceMaterial caster shadow, diff=${diff.toFixed(3)}`,
+      )
+    }
+  }
+})
+
 test('malformed custom shadow material containers fail clearly', () => {
   function makeScene(property, customShadowMaterial, light) {
     const scene = new THREE.Scene()
