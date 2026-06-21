@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import {
   applyVrmAnimation,
   loadVrmAnimationFromFile,
@@ -107,7 +108,7 @@ async function importOptionalPackage(specifier, missingMessage) {
 
   try {
     const requireFromCaller = createRequire(path.join(process.cwd(), 'package.json'))
-    return normalizeModuleNamespace(await import(requireFromCaller.resolve(specifier)))
+    return normalizeModuleNamespace(await import(pathToFileURL(requireFromCaller.resolve(specifier)).href))
   } catch (error) {
     if (error?.code !== 'ERR_MODULE_NOT_FOUND' && error?.code !== 'MODULE_NOT_FOUND') throw error
     throw new Error(missingMessage)
