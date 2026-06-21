@@ -96,7 +96,9 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    physicalClearcoatMapCorpus(),
     physicalSpecularMapCorpus(),
+    physicalAnisotropyMapCorpus(),
     physicalIridescenceMapCorpus(),
     physicalTransmissionDispersionCorpus(),
     transmissionResolutionScaleCorpus(),
@@ -5280,6 +5282,111 @@ function physicalIblShadowCorpus() {
   }
 }
 
+function physicalClearcoatMapCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeMap(data, offsetX) {
+    const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, offsetX)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(parameters) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = environmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        ...parameters,
+      }),
+    ))
+    return scene
+  }
+
+  function makeClearcoatScene(offsetX) {
+    return makeScene({
+      clearcoat: 1,
+      clearcoatRoughness: 0.04,
+      clearcoatMap: makeMap([
+        0, 0, 0, 255,
+        255, 0, 0, 255,
+      ], offsetX),
+    })
+  }
+
+  function makeClearcoatRoughnessScene(offsetX) {
+    return makeScene({
+      clearcoat: 1,
+      clearcoatRoughness: 1,
+      clearcoatRoughnessMap: makeMap([
+        0, 0, 0, 255,
+        0, 255, 0, 255,
+      ], offsetX),
+    })
+  }
+
+  function makeClearcoatNormalScene(offsetX) {
+    return makeScene({
+      clearcoat: 1,
+      clearcoatRoughness: 0.04,
+      clearcoatNormalMap: makeMap([
+        128, 128, 255, 255,
+        255, 128, 128, 255,
+      ], offsetX),
+      clearcoatNormalScale: new THREE.Vector2(1, 1),
+    })
+  }
+
+  function luminance(mean) {
+    return 0.2126 * mean.r + 0.7152 * mean.g + 0.0722 * mean.b
+  }
+
+  return {
+    name: 'physical-clearcoat-map-slots',
+    scene: makeClearcoatScene(0.5),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      const clearcoatPrimary = renderer.render(makeClearcoatScene(0), camera, options)
+      const clearcoatShifted = renderer.render(makeClearcoatScene(0.5), camera, options)
+      const roughnessPrimary = renderer.render(makeClearcoatRoughnessScene(0), camera, options)
+      const roughnessShifted = renderer.render(makeClearcoatRoughnessScene(0.5), camera, options)
+      const normalPrimary = renderer.render(makeClearcoatNormalScene(0), camera, options)
+      const normalShifted = renderer.render(makeClearcoatNormalScene(0.5), camera, options)
+      stats.clearcoatPrimary = luminance(meanRegion(clearcoatPrimary, options.width, 0, 0, options.width, options.height))
+      stats.clearcoatShifted = luminance(meanRegion(clearcoatShifted, options.width, 0, 0, options.width, options.height))
+      stats.roughnessPrimary = luminance(meanRegion(roughnessPrimary, options.width, 0, 0, options.width, options.height))
+      stats.roughnessShifted = luminance(meanRegion(roughnessShifted, options.width, 0, 0, options.width, options.height))
+      stats.normalDiff = meanAbsDiff(normalPrimary, normalShifted)
+      return clearcoatShifted
+    },
+    validate() {
+      if (!(stats.clearcoatShifted > stats.clearcoatPrimary + 50)) {
+        throw new Error(`physical clearcoat corpus should enable shifted clearcoatMap highlights, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.roughnessPrimary > stats.roughnessShifted + 10)) {
+        throw new Error(`physical clearcoat corpus should sample shifted rough clearcoatRoughnessMap texels, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.normalDiff > 2)) {
+        throw new Error(`physical clearcoat corpus should sample shifted clearcoatNormalMap texels, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
 function physicalSpecularMapCorpus() {
   const camera = makeCamera([0, 0, 3])
   const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
@@ -5376,6 +5483,65 @@ function physicalSpecularMapCorpus() {
       }
       if (!(stats.intensityShifted > stats.intensityPrimary + 40)) {
         throw new Error(`physical specular corpus should enable shifted specularIntensityMap highlights, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
+function physicalAnisotropyMapCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeMap(offsetX) {
+    const texture = new THREE.DataTexture(new Uint8Array([
+      128, 128, 0, 255,
+      255, 128, 255, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, offsetX)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x111111,
+        roughness: 0.2,
+        metalness: 0,
+        anisotropy: 1,
+        anisotropyRotation: Math.PI / 4,
+        anisotropyMap: makeMap(offsetX),
+      }),
+    ))
+    const light = new THREE.PointLight(0xffffff, 250)
+    light.position.set(0.8, 0.8, 2)
+    scene.add(light)
+    return scene
+  }
+
+  return {
+    name: 'physical-anisotropy-map-slot',
+    scene: makeScene(0.5),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      const primary = renderer.render(makeScene(0), camera, options)
+      const shifted = renderer.render(makeScene(0.5), camera, options)
+      stats.diff = meanAbsDiff(primary, shifted)
+      return shifted
+    },
+    validate() {
+      if (!(stats.diff > 1)) {
+        throw new Error(`physical anisotropy corpus should sample the shifted anisotropyMap texel, diff=${stats.diff}`)
       }
     },
   }
