@@ -47,6 +47,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js'
+import InstancedPoints from 'three/examples/jsm/objects/InstancedPoints.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { MarchingCubes } from 'three/examples/jsm/objects/MarchingCubes.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
@@ -54,8 +55,11 @@ import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRP
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { ShadowMesh } from 'three/examples/jsm/objects/ShadowMesh.js'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
+import { SkyMesh } from 'three/examples/jsm/objects/SkyMesh.js'
 import { Water } from 'three/examples/jsm/objects/Water.js'
 import { Water as FlowWater } from 'three/examples/jsm/objects/Water2.js'
+import { WaterMesh } from 'three/examples/jsm/objects/WaterMesh.js'
+import { WaterMesh as FlowWaterMesh } from 'three/examples/jsm/objects/Water2Mesh.js'
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js'
 import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
@@ -3957,6 +3961,44 @@ test('Three.js scene helper shader materials fail clearly with helper guidance',
       pattern,
       `${name} should fail with helper-specific guidance`,
     )
+  }
+})
+
+test('Three.js WebGPU examples NodeMaterial objects fail clearly', () => {
+  function makeFlatCamera() {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+    camera.position.z = 2
+    camera.updateProjectionMatrix()
+    camera.updateMatrixWorld()
+    return camera
+  }
+
+  const cases = [
+    ['SkyMesh', () => new SkyMesh()],
+    ['WaterMesh', () => new WaterMesh(new THREE.PlaneGeometry(1, 1), {
+      waterNormals: solidTexture(128, 128, 255),
+    })],
+    ['Water2Mesh', () => new FlowWaterMesh(new THREE.PlaneGeometry(1, 1), {
+      normalMap0: solidTexture(128, 128, 255),
+      normalMap1: solidTexture(128, 128, 255),
+    })],
+    ['InstancedPoints', () => new InstancedPoints()],
+  ]
+
+  for (const [name, createObject] of cases) {
+    const renderer = new Renderer()
+    try {
+      const scene = new THREE.Scene()
+      scene.add(createObject())
+
+      assert.throws(
+        () => renderer.render(scene, makeFlatCamera(), { width: 16, height: 16, format: 'rgba' }),
+        /NodeMaterial is not supported directly.*fragmentWgsl/i,
+        `${name} should fail with NodeMaterial guidance`,
+      )
+    } finally {
+      renderer.dispose?.()
+    }
   }
 })
 
