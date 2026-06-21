@@ -21546,6 +21546,76 @@ test('material.toneMapped=false skips material tone mapping before output conver
   assert.ok(unmapped.r > 245, `toneMapped=false should preserve white output (${unmapped.r})`)
 })
 
+test('unlit sprite, point, and line materials honor toneMapped=false', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderPrimitive(kind, toneMapped) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        color: 0xffffff,
+        toneMapped,
+      }))
+      sprite.scale.set(2, 2, 1)
+      scene.add(sprite)
+    } else if (kind === 'points') {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 48,
+        sizeAttenuation: false,
+        toneMapped,
+      })))
+    } else {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-1.5, 0, 0),
+        new THREE.Vector3(1.5, 0, 0),
+      ])
+      const material = kind === 'dashed-line'
+        ? new THREE.LineDashedMaterial({
+          color: 0xffffff,
+          dashSize: 10,
+          gapSize: 0,
+          linewidth: 8,
+          scale: 1,
+          toneMapped,
+        })
+        : new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          linewidth: 8,
+          toneMapped,
+        })
+      const line = new THREE.Line(geometry, material)
+      if (kind === 'dashed-line') line.computeLineDistances()
+      scene.add(line)
+    }
+
+    const rgba = renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+    return kind === 'sprite' || kind === 'points'
+      ? meanRegion(rgba, 64, 64, 20, 20, 44, 44)
+      : meanRegion(rgba, 64, 64, 0, 30, 64, 34)
+  }
+
+  for (const kind of ['sprite', 'points', 'line', 'dashed-line']) {
+    const mapped = renderPrimitive(kind, true)
+    const unmapped = renderPrimitive(kind, false)
+    assert.ok(
+      unmapped.r > mapped.r + 35,
+      `${kind} toneMapped=false should keep brighter linear white (${unmapped.r} vs ${mapped.r})`,
+    )
+    assert.ok(unmapped.r > 245, `${kind} toneMapped=false should preserve white output (${unmapped.r})`)
+  }
+})
+
 test('Renderer toneMapping state controls material tone mapping exposure', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
