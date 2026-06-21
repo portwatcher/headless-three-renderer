@@ -123,7 +123,7 @@ test('node loader setup docs name every exported loader helper', async () => {
   assert.ok(loaderExportBlock, 'api/index.ts should re-export public loader helpers from ./loaders')
   const exportedLoaderNames = loaderExportBlock[1]
     .split('\n')
-    .map((line) => line.replace(/[, ]/g, ''))
+    .map((line) => line.replace(/[,\s]/g, ''))
     .filter(Boolean)
 
   for (const name of exportedLoaderNames) {
