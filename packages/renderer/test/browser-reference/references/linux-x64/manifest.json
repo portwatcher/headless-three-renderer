@@ -532,6 +532,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "shadow-map-enabled-gating.png",
+      "name": "shadow-map-enabled-gating",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "shadow-material-receiver.png",
       "name": "shadow-material-receiver",
       "width": 96,

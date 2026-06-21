@@ -6334,7 +6334,6 @@ function shadowMapEnabledGatingCorpus() {
     options,
     background: [255, 255, 255],
     minNonBackgroundRatio: 0.02,
-    browserReference: false,
     render(renderer) {
       const previousEnabled = renderer.shadowMap.enabled
       try {
