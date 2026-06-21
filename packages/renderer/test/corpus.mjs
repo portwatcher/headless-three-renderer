@@ -67,6 +67,7 @@ export function createSceneCorpus() {
     linearFogCorpus(),
     fogExp2MixedObjectCorpus(),
     textureMatrixColorSpaceCorpus(),
+    textureSlotMatrixCorpus(),
     linearOutputColorSpaceCorpus(),
     toneMappingStateCorpus(),
     postProcessingOptionsCorpus(),
@@ -329,6 +330,15 @@ function pixelAt(rgba, width, x, y) {
     b: rgba[offset + 2],
     a: rgba[offset + 3],
   }
+}
+
+function setTextureMatrixOffset(texture, x, y = 0) {
+  texture.matrixAutoUpdate = false
+  texture.matrix.set(
+    1, 0, x,
+    0, 1, y,
+    0, 0, 1,
+  )
 }
 
 function transparentLayerCorpus() {
@@ -1182,6 +1192,90 @@ function textureMatrixColorSpaceCorpus() {
       const transformedDark = pixelAt(rgba, width, 30, 37)
       if (!(transformedBright.r > 180 && transformedBright.g > 180 && transformedBright.b > 180 && transformedDark.r < 80 && transformedDark.g < 80 && transformedDark.b < 80)) {
         throw new Error(`texture matrix corpus should sample distinct sRGB bright/dark texels, got bright=${JSON.stringify(transformedBright)} dark=${JSON.stringify(transformedDark)}`)
+      }
+    },
+  }
+}
+
+function matrixSlotTexture(data) {
+  const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(texture, 0.5)
+  texture.needsUpdate = true
+  return texture
+}
+
+function textureSlotMatrixCorpus() {
+  const alphaMap = matrixSlotTexture([
+    255, 0, 0, 255,
+    255, 255, 0, 255,
+  ])
+  const aoMap = matrixSlotTexture([
+    255, 255, 255, 255,
+    0, 0, 0, 255,
+  ])
+  const emissiveMap = matrixSlotTexture([
+    0, 0, 0, 255,
+    0, 255, 0, 255,
+  ])
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0.16)
+  const panelGeometry = () => constantUvPlane(0.25, 0.5, 0.72, 0.9)
+
+  const alphaPanel = new THREE.Mesh(
+    panelGeometry(),
+    new THREE.MeshBasicMaterial({
+      color: 0xff3311,
+      alphaMap,
+      alphaTest: 0.5,
+    }),
+  )
+  alphaPanel.position.x = -0.86
+
+  const aoPanel = new THREE.Mesh(
+    panelGeometry(),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffaa,
+      aoMap,
+      aoMapIntensity: 1,
+    }),
+  )
+
+  const emissivePanel = new THREE.Mesh(
+    panelGeometry(),
+    new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0x00ff00,
+      emissiveIntensity: 2,
+      emissiveMap,
+    }),
+  )
+  emissivePanel.position.x = 0.86
+
+  scene.add(alphaPanel, aoPanel, emissivePanel)
+
+  return {
+    name: 'texture-slot-explicit-matrices',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 113],
+    minNonBackgroundRatio: 0.06,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const alpha = meanRegion(rgba, width, 8, 34, 26, 62)
+      const ao = meanRegion(rgba, width, 38, 34, 56, 62)
+      const emissive = meanRegion(rgba, width, 67, 34, 85, 62)
+      if (!(alpha.r > alpha.b + 55 && alpha.r > alpha.g + 35)) {
+        throw new Error(`alphaMap explicit matrix should reveal the red panel, got ${JSON.stringify(alpha)}`)
+      }
+      if (!(ao.r < 12 && ao.g < 12 && ao.b < 12)) {
+        throw new Error(`aoMap explicit matrix should darken the center panel, got ${JSON.stringify(ao)}`)
+      }
+      if (!(emissive.g > emissive.r + 35 && emissive.g > emissive.b + 55)) {
+        throw new Error(`emissiveMap explicit matrix should light the green panel, got ${JSON.stringify(emissive)}`)
       }
     },
   }
