@@ -88,6 +88,7 @@ import { LUT3dlLoader } from 'three/examples/jsm/loaders/LUT3dlLoader.js'
 import { LUTCubeLoader } from 'three/examples/jsm/loaders/LUTCubeLoader.js'
 import { MDDLoader } from 'three/examples/jsm/loaders/MDDLoader.js'
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
+import { NRRDLoader } from 'three/examples/jsm/loaders/NRRDLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
 import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
@@ -5867,6 +5868,153 @@ test('examples Volume slices render canvas-backed grayscale texture meshes', () 
     assert.equal(slice.geometryNeedsUpdate, true)
     volume.repaintAllSlices()
     assert.equal(slice.geometryNeedsUpdate, false)
+  } finally {
+    if (slice) {
+      slice.mesh.material.map.dispose()
+      slice.mesh.material.dispose()
+      slice.mesh.geometry.dispose()
+    }
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
+test('examples NRRDLoader parses volumes into renderable slice meshes', () => {
+  function makeCanvas() {
+    const canvas = {
+      _width: 0,
+      _height: 0,
+      _pixels: new Uint8ClampedArray(0),
+      get width() {
+        return this._width
+      },
+      set width(value) {
+        this._width = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      get height() {
+        return this._height
+      },
+      set height(value) {
+        this._height = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      getContext(type) {
+        if (type !== '2d') return null
+        return {
+          getImageData: (x, y, width, height) => {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(width, canvas.width)
+            assert.equal(height, canvas.height)
+            return {
+              data: new Uint8ClampedArray(canvas._pixels),
+              width,
+              height,
+            }
+          },
+          putImageData: (imageData, x, y) => {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(imageData.data.length, canvas._pixels.length)
+            canvas._pixels.set(imageData.data)
+          },
+          drawImage: (source, sx, sy, sw, sh, dx, dy, dw, dh) => {
+            assert.equal(sx, 0)
+            assert.equal(sy, 0)
+            assert.equal(dx, 0)
+            assert.equal(dy, 0)
+            assert.equal(sw, source.width)
+            assert.equal(sh, source.height)
+            assert.equal(dw, canvas.width)
+            assert.equal(dh, canvas.height)
+            for (let row = 0; row < canvas.height; row += 1) {
+              const sourceY = Math.min(source.height - 1, Math.floor(row * source.height / canvas.height))
+              for (let col = 0; col < canvas.width; col += 1) {
+                const sourceX = Math.min(source.width - 1, Math.floor(col * source.width / canvas.width))
+                const sourceOffset = (sourceY * source.width + sourceX) * 4
+                const targetOffset = (row * canvas.width + col) * 4
+                canvas._pixels[targetOffset] = source._pixels[sourceOffset]
+                canvas._pixels[targetOffset + 1] = source._pixels[sourceOffset + 1]
+                canvas._pixels[targetOffset + 2] = source._pixels[sourceOffset + 2]
+                canvas._pixels[targetOffset + 3] = source._pixels[sourceOffset + 3]
+              }
+            }
+          },
+        }
+      },
+    }
+    return canvas
+  }
+
+  const values = [
+    0, 32, 96,
+    128, 180, 220,
+    255, 64, 160,
+    32, 96, 160,
+    80, 144, 208,
+    250, 120, 40,
+    12, 48, 84,
+    120, 156, 192,
+    228, 240, 252,
+  ]
+  const payload = new TextEncoder().encode([
+    'NRRD0005',
+    'type: uchar',
+    'dimension: 3',
+    'sizes: 3 3 3',
+    'encoding: ascii',
+    '# payload follows',
+    '',
+    values.join(' '),
+  ].join('\n'))
+
+  const previousDocument = globalThis.document
+  let slice
+  try {
+    globalThis.document = {
+      createElement(type) {
+        assert.equal(type, 'canvas')
+        return makeCanvas()
+      },
+    }
+
+    const volume = new NRRDLoader().parse(payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength))
+    volume.lowerThreshold = 1
+    slice = volume.extractSlice('z', 1)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    scene.add(slice.mesh)
+
+    const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.01, 10)
+    camera.position.set(0, 0, 4)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    const width = 96
+    const height = 96
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.deepEqual(volume.dimensions, [3, 3, 3])
+    assert.deepEqual(volume.spacing, [1, 1, 1])
+    assert.deepEqual(volume.RASDimensions, [3, 3, 3])
+    assert.equal(volume.data instanceof Uint8Array, true)
+    assert.equal(volume.getData(2, 1, 1), 208)
+    assert.equal(slice instanceof VolumeSlice, true)
+    assert.equal(slice.canvas.width, 3)
+    assert.equal(slice.canvas.height, 3)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 30 || g > 30 || b > 30) > 3000,
+      'NRRDLoader parsed VolumeSlice should render visible grayscale pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 170 && g > 170 && b > 170) > 400,
+      'NRRDLoader parsed VolumeSlice should render bright voxels',
+    )
   } finally {
     if (slice) {
       slice.mesh.material.map.dispose()
