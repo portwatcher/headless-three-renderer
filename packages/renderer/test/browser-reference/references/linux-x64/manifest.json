@@ -672,6 +672,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "batched-mesh-culling-opt-outs.png",
+      "name": "batched-mesh-culling-opt-outs",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "batched-mesh-custom-sort.png",
       "name": "batched-mesh-custom-sort",
       "width": 96,

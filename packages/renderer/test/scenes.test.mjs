@@ -34,6 +34,7 @@ import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
+import { ShadowMesh } from 'three/examples/jsm/objects/ShadowMesh.js'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { Water } from 'three/examples/jsm/objects/Water.js'
 import { Water as FlowWater } from 'three/examples/jsm/objects/Water2.js'
@@ -3242,6 +3243,50 @@ test('Reflector and Refractor prepasses use Renderer target state and restore fl
     assert.equal(renderer.autoClear, false)
     assert.equal(helper.visible, true)
     helper.dispose()
+  }
+})
+
+test('ShadowMesh renders projected helper geometry with built-in material state', () => {
+  const sourceGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.7)
+  const sourceMaterial = new THREE.MeshBasicMaterial({ color: 0xff5533 })
+  const source = new THREE.Mesh(sourceGeometry, sourceMaterial)
+  source.position.set(0, 0.45, 0)
+  source.rotation.set(0.2, 0.4, 0.1)
+  source.updateMatrixWorld(true)
+
+  const shadow = new ShadowMesh(source)
+  shadow.update(
+    new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    new THREE.Vector4(-2, 4, 3, 1),
+  )
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0xffffff)
+  scene.add(shadow)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0, 2.4, 3.2)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    const center = meanRegion(rgba, 64, 64, 20, 20, 44, 44)
+    assert.equal(shadow.isShadowMesh, true)
+    assert.equal(shadow.frustumCulled, false)
+    assert.equal(shadow.matrixAutoUpdate, false)
+    assert.ok(
+      nonBackgroundRatio(rgba, [255, 255, 255], 3) > 0.03,
+      'ShadowMesh should project visible helper geometry onto the plane',
+    )
+    assert.ok(
+      center.r < 235 && center.g < 235 && center.b < 235,
+      `ShadowMesh transparent material should darken the projected region (${center.r}, ${center.g}, ${center.b})`,
+    )
+  } finally {
+    shadow.material.dispose()
+    sourceGeometry.dispose()
+    sourceMaterial.dispose()
   }
 })
 

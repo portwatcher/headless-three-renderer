@@ -8271,7 +8271,6 @@ function batchedMeshCullingOptOutCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.5,
-    browserReference: false,
     render(renderer) {
       const perObjectCulled = renderer.render(
         makeScene({ frustumCulled: false, perObjectFrustumCulled: true }),
