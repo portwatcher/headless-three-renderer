@@ -8,6 +8,13 @@ import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { AnimationClipCreator } from 'three/examples/jsm/animation/AnimationClipCreator.js'
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
+import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls.js'
+import { FlyControls } from 'three/examples/jsm/controls/FlyControls.js'
+import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js'
+import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { CSM } from 'three/examples/jsm/csm/CSM.js'
 import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
@@ -6212,6 +6219,121 @@ test('examples CameraUtils.frameCorners renders off-axis framed scene content', 
   } finally {
     planeGeometry.dispose()
     planeMaterial.dispose()
+  }
+})
+
+test('examples camera controls drive renderable still-frame camera and helper state', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+
+  const redGeometry = new THREE.PlaneGeometry(0.5, 0.5)
+  const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
+  const red = new THREE.Mesh(redGeometry, redMaterial)
+  red.position.x = -0.45
+  scene.add(red)
+
+  const blueGeometry = new THREE.PlaneGeometry(0.5, 0.5)
+  const blueMaterial = new THREE.MeshBasicMaterial({ color: 0x44aaff, side: THREE.DoubleSide })
+  const blue = new THREE.Mesh(blueGeometry, blueMaterial)
+  blue.position.x = 0.45
+  scene.add(blue)
+
+  const orbitCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 10)
+  orbitCamera.position.set(0, 0, 3)
+  const orbit = new OrbitControls(orbitCamera, null)
+  orbit.target.copy(red.position)
+  orbit.update()
+  const orbitDirection = orbitCamera.getWorldDirection(new THREE.Vector3())
+  assert.ok(orbitDirection.x < -0.1, 'OrbitControls should orient the camera toward its target')
+
+  const mapCamera = orbitCamera.clone()
+  mapCamera.position.set(0, 0, 3)
+  const mapControls = new MapControls(mapCamera, null)
+  mapControls.target.copy(blue.position)
+  mapControls.update()
+  const mapDirection = mapCamera.getWorldDirection(new THREE.Vector3())
+  assert.equal(mapControls.screenSpacePanning, false)
+  assert.ok(mapDirection.x > 0.1, 'MapControls should orient the camera toward its target')
+
+  const trackballCamera = orbitCamera.clone()
+  trackballCamera.position.set(0, 0, 3)
+  const trackball = new TrackballControls(trackballCamera, null)
+  trackball.target.copy(blue.position)
+  trackball.update()
+  const trackballDirection = trackballCamera.getWorldDirection(new THREE.Vector3())
+  assert.ok(trackballDirection.x > 0.1, 'TrackballControls should orient the camera toward its target')
+
+  const firstPersonCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 10)
+  firstPersonCamera.position.set(0, 0, 3)
+  const firstPerson = new FirstPersonControls(firstPersonCamera, null)
+  firstPerson.autoForward = true
+  firstPerson.lookAt(0, 0, 0)
+  firstPerson.update(0.5)
+  assert.ok(firstPersonCamera.position.z < 2.6, 'FirstPersonControls should advance an auto-forward still frame')
+
+  const flyCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 10)
+  flyCamera.position.set(0, 0, 3)
+  const fly = new FlyControls(flyCamera, null)
+  fly.movementSpeed = 2
+  fly._moveState.forward = 1
+  fly._moveState.right = 1
+  fly._updateMovementVector()
+  fly.update(0.5)
+  assert.ok(flyCamera.position.z < 2.2 && flyCamera.position.x > 0.8, 'FlyControls should apply deterministic movement vectors')
+
+  const pointerCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 10)
+  pointerCamera.position.set(0, 0, 3)
+  const pointerLock = new PointerLockControls(pointerCamera, null)
+  pointerLock.moveForward(0.5)
+  pointerLock.moveRight(0.25)
+  assert.ok(pointerCamera.position.z < 2.6 && pointerCamera.position.x > 0.2, 'PointerLockControls should move the camera on the XZ plane')
+
+  const transformCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  transformCamera.position.set(0, 0, 4)
+  transformCamera.lookAt(0, 0, 0)
+  transformCamera.updateMatrixWorld(true)
+  const transformScene = new THREE.Scene()
+  transformScene.background = new THREE.Color(0x000000)
+  const transformTargetGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1)
+  const transformTargetMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  const transformTarget = new THREE.Mesh(transformTargetGeometry, transformTargetMaterial)
+  transformTarget.visible = false
+  transformScene.add(transformTarget)
+  const transformControlsDom = {
+    style: {},
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  const transformControls = new TransformControls(transformCamera, transformControlsDom)
+  transformControls.attach(transformTarget)
+  transformControls.setMode('translate')
+  transformControls.setSpace('world')
+  transformControls.setSize(1.5)
+  transformControls.getHelper().updateMatrixWorld(true)
+  transformScene.add(transformControls.getHelper())
+
+  try {
+    const width = 128
+    const height = 96
+    const controlsRgba = renderRgba(scene, orbitCamera, { width, height })
+    const helperRgba = renderRgba(transformScene, transformCamera, { width, height })
+
+    assert.ok(
+      countRegionPixels(controlsRgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && r > g + 40 && r > b + 30) > 200,
+      'OrbitControls-targeted camera should render the red target mesh',
+    )
+    assert.ok(
+      countRegionPixels(helperRgba, width, height, 0, 0, width, height, (r, g, b) => r > 20 || g > 20 || b > 20) > 80,
+      'TransformControls helper should render built-in transform gizmo geometry',
+    )
+  } finally {
+    transformControls.dispose()
+    redGeometry.dispose()
+    redMaterial.dispose()
+    blueGeometry.dispose()
+    blueMaterial.dispose()
+    transformTargetGeometry.dispose()
+    transformTargetMaterial.dispose()
   }
 })
 
