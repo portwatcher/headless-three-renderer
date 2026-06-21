@@ -14,6 +14,7 @@ import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
@@ -2445,6 +2446,24 @@ test('KTX2Loader detects conservative renderer texture compression support', asy
   const asyncLoader = new KTX2Loader()
   assert.equal(await asyncLoader.detectSupportAsync(renderer), asyncLoader)
   assert.deepEqual(asyncLoader.workerConfig, expectedSupport)
+})
+
+test('ProgressiveLightMap internal shader rewrite fails clearly', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  scene.add(mesh)
+
+  const lightMap = new ProgressiveLightMap(renderer, 16)
+  lightMap.addObjectsToLightMap([mesh])
+
+  assert.throws(
+    () => lightMap.update(makeCamera(), 1, false),
+    /material\.onBeforeCompile customizations.*fragmentWgsl/i,
+  )
 })
 
 test('ViewHelper render uses domElement offset size and restores viewport', () => {
