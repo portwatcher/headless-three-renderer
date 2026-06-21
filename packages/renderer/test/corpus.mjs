@@ -123,6 +123,7 @@ export function createSceneCorpus() {
     batchedMeshCorpus(),
     batchedMeshInactiveGeometryCorpus(),
     batchedMeshOptimizedRangeCorpus(),
+    batchedMeshIndexedGroupsCorpus(),
     batchedMeshNonIndexedGroupsCorpus(),
     batchedMeshPartialGroupRangeCorpus(),
     batchedMeshSparseMaterialGroupsCorpus(),
@@ -7308,6 +7309,60 @@ function batchedMeshOptimizedRangeCorpus() {
       }
       if (!(rightMean.b > rightMean.r + 80 && rightMean.b > rightMean.g + 80)) {
         throw new Error(`repacked BatchedMesh geometry should render blue on the right, got ${JSON.stringify(rightMean)}`)
+      }
+    },
+  }
+}
+
+function batchedMeshIndexedGroupsCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.45, 0.45)
+  const batch = new THREE.BatchedMesh(
+    2,
+    source.getAttribute('position').count * 2,
+    source.index.count * 2,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const leftGeometryId = batch.addGeometry(source)
+  const rightGeometryId = batch.addGeometry(source.clone())
+  const left = batch.addInstance(leftGeometryId)
+  const right = batch.addInstance(rightGeometryId)
+  batch.setMatrixAt(left, new THREE.Matrix4().makeTranslation(-0.55, 0, 0))
+  batch.setMatrixAt(right, new THREE.Matrix4().makeTranslation(0.55, 0, 0))
+  batch.perObjectFrustumCulled = false
+
+  const leftRange = batch.getGeometryRangeAt(leftGeometryId, {})
+  const rightRange = batch.getGeometryRangeAt(rightGeometryId, {})
+  batch.geometry.clearGroups()
+  batch.geometry.addGroup(leftRange.start, leftRange.count, 0)
+  batch.geometry.addGroup(rightRange.start, rightRange.count, 1)
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-indexed-groups',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.025,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const leftMean = meanRegion(rgba, width, 20, 42, 30, 54)
+      const rightMean = meanRegion(rgba, width, 66, 42, 76, 54)
+      if (!(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80)) {
+        throw new Error(`indexed BatchedMesh left group should use the red material, got ${JSON.stringify(leftMean)}`)
+      }
+      if (!(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80)) {
+        throw new Error(`indexed BatchedMesh right group should use the green material, got ${JSON.stringify(rightMean)}`)
       }
     },
   }
