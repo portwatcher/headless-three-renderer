@@ -2061,6 +2061,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeAnaglyphEffectShaderMaterial(material)) {
+    throw new Error(
+      'THREE.AnaglyphEffect internal ShaderMaterial is not translated by @headless-three/renderer yet. Use StereoEffect or PeppersGhostEffect for covered stereo helper renders, or render the left and right eye targets separately and compose the anaglyph image outside this helper.',
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2071,6 +2077,30 @@ function isThreePmremShaderMaterial(material: ThreeMaterialLike): material is Th
   return material.name === 'EquirectangularToCubeUV' ||
     material.name === 'CubemapToCubeUV' ||
     material.name === 'SphericalGaussianBlur'
+}
+
+function isThreeAnaglyphEffectShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.mapLeft == null ||
+    values.mapRight == null ||
+    values.colorMatrixLeft == null ||
+    values.colorMatrixRight == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DmapLeft;') &&
+    compact.includes('uniformsampler2DmapRight;') &&
+    compact.includes('uniformmat3colorMatrixLeft;') &&
+    compact.includes('uniformmat3colorMatrixRight;') &&
+    compact.includes('colorMatrixLeft*colorL.rgb+') &&
+    compact.includes('colorMatrixRight*colorR.rgb')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

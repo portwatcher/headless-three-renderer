@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
+import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
 import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
@@ -2568,6 +2569,32 @@ test('PeppersGhostEffect renders scissored cameras into the active target', () =
   assert.ok(nonBackgroundRatio(target.data, [0, 0, 0], 3) > 0.01, 'PeppersGhostEffect should render visible helper panels')
   assert.equal(renderer.getRenderTarget(), target)
   assert.equal(renderer.getScissorTest(), false)
+})
+
+test('AnaglyphEffect internal shader pass fails clearly', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ))
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const renderer = new Renderer()
+  const effect = new AnaglyphEffect(renderer, 32, 32)
+  effect.setSize(32, 32)
+
+  try {
+    assert.throws(
+      () => effect.render(scene, camera),
+      /AnaglyphEffect internal ShaderMaterial.*not translated.*StereoEffect.*PeppersGhostEffect/i,
+    )
+  } finally {
+    effect.dispose()
+  }
 })
 
 test('EffectComposer RenderPass uses Renderer target state and readback', () => {
