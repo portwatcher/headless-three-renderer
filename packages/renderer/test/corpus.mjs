@@ -94,6 +94,7 @@ export function createSceneCorpus() {
     shadowMapEnabledGatingCorpus(),
     shadowMapTypeFilteringCorpus(),
     shadowMaterialReceiverCorpus(),
+    shadowMaterialOpacityCorpus(),
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
@@ -5087,6 +5088,79 @@ function shadowMaterialReceiverCorpus() {
       const shadow = meanRegion(rgba, width, 24, 42, 30, 54)
       if (!(shadow.b > shadow.g + 18 && shadow.g > shadow.r + 1)) {
         throw new Error(`ShadowMaterial corpus should tint received shadows blue-purple (${shadow.r}, ${shadow.g}, ${shadow.b})`)
+      }
+    },
+  }
+}
+
+function shadowMaterialOpacityCorpus() {
+  const camera = makeCamera([0.8, 1.5, 3.0], [0, -0.35, 0])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeScene(opacity) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 4),
+      new THREE.ShadowMaterial({ opacity }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.position.y = -0.6
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 0.8, 0.8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 0.05
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(3, 4, 2)
+    light.target.position.set(0, -0.4, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.left = -3
+    light.shadow.camera.right = 3
+    light.shadow.camera.top = 3
+    light.shadow.camera.bottom = -3
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 10
+    scene.add(light, light.target)
+
+    return scene
+  }
+
+  function shadowLuminance(rgba) {
+    const shadow = meanRegion(rgba, options.width, 24, 42, 30, 54)
+    return shadow.r + shadow.g + shadow.b
+  }
+
+  return {
+    name: 'shadow-material-opacity-scaling',
+    scene: makeScene(1),
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.01,
+    browserReference: false,
+    render(renderer) {
+      const opaque = renderer.render(makeScene(1), camera, options)
+      const translucent = renderer.render(makeScene(0.35), camera, options)
+      stats.opaqueLum = shadowLuminance(opaque)
+      stats.translucentLum = shadowLuminance(translucent)
+      return opaque
+    },
+    validate() {
+      if (!(stats.opaqueLum < 720)) {
+        throw new Error(`opaque ShadowMaterial should render a visible received shadow, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.translucentLum > stats.opaqueLum + 40)) {
+        throw new Error(`lower ShadowMaterial opacity should blend more background through received shadows, stats=${JSON.stringify(stats)}`)
       }
     },
   }
