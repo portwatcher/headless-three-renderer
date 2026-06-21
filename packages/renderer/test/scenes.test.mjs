@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { CSM } from 'three/examples/jsm/csm/CSM.js'
+import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
@@ -2486,6 +2487,48 @@ test('CSM material shader injection fails clearly', () => {
       /CSM material onBeforeCompile customization.*not translated.*native lights and shadows.*fragmentWgsl/i,
     )
   } finally {
+    csm.dispose()
+    csm.remove()
+    THREE.ShaderChunk.lights_fragment_begin = previousLightsFragmentBegin
+    THREE.ShaderChunk.lights_pars_begin = previousLightsParsBegin
+  }
+})
+
+test('CSMHelper renders supported cascade visualization geometry', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const camera = makeCamera()
+  camera.updateMatrixWorld()
+  const viewCamera = new THREE.PerspectiveCamera(50, 1, 0.01, 100)
+  viewCamera.position.set(4, 3, 5)
+  viewCamera.lookAt(0, 0, 0)
+
+  const previousLightsFragmentBegin = THREE.ShaderChunk.lights_fragment_begin
+  const previousLightsParsBegin = THREE.ShaderChunk.lights_pars_begin
+  const csm = new CSM({
+    camera,
+    parent: scene,
+    cascades: 2,
+    shadowMapSize: 16,
+  })
+  let helper
+
+  try {
+    csm.update()
+    helper = new CSMHelper(csm)
+    helper.update()
+    scene.add(helper)
+
+    const rgba = renderRgba(scene, viewCamera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
+      'CSMHelper should render visible cascade helper geometry',
+    )
+  } finally {
+    if (helper) {
+      scene.remove(helper)
+      helper.dispose()
+    }
     csm.dispose()
     csm.remove()
     THREE.ShaderChunk.lights_fragment_begin = previousLightsFragmentBegin
