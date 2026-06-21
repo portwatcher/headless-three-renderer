@@ -56,8 +56,10 @@ import { TextureHelper } from 'three/examples/jsm/helpers/TextureHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
+import { HTMLMesh } from 'three/examples/jsm/interactive/HTMLMesh.js'
 import { InteractiveGroup } from 'three/examples/jsm/interactive/InteractiveGroup.js'
 import { SelectionBox } from 'three/examples/jsm/interactive/SelectionBox.js'
+import { SelectionHelper } from 'three/examples/jsm/interactive/SelectionHelper.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
@@ -6496,7 +6498,65 @@ test('examples interactive selection utilities produce renderable selected scene
   assert.ok(Math.abs(clickUv.x - 0.5) < 0.05)
   assert.ok(Math.abs(clickUv.y - 0.47) < 0.08)
 
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+  let selectionHelper = null
+
   try {
+    const createOverlayElement = () => ({
+      classList: {
+        values: [],
+        add(value) {
+          this.values.push(value)
+        },
+      },
+      parentElement: null,
+      style: {},
+    })
+    globalThis.document = {
+      createElement(tagName) {
+        assert.equal(tagName, 'div')
+        return createOverlayElement()
+      },
+    }
+    const overlayParent = {
+      children: [],
+      appendChild(element) {
+        this.children.push(element)
+        element.parentElement = this
+      },
+      removeChild(element) {
+        this.children = this.children.filter((child) => child !== element)
+        element.parentElement = null
+      },
+    }
+    const selectionListeners = new Map()
+    const selectionRenderer = {
+      domElement: {
+        parentElement: overlayParent,
+        addEventListener(type, listener) {
+          selectionListeners.set(type, listener)
+        },
+        removeEventListener(type, listener) {
+          if (selectionListeners.get(type) === listener) selectionListeners.delete(type)
+        },
+      },
+    }
+    selectionHelper = new SelectionHelper(selectionRenderer, 'selection-box')
+    assert.deepEqual(selectionHelper.element.classList.values, ['selection-box'])
+    assert.equal(selectionHelper.element.style.pointerEvents, 'none')
+    selectionListeners.get('pointerdown')({ clientX: 72, clientY: 38 })
+    selectionListeners.get('pointermove')({ clientX: 40, clientY: 80 })
+    assert.equal(selectionHelper.element.style.display, 'block')
+    assert.equal(selectionHelper.element.style.left, '40px')
+    assert.equal(selectionHelper.element.style.top, '38px')
+    assert.equal(selectionHelper.element.style.width, '32px')
+    assert.equal(selectionHelper.element.style.height, '42px')
+    assert.equal(overlayParent.children.length, 1)
+    selectionListeners.get('pointerup')()
+    assert.equal(selectionHelper.isDown, false)
+    assert.equal(overlayParent.children.length, 0)
+
     const width = 128
     const height = 96
     const rgba = renderRgba(scene, camera, { width, height })
@@ -6518,6 +6578,12 @@ test('examples interactive selection utilities produce renderable selected scene
       'InteractiveGroup child mesh should render through normal group traversal',
     )
   } finally {
+    if (selectionHelper) selectionHelper.dispose()
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
     redGeometry.dispose()
     redMaterial.dispose()
     blueGeometry.dispose()
@@ -6526,6 +6592,42 @@ test('examples interactive selection utilities produce renderable selected scene
     instancedMaterial.dispose()
     interactiveGeometry.dispose()
     interactiveMaterial.dispose()
+  }
+})
+
+test('examples DOM-backed interactive helpers require browser DOM APIs', () => {
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+  delete globalThis.document
+
+  try {
+    const renderer = {
+      domElement: {
+        addEventListener() {},
+        removeEventListener() {},
+        parentElement: {
+          appendChild() {},
+          removeChild() {},
+        },
+      },
+    }
+
+    assert.throws(
+      () => new SelectionHelper(renderer, 'selection-box'),
+      /document is not defined/i,
+      'SelectionHelper should require a browser document for its overlay element',
+    )
+    assert.throws(
+      () => new HTMLMesh({}),
+      /document is not defined/i,
+      'HTMLMesh should require browser document/canvas APIs for html2canvas texture extraction',
+    )
+  } finally {
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
   }
 })
 
