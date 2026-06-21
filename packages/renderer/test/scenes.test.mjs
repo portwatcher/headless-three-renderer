@@ -6509,6 +6509,23 @@ test('Three.js WebGPU examples NodeMaterial objects fail clearly', () => {
   }
 })
 
+test('Three.js WebGPU helper modules fail at import when core NodeMaterial exports are unavailable', async () => {
+  const cases = [
+    'three/examples/jsm/utils/ShadowMapViewerGPU.js',
+    'three/examples/jsm/utils/WebGPUTextureUtils.js',
+    'three/examples/jsm/helpers/LightProbeHelperGPU.js',
+    'three/examples/jsm/helpers/TextureHelperGPU.js',
+  ]
+
+  for (const specifier of cases) {
+    await assert.rejects(
+      () => import(specifier),
+      /does not provide an export named 'NodeMaterial'/,
+      `${specifier} should fail before renderer use when the installed Three.js core entrypoint lacks NodeMaterial exports`,
+    )
+  }
+})
+
 test('EffectComposer RenderPass uses Renderer target state and readback', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
