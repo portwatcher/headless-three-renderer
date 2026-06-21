@@ -4933,6 +4933,127 @@ test('examples FlakesTexture canvas output renders through supported texture pat
   }
 })
 
+test('examples Text2D creates renderable canvas-backed text meshes', () => {
+  function colorFromStyle(style) {
+    return style === '#ffffff' || style === 'white'
+      ? [255, 255, 255, 255]
+      : [0, 0, 0, 255]
+  }
+
+  function makeCanvas() {
+    const canvas = {
+      _width: 0,
+      _height: 0,
+      _pixels: new Uint8ClampedArray(0),
+      _commands: [],
+      get width() {
+        return this._width
+      },
+      set width(value) {
+        this._width = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      get height() {
+        return this._height
+      },
+      set height(value) {
+        this._height = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      getContext(type) {
+        if (type !== '2d') return null
+        return context
+      },
+    }
+    const context = {
+      font: '',
+      textAlign: 'left',
+      textBaseline: 'alphabetic',
+      fillStyle: '#000000',
+      measureText(text) {
+        canvas._commands.push('measureText')
+        return { width: Math.max(1, text.length * 48) }
+      },
+      fillText(text, x, y) {
+        canvas._commands.push('fillText')
+        const color = colorFromStyle(context.fillStyle)
+        const textWidth = Math.min(canvas.width, Math.max(1, Math.floor(text.length * 30)))
+        const x0 = Math.max(0, Math.floor(x - textWidth / 2))
+        const x1 = Math.min(canvas.width, Math.ceil(x + textWidth / 2))
+        const y0 = Math.max(0, Math.floor(y - 22))
+        const y1 = Math.min(canvas.height, Math.ceil(y + 22))
+        for (let row = y0; row < y1; row += 1) {
+          for (let col = x0; col < x1; col += 1) {
+            if ((row + col) % 4 !== 0) {
+              canvas._pixels.set(color, (row * canvas.width + col) * 4)
+            }
+          }
+        }
+      },
+      getImageData(x, y, width, height) {
+        assert.equal(x, 0)
+        assert.equal(y, 0)
+        assert.equal(width, canvas.width)
+        assert.equal(height, canvas.height)
+        return {
+          data: new Uint8ClampedArray(canvas._pixels),
+          width,
+          height,
+        }
+      },
+    }
+    return canvas
+  }
+
+  const previousDocument = globalThis.document
+  let mesh
+  try {
+    globalThis.document = {
+      createElement(type) {
+        assert.equal(type, 'canvas')
+        return makeCanvas()
+      },
+    }
+
+    mesh = createText('Node XR', 0.55)
+    const canvas = mesh.material.map.image
+    assert.equal(mesh.isMesh, true)
+    assert.equal(mesh.material.isMeshBasicMaterial, true)
+    assert.equal(mesh.material.transparent, true)
+    assert.equal(mesh.material.map.isTexture, true)
+    assert.equal(canvas.width, 336)
+    assert.equal(canvas.height, 100)
+    assert.ok(canvas._commands.includes('measureText'))
+    assert.ok(canvas._commands.includes('fillText'))
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    scene.add(mesh)
+
+    const camera = new THREE.OrthographicCamera(-1.3, 1.3, 0.9, -0.9, 0.01, 10)
+    camera.position.set(0, 0, 4)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    const width = 96
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 100 && g > 100 && b > 100) > 350,
+      'Text2D canvas texture should render visible white text pixels',
+    )
+  } finally {
+    mesh?.material.map.dispose()
+    mesh?.material.dispose()
+    mesh?.geometry.dispose()
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
 test('examples canvas-backed utilities require browser canvas creation APIs', () => {
   const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
   const previousDocument = globalThis.document
@@ -4959,6 +5080,11 @@ test('examples canvas-backed utilities require browser canvas creation APIs', ()
       () => new FlakesTexture(4, 4),
       /document is not defined/i,
       'FlakesTexture should require browser-style canvas creation',
+    )
+    assert.throws(
+      () => createText('Node XR', 0.2),
+      /document is not defined/i,
+      'Text2D.createText should require browser-style canvas creation',
     )
   } finally {
     sourceGeometry.dispose()
