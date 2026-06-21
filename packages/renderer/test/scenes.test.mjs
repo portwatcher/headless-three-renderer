@@ -150,6 +150,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import { CSS3DObject, CSS3DRenderer, CSS3DSprite } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 import { Projector, RenderableFace, RenderableLine, RenderableSprite } from 'three/examples/jsm/renderers/Projector.js'
+import { SVGObject, SVGRenderer } from 'three/examples/jsm/renderers/SVGRenderer.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import { FlakesTexture } from 'three/examples/jsm/textures/FlakesTexture.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -3384,6 +3385,118 @@ test('CSS2DRenderer and CSS3DRenderer maintain browser DOM overlay state', () =>
     assert.match(panelElement.style.transform, /matrix3d/)
     assert.match(spriteElement.style.transform, /matrix3d/)
   } finally {
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
+  }
+})
+
+test('SVGRenderer serializes supported Projector output into SVG DOM nodes', () => {
+  function makeSvgElement(namespaceURI, tagName) {
+    const childNodes = []
+    const element = {
+      namespaceURI,
+      tagName,
+      style: {},
+      attributes: new Map(),
+      childNodes,
+      children: childNodes,
+      parentNode: null,
+      setAttribute(name, value) {
+        this.attributes.set(name, String(value))
+      },
+      appendChild(child) {
+        if (child.parentNode && child.parentNode !== this) child.parentNode.removeChild(child)
+        child.parentNode = this
+        childNodes.push(child)
+        return child
+      },
+      removeChild(child) {
+        const index = childNodes.indexOf(child)
+        if (index >= 0) childNodes.splice(index, 1)
+        child.parentNode = null
+        return child
+      },
+    }
+    return element
+  }
+
+  function makeDocument() {
+    return {
+      createElementNS(namespaceURI, tagName) {
+        assert.equal(namespaceURI, 'http://www.w3.org/2000/svg')
+        return makeSvgElement(namespaceURI, tagName)
+      },
+    }
+  }
+
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+  const meshGeometry = new THREE.PlaneGeometry(0.8, 0.7)
+  const meshMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-0.55, -0.45, 0),
+    new THREE.Vector3(0.45, -0.45, 0),
+  ])
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x44ff66 })
+
+  try {
+    delete globalThis.document
+    assert.throws(() => new SVGRenderer(), /document is not defined/i)
+
+    globalThis.document = makeDocument()
+    const renderer = new SVGRenderer()
+    renderer.setQuality('low')
+    renderer.setClearColor(0x112233)
+    renderer.setSize(120, 80)
+    renderer.clear()
+
+    assert.equal(renderer.domElement.tagName, 'svg')
+    assert.equal(renderer.domElement.attributes.get('width'), '120')
+    assert.equal(renderer.domElement.attributes.get('height'), '80')
+    assert.equal(renderer.domElement.attributes.get('viewBox'), '-60 -40 120 80')
+    assert.match(renderer.domElement.style.backgroundColor, /^rgb/)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    const mesh = new THREE.Mesh(meshGeometry, meshMaterial)
+    mesh.position.x = -0.2
+    const line = new THREE.LineSegments(lineGeometry, lineMaterial)
+    const customNode = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    const svgObject = new SVGObject(customNode)
+    svgObject.position.set(0.35, 0.2, 0)
+    scene.add(mesh, line, svgObject)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.z = 3
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    renderer.setPrecision(2)
+    renderer.render(scene, camera)
+    const pathNodes = renderer.domElement.childNodes.filter((node) => node.tagName === 'path')
+    assert.ok(pathNodes.length >= 2, 'SVGRenderer should append projected path nodes')
+    assert.ok(pathNodes.some((node) => node.attributes.get('style').includes('fill:')), 'mesh faces should produce fill paths')
+    assert.ok(pathNodes.some((node) => node.attributes.get('style').includes('stroke:')), 'line segments should produce stroke paths')
+    assert.ok(pathNodes.some((node) => node.attributes.get('shape-rendering') === 'crispEdges'))
+    assert.ok(pathNodes.every((node) => node.attributes.get('d').startsWith('M')))
+    assert.equal(customNode.parentNode, renderer.domElement)
+    assert.match(customNode.attributes.get('transform'), /^translate\(/)
+    assert.equal(renderer.info.render.faces, 2)
+    assert.equal(renderer.info.render.vertices, 6)
+
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.03,
+      'SVGRenderer source scene objects should still render through the normal renderer path',
+    )
+  } finally {
+    meshGeometry.dispose()
+    meshMaterial.dispose()
+    lineGeometry.dispose()
+    lineMaterial.dispose()
     if (hadDocument) {
       globalThis.document = previousDocument
     } else {
