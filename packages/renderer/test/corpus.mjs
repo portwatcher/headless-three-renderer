@@ -23,6 +23,7 @@ export function createSceneCorpus() {
     cubeCameraUpdateCorpus(),
     viewportScissorCorpus(),
     customSortGroupCorpus(),
+    customTransparentSortGroupCorpus(),
     materialEnvMapCorpus(),
     materialEnvMapBasicLambertCorpus(),
     materialEnvMapPbrCorpus(),
@@ -3393,6 +3394,54 @@ function customSortGroupCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(center.r > center.b + 160 && center.r > center.g + 170 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
         throw new Error(`custom sort corpus should draw the red group last on black background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function customTransparentSortGroupCorpus() {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.9, 0,
+    0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, 0.9, 0,
+    -0.9, -0.9, 0,
+    0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, -0.9, 0,
+    0.9, 0.9, 0,
+    -0.9, 0.9, 0,
+  ]), 3))
+  geometry.addGroup(0, 6, 0)
+  geometry.addGroup(6, 6, 1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(geometry, [
+    new THREE.MeshBasicMaterial({ color: 0xff3344, opacity: 0.55, transparent: true, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: 0x2266ff, opacity: 0.55, transparent: true, depthWrite: false }),
+  ]))
+
+  return {
+    name: 'custom-transparent-sort-group-items',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: {
+      width: CORPUS_RENDER_SIZE,
+      height: CORPUS_RENDER_SIZE,
+      format: 'rgba',
+      transparentSort: (a, b) => b.group.materialIndex - a.group.materialIndex,
+    },
+    background: [0, 0, 0],
+    browserReference: false,
+    validate(rgba, { width }) {
+      const center = pixelAt(rgba, width, 48, 48)
+      const corner = pixelAt(rgba, width, 4, 4)
+      if (!(center.r > center.b + 10 && center.r > center.g + 60 && corner.r === 0 && corner.g === 0 && corner.b === 0)) {
+        throw new Error(`custom transparent sort corpus should draw the red group last on black background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },
   }
