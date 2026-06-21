@@ -6703,7 +6703,12 @@ function shadowMaterialOpacityCorpus() {
 
 function shadowMaterialOutputColorSpaceCorpus() {
   const camera = makeCamera([0, 6, 8], [0, 0, 0])
-  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const options = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }
   const stats = {}
 
   function makeScene() {
@@ -6753,7 +6758,6 @@ function shadowMaterialOutputColorSpaceCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.01,
-    browserReference: false,
     render(renderer) {
       const srgb = renderer.render(makeScene(), camera, { ...options, outputColorSpace: THREE.SRGBColorSpace })
       const linear = renderer.render(makeScene(), camera, { ...options, outputColorSpace: THREE.LinearSRGBColorSpace })

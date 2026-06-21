@@ -476,6 +476,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "shadow-material-output-color-space.png",
+      "name": "shadow-material-output-color-space",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
       "file": "shadow-material-fog-opt-out.png",
       "name": "shadow-material-fog-opt-out",
       "width": 96,
