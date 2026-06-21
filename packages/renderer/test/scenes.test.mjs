@@ -3820,6 +3820,143 @@ test('examples WebXR hand and controller model helpers update renderable local g
   envMap.dispose()
 })
 
+test('examples WebXR planes and estimated light helpers update renderable scene state', async () => {
+  const { XREstimatedLight } = await import('three/examples/jsm/webxr/XREstimatedLight.js')
+  const { XRPlanes } = await import('three/examples/jsm/webxr/XRPlanes.js')
+
+  const renderer = new Renderer()
+  const planes = new XRPlanes(renderer)
+  let planeChanges = 0
+  planes.addEventListener('planeschanged', () => {
+    planeChanges += 1
+  })
+  const detectedPlane = {
+    planeSpace: { id: 'plane-space' },
+    polygon: [
+      { x: -0.45, z: -0.25 },
+      { x: 0.45, z: -0.25 },
+      { x: 0.45, z: 0.25 },
+      { x: -0.45, z: 0.25 },
+    ],
+  }
+  const planeMatrix = new THREE.Matrix4().makeTranslation(0, 0, -1).toArray()
+  renderer.xr.dispatchEvent({
+    type: 'planesdetected',
+    data: {
+      detectedPlanes: new Set([detectedPlane]),
+      getPose(planeSpace, referenceSpace) {
+        assert.equal(planeSpace, detectedPlane.planeSpace)
+        assert.equal(referenceSpace, null)
+        return { transform: { matrix: planeMatrix } }
+      },
+    },
+  })
+  assert.equal(planeChanges, 1)
+  assert.equal(planes.children.length, 1)
+  const planeMesh = planes.children[0]
+  assert.equal(planeMesh.isMesh, true)
+  assert.equal(planeMesh.geometry.parameters.width, 0.9)
+  assert.equal(planeMesh.geometry.parameters.height, 0.01)
+  assert.equal(planeMesh.geometry.parameters.depth, 0.5)
+
+  const planeScene = new THREE.Scene()
+  planeScene.background = new THREE.Color(0x000000)
+  planeScene.add(planes)
+  const planeCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  planeCamera.position.set(0, 0.8, 1.8)
+  planeCamera.lookAt(0, 0, -1)
+  const planeRgba = renderRgba(planeScene, planeCamera, { width: 64, height: 64 })
+  assert.ok(
+    nonBackgroundRatio(planeRgba, [0, 0, 0], 3) > 0.01,
+    'XRPlanes should create renderable built-in mesh plane geometry',
+  )
+
+  renderer.xr.dispatchEvent({
+    type: 'planesdetected',
+    data: {
+      detectedPlanes: new Set(),
+      getPose() {
+        throw new Error('removed planes should not request poses')
+      },
+    },
+  })
+  assert.equal(planeChanges, 2)
+  assert.equal(planes.children.length, 0)
+  renderer.dispose()
+
+  const listeners = new Map()
+  const frameCallbacks = []
+  const lightProbeHandle = { id: 'light-probe' }
+  let requestedLightProbe = null
+  const session = {
+    preferredReflectionFormat: 'srgba8',
+    requestLightProbe(init) {
+      requestedLightProbe = init
+      return Promise.resolve(lightProbeHandle)
+    },
+    requestAnimationFrame(callback) {
+      frameCallbacks.push(callback)
+    },
+  }
+  const xr = {
+    addEventListener(type, listener) {
+      if (!listeners.has(type)) listeners.set(type, [])
+      listeners.get(type).push(listener)
+    },
+    getSession() {
+      return session
+    },
+    dispatch(type) {
+      for (const listener of listeners.get(type) ?? []) listener({ type })
+    },
+  }
+  const estimatedLight = new XREstimatedLight({ xr }, false)
+  let estimationStarts = 0
+  let estimationEnds = 0
+  estimatedLight.addEventListener('estimationstart', () => {
+    estimationStarts += 1
+  })
+  estimatedLight.addEventListener('estimationend', () => {
+    estimationEnds += 1
+  })
+  assert.equal(estimatedLight.lightProbe.intensity, 0)
+  assert.equal(estimatedLight.directionalLight.intensity, 0)
+  assert.equal(estimatedLight.environment, null)
+
+  xr.dispatch('sessionstart')
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.deepEqual(requestedLightProbe, { reflectionFormat: 'srgba8' })
+  assert.equal(frameCallbacks.length, 1)
+
+  const sphericalHarmonics = Array.from({ length: 27 }, (_, index) => (index === 0 ? 0.5 : 0.01))
+  frameCallbacks[0](0, {
+    session,
+    getLightEstimate(probe) {
+      assert.equal(probe, lightProbeHandle)
+      return {
+        sphericalHarmonicsCoefficients: sphericalHarmonics,
+        primaryLightIntensity: { x: 3, y: 1.5, z: 0.75 },
+        primaryLightDirection: new THREE.Vector3(0, -1, 0),
+      }
+    },
+  })
+  assert.equal(frameCallbacks.length, 2)
+  assert.equal(estimationStarts, 1)
+  assert.equal(estimatedLight.lightProbe.intensity, 1)
+  assert.equal(estimatedLight.directionalLight.intensity, 3)
+  assert.ok(Math.abs(estimatedLight.directionalLight.color.r - 1) < 1e-6)
+  assert.ok(Math.abs(estimatedLight.directionalLight.color.g - 0.5) < 1e-6)
+  assert.ok(Math.abs(estimatedLight.directionalLight.color.b - 0.25) < 1e-6)
+  assert.equal(estimatedLight.directionalLight.position.y, -1)
+
+  xr.dispatch('sessionend')
+  assert.equal(estimationEnds, 1)
+  estimatedLight.dispose()
+  assert.equal(estimatedLight.lightProbe, null)
+  assert.equal(estimatedLight.directionalLight, null)
+})
+
 test('examples Addons barrel imports in Node and exposes covered helper modules', async () => {
   const Addons = await import('three/examples/jsm/Addons.js')
 
