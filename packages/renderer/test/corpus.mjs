@@ -96,6 +96,7 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    physicalSpecularMapCorpus(),
     physicalIridescenceMapCorpus(),
     physicalTransmissionDispersionCorpus(),
     transmissionResolutionScaleCorpus(),
@@ -119,6 +120,7 @@ export function createSceneCorpus() {
     pointsMaterialTextureCorpus(),
     pointsMaterialUvChannelCorpus(),
     instancedLinesPointsCorpus(),
+    instancedLineNoBridgeCorpus(),
     instancedTextureUvCorpus(),
     renderableFrustumCullingCorpus(),
     batchedMeshCorpus(),
@@ -5278,6 +5280,107 @@ function physicalIblShadowCorpus() {
   }
 }
 
+function physicalSpecularMapCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeMap(data, offsetX) {
+    const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, offsetX)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function addSpecularLight(scene) {
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+  }
+
+  function makeSpecularColorScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+        specularColorMap: makeMap([
+          0, 0, 0, 255,
+          255, 0, 0, 255,
+        ], offsetX),
+      }),
+    ))
+    addSpecularLight(scene)
+    return scene
+  }
+
+  function makeSpecularIntensityScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+        specularIntensityMap: makeMap([
+          0, 0, 0, 0,
+          0, 0, 0, 255,
+        ], offsetX),
+      }),
+    ))
+    addSpecularLight(scene)
+    return scene
+  }
+
+  function maxLuminance(rgba) {
+    let max = 0
+    for (let i = 0; i < rgba.length; i += 4) {
+      const lum = 0.2126 * rgba[i] + 0.7152 * rgba[i + 1] + 0.0722 * rgba[i + 2]
+      if (lum > max) max = lum
+    }
+    return max
+  }
+
+  return {
+    name: 'physical-specular-map-slots',
+    scene: makeSpecularColorScene(0.5),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      const colorPrimary = renderer.render(makeSpecularColorScene(0), camera, options)
+      const colorShifted = renderer.render(makeSpecularColorScene(0.5), camera, options)
+      const intensityPrimary = renderer.render(makeSpecularIntensityScene(0), camera, options)
+      const intensityShifted = renderer.render(makeSpecularIntensityScene(0.5), camera, options)
+      stats.colorPrimary = meanRegion(colorPrimary, options.width, 0, 0, options.width, options.height)
+      stats.colorShifted = meanRegion(colorShifted, options.width, 0, 0, options.width, options.height)
+      stats.intensityPrimary = maxLuminance(intensityPrimary)
+      stats.intensityShifted = maxLuminance(intensityShifted)
+      return colorShifted
+    },
+    validate() {
+      if (!(stats.colorShifted.r > stats.colorPrimary.r + 4 && stats.colorShifted.r > stats.colorShifted.g + 4)) {
+        throw new Error(`physical specular corpus should tint specularColorMap highlights red, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.intensityShifted > stats.intensityPrimary + 40)) {
+        throw new Error(`physical specular corpus should enable shifted specularIntensityMap highlights, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
 function physicalIridescenceMapCorpus() {
   const camera = makeCamera([0, 0, 3])
   const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
@@ -7045,6 +7148,67 @@ function instancedLinesPointsCorpus() {
       if (!(redPixels > 250 && greenPixels > 250 && bluePixels > 250 && yellowPixels > 250 && cyanPixels > 250)) {
         throw new Error(`instanced line/point corpus should render all per-instance colors, got red=${redPixels} green=${greenPixels} blue=${bluePixels} yellow=${yellowPixels} cyan=${cyanPixels}`)
       }
+    },
+  }
+}
+
+function instancedLineNoBridgeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  function makeGeometry(y) {
+    const geometry = new THREE.InstancedBufferGeometry()
+    geometry.instanceCount = 2
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -0.25, y, 0,
+      0.25, y, 0,
+    ]), 3))
+    geometry.setAttribute('instanceOffset', new THREE.InstancedBufferAttribute(new Float32Array([
+      -0.5, 0, 0,
+      0.5, 0, 0,
+    ]), 3))
+    geometry.setAttribute('color', new THREE.InstancedBufferAttribute(new Float32Array([
+      1, 0, 0,
+      0, 1, 0,
+    ]), 3))
+    return geometry
+  }
+
+  function makeMaterial() {
+    return new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      linewidth: 8,
+      vertexColors: true,
+    })
+  }
+
+  scene.add(new THREE.Line(makeGeometry(0.4), makeMaterial()))
+  scene.add(new THREE.LineLoop(makeGeometry(-0.4), makeMaterial()))
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'instanced-line-no-bridge',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.004,
+    browserReference: false,
+    validate(rgba, { width }) {
+      function checkRow(label, minY, maxY) {
+        const redPixels = countRegionPixels(rgba, width, 16, minY, 40, maxY, (r, g, b) => r > g + 30 && r > b + 30)
+        const greenPixels = countRegionPixels(rgba, width, 56, minY, 80, maxY, (r, g, b) => g > r + 30 && g > b + 30)
+        const bridgePixels = countRegionPixels(rgba, width, 42, minY, 54, maxY, (r, g, b) => r > 30 || g > 30 || b > 30)
+        if (redPixels < 20 || greenPixels < 20 || bridgePixels > 1) {
+          throw new Error(`${label} instanced line corpus should draw both instances without a center bridge, red=${redPixels} green=${greenPixels} bridge=${bridgePixels}`)
+        }
+      }
+
+      checkRow('Line', 26, 38)
+      checkRow('LineLoop', 58, 70)
     },
   }
 }
