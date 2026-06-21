@@ -13,6 +13,7 @@ import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExp
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
@@ -2423,6 +2424,27 @@ test('LightProbeGenerator reads cube targets through the WebGLRenderer marker pa
   ), 0)
   assert.ok(Number.isFinite(energy), `generated LightProbe coefficients should stay finite (${energy})`)
   assert.ok(energy > 0.01, `generated LightProbe should contain captured cube radiance (${energy})`)
+})
+
+test('KTX2Loader detects conservative renderer texture compression support', async () => {
+  const renderer = new Renderer()
+  const expectedSupport = {
+    astcSupported: false,
+    astcHDRSupported: false,
+    etc1Supported: false,
+    etc2Supported: false,
+    dxtSupported: false,
+    bptcSupported: false,
+    pvrtcSupported: false,
+  }
+
+  const loader = new KTX2Loader()
+  assert.equal(loader.detectSupport(renderer), loader)
+  assert.deepEqual(loader.workerConfig, expectedSupport)
+
+  const asyncLoader = new KTX2Loader()
+  assert.equal(await asyncLoader.detectSupportAsync(renderer), asyncLoader)
+  assert.deepEqual(asyncLoader.workerConfig, expectedSupport)
 })
 
 test('ViewHelper render uses domElement offset size and restores viewport', () => {
