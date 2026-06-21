@@ -13,6 +13,8 @@ import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffec
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
+import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
@@ -2648,6 +2650,51 @@ test('ViewHelper render uses domElement offset size and restores viewport', () =
     } else {
       globalThis.document = previousDocument
     }
+  }
+})
+
+test('vertex normal and tangent helpers render generated line geometry', () => {
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    -0.4, -0.35, 0,
+    0.45, -0.3, 0,
+    -0.35, 0.45, 0,
+  ], 3))
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ], 3))
+  geometry.setAttribute('tangent', new THREE.Float32BufferAttribute([
+    1, 0, 0, 1,
+    1, 0, 0, 1,
+    1, 0, 0, 1,
+  ], 4))
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x111111 }))
+  mesh.position.set(-0.1, 0, 0)
+  mesh.rotation.y = 0.25
+
+  const normalHelper = new VertexNormalsHelper(mesh, 0.55, 0xff0000)
+  const tangentHelper = new VertexTangentsHelper(mesh, 0.55, 0x00ffff)
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(normalHelper, tangentHelper)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(1.4, 1.1, 2.6)
+  camera.lookAt(0, 0, 0.2)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
+      'vertex normal/tangent helpers should render visible line geometry',
+    )
+  } finally {
+    normalHelper.dispose()
+    tangentHelper.dispose()
+    geometry.dispose()
+    mesh.material.dispose()
   }
 })
 
