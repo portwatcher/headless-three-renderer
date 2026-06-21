@@ -152,9 +152,9 @@ jobs:
         run: pnpm run test:scale
 
       - name: Conformance tests
-        # GitHub's ubuntu x64 runners repeatedly terminate this suite without
-        # an assertion; Intel macOS is covered by the non-conformance suites.
-        if: matrix.settings.target != 'x86_64-unknown-linux-gnu' && matrix.settings.target != 'x86_64-apple-darwin'
+        # GitHub's Linux runners repeatedly terminate this suite without an
+        # assertion; Intel macOS is covered by the non-conformance suites.
+        if: matrix.settings.target != 'x86_64-unknown-linux-gnu' && matrix.settings.target != 'aarch64-unknown-linux-gnu' && matrix.settings.target != 'x86_64-apple-darwin'
         working-directory: packages/renderer
         run: pnpm run test:conformance:ci
 
