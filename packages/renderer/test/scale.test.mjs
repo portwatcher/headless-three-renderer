@@ -343,6 +343,63 @@ test('mesh render budget handles 1,936 separate mesh objects', () => {
   assert.ok(mean.r > 25 && mean.g > 25 && mean.b > 25, `separate mesh colors should survive rendering (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('material group budget renders 512 grouped spans in one mesh', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 32
+  const rows = 16
+  const groupCount = columns * rows
+  const quadWidth = 0.052
+  const quadHeight = 0.096
+  const positions = new Float32Array(groupCount * 4 * 3)
+  const indices = []
+  const geometry = new THREE.BufferGeometry()
+
+  for (let index = 0; index < groupCount; index += 1) {
+    const col = index % columns
+    const row = Math.floor(index / columns)
+    const centerX = (col / (columns - 1) - 0.5) * 1.95
+    const centerY = (row / (rows - 1) - 0.5) * 1.85
+    const z = Math.sin(col * 0.23 + row * 0.31) * 0.01
+    const vertexOffset = index * 4
+    const positionOffset = vertexOffset * 3
+
+    positions.set([
+      centerX - quadWidth / 2, centerY - quadHeight / 2, z,
+      centerX + quadWidth / 2, centerY - quadHeight / 2, z,
+      centerX + quadWidth / 2, centerY + quadHeight / 2, z,
+      centerX - quadWidth / 2, centerY + quadHeight / 2, z,
+    ], positionOffset)
+    indices.push(
+      vertexOffset, vertexOffset + 1, vertexOffset + 2,
+      vertexOffset, vertexOffset + 2, vertexOffset + 3,
+    )
+    geometry.addGroup(index * 6, 6, index % 16)
+  }
+
+  const materials = Array.from({ length: 16 }, (_, index) => new THREE.MeshBasicMaterial({
+    color: new THREE.Color().setHSL(index / 16, 0.72, 0.55),
+  }))
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  scene.add(new THREE.Mesh(geometry, materials))
+
+  assert.equal(geometry.groups.length, groupCount)
+  assert.equal(materials.length, 16)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.3, `grouped material-array mesh should render broad coverage (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > 30 && mean.g > 30 && mean.b > 25, `group material colors should survive batching (${mean.r}, ${mean.g}, ${mean.b})`)
+})
+
 test('transparent sorting budget renders 1,024 layered meshes', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)

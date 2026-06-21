@@ -9,6 +9,7 @@ target platform and GPU backend.
 | Area | Covered budget | Notes |
 |---|---:|---|
 | Mesh count | 1,936 meshes | `scale.test.mjs` renders a 44 x 44 grid of separate mesh objects with shared lightweight geometry and a small material set. |
+| Material group spans | 512 groups | A single indexed mesh renders a 32 x 16 grid with one geometry group per quad and a 16-material array. |
 | Transparent sorting | 1,024 layered meshes | A 32 x 16 grid renders paired transparent planes with traversal order opposite `renderOrder` to exercise the transparent sort list at scale. |
 | Nested scene graph traversal | 2,048 transform groups and 256 meshes | A 16 x 16 grid renders visible meshes below eight-level `Object3D` transform chains to exercise hierarchy traversal and world-matrix propagation. |
 | Mixed mesh/texture/light scene | 144 meshes | A 12 x 12 grid of transformed box meshes renders with ten unique raw textures and supported punctual lights. |
