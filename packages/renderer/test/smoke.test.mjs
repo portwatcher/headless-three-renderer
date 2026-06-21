@@ -236,11 +236,18 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
     assert.equal(fileUrlGltf.scene.name, 'SimpleTriangleScene')
 
     const fixtureRoot = fileURLToPath(new URL('./fixtures/', import.meta.url))
-    const rootedLoaderBundle = await createNodeGltfLoader(fixtureRoot)
-    const directLoadedGltf = await new Promise((resolve, reject) => {
-      rootedLoaderBundle.loader.load('simple-triangle.gltf', resolve, undefined, reject)
-    })
-    assert.equal(directLoadedGltf.scene.name, 'SimpleTriangleScene')
+    const directRootCases = [
+      ['absolute', fixtureRoot],
+      ['relative', path.relative(process.cwd(), fixtureRoot) || '.'],
+      ['file URL', pathToFileURL(fixtureRoot).href],
+    ]
+    for (const [label, rootDir] of directRootCases) {
+      const rootedLoaderBundle = await createNodeGltfLoader(rootDir)
+      const directLoadedGltf = await new Promise((resolve, reject) => {
+        rootedLoaderBundle.loader.load('simple-triangle.gltf', resolve, undefined, reject)
+      })
+      assert.equal(directLoadedGltf.scene.name, 'SimpleTriangleScene', `${label} root should support direct loader.load()`)
+    }
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
