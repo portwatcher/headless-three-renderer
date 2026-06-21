@@ -96,6 +96,7 @@ import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
 import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js'
 import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader.js'
 import { VTKLoader } from 'three/examples/jsm/loaders/VTKLoader.js'
@@ -4346,6 +4347,23 @@ test('SVGRenderer serializes supported Projector output into SVG DOM nodes', () 
       globalThis.document = previousDocument
     } else {
       delete globalThis.document
+    }
+  }
+})
+
+test('SVGLoader exposes its DOMParser dependency in plain Node', () => {
+  const hadDOMParser = Object.prototype.hasOwnProperty.call(globalThis, 'DOMParser')
+  const previousDOMParser = globalThis.DOMParser
+
+  try {
+    delete globalThis.DOMParser
+    assert.throws(
+      () => new SVGLoader().parse('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L1 0 L1 1 Z"/></svg>'),
+      /DOMParser is not defined|DOMParser is not a constructor/i,
+    )
+  } finally {
+    if (hadDOMParser) {
+      globalThis.DOMParser = previousDOMParser
     }
   }
 })
