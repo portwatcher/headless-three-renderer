@@ -17,6 +17,10 @@ import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExp
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { DebugEnvironment } from 'three/examples/jsm/environments/DebugEnvironment.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { TrefoilKnot } from 'three/examples/jsm/curves/CurveExtras.js'
+import { NURBSCurve } from 'three/examples/jsm/curves/NURBSCurve.js'
+import { NURBSSurface } from 'three/examples/jsm/curves/NURBSSurface.js'
+import { NURBSVolume } from 'three/examples/jsm/curves/NURBSVolume.js'
 import { BoxLineGeometry } from 'three/examples/jsm/geometries/BoxLineGeometry.js'
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
@@ -3827,6 +3831,122 @@ test('examples InstancedPointsGeometry and ParametricGeometries render generated
     instancedGeometry.dispose()
     for (const entry of entries) entry.geometry.dispose()
     for (const material of materials) material.dispose()
+  }
+})
+
+test('examples CurveExtras and NURBS helpers render generated geometry paths', () => {
+  const curveGeometry = new THREE.TubeGeometry(new TrefoilKnot(0.18), 64, 0.025, 6, true)
+  const curveMaterial = new THREE.MeshBasicMaterial({ color: 0xff55aa, side: THREE.DoubleSide })
+  const curveMesh = new THREE.Mesh(curveGeometry, curveMaterial)
+  curveMesh.position.x = -1.2
+
+  const nurbsCurve = new NURBSCurve(3, [0, 0, 0, 0, 1, 1, 1, 1], [
+    new THREE.Vector4(-0.42, -0.28, 0, 1),
+    new THREE.Vector4(-0.12, 0.42, 0.18, 1),
+    new THREE.Vector4(0.18, -0.42, -0.08, 1),
+    new THREE.Vector4(0.42, 0.28, 0, 1),
+  ])
+  const nurbsCurveGeometry = new THREE.TubeGeometry(nurbsCurve, 32, 0.022, 6, false)
+  const nurbsCurveMaterial = new THREE.MeshBasicMaterial({ color: 0x55ffff, side: THREE.DoubleSide })
+  const nurbsCurveMesh = new THREE.Mesh(nurbsCurveGeometry, nurbsCurveMaterial)
+  nurbsCurveMesh.position.x = -0.35
+
+  const surfaceKnots = [0, 0, 0, 1, 1, 1]
+  const nurbsSurface = new NURBSSurface(2, 2, surfaceKnots, surfaceKnots, [
+    [
+      new THREE.Vector4(-0.34, -0.34, 0.02, 1),
+      new THREE.Vector4(-0.34, 0, 0.22, 1),
+      new THREE.Vector4(-0.34, 0.34, 0.02, 1),
+    ],
+    [
+      new THREE.Vector4(0, -0.34, 0.18, 1),
+      new THREE.Vector4(0, 0, 0.34, 1),
+      new THREE.Vector4(0, 0.34, 0.18, 1),
+    ],
+    [
+      new THREE.Vector4(0.34, -0.34, 0.02, 1),
+      new THREE.Vector4(0.34, 0, 0.22, 1),
+      new THREE.Vector4(0.34, 0.34, 0.02, 1),
+    ],
+  ])
+  const surfaceGeometry = new ParametricGeometry((u, v, target) => {
+    nurbsSurface.getPoint(u, v, target)
+  }, 10, 10)
+  const surfaceMaterial = new THREE.MeshBasicMaterial({ color: 0x66ff77, side: THREE.DoubleSide })
+  const surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial)
+  surfaceMesh.position.x = 0.45
+
+  const volumeKnots = [0, 0, 1, 1]
+  const nurbsVolume = new NURBSVolume(1, 1, 1, volumeKnots, volumeKnots, volumeKnots, [
+    [
+      [new THREE.Vector4(-0.28, -0.24, -0.08, 1), new THREE.Vector4(-0.18, -0.18, 0.16, 1)],
+      [new THREE.Vector4(-0.24, 0.24, 0.04, 1), new THREE.Vector4(-0.12, 0.28, 0.22, 1)],
+    ],
+    [
+      [new THREE.Vector4(0.22, -0.22, -0.02, 1), new THREE.Vector4(0.28, -0.18, 0.18, 1)],
+      [new THREE.Vector4(0.18, 0.22, 0.08, 1), new THREE.Vector4(0.3, 0.26, 0.26, 1)],
+    ],
+  ])
+  const volumeSamples = [
+    [0, 0, 0],
+    [1, 1, 1],
+    [0, 1, 0],
+    [1, 0, 1],
+    [0, 0.5, 1],
+    [1, 0.5, 0],
+  ].map(([u, v, w]) => {
+    const point = new THREE.Vector3()
+    nurbsVolume.getPoint(u, v, w, point)
+    return point
+  })
+  const volumeGeometry = new THREE.BufferGeometry().setFromPoints(volumeSamples)
+  const volumeMaterial = new THREE.LineBasicMaterial({ color: 0x6688ff, linewidth: 4 })
+  const volumeLines = new THREE.LineSegments(volumeGeometry, volumeMaterial)
+  volumeLines.position.x = 1.25
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(curveMesh, nurbsCurveMesh, surfaceMesh, volumeLines)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.equal(curveGeometry.isBufferGeometry, true)
+    assert.ok(curveGeometry.getAttribute('position')?.count > 0, 'CurveExtras TubeGeometry should generate vertices')
+    assert.ok(nurbsCurveGeometry.getAttribute('position')?.count > 0, 'NURBSCurve TubeGeometry should generate vertices')
+    assert.ok(surfaceGeometry.getAttribute('normal'), 'NURBSSurface ParametricGeometry should generate normals')
+    assert.equal(volumeGeometry.getAttribute('position')?.count, 6)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 130 && b > 100 && g < 120) > 60,
+      'CurveExtras TrefoilKnot tube should render pink pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 180 && b > 180 && r < 190) > 25,
+      'NURBSCurve tube should render cyan pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 130 && g > r + 40 && g > b + 20) > 60,
+      'NURBSSurface mesh should render green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && r < 130 && g < 170) > 20,
+      'NURBSVolume sampled line segments should render blue pixels',
+    )
+  } finally {
+    curveGeometry.dispose()
+    curveMaterial.dispose()
+    nurbsCurveGeometry.dispose()
+    nurbsCurveMaterial.dispose()
+    surfaceGeometry.dispose()
+    surfaceMaterial.dispose()
+    volumeGeometry.dispose()
+    volumeMaterial.dispose()
   }
 })
 
@@ -39929,6 +40049,8 @@ test('Renderer pixel ratio is validated compatibility state', () => {
   const renderer = new Renderer()
   assert.equal(renderer.getPixelRatio(), 1)
   renderer.setPixelRatio(2)
+  assert.equal(renderer.getPixelRatio(), 2)
+  assert.equal(renderer.setPixelRatio(undefined), undefined)
   assert.equal(renderer.getPixelRatio(), 2)
 
   renderer.setSize(24, 16)

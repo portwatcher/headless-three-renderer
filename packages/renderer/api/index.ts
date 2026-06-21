@@ -3213,7 +3213,8 @@ export class Renderer {
     )
   }
 
-  setPixelRatio(value: number): void {
+  setPixelRatio(value?: number): void {
+    if (value === undefined) return
     this.pixelRatioValue = rendererStatePixelRatio(value, 'Renderer.setPixelRatio')
   }
 
