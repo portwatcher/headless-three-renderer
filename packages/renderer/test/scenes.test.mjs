@@ -50,6 +50,7 @@ import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { Lut } from 'three/examples/jsm/math/Lut.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
@@ -1381,6 +1382,71 @@ test('BatchedMesh material arrays honor packed geometry groups', () => {
   const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
   assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `left BatchedMesh geometry group should use the red material (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
   assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right BatchedMesh geometry group should use the green material (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
+})
+
+test('BatchedMesh packed geometry groups preserve source offsets inside later geometry ranges', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const padding = new THREE.BufferGeometry()
+  padding.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.1, -0.1, 0,
+    0.1, -0.1, 0,
+    0, 0.1, 0,
+  ]), 3))
+  padding.setIndex([0, 1, 2])
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+  source.addGroup(0, 6, 0)
+  source.addGroup(6, 6, 1)
+
+  const batched = new THREE.BatchedMesh(
+    1,
+    padding.getAttribute('position').count + source.getAttribute('position').count,
+    padding.index.count + source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  batched.addGeometry(padding)
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+  batched.perObjectFrustumCulled = false
+
+  const range = batched.getGeometryRangeAt(geometryId, {})
+  assert.equal(range.start, padding.index.count)
+  batched.geometry.clearGroups()
+  for (const group of source.groups) {
+    batched.geometry.addGroup(range.start + group.start, group.count, group.materialIndex)
+  }
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const leftMean = meanRegion(rgba, 96, 64, 20, 28, 30, 36)
+  const rightMean = meanRegion(rgba, 96, 64, 66, 28, 76, 36)
+  assert.ok(leftMean.r > leftMean.g + 80 && leftMean.r > leftMean.b + 80, `later packed BatchedMesh source group should render red on the left (${leftMean.r}, ${leftMean.g}, ${leftMean.b})`)
+  assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `later packed BatchedMesh source group should render green on the right (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
 test('BatchedMesh material arrays honor non-indexed packed geometry groups', () => {
@@ -4276,6 +4342,71 @@ test('examples SceneOptimizer batches compatible meshes into renderable BatchedM
         child.material?.dispose()
       }
     }
+  }
+})
+
+test('examples Lut maps scalar values into renderable vertex colors', () => {
+  const lut = new Lut('rainbow', 8).setMin(-1).setMax(1)
+  const scalarValues = [-1, 0, 1]
+  const centers = [-0.62, 0, 0.62]
+  const positions = []
+  const colors = []
+  const halfWidth = 0.22
+  const halfHeight = 0.42
+
+  for (let i = 0; i < scalarValues.length; i += 1) {
+    const x = centers[i]
+    const corners = [
+      [x - halfWidth, -halfHeight, 0],
+      [x + halfWidth, -halfHeight, 0],
+      [x + halfWidth, halfHeight, 0],
+      [x - halfWidth, -halfHeight, 0],
+      [x + halfWidth, halfHeight, 0],
+      [x - halfWidth, halfHeight, 0],
+    ]
+    const color = lut.getColor(scalarValues[i])
+    assert.ok(color?.isColor, 'Lut should produce THREE.Color values')
+    for (const corner of corners) {
+      positions.push(...corner)
+      colors.push(color.r, color.g, color.b)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  const material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && r < 120 && g < 170) > 200,
+      'Lut low scalar vertex colors should render blue pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 20 && g > b + 20) > 200,
+      'Lut midpoint vertex colors should render green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 140 && b < 140) > 200,
+      'Lut high scalar vertex colors should render red pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
   }
 })
 

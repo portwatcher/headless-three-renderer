@@ -132,6 +132,7 @@ export function createSceneCorpus() {
     batchedMeshInactiveGeometryCorpus(),
     batchedMeshOptimizedRangeCorpus(),
     batchedMeshIndexedGroupsCorpus(),
+    batchedMeshMultiSourceGroupOffsetsCorpus(),
     batchedMeshNonIndexedGroupsCorpus(),
     batchedMeshDefaultGroupMaterialCorpus(),
     batchedMeshPartialGroupRangeCorpus(),
@@ -7978,6 +7979,81 @@ function batchedMeshIndexedGroupsCorpus() {
       }
       if (!(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80)) {
         throw new Error(`indexed BatchedMesh right group should use the green material, got ${JSON.stringify(rightMean)}`)
+      }
+    },
+  }
+}
+
+function batchedMeshMultiSourceGroupOffsetsCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const padding = new THREE.BufferGeometry()
+  padding.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.1, -0.1, 0,
+    0.1, -0.1, 0,
+    0, 0.1, 0,
+  ]), 3))
+  padding.setIndex([0, 1, 2])
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+  source.addGroup(0, 6, 0)
+  source.addGroup(6, 6, 1)
+
+  const batch = new THREE.BatchedMesh(
+    1,
+    padding.getAttribute('position').count + source.getAttribute('position').count,
+    padding.index.count + source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  batch.addGeometry(padding)
+  const geometryId = batch.addGeometry(source)
+  batch.addInstance(geometryId)
+  batch.perObjectFrustumCulled = false
+
+  const range = batch.getGeometryRangeAt(geometryId, {})
+  batch.geometry.clearGroups()
+  for (const group of source.groups) {
+    batch.geometry.addGroup(range.start + group.start, group.count, group.materialIndex)
+  }
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-multi-source-group-offsets',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    browserReference: false,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const left = meanRegion(rgba, width, 20, 42, 30, 54)
+      const right = meanRegion(rgba, width, 66, 42, 76, 54)
+      if (!(left.r > left.g + 80 && left.r > left.b + 80 && right.g > right.r + 70 && right.g > right.b + 80)) {
+        throw new Error(`BatchedMesh translated source groups should render left red and right green, got left=${JSON.stringify(left)} right=${JSON.stringify(right)}`)
       }
     },
   }
