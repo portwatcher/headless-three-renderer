@@ -94,6 +94,7 @@ export function createSceneCorpus() {
     renderableFrustumCullingCorpus(),
     batchedMeshCorpus(),
     batchedMeshInactiveGeometryCorpus(),
+    batchedMeshSparseMaterialGroupsCorpus(),
     batchedMeshCullingCorpus(),
     batchedMeshCustomSortCorpus(),
     lodAndGroupsCorpus(),
@@ -4805,6 +4806,78 @@ function batchedMeshInactiveGeometryCorpus() {
       }
       if (rightR > 8 || rightG > 8 || rightB > 8) {
         throw new Error(`deleted BatchedMesh geometry should remain black, got rgb(${rightR}, ${rightG}, ${rightB})`)
+      }
+    },
+  }
+}
+
+function batchedMeshSparseMaterialGroupsCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.95, -0.45, 0,
+    -0.35, -0.45, 0,
+    -0.35, 0.45, 0,
+    -0.95, 0.45, 0,
+    -0.2, -0.45, 0,
+    0.2, -0.45, 0,
+    0.2, 0.45, 0,
+    -0.2, 0.45, 0,
+    0.35, -0.45, 0,
+    0.95, -0.45, 0,
+    0.95, 0.45, 0,
+    0.35, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+    8, 9, 10,
+    8, 10, 11,
+  ])
+
+  const batch = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batch.addGeometry(source)
+  batch.addInstance(geometryId)
+  batch.perObjectFrustumCulled = false
+
+  const range = batch.getGeometryRangeAt(geometryId, {})
+  batch.geometry.clearGroups()
+  batch.geometry.addGroup(range.start, 6, 0)
+  batch.geometry.addGroup(range.start + 12, 6, 1)
+  batch._geometryInfo[geometryId].start = range.start + 3
+  batch._geometryInfo[geometryId].count = 12
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-sparse-material-groups',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.015,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const redPixels = countRegionPixels(rgba, width, 10, 16, 40, 80, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
+      const greenPixels = countRegionPixels(rgba, width, 58, 16, 88, 80, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
+      const gap = meanRegion(rgba, width, 42, 34, 54, 62)
+      if (!(redPixels > 40 && greenPixels > 40 && gap.r < 5 && gap.g < 5 && gap.b < 5)) {
+        throw new Error(`BatchedMesh sparse material groups should keep red/green clipped groups and skip the center gap, red=${redPixels} green=${greenPixels} gap=${JSON.stringify(gap)}`)
       }
     },
   }
