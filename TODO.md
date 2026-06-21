@@ -50,6 +50,7 @@ Already supported in the current implementation:
 - Three.js examples scene and sampling utilities `SceneUtils.createMeshesFromMultiMaterialMesh()`, `SceneUtils.createMeshesFromInstancedMesh()`, `SceneUtils.reduceVertices()`, visible/ancestor traversal generators, and `MeshSurfaceSampler` produce renderable groups or sampled point geometry through supported mesh and point material paths.
 - Three.js examples `SceneOptimizer.toBatchedMesh()` batches compatible mesh children into a `BatchedMesh` that renders through the supported packed-geometry CPU expansion path with per-instance colors.
 - Three.js examples `SortUtils.radixSort()` can order renderer-visible `BatchedMesh.customSort` draw lists before rendering.
+- Three.js examples `WorkerPool` can coordinate deterministic pre-render work and feed still-frame mesh state that renders through supported built-in material paths.
 - Three.js examples math utilities `Lut`, `ColorConverter`, `ImprovedNoise`, `SimplexNoise`, `Capsule`, `ConvexHull`, `OBB`, and `Octree` produce `THREE.Color` values, point paths, or collision/bounds-derived line and mesh geometry that render through supported material, vertex-color, line, and mesh paths.
 - Three.js examples `ColorSpaces` Display-P3 and Rec.2020 constants fail clearly outside the current `THREE.SRGBColorSpace`/`THREE.LinearSRGBColorSpace` output and texture color-space contract.
 - Three.js examples `Gyroscope` preserves child orientation under rotated parents while rendering children through supported `Object3D` and mesh transform paths.

@@ -129,6 +129,7 @@ import { SceneOptimizer } from 'three/examples/jsm/utils/SceneOptimizer.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { radixSort } from 'three/examples/jsm/utils/SortUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
+import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
@@ -2290,6 +2291,96 @@ test('examples SortUtils radixSort can order BatchedMesh customSort draw lists',
   const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
   assert.deepEqual(sortedInstanceOrder, [near, far])
   assert.ok(mean.b > mean.r + 80, `SortUtils-ordered BatchedMesh draw list should render blue last (${mean.b} vs ${mean.r})`)
+})
+
+test('examples WorkerPool can drive still-frame render input preparation', async () => {
+  const workers = []
+  const pool = new WorkerPool(1)
+  pool.setWorkerCreator(() => {
+    const worker = {
+      messages: [],
+      terminated: false,
+      listener: null,
+      addEventListener(type, listener) {
+        assert.equal(type, 'message')
+        this.listener = listener
+      },
+      postMessage(message, transfer) {
+        this.messages.push({ message, transfer })
+        queueMicrotask(() => {
+          this.listener({
+            data: {
+              id: message.id,
+              x: message.x,
+              color: message.color,
+            },
+          })
+        })
+      },
+      terminate() {
+        this.terminated = true
+      },
+    }
+    workers.push(worker)
+    return worker
+  })
+
+  const transferBuffer = new ArrayBuffer(4)
+  const [left, center, right] = await Promise.all([
+    pool.postMessage({ id: 'left', x: -0.55, color: 0xff3344 }, [transferBuffer]),
+    pool.postMessage({ id: 'center', x: 0, color: 0x44ff66 }),
+    pool.postMessage({ id: 'right', x: 0.55, color: 0x4488ff }),
+  ])
+
+  assert.equal(workers.length, 1)
+  assert.equal(workers[0].messages.length, 3)
+  assert.strictEqual(workers[0].messages[0].transfer[0], transferBuffer)
+  assert.deepEqual([left.data.id, center.data.id, right.data.id], ['left', 'center', 'right'])
+  assert.equal(pool.queue.length, 0)
+  assert.equal(pool.workerStatus, 0)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const geometry = new THREE.PlaneGeometry(0.34, 0.5)
+  const materials = []
+  for (const result of [left, center, right]) {
+    const material = new THREE.MeshBasicMaterial({ color: result.data.color, side: THREE.DoubleSide })
+    materials.push(material)
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.position.x = result.data.x
+    scene.add(mesh)
+  }
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 160 && g < 120 && b < 120) > 120,
+      'WorkerPool-prepared red mesh should render visible pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 130 && g > r + 30 && g > b + 20) > 120,
+      'WorkerPool-prepared green mesh should render visible pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 160 && r < 140 && g < 170) > 120,
+      'WorkerPool-prepared blue mesh should render visible pixels',
+    )
+  } finally {
+    pool.dispose()
+    geometry.dispose()
+    for (const material of materials) material.dispose()
+  }
+
+  assert.equal(workers[0].terminated, true)
+  assert.equal(pool.workers.length, 0)
+  assert.equal(pool.workersResolve.length, 0)
 })
 
 test('BatchedMesh default onBeforeRender does not re-enter customSort', () => {
