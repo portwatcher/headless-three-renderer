@@ -56,6 +56,7 @@ import { Lut } from 'three/examples/jsm/math/Lut.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
+import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
@@ -4519,6 +4520,62 @@ test('examples color and noise math utilities produce renderable scene inputs', 
     for (const material of colorMaterials) material.dispose()
     lineGeometry.dispose()
     lineMaterial.dispose()
+  }
+})
+
+test('examples Gyroscope preserves child orientation while rendering normal mesh paths', () => {
+  const geometry = new THREE.PlaneGeometry(0.46, 0.18)
+  const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
+  const greenMaterial = new THREE.MeshBasicMaterial({ color: 0x44ff66, side: THREE.DoubleSide })
+
+  const normalParent = new THREE.Object3D()
+  normalParent.position.x = -0.45
+  normalParent.rotation.z = Math.PI / 2
+  const normalMesh = new THREE.Mesh(geometry, redMaterial)
+  normalParent.add(normalMesh)
+
+  const gyroParent = new THREE.Object3D()
+  gyroParent.position.x = 0.45
+  gyroParent.rotation.z = Math.PI / 2
+  const gyroscope = new Gyroscope()
+  const gyroMesh = new THREE.Mesh(geometry, greenMaterial)
+  gyroscope.add(gyroMesh)
+  gyroParent.add(gyroscope)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(normalParent, gyroParent)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    scene.updateMatrixWorld(true)
+    const normalQuaternion = new THREE.Quaternion()
+    const gyroQuaternion = new THREE.Quaternion()
+    normalMesh.matrixWorld.decompose(new THREE.Vector3(), normalQuaternion, new THREE.Vector3())
+    gyroMesh.matrixWorld.decompose(new THREE.Vector3(), gyroQuaternion, new THREE.Vector3())
+
+    assert.ok(Math.abs(normalQuaternion.angleTo(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))) < 1e-6)
+    assert.ok(Math.abs(gyroQuaternion.angleTo(new THREE.Quaternion())) < 1e-6)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 140) > 100,
+      'normally parented mesh should render red pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 150 && g > r + 20 && g > b + 20) > 100,
+      'Gyroscope child mesh should render green pixels',
+    )
+  } finally {
+    geometry.dispose()
+    redMaterial.dispose()
+    greenMaterial.dispose()
   }
 })
 
