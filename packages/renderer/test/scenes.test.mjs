@@ -23,14 +23,17 @@ import { DotScreenPass } from 'three/examples/jsm/postprocessing/DotScreenPass.j
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js'
 import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass.js'
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { HalftonePass } from 'three/examples/jsm/postprocessing/HalftonePass.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js'
 import { RenderTransitionPass } from 'three/examples/jsm/postprocessing/RenderTransitionPass.js'
+import { SAOPass } from 'three/examples/jsm/postprocessing/SAOPass.js'
 import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js'
 import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass.js'
 import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
@@ -2962,6 +2965,59 @@ test('EffectComposer scene-backed shader passes fail clearly with helper guidanc
       'CubeTexturePass',
       () => new CubeTexturePass(makeCamera(), new THREE.CubeTexture(), 1),
       /CubeTexturePass internal cube ShaderMaterial.*not translated.*scene\.background.*custom WGSL/i,
+    ],
+  ]
+
+  for (const [name, createPass, pattern] of cases) {
+    const renderer = new Renderer()
+    const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const pass = createPass()
+
+    try {
+      assert.throws(
+        () => pass.render(renderer, writeBuffer, readBuffer, 0.016, false),
+        pattern,
+        `${name} should fail with helper-specific guidance`,
+      )
+    } finally {
+      pass.dispose()
+    }
+  }
+})
+
+test('EffectComposer ambient-occlusion shader passes fail clearly with helper guidance', () => {
+  function makeScene() {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    ))
+    return scene
+  }
+
+  function makeCamera() {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+    camera.position.z = 2
+    camera.updateProjectionMatrix()
+    return camera
+  }
+
+  const cases = [
+    [
+      'SAOPass',
+      () => new SAOPass(makeScene(), makeCamera(), new THREE.Vector2(16, 16)),
+      /SAOPass internal SAOShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'SSAOPass',
+      () => new SSAOPass(makeScene(), makeCamera(), 16, 16, 4),
+      /SSAOPass internal SSAOShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'GTAOPass',
+      () => new GTAOPass(makeScene(), makeCamera(), 16, 16),
+      /GTAOPass internal GTAOShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
     ],
   ]
 

@@ -2133,6 +2133,24 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeSaoPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.SAOPass internal SAOShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent ambient-occlusion pass, or compose the SAO effect outside this helper.",
+    )
+  }
+
+  if (isThreeSsaoPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.SSAOPass internal SSAOShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent screen-space ambient-occlusion pass, or compose the SSAO effect outside this helper.",
+    )
+  }
+
+  if (isThreeGtaoPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.GTAOPass internal GTAOShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent ground-truth ambient-occlusion pass, or compose the GTAO effect outside this helper.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2424,6 +2442,110 @@ function isThreeCubeTexturePassShaderMaterial(material: ThreeMaterialLike): bool
     compact.includes('uniformfloatopacity;') &&
     compact.includes('textureCube(tCube,vec3(tFlip*vWorldDirection.x,vWorldDirection.yz))') &&
     compact.includes('gl_FragColor.a*=opacity;')
+}
+
+function isThreeSaoPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDepth == null ||
+    values.tNormal == null ||
+    values.size == null ||
+    values.cameraNear == null ||
+    values.cameraFar == null ||
+    values.cameraProjectionMatrix == null ||
+    values.cameraInverseProjectionMatrix == null ||
+    values.scale == null ||
+    values.intensity == null ||
+    values.bias == null ||
+    values.minResolution == null ||
+    values.kernelRadius == null ||
+    values.randomSeed == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformhighpsampler2DtDepth;') &&
+    compact.includes('uniformhighpsampler2DtNormal;') &&
+    compact.includes('uniformfloatkernelRadius;') &&
+    compact.includes('floatgetAmbientOcclusion(constinvec3centerViewPosition)') &&
+    compact.includes('scaleDividedByCameraFar=scale/cameraFar;') &&
+    compact.includes('occlusionSum+=getOcclusion(centerViewPosition,centerViewNormal,sampleViewPosition);') &&
+    compact.includes('gl_FragColor.xyz*=1.0-ambientOcclusion;')
+}
+
+function isThreeSsaoPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tNormal == null ||
+    values.tDepth == null ||
+    values.tNoise == null ||
+    values.kernel == null ||
+    values.cameraNear == null ||
+    values.cameraFar == null ||
+    values.resolution == null ||
+    values.cameraProjectionMatrix == null ||
+    values.cameraInverseProjectionMatrix == null ||
+    values.kernelRadius == null ||
+    values.minDistance == null ||
+    values.maxDistance == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformhighpsampler2DtNormal;') &&
+    compact.includes('uniformhighpsampler2DtDepth;') &&
+    compact.includes('uniformsampler2DtNoise;') &&
+    compact.includes('uniformvec3kernel[KERNEL_SIZE];') &&
+    compact.includes('vec2noiseScale=vec2(resolution.x/4.0,resolution.y/4.0);') &&
+    compact.includes('vec3sampleVector=kernelMatrix*kernel[i];') &&
+    compact.includes('if(delta>minDistance&&delta<maxDistance)') &&
+    compact.includes('gl_FragColor=vec4(vec3(1.0-occlusion),1.0);')
+}
+
+function isThreeGtaoPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tNormal == null ||
+    values.tDepth == null ||
+    values.tNoise == null ||
+    values.resolution == null ||
+    values.cameraNear == null ||
+    values.cameraFar == null ||
+    values.cameraProjectionMatrix == null ||
+    values.cameraProjectionMatrixInverse == null ||
+    values.cameraWorldMatrix == null ||
+    values.radius == null ||
+    values.distanceExponent == null ||
+    values.thickness == null ||
+    values.distanceFallOff == null ||
+    values.scale == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformhighpsampler2DtNormal;') &&
+    compact.includes('uniformhighpsampler2DtDepth;') &&
+    compact.includes('uniformsampler2DtNoise;') &&
+    compact.includes('uniformmat4cameraProjectionMatrixInverse;') &&
+    compact.includes('floatgetDepth(constvec2uv)') &&
+    compact.includes('returntextureLod(tDepth,uv.xy,0.0).DEPTH_SWIZZLING;') &&
+    compact.includes('constintDIRECTIONS=SAMPLES<30?3:5;') &&
+    compact.includes('gl_FragColor=FRAGMENT_OUTPUT;')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {
