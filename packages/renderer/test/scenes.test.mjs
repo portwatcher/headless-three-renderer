@@ -20,7 +20,10 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { CSM } from 'three/examples/jsm/csm/CSM.js'
+import { CSMFrustum } from 'three/examples/jsm/csm/CSMFrustum.js'
 import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
+import { CSMShader } from 'three/examples/jsm/csm/CSMShader.js'
+import { CSMShadowNode } from 'three/examples/jsm/csm/CSMShadowNode.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
 import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
@@ -3739,6 +3742,54 @@ test('examples TiledLighting builds tiled point-light metadata before compute bo
   }
 })
 
+test('CSM internals expose frustum splits, shader chunks, and shadow-node cascade state', () => {
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 20)
+  camera.updateProjectionMatrix()
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  const frustum = new CSMFrustum({ projectionMatrix: camera.projectionMatrix, maxFar: 12 })
+  const cascades = []
+  frustum.split([0.25, 0.65, 1], cascades)
+  assert.equal(cascades.length, 3)
+  assert.ok(cascades[0].vertices.near[0].distanceTo(frustum.vertices.near[0]) < 1e-6)
+  assert.ok(cascades[2].vertices.far[0].distanceTo(frustum.vertices.far[0]) < 1e-6)
+  assert.ok(cascades[1].vertices.near[0].distanceTo(cascades[0].vertices.far[0]) < 1e-6)
+
+  const translated = new CSMFrustum()
+  cascades[0].toSpace(new THREE.Matrix4().makeTranslation(1, 2, 3), translated)
+  assert.ok(translated.vertices.near[0].distanceTo(cascades[0].vertices.near[0].clone().add(new THREE.Vector3(1, 2, 3))) < 1e-6)
+  assert.match(CSMShader.lights_fragment_begin, /USE_CSM/)
+  assert.match(CSMShader.lights_pars_begin, /CSM_cascades/)
+
+  const scene = new THREE.Scene()
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.position.set(4, 5, 6)
+  light.target.position.set(0, 0, 0)
+  scene.add(light, light.target)
+
+  const renderer = new Renderer()
+  const shadowNode = new CSMShadowNode(light, { cascades: 2, maxFar: 12, mode: 'uniform', lightMargin: 3 })
+  try {
+    shadowNode.init({ camera, renderer })
+    const expectedBreak = (camera.near + (Math.min(camera.far, shadowNode.maxFar) - camera.near) / 2) / Math.min(camera.far, shadowNode.maxFar)
+    assert.equal(shadowNode.mainFrustum instanceof CSMFrustum, true)
+    assert.equal(shadowNode.lights.length, 2)
+    assert.equal(shadowNode.frustums.length, 2)
+    assert.deepEqual(shadowNode.breaks, [expectedBreak, 1])
+    assert.deepEqual(shadowNode._cascades.map((entry) => [entry.x, entry.y]), [[0, expectedBreak], [expectedBreak, 1]])
+    assert.ok(shadowNode.lights.every((cascadeLight) => cascadeLight.parent === scene))
+    shadowNode.updateBefore()
+    assert.ok(shadowNode.lights.every((cascadeLight) => Number.isFinite(cascadeLight.position.x)))
+  } finally {
+    shadowNode.dispose()
+    renderer.dispose()
+  }
+
+  assert.ok(shadowNode.lights.every((cascadeLight) => cascadeLight.parent === null))
+})
+
 test('CSM material shader injection fails clearly', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
@@ -5632,6 +5683,100 @@ test('TextGeometry renders parsed example fonts through built-in mesh materials'
   } finally {
     geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples XYZLoader GCodeLoader and PDBLoader parse renderable geometry paths', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 20)
+  camera.position.set(0, 0, 6)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  const xyzGeometry = new XYZLoader().parse(`
+    # XYZRGB point cloud
+    -0.8 0 0 255 0 0
+    0 0.8 0 0 255 0
+    0.8 0 0 0 0 255
+  `)
+  const xyzMaterial = new THREE.PointsMaterial({ size: 4, sizeAttenuation: false, vertexColors: true })
+  const xyzPoints = new THREE.Points(xyzGeometry, xyzMaterial)
+  const xyzScene = new THREE.Scene()
+  xyzScene.background = new THREE.Color(0x000000)
+  xyzScene.add(xyzPoints)
+
+  const gcodeLoader = new GCodeLoader()
+  gcodeLoader.splitLayer = true
+  const gcodeGroup = gcodeLoader.parse([
+    'G90',
+    'G1 X0 Y0 Z0 F1500',
+    'G1 X1 Y0 Z0 E0.2',
+    'G1 X1 Y1 Z0 E0.4',
+    'G1 X0 Y1 Z0',
+    'G91',
+    'G1 X0 Y0 Z1',
+    'G1 X-1 Y0 Z0 E0.6',
+  ].join('\n'))
+  gcodeGroup.scale.setScalar(1.2)
+  gcodeGroup.position.set(-0.5, -0.5, 0)
+  const gcodeScene = new THREE.Scene()
+  gcodeScene.background = new THREE.Color(0x000000)
+  gcodeScene.add(gcodeGroup)
+
+  const atomLine = (serial, name, residue, chain, sequence, x, y, z, element) => {
+    return `HETATM${String(serial).padStart(5)} ${name.padEnd(4)} ${residue.padStart(3)} ${chain}${String(sequence).padStart(4)}    ${x.toFixed(3).padStart(7)} ${y.toFixed(3).padStart(7)} ${z.toFixed(3).padStart(7)}  1.00 20.00           ${element.padStart(2)}`
+  }
+  const pdb = new PDBLoader().parse([
+    atomLine(1, 'C', 'MOL', 'A', 1, -0.6, 0, 0, 'C'),
+    atomLine(2, 'O', 'MOL', 'A', 1, 0.6, 0, 0, 'O'),
+    'CONECT    1    2',
+    'END',
+  ].join('\n'))
+  const pdbAtomMaterial = new THREE.PointsMaterial({ size: 6, sizeAttenuation: false, vertexColors: true })
+  const pdbBondMaterial = new THREE.LineBasicMaterial({ color: 0xffffff })
+  const pdbAtoms = new THREE.Points(pdb.geometryAtoms, pdbAtomMaterial)
+  const pdbBonds = new THREE.LineSegments(pdb.geometryBonds, pdbBondMaterial)
+  const pdbScene = new THREE.Scene()
+  pdbScene.background = new THREE.Color(0x000000)
+  pdbScene.add(pdbBonds, pdbAtoms)
+
+  try {
+    const xyzRgba = renderRgba(xyzScene, camera, { width: 64, height: 64 })
+    assert.equal(xyzGeometry.isBufferGeometry, true)
+    assert.equal(xyzGeometry.getAttribute('position').count, 3)
+    assert.equal(xyzGeometry.getAttribute('color').count, 3)
+    assert.ok(
+      nonBackgroundRatio(xyzRgba, [0, 0, 0], 3) > 0.008,
+      'XYZLoader point cloud output should render visible colored points',
+    )
+
+    const gcodeRgba = renderRgba(gcodeScene, camera, { width: 64, height: 64 })
+    assert.equal(gcodeGroup.name, 'gcode')
+    assert.equal(gcodeGroup.children.length, 6)
+    assert.ok(gcodeGroup.children.some((child) => child.material.name === 'extruded'))
+    assert.ok(gcodeGroup.children.some((child) => child.material.name === 'path'))
+    assert.ok(
+      nonBackgroundRatio(gcodeRgba, [0, 0, 0], 3) > 0.008,
+      'GCodeLoader line output should render visible tool paths',
+    )
+
+    const pdbRgba = renderRgba(pdbScene, camera, { width: 64, height: 64 })
+    assert.equal(pdb.geometryAtoms.getAttribute('position').count, 2)
+    assert.equal(pdb.geometryAtoms.getAttribute('color').count, 2)
+    assert.equal(pdb.geometryBonds.getAttribute('position').count, 2)
+    assert.deepEqual(pdb.json.atoms.map((atom) => atom[4]), ['C', 'O'])
+    assert.ok(
+      nonBackgroundRatio(pdbRgba, [0, 0, 0], 3) > 0.003,
+      'PDBLoader atom and bond geometry should render visible points and bonds',
+    )
+  } finally {
+    xyzGeometry.dispose()
+    xyzMaterial.dispose()
+    for (const child of gcodeGroup.children) child.geometry.dispose()
+    for (const material of new Set(gcodeGroup.children.map((child) => child.material))) material.dispose()
+    pdb.geometryAtoms.dispose()
+    pdb.geometryBonds.dispose()
+    pdbAtomMaterial.dispose()
+    pdbBondMaterial.dispose()
   }
 })
 
