@@ -14,6 +14,7 @@ import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
+import { PositionalAudioHelper } from 'three/examples/jsm/helpers/PositionalAudioHelper.js'
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
@@ -2731,6 +2732,33 @@ test('RectAreaLightHelper renders supported light visualization geometry', () =>
     assert.ok(
       nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
       'RectAreaLightHelper should render visible helper geometry',
+    )
+  } finally {
+    helper.dispose()
+  }
+})
+
+test('PositionalAudioHelper renders grouped cone line geometry', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const helper = new PositionalAudioHelper({
+    panner: {
+      coneInnerAngle: 50,
+      coneOuterAngle: 120,
+    },
+  }, 1.1, 12, 3)
+  helper.rotation.y = -0.2
+  scene.add(helper)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0.15, 1.8, 2.6)
+  camera.lookAt(0, 0, 0.35)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
+      'PositionalAudioHelper should render visible grouped line geometry',
     )
   } finally {
     helper.dispose()

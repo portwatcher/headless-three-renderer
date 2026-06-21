@@ -40,6 +40,7 @@ Already supported in the current implementation:
 - `CSM` can create its cascaded directional lights and patch materials, then fails clearly on its `onBeforeCompile` shader-chunk injection with guidance to use regular supported lights/shadows, baked cascaded shadowing, or custom WGSL; `CSMHelper` visualization geometry renders through supported built-in line/basic materials.
 - Three.js examples `VertexNormalsHelper` and `VertexTangentsHelper` recompute helper line geometry from source mesh attributes and render through supported `LineSegments` plus `LineBasicMaterial` paths.
 - Three.js `RectAreaLightHelper` renders its light outline and fill visualization through supported `LineBasicMaterial` and `MeshBasicMaterial` geometry.
+- Three.js `PositionalAudioHelper` renders grouped cone line geometry through supported `Line` material-array groups with `LineBasicMaterial`.
 - Three.js `LightProbeHelper` fails clearly on its internal `LightProbeHelperMaterial` shader path with guidance to use native `THREE.LightProbe` lighting, `LightProbeGenerator` readback, or a custom WGSL visualizer.
 - Three.js examples `Line2`, `LineSegments2`, and `Wireframe` fail clearly on their `LineMaterial` shader path with guidance to use the renderer's supported built-in `Line`/`LineSegments`/`LineLoop` plus `LineBasicMaterial`/`LineDashedMaterial` paths.
 - `ProgressiveLightMap` reaches its target-state setup path and then fails clearly on its internal `onBeforeCompile` shader rewrite with the documented custom-WGSL guidance.
