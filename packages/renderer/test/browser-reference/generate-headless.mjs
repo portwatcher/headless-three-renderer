@@ -1,7 +1,10 @@
 import { createReadStream } from 'node:fs'
-import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { createServer as createNetServer } from 'node:net'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { BROWSER_REFERENCE_MANIFEST_FILE } from './manifest.mjs'
 
@@ -41,44 +44,52 @@ const server = await startStaticServer(options.port)
 const { port } = server.address()
 const baseUrl = `http://127.0.0.1:${port}`
 
-let browser
 try {
-  const playwright = await loadPlaywright()
-  const browserType = playwright[options.browser]
-  if (!browserType) {
-    throw new Error(`Unsupported Playwright browser "${options.browser}". Use chromium, firefox, or webkit.`)
-  }
-
-  browser = await browserType.launch({ headless: !options.headed })
-  const page = await browser.newPage()
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      console.error(`[browser] ${message.text()}`)
-    }
-  })
-
-  await page.goto(`${baseUrl}${browserReferencePage}`, { waitUntil: 'load' })
-  const result = await page.evaluate(
-    async ({ readyGlobal }) => {
-      const ready = globalThis[readyGlobal]
-      if (!ready || typeof ready.then !== 'function') {
-        throw new Error(`Browser reference page did not expose ${readyGlobal}.`)
-      }
-      return ready
-    },
-    { readyGlobal },
-  )
-
+  const result = options.browserExecutable
+    ? await renderWithChromeDevTools(baseUrl, options)
+    : await renderWithPlaywright(baseUrl, options)
   await writeBrowserReferences(result, options.outputDir)
   console.log(`Wrote ${result.fixtures.length} browser reference PNGs and ${BROWSER_REFERENCE_MANIFEST_FILE} to ${options.outputDir}`)
 } finally {
-  await browser?.close()
   await new Promise((resolve, reject) => {
     server.close((error) => {
       if (error) reject(error)
       else resolve()
     })
   })
+}
+
+async function renderWithPlaywright(baseUrl, options) {
+  const playwright = await loadPlaywright()
+  const browserType = playwright[options.browser]
+  if (!browserType) {
+    throw new Error(`Unsupported Playwright browser "${options.browser}". Use chromium, firefox, or webkit.`)
+  }
+
+  let browser
+  try {
+    browser = await browserType.launch({ headless: !options.headed })
+    const page = await browser.newPage()
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        console.error(`[browser] ${message.text()}`)
+      }
+    })
+
+    await page.goto(`${baseUrl}${browserReferencePage}`, { waitUntil: 'load' })
+    return await page.evaluate(
+      async ({ readyGlobal }) => {
+        const ready = globalThis[readyGlobal]
+        if (!ready || typeof ready.then !== 'function') {
+          throw new Error(`Browser reference page did not expose ${readyGlobal}.`)
+        }
+        return ready
+      },
+      { readyGlobal },
+    )
+  } finally {
+    await browser?.close()
+  }
 }
 
 async function loadPlaywright() {
@@ -94,6 +105,65 @@ async function loadPlaywright() {
       ].join('\n'),
       { cause: error },
     )
+  }
+}
+
+async function renderWithChromeDevTools(baseUrl, options) {
+  if (typeof WebSocket !== 'function') {
+    throw new Error('The --browser-executable path requires a Node.js runtime with a global WebSocket implementation.')
+  }
+
+  const debugPort = await findFreePort()
+  const userDataDir = await mkdtemp(path.join(tmpdir(), 'headless-three-browser-reference-'))
+  const browser = spawn(options.browserExecutable, [
+    ...(options.headed ? [] : ['--headless=new']),
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--enable-unsafe-swiftshader',
+    '--use-gl=angle',
+    '--use-angle=swiftshader',
+    `--remote-debugging-port=${debugPort}`,
+    `--user-data-dir=${userDataDir}`,
+    'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'] })
+  let stderrTail = ''
+  let spawnError
+  browser.stderr.on('data', (chunk) => {
+    stderrTail = `${stderrTail}${String(chunk)}`.slice(-4096)
+  })
+  browser.once('error', (error) => {
+    spawnError = error
+  })
+
+  let cdp
+  try {
+    const wsUrl = await waitForChromeDevToolsUrl(debugPort, browser, () => stderrTail, () => spawnError)
+    cdp = await connectChromeDevTools(wsUrl)
+    await cdp.send('Page.enable')
+    await cdp.send('Runtime.enable')
+    await cdp.send('Page.navigate', { url: `${baseUrl}${browserReferencePage}` })
+    await cdp.waitFor('Page.loadEventFired', 30000)
+
+    const evaluation = await cdp.send('Runtime.evaluate', {
+      expression: `(async () => {
+        const ready = globalThis[${JSON.stringify(readyGlobal)}]
+        if (!ready || typeof ready.then !== 'function') {
+          throw new Error('Browser reference page did not expose ${readyGlobal}.')
+        }
+        return await ready
+      })()`,
+      awaitPromise: true,
+      returnByValue: true,
+    }, 180000)
+    if (evaluation.exceptionDetails) {
+      throw new Error(evaluation.exceptionDetails.text || 'Browser reference page evaluation failed.')
+    }
+    return evaluation.result.value
+  } finally {
+    cdp?.close()
+    browser.kill('SIGTERM')
+    await waitForProcessExit(browser)
+    await rm(userDataDir, { recursive: true, force: true })
   }
 }
 
@@ -207,9 +277,148 @@ function isInside(root, candidate) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
 }
 
+function findFreePort() {
+  const server = createNetServer()
+  return new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen({ host: '127.0.0.1', port: 0 }, () => {
+      const { port } = server.address()
+      server.close((error) => {
+        if (error) reject(error)
+        else resolve(port)
+      })
+    })
+  })
+}
+
+async function waitForChromeDevToolsUrl(port, browser, readStderrTail, readSpawnError) {
+  const deadline = Date.now() + 30000
+  let lastError
+  while (Date.now() < deadline) {
+    const spawnError = readSpawnError()
+    if (spawnError) {
+      throw new Error(`Browser executable failed to start: ${spawnError.message}`)
+    }
+    if (browser.exitCode !== null) {
+      const stderrTail = readStderrTail()
+      throw new Error(`Browser executable exited before DevTools became available.${stderrTail ? `\n${stderrTail}` : ''}`)
+    }
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/list`)
+      if (response.ok) {
+        const targets = await response.json()
+        const page = targets.find((target) => target.type === 'page' && target.webSocketDebuggerUrl)
+        if (page) return page.webSocketDebuggerUrl
+      }
+    } catch (error) {
+      lastError = error
+    }
+    await delay(150)
+  }
+  throw new Error(`Timed out waiting for Chrome DevTools on port ${port}.`, { cause: lastError })
+}
+
+function connectChromeDevTools(wsUrl) {
+  const socket = new WebSocket(wsUrl)
+  const pending = new Map()
+  const queuedEvents = []
+  const waiters = []
+  let nextId = 1
+
+  return new Promise((resolve, reject) => {
+    socket.addEventListener('open', () => {
+      socket.addEventListener('message', (event) => {
+        const message = JSON.parse(event.data)
+        if (message.id && pending.has(message.id)) {
+          const request = pending.get(message.id)
+          pending.delete(message.id)
+          if (message.error) {
+            request.reject(new Error(`${message.error.message}: ${message.error.data ?? ''}`))
+          } else {
+            request.resolve(message.result)
+          }
+          return
+        }
+        if (message.method) {
+          const waiterIndex = waiters.findIndex((waiter) => waiter.method === message.method)
+          if (waiterIndex >= 0) {
+            const [waiter] = waiters.splice(waiterIndex, 1)
+            clearTimeout(waiter.timer)
+            waiter.resolve(message.params)
+          } else {
+            queuedEvents.push(message)
+          }
+        }
+      })
+
+      resolve({
+        send(method, params = {}, timeoutMs = 30000) {
+          const id = nextId++
+          return new Promise((resolveRequest, rejectRequest) => {
+            const timer = setTimeout(() => {
+              pending.delete(id)
+              rejectRequest(new Error(`Timed out waiting for ${method}.`))
+            }, timeoutMs)
+            pending.set(id, {
+              resolve(value) {
+                clearTimeout(timer)
+                resolveRequest(value)
+              },
+              reject(error) {
+                clearTimeout(timer)
+                rejectRequest(error)
+              },
+            })
+            socket.send(JSON.stringify({ id, method, params }))
+          })
+        },
+        waitFor(method, timeoutMs = 30000) {
+          const queuedIndex = queuedEvents.findIndex((message) => message.method === method)
+          if (queuedIndex >= 0) {
+            const [message] = queuedEvents.splice(queuedIndex, 1)
+            return Promise.resolve(message.params)
+          }
+          return new Promise((resolveEvent, rejectEvent) => {
+            const timer = setTimeout(() => {
+              const waiterIndex = waiters.findIndex((waiter) => waiter.resolve === resolveEvent)
+              if (waiterIndex >= 0) waiters.splice(waiterIndex, 1)
+              rejectEvent(new Error(`Timed out waiting for ${method}.`))
+            }, timeoutMs)
+            waiters.push({ method, resolve: resolveEvent, timer })
+          })
+        },
+        close() {
+          socket.close()
+        },
+      })
+    }, { once: true })
+    socket.addEventListener('error', reject, { once: true })
+  })
+}
+
+function waitForProcessExit(child) {
+  if (child.exitCode !== null) return Promise.resolve()
+  return new Promise((resolve) => {
+    const forceKillTimer = setTimeout(() => {
+      child.kill('SIGKILL')
+    }, 5000)
+    const giveUpTimer = setTimeout(resolve, 10000)
+    child.once('exit', () => {
+      clearTimeout(forceKillTimer)
+      clearTimeout(giveUpTimer)
+      resolve()
+    })
+  })
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function parseArgs(args) {
   const parsed = {
     browser: 'chromium',
+    browserExecutable: undefined,
     headed: false,
     help: false,
     outputDir: undefined,
@@ -226,6 +435,9 @@ function parseArgs(args) {
       parsed.headed = true
     } else if (arg === '--browser') {
       parsed.browser = requireValue(args, index, arg)
+      index += 1
+    } else if (arg === '--browser-executable') {
+      parsed.browserExecutable = path.resolve(requireValue(args, index, arg))
       index += 1
     } else if (arg === '--output') {
       parsed.outputDir = path.resolve(requireValue(args, index, arg))
@@ -265,6 +477,9 @@ Usage:
 Options:
   --output <directory>   Directory for PNG files and ${BROWSER_REFERENCE_MANIFEST_FILE}.
   --browser <name>       Playwright browser type: chromium, firefox, or webkit. Default: chromium.
+  --browser-executable <path>
+                         Chrome/Chromium-compatible executable to drive directly
+                         over DevTools without Playwright.
   --headed               Show the browser while rendering.
   --port <number>        Static server port. Default: 0, which selects a free port.
   -h, --help             Show this help.

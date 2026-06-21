@@ -47,6 +47,12 @@ pnpm exec playwright install chromium
 pnpm -C packages/renderer run generate:browser-reference -- --output test/browser-reference/references/<platform>-<arch>
 ```
 
+Alternatively, point the wrapper at an installed Chrome or Chromium executable:
+
+```bash
+pnpm -C packages/renderer run generate:browser-reference -- --browser-executable "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --output test/browser-reference/references/<platform>-<arch>
+```
+
 Compare those browser PNGs against the headless renderer with:
 
 ```bash
