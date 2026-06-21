@@ -84,10 +84,12 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
+import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
 import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader.js'
+import { VTKLoader } from 'three/examples/jsm/loaders/VTKLoader.js'
 import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
 import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
 import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
@@ -3619,6 +3621,205 @@ test('examples WebXR button helpers build DOM fallback and session controls', as
   }
 })
 
+test('examples WebXR hand and controller model helpers update renderable local geometry', async () => {
+  const { OculusHandModel } = await import('three/examples/jsm/webxr/OculusHandModel.js')
+  const { OculusHandPointerModel } = await import('three/examples/jsm/webxr/OculusHandPointerModel.js')
+  const { XRControllerModelFactory } = await import('three/examples/jsm/webxr/XRControllerModelFactory.js')
+  const { XRHandModelFactory } = await import('three/examples/jsm/webxr/XRHandModelFactory.js')
+
+  const jointNames = [
+    'wrist',
+    'thumb-metacarpal',
+    'thumb-phalanx-proximal',
+    'thumb-phalanx-distal',
+    'thumb-tip',
+    'index-finger-metacarpal',
+    'index-finger-phalanx-proximal',
+    'index-finger-phalanx-intermediate',
+    'index-finger-phalanx-distal',
+    'index-finger-tip',
+    'middle-finger-metacarpal',
+    'middle-finger-phalanx-proximal',
+    'middle-finger-phalanx-intermediate',
+    'middle-finger-phalanx-distal',
+    'middle-finger-tip',
+    'ring-finger-metacarpal',
+    'ring-finger-phalanx-proximal',
+    'ring-finger-phalanx-intermediate',
+    'ring-finger-phalanx-distal',
+    'ring-finger-tip',
+    'pinky-finger-metacarpal',
+    'pinky-finger-phalanx-proximal',
+    'pinky-finger-phalanx-intermediate',
+    'pinky-finger-phalanx-distal',
+    'pinky-finger-tip',
+  ]
+  const makeJoint = (index) => {
+    const joint = new THREE.Object3D()
+    joint.visible = true
+    joint.position.set((index % 5) * 0.035 - 0.07, Math.floor(index / 5) * 0.035 - 0.07, 0)
+    joint.quaternion.identity()
+    joint.jointRadius = 0.018
+    return joint
+  }
+  const makeController = () => {
+    const controller = new THREE.Object3D()
+    controller.joints = Object.fromEntries(jointNames.map((name, index) => [name, makeJoint(index)]))
+    controller.visible = true
+    return controller
+  }
+  const makeHandAsset = () => {
+    const root = new THREE.Group()
+    const skinnedMesh = new THREE.SkinnedMesh(
+      new THREE.BoxGeometry(0.02, 0.02, 0.02),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    root.add(skinnedMesh)
+    for (const name of jointNames) {
+      const bone = new THREE.Bone()
+      bone.name = name
+      root.add(bone)
+    }
+    return root
+  }
+  const fakeHandLoader = {
+    paths: [],
+    urls: [],
+    setPath(pathValue) {
+      this.paths.push(pathValue)
+      return this
+    },
+    load(url, onLoad) {
+      this.urls.push(url)
+      onLoad({ scene: { children: [makeHandAsset()] } })
+    },
+  }
+  const disposeObject = (object) => {
+    object.traverse?.((child) => {
+      child.geometry?.dispose?.()
+      if (Array.isArray(child.material)) {
+        for (const material of child.material) material.dispose?.()
+      } else {
+        child.material?.dispose?.()
+      }
+    })
+  }
+
+  const primitiveController = makeController()
+  const handModel = new XRHandModelFactory().createHandModel(primitiveController, 'boxes')
+  primitiveController.dispatchEvent({
+    type: 'connected',
+    data: { hand: true, handedness: 'left' },
+  })
+  handModel.updateMatrixWorld(true)
+  const primitiveMesh = handModel.motionController.handMesh
+  assert.equal(primitiveMesh.isInstancedMesh, true)
+  assert.equal(primitiveMesh.count, jointNames.length)
+  assert.equal(primitiveMesh.geometry.type, 'BoxGeometry')
+  assert.equal(primitiveMesh.instanceMatrix.usage, THREE.DynamicDrawUsage)
+
+  const handScene = new THREE.Scene()
+  handScene.background = new THREE.Color(0x000000)
+  handScene.add(new THREE.HemisphereLight(0xffffff, 0x202020, 3))
+  handScene.add(handModel)
+  const handCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  handCamera.position.set(0, 0, 0.8)
+  handCamera.lookAt(0, 0, 0)
+  const handRgba = renderRgba(handScene, handCamera, { width: 64, height: 64 })
+  assert.ok(
+    nonBackgroundRatio(handRgba, [0, 0, 0], 3) > 0.01,
+    'XRHandPrimitiveModel instanced joint geometry should render visible pixels',
+  )
+
+  const meshController = makeController()
+  const oculusHand = new OculusHandModel(meshController, fakeHandLoader)
+  meshController.dispatchEvent({
+    type: 'connected',
+    data: { hand: true, handedness: 'left' },
+  })
+  assert.ok(oculusHand.motionController)
+  assert.deepEqual(fakeHandLoader.urls, ['left.glb'])
+  meshController.joints['index-finger-tip'].position.set(0, 0, 0)
+  assert.equal(oculusHand.getPointerPosition(), meshController.joints['index-finger-tip'].position)
+
+  const buttonMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.05, 0.05),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+  )
+  let pressed = false
+  let whilePressed = 0
+  buttonMesh.onPress = () => {
+    pressed = true
+  }
+  buttonMesh.onClear = () => {
+    pressed = false
+  }
+  buttonMesh.isPressed = () => pressed
+  buttonMesh.whilePressed = () => {
+    whilePressed += 1
+  }
+  oculusHand.checkButton(buttonMesh)
+  assert.equal(pressed, true)
+  assert.equal(whilePressed, 1)
+  oculusHand.updateMatrixWorld(true)
+  assert.equal(oculusHand.motionController.bones[0].position.x, meshController.joints.wrist.position.x)
+  meshController.dispatchEvent({ type: 'disconnected' })
+  assert.equal(oculusHand.motionController, null)
+
+  const pointerHand = new THREE.Object3D()
+  pointerHand.joints = {
+    'index-finger-tip': new THREE.Object3D(),
+    'thumb-tip': new THREE.Object3D(),
+  }
+  pointerHand.joints['index-finger-tip'].position.set(-0.004, 0, 0)
+  pointerHand.joints['thumb-tip'].position.set(0.004, 0, 0)
+  const pointerController = new THREE.Object3D()
+  pointerController.visible = true
+  const pointerModel = new OculusHandPointerModel(pointerHand, pointerController)
+  pointerHand.dispatchEvent({ type: 'connected', data: { hand: true } })
+  pointerModel.updateMatrixWorld(true)
+  assert.equal(pointerModel.pointerMesh.isMesh, true)
+  assert.equal(pointerModel.cursorObject.isMesh, true)
+  assert.equal(pointerModel.isPinched(), true)
+  pointerModel.setAttached(true)
+  assert.equal(pointerModel.isAttached(), true)
+  pointerModel.setAttached(false)
+  pointerModel.setCursor(0.5)
+  assert.ok(Math.abs(pointerModel.cursorObject.position.z + 0.5) < 1e-6)
+  assert.ok(pointerModel.intersectObjects([], true)?.length === 0)
+  pointerModel.dispose()
+
+  const controllerFactory = new XRControllerModelFactory({
+    setPath(pathValue) {
+      this.path = pathValue
+      return this
+    },
+    load() {
+      throw new Error('tracked-pointer profile assets should not be loaded for ignored XR input sources')
+    },
+  })
+  assert.equal(controllerFactory.setPath('/profiles/'), controllerFactory)
+  const grip = new THREE.Object3D()
+  const controllerModel = controllerFactory.createControllerModel(grip)
+  const envMap = new THREE.Texture()
+  controllerModel.add(buttonMesh)
+  const materialVersion = buttonMesh.material.version
+  assert.equal(controllerModel.setEnvironmentMap(envMap), controllerModel)
+  assert.equal(buttonMesh.material.envMap, envMap)
+  assert.ok(buttonMesh.material.version > materialVersion)
+  grip.dispatchEvent({
+    type: 'connected',
+    data: { targetRayMode: 'gaze', gamepad: {}, hand: null },
+  })
+  assert.equal(controllerModel.motionController, null)
+  grip.dispatchEvent({ type: 'disconnected' })
+
+  disposeObject(handModel)
+  disposeObject(oculusHand)
+  disposeObject(controllerModel)
+  envMap.dispose()
+})
+
 test('examples Addons barrel imports in Node and exposes covered helper modules', async () => {
   const Addons = await import('three/examples/jsm/Addons.js')
 
@@ -6384,6 +6585,88 @@ test('examples OBJLoader STLLoader and PLYLoader parse renderable mesh geometry 
     stlMaterial.dispose()
     plyGeometry.dispose()
     plyMaterial.dispose()
+  }
+})
+
+test('examples PCDLoader and VTKLoader parse renderable point and mesh geometry paths', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  const pcdPointCloud = new PCDLoader().parse(new TextEncoder().encode([
+    '# .PCD v0.7 - Point Cloud Data file format',
+    'VERSION 0.7',
+    'FIELDS x y z rgb',
+    'SIZE 4 4 4 4',
+    'TYPE F F F U',
+    'COUNT 1 1 1 1',
+    'WIDTH 3',
+    'HEIGHT 1',
+    'VIEWPOINT 0 0 0 1 0 0 0',
+    'POINTS 3',
+    'DATA ascii',
+    '-0.8 0 0 16711680',
+    '0 0.8 0 65280',
+    '0.8 0 0 255',
+  ].join('\n')).buffer)
+  pcdPointCloud.material.size = 5
+  pcdPointCloud.material.sizeAttenuation = false
+  const pcdScene = new THREE.Scene()
+  pcdScene.background = new THREE.Color(0x000000)
+  pcdScene.add(pcdPointCloud)
+
+  const vtkGeometry = new VTKLoader().parse(new TextEncoder().encode([
+    '# vtk DataFile Version 3.0',
+    'tri',
+    'ASCII',
+    'DATASET POLYDATA',
+    'POINTS 3 float',
+    '-0.6 -0.4 0',
+    '0.6 -0.4 0',
+    '0 0.6 0',
+    'POLYGONS 1 4',
+    '3 0 1 2',
+    'POINT_DATA 3',
+    'COLOR_SCALARS color 3',
+    '1 0 0',
+    '0 1 0',
+    '0 0 1',
+    'NORMALS normals float',
+    '0 0 1',
+    '0 0 1',
+    '0 0 1',
+  ].join('\n').padEnd(260, '\n')).buffer)
+  const vtkMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, vertexColors: true })
+  const vtkMesh = new THREE.Mesh(vtkGeometry, vtkMaterial)
+  const vtkScene = new THREE.Scene()
+  vtkScene.background = new THREE.Color(0x000000)
+  vtkScene.add(vtkMesh)
+
+  try {
+    assert.equal(pcdPointCloud.isPoints, true)
+    assert.equal(pcdPointCloud.geometry.getAttribute('position').count, 3)
+    assert.equal(pcdPointCloud.geometry.getAttribute('color').count, 3)
+    assert.equal(pcdPointCloud.material.vertexColors, true)
+    assert.ok(
+      nonBackgroundRatio(renderRgba(pcdScene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.01,
+      'PCDLoader point cloud output should render visible colored points',
+    )
+
+    assert.equal(vtkGeometry.isBufferGeometry, true)
+    assert.equal(vtkGeometry.getAttribute('position').count, 3)
+    assert.equal(vtkGeometry.index.count, 3)
+    assert.equal(vtkGeometry.getAttribute('color').count, 3)
+    assert.equal(vtkGeometry.getAttribute('normal').count, 3)
+    assert.ok(
+      nonBackgroundRatio(renderRgba(vtkScene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.08,
+      'VTKLoader mesh output should render visible vertex-colored geometry',
+    )
+  } finally {
+    pcdPointCloud.geometry.dispose()
+    pcdPointCloud.material.dispose()
+    vtkGeometry.dispose()
+    vtkMaterial.dispose()
   }
 })
 
