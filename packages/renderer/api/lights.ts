@@ -191,6 +191,8 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   out.shadowMapSize = Math.max(mapSize.width, mapSize.height)
   out.shadowMapWidth = mapSize.width
   out.shadowMapHeight = mapSize.height
+  optionalBoolean(shadow?.autoUpdate, 'light.shadow.autoUpdate')
+  optionalBoolean(shadow?.needsUpdate, 'light.shadow.needsUpdate')
   const bias = optionalFiniteNumber(shadow?.bias, 'light.shadow.bias')
   const normalBias = optionalFiniteNumber(shadow?.normalBias, 'light.shadow.normalBias')
   const radius = optionalNonNegativeFiniteNumber(shadow?.radius, 'light.shadow.radius')

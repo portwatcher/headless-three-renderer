@@ -31786,6 +31786,26 @@ test('invalid object and light shadow flag values fail clearly', () => {
     () => extractLights(lightScene),
     /light\.castShadow must be a boolean/i,
   )
+
+  for (const [name, mutate, pattern] of [
+    ['shadow.autoUpdate', (shadow) => {
+      shadow.autoUpdate = 'yes'
+    }, /light\.shadow\.autoUpdate must be a boolean/i],
+    ['shadow.needsUpdate', (shadow) => {
+      shadow.needsUpdate = 'yes'
+    }, /light\.shadow\.needsUpdate must be a boolean/i],
+  ]) {
+    const scene = new THREE.Scene()
+    const shadowLight = new THREE.DirectionalLight(0xffffff, 1)
+    shadowLight.castShadow = true
+    mutate(shadowLight.shadow)
+    scene.add(shadowLight)
+    assert.throws(
+      () => extractLights(scene),
+      pattern,
+      name,
+    )
+  }
 })
 
 test('invalid shadow numeric values fail clearly', () => {

@@ -486,6 +486,8 @@ export interface ThreeObject3DLike {
   /** DirectionalLight.shadow (three.js). */
   shadow?: {
     mapSize?: { x?: number; y?: number; width?: number; height?: number }
+    autoUpdate?: boolean
+    needsUpdate?: boolean
     bias?: number
     normalBias?: number
     radius?: number
