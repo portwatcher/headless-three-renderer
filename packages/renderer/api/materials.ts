@@ -2151,6 +2151,30 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeUnrealBloomPassHighPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.UnrealBloomPass internal LuminosityHighPassShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent bloom pass, or compose UnrealBloom outside this helper.",
+    )
+  }
+
+  if (isThreeSsrPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.SSRPass internal SSRShader ShaderMaterial is not translated by @headless-three/renderer yet. Render reflections through supported scene/environment/material inputs, provide a custom WGSL fragment for an equivalent screen-space reflection pass, or compose SSR outside this helper.",
+    )
+  }
+
+  if (isThreeSmaaPassEdgesShaderMaterial(material)) {
+    throw new Error(
+      "THREE.SMAAPass internal SMAAEdgesShader ShaderMaterial is not translated by @headless-three/renderer yet. Use native MSAA through render options or targets when applicable, provide a custom WGSL fragment for an equivalent antialiasing pass, or compose SMAA outside this helper.",
+    )
+  }
+
+  if (isThreeOutlinePassPrepareMaskShaderMaterial(material)) {
+    throw new Error(
+      "THREE.OutlinePass internal prepare-mask ShaderMaterial is not translated by @headless-three/renderer yet. Use options.renderMode mask/object-id outputs for supported object isolation, provide a custom WGSL fragment for an equivalent outline pass, or compose outlines outside this helper.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2546,6 +2570,101 @@ function isThreeGtaoPassShaderMaterial(material: ThreeMaterialLike): boolean {
     compact.includes('returntextureLod(tDepth,uv.xy,0.0).DEPTH_SWIZZLING;') &&
     compact.includes('constintDIRECTIONS=SAMPLES<30?3:5;') &&
     compact.includes('gl_FragColor=FRAGMENT_OUTPUT;')
+}
+
+function isThreeUnrealBloomPassHighPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse == null ||
+    values.luminosityThreshold == null ||
+    values.smoothWidth == null ||
+    values.defaultColor == null ||
+    values.defaultOpacity == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformvec3defaultColor;') &&
+    compact.includes('uniformfloatdefaultOpacity;') &&
+    compact.includes('uniformfloatluminosityThreshold;') &&
+    compact.includes('floatv=luminance(texel.xyz);') &&
+    compact.includes('vec4outputColor=vec4(defaultColor.rgb,defaultOpacity);') &&
+    compact.includes('floatalpha=smoothstep(luminosityThreshold,luminosityThreshold+smoothWidth,v);') &&
+    compact.includes('gl_FragColor=mix(outputColor,texel,alpha);')
+}
+
+function isThreeSsrPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse == null ||
+    values.tNormal == null ||
+    values.tMetalness == null ||
+    values.tDepth == null ||
+    values.cameraNear == null ||
+    values.cameraFar == null ||
+    values.resolution == null ||
+    values.cameraProjectionMatrix == null ||
+    values.cameraInverseProjectionMatrix == null ||
+    values.opacity == null ||
+    values.maxDistance == null ||
+    values.cameraRange == null ||
+    values.thickness == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('precisionhighpsampler2D;') &&
+    compact.includes('uniformsampler2DtMetalness;') &&
+    compact.includes('uniformfloatmaxDistance;') &&
+    compact.includes('floatpointToLineDistance(vec3x0,vec3x1,vec3x2)') &&
+    compact.includes('vec2viewPositionToXY(vec3viewPosition)') &&
+    compact.includes('vec3viewReflectDir=reflect(viewIncidentDir,viewNormal);') &&
+    compact.includes('vec4reflectColor=texture2D(tDiffuse,uv);') &&
+    compact.includes('gl_FragColor.xyz=reflectColor.xyz;')
+}
+
+function isThreeSmaaPassEdgesShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.tDiffuse == null || values.resolution == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('varyingvec4vOffset[3];') &&
+    compact.includes('vec4SMAAColorEdgeDetectionPS(vec2texcoord,vec4offset[3],sampler2DcolorTex)') &&
+    compact.includes('vec2threshold=vec2(SMAA_THRESHOLD,SMAA_THRESHOLD);') &&
+    compact.includes('vec2edges=step(threshold,delta.xy);') &&
+    compact.includes('edges.xy*=step(0.5*maxDelta,delta.xy);') &&
+    compact.includes('gl_FragColor=SMAAColorEdgeDetectionPS(vUv,vOffset,tDiffuse);')
+}
+
+function isThreeOutlinePassPrepareMaskShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.depthTexture == null || values.cameraNearFar == null || values.textureMatrix == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DdepthTexture;') &&
+    compact.includes('uniformvec2cameraNearFar;') &&
+    compact.includes('floatdepth=unpackRGBAToDepth(texture2DProj(depthTexture,projTexCoord));') &&
+    compact.includes('DepthToViewZ(depth,cameraNearFar.x,cameraNearFar.y);') &&
+    compact.includes('floatdepthTest=(-vPosition.z>viewZ)?1.0:0.0;') &&
+    compact.includes('gl_FragColor=vec4(0.0,depthTest,1.0,1.0);')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

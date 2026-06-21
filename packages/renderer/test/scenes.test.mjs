@@ -25,6 +25,7 @@ import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js'
 import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass.js'
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js'
 import { HalftonePass } from 'three/examples/jsm/postprocessing/HalftonePass.js'
+import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -33,10 +34,13 @@ import { RenderTransitionPass } from 'three/examples/jsm/postprocessing/RenderTr
 import { SAOPass } from 'three/examples/jsm/postprocessing/SAOPass.js'
 import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
+import { SSRPass } from 'three/examples/jsm/postprocessing/SSRPass.js'
 import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js'
 import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass.js'
 import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
@@ -3035,6 +3039,93 @@ test('EffectComposer ambient-occlusion shader passes fail clearly with helper gu
       )
     } finally {
       pass.dispose()
+    }
+  }
+})
+
+test('EffectComposer advanced shader passes fail clearly with helper guidance', () => {
+  class StubImage {
+    set src(value) {
+      this._src = value
+    }
+
+    get src() {
+      return this._src
+    }
+  }
+
+  function makeScene(color = 0xff0000) {
+    const scene = new THREE.Scene()
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color }),
+    )
+    scene.add(mesh)
+    return { scene, mesh }
+  }
+
+  function makeCamera() {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+    camera.position.z = 2
+    camera.updateProjectionMatrix()
+    return camera
+  }
+
+  const hadImage = Object.prototype.hasOwnProperty.call(globalThis, 'Image')
+  const previousImage = globalThis.Image
+  globalThis.Image = StubImage
+
+  const cases = [
+    [
+      'UnrealBloomPass',
+      () => new UnrealBloomPass(new THREE.Vector2(16, 16), 1, 0.1, 0.2),
+      /UnrealBloomPass internal LuminosityHighPassShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'SSRPass',
+      () => {
+        const { scene } = makeScene()
+        return new SSRPass({ renderer: new Renderer(), scene, camera: makeCamera(), width: 16, height: 16 })
+      },
+      /SSRPass internal SSRShader ShaderMaterial.*not translated.*reflections.*custom WGSL/i,
+    ],
+    [
+      'SMAAPass',
+      () => new SMAAPass(16, 16),
+      /SMAAPass internal SMAAEdgesShader ShaderMaterial.*not translated.*native MSAA.*custom WGSL/i,
+    ],
+    [
+      'OutlinePass',
+      () => {
+        const { scene, mesh } = makeScene()
+        return new OutlinePass(new THREE.Vector2(16, 16), scene, makeCamera(), [mesh])
+      },
+      /OutlinePass internal prepare-mask ShaderMaterial.*not translated.*renderMode.*custom WGSL/i,
+    ],
+  ]
+
+  try {
+    for (const [name, createPass, pattern] of cases) {
+      const renderer = new Renderer()
+      const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+      const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+      const pass = createPass()
+
+      try {
+        assert.throws(
+          () => pass.render(renderer, writeBuffer, readBuffer, 0.016, false),
+          pattern,
+          `${name} should fail with helper-specific guidance`,
+        )
+      } finally {
+        pass.dispose()
+      }
+    }
+  } finally {
+    if (hadImage) {
+      globalThis.Image = previousImage
+    } else {
+      delete globalThis.Image
     }
   }
 })
