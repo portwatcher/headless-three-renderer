@@ -51,6 +51,7 @@ Already supported in the current implementation:
 - Three.js examples `SortUtils.radixSort()` can order renderer-visible `BatchedMesh.customSort` draw lists before rendering.
 - Three.js examples math utilities `Lut`, `ColorConverter`, `ImprovedNoise`, `SimplexNoise`, `Capsule`, `ConvexHull`, `OBB`, and `Octree` produce `THREE.Color` values, point paths, or collision/bounds-derived line and mesh geometry that render through supported material, vertex-color, line, and mesh paths.
 - Three.js examples `Gyroscope` preserves child orientation under rotated parents while rendering children through supported `Object3D` and mesh transform paths.
+- Three.js examples `Timer` and `FixedTimer` can drive deterministic still-frame transform state before rendering.
 - Three.js examples `MorphAnimMesh` and `MorphBlendMesh` update morph target influences through their helper APIs, and the resulting meshes render through the supported CPU morph-target baking path.
 - Three.js examples `GeometryUtils.hilbert2D()` produces line point paths and `TubePainter` writes dynamic tube mesh attributes/draw ranges that render through supported line and mesh material paths.
 - Three.js examples `SkeletonUtils.clone()` remaps cloned skinned meshes to cloned bones, and the resulting `SkinnedMesh` renders through the supported CPU skinning path.

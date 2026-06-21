@@ -66,6 +66,7 @@ import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
 import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
+import { FixedTimer, Timer } from 'three/examples/jsm/misc/Timer.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
@@ -4855,6 +4856,59 @@ test('examples Gyroscope preserves child orientation while rendering normal mesh
       'Gyroscope child mesh should render green pixels',
     )
   } finally {
+    geometry.dispose()
+    redMaterial.dispose()
+    greenMaterial.dispose()
+  }
+})
+
+test('examples Timer utilities can drive still-frame render state', () => {
+  const timer = new Timer()
+  timer.setTimescale(2)
+  timer.update(timer._startTime + 250)
+
+  const fixedTimer = new FixedTimer(10)
+  fixedTimer.setTimescale(1.5)
+  fixedTimer.update()
+  fixedTimer.update()
+
+  assert.ok(Math.abs(timer.getDelta() - 0.5) < 1e-6)
+  assert.ok(Math.abs(timer.getElapsed() - 0.5) < 1e-6)
+  assert.ok(Math.abs(fixedTimer.getDelta() - 0.1) < 1e-6)
+  assert.ok(Math.abs(fixedTimer.getElapsed() - 0.3) < 1e-6)
+
+  const geometry = new THREE.PlaneGeometry(0.36, 0.36)
+  const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
+  const greenMaterial = new THREE.MeshBasicMaterial({ color: 0x44ff66, side: THREE.DoubleSide })
+  const red = new THREE.Mesh(geometry, redMaterial)
+  red.position.x = -timer.getElapsed()
+  const green = new THREE.Mesh(geometry, greenMaterial)
+  green.position.x = fixedTimer.getElapsed() + 0.2
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(red, green)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width / 2, height, (r, g, b) => r > 150 && g < 120 && b < 140) > 120,
+      'Timer-driven red mesh should render on the left',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, width / 2, 0, width, height, (r, g, b) => g > 150 && g > r + 20 && g > b + 20) > 120,
+      'FixedTimer-driven green mesh should render on the right',
+    )
+  } finally {
+    timer.dispose()
+    fixedTimer.dispose()
     geometry.dispose()
     redMaterial.dispose()
     greenMaterial.dispose()
