@@ -1,4 +1,4 @@
-import test from 'node:test'
+import test, { afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -215,6 +215,7 @@ const { extractBackgroundTexture, extractEnvironmentMap, extractTextureData } = 
 const cjsRequire = createRequire(import.meta.url)
 
 const SIZE = 128
+const SHARED_RENDERER_RECYCLE_TEST_INTERVAL = 64
 const BG = [89, 89, 89] // sRGB output for linear 0.1
 const UnsignedInt101111Type = THREE.UnsignedInt101111Type ?? 35899
 
@@ -429,11 +430,19 @@ function addLights(scene) {
 }
 
 let sharedRenderer
+let sharedRendererCompletedTests = 0
 
 function getRenderer() {
   sharedRenderer ??= new Renderer()
   return sharedRenderer
 }
+
+afterEach(() => {
+  sharedRendererCompletedTests += 1
+  if (sharedRendererCompletedTests % SHARED_RENDERER_RECYCLE_TEST_INTERVAL !== 0) return
+  sharedRenderer?.dispose()
+  sharedRenderer = undefined
+})
 
 function renderRgba(scene, camera, options = {}) {
   return getRenderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
