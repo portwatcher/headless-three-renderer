@@ -84,6 +84,8 @@ import { BVHLoader } from 'three/examples/jsm/loaders/BVHLoader.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { LUT3dlLoader } from 'three/examples/jsm/loaders/LUT3dlLoader.js'
+import { LUTCubeLoader } from 'three/examples/jsm/loaders/LUTCubeLoader.js'
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
@@ -4415,6 +4417,58 @@ test('KTX2Loader detects conservative renderer texture compression support', asy
     [],
     'asynchronous KTX2 detection should use renderer feature probes instead of WebGL extension probes',
   )
+})
+
+test('examples LUT loaders parse 3D LUT textures and fail clearly as material maps', () => {
+  const lut3dl = new LUT3dlLoader().parse([
+    '0 1',
+    '0 0 0',
+    '0 0 1',
+    '0 1 0',
+    '0 1 1',
+    '1 0 0',
+    '1 0 1',
+    '1 1 0',
+    '1 1 1',
+  ].join('\n'))
+  const cube = new LUTCubeLoader().parse([
+    'TITLE "tiny"',
+    'LUT_3D_SIZE 2',
+    '0 0 0',
+    '0 0 1',
+    '0 1 0',
+    '0 1 1',
+    '1 0 0',
+    '1 0 1',
+    '1 1 0',
+    '1 1 1',
+  ].join('\n'))
+
+  const geometry = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({ map: cube.texture3D })
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(geometry, material))
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.z = 2
+  camera.updateMatrixWorld(true)
+
+  try {
+    assert.equal(lut3dl.size, 2)
+    assert.equal(lut3dl.texture3D.isData3DTexture, true)
+    assert.equal(lut3dl.texture3D.image.data.length, 32)
+    assert.equal(cube.title, 'tiny')
+    assert.equal(cube.size, 2)
+    assert.equal(cube.texture3D.isData3DTexture, true)
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 32, height: 32 }),
+      /material\.map uses an array or 3D texture.*not supported.*2D texture image/i,
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
+    lut3dl.texture3D.dispose()
+    cube.texture3D.dispose()
+  }
 })
 
 test('GPUComputationRenderer stops at conservative vertex texture support detection', () => {
