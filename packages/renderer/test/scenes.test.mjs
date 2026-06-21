@@ -80,6 +80,7 @@ import { TiledLighting } from 'three/examples/jsm/lighting/TiledLighting.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { RectAreaLightTexturesLib } from 'three/examples/jsm/lights/RectAreaLightTexturesLib.js'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
+import { BVHLoader } from 'three/examples/jsm/loaders/BVHLoader.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
@@ -8195,6 +8196,65 @@ test('examples SkeletonUtils.clone preserves renderable skinned mesh hierarchies
     geometry.dispose()
     placeholderMaterial.dispose()
     clonedMaterial.dispose()
+  }
+})
+
+test('examples BVHLoader parses animation clips into renderable skeleton helper state', () => {
+  const { skeleton, clip } = new BVHLoader().parse([
+    'HIERARCHY',
+    'ROOT Hips',
+    '{',
+    'OFFSET 0 0 0',
+    'CHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation',
+    'JOINT Chest',
+    '{',
+    'OFFSET 0 1 0',
+    'CHANNELS 3 Zrotation Xrotation Yrotation',
+    'End Site',
+    '{',
+    'OFFSET 0 1 0',
+    '}',
+    '}',
+    '}',
+    'MOTION',
+    'Frames: 2',
+    'Frame Time: 0.0333333',
+    '0 0 0 0 0 0 0 0 0',
+    '0 0 0 0 0 45 0 0 0',
+  ].join('\n'))
+  const root = skeleton.bones[0]
+  const helper = new THREE.SkeletonHelper(root)
+  helper.material.linewidth = 3
+  const mixer = new THREE.AnimationMixer(root)
+  mixer.clipAction(clip).play()
+  mixer.setTime(0.0333333)
+  root.updateMatrixWorld(true)
+  helper.updateMatrixWorld(true)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(root, helper)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 1, 4)
+  camera.lookAt(0, 0.8, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const chest = skeleton.bones.find((bone) => bone.name === 'Chest')
+    assert.equal(skeleton.bones.length, 3)
+    assert.equal(clip.tracks.length, 4)
+    assert.ok(root.quaternion.y > 0.3, 'BVH animation should rotate the root bone')
+    assert.equal(chest.position.y, 1)
+    assert.equal(helper.isSkeletonHelper, true)
+    assert.equal(helper.geometry.getAttribute('position').count, 4)
+    assert.ok(
+      nonBackgroundRatio(renderRgba(scene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.02,
+      'BVH-derived SkeletonHelper should render visible line geometry',
+    )
+  } finally {
+    helper.geometry.dispose()
+    helper.material.dispose()
   }
 })
 
