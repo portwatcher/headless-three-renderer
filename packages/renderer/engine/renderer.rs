@@ -87,7 +87,7 @@ pub struct Uniforms {
     pub shadow_params4: [f32; 4],
     /// x = light index, y = layer base, z = layer count, w = shadow kind.
     pub shadow_infos: [[f32; 4]; MAX_SHADOW_LAYERS],
-    /// x = bias, y = normal_bias, z = PCF radius multiplier, w = reserved.
+    /// x = bias, y = normal_bias, z = PCF radius multiplier, w = shadow intensity.
     pub shadow_biases: [[f32; 4]; MAX_SHADOW_LAYERS],
     /// x/y/z = cascade split distances, w = reserved.
     pub shadow_cascade_splits: [[f32; 4]; MAX_SHADOW_LAYERS],
@@ -4588,7 +4588,12 @@ fn shadow_biases(settings: &RenderSettings) -> [[f32; 4]; MAX_SHADOW_LAYERS] {
     let mut biases = [[0.0; 4]; MAX_SHADOW_LAYERS];
     if let Some(shadow_maps) = &settings.shadow {
         for (slot, caster) in shadow_maps.casters.iter().enumerate() {
-            biases[slot] = [caster.bias, caster.normal_bias, caster.radius, 0.0];
+            biases[slot] = [
+                caster.bias,
+                caster.normal_bias,
+                caster.radius,
+                caster.intensity,
+            ];
         }
     }
     biases

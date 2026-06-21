@@ -103,7 +103,7 @@ struct Uniforms {
   shadow_params4: vec4<f32>,
   // x = light index, y = layer base, z = layer count, w = shadow kind.
   shadow_infos: array<vec4<f32>, 12>,
-  // x = bias, y = normal_bias, z = PCF radius multiplier, w = reserved.
+  // x = bias, y = normal_bias, z = PCF radius multiplier, w = shadow intensity.
   shadow_biases: array<vec4<f32>, 12>,
   // x/y/z = cascade split distances, w = reserved.
   shadow_cascade_splits: array<vec4<f32>, 12>,
@@ -361,9 +361,11 @@ fn sample_shadow_layer(shadow_slot: u32, world_pos: vec3<f32>, layer: u32, world
   let reference = proj.z - bias.x;
   let texel = uniforms.shadow_params2.yz;
   let shadow_map_type = uniforms.shadow_params2.w;
+  let intensity = max(bias.w, 0.0);
 
   if shadow_map_type < 0.5 {
-    return textureSampleCompareLevel(t_shadow, s_shadow, uv, layer, reference);
+    let visibility = textureSampleCompareLevel(t_shadow, s_shadow, uv, layer, reference);
+    return mix(1.0, visibility, intensity);
   }
 
   // 3x3 PCF.
@@ -374,7 +376,7 @@ fn sample_shadow_layer(shadow_slot: u32, world_pos: vec3<f32>, layer: u32, world
       sum = sum + textureSampleCompareLevel(t_shadow, s_shadow, uv + offset, layer, reference);
     }
   }
-  return sum / 9.0;
+  return mix(1.0, sum / 9.0, intensity);
 }
 
 fn point_shadow_layer(light_vec: vec3<f32>) -> u32 {

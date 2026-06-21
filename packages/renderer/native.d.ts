@@ -179,6 +179,8 @@ export interface SceneLight {
   shadowNormalBias?: number
   /** PCF shadow radius multiplier. Defaults to 1. */
   shadowRadius?: number
+  /** Shadow darkness multiplier. Defaults to 1; 0 disables received shadow darkening. */
+  shadowIntensity?: number
   /** VSM blur sample count. Defaults to Three.js' LightShadow default of 8. */
   shadowBlurSamples?: number
   /** Orthographic shadow-camera frustum bounds. */

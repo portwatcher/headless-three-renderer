@@ -194,10 +194,12 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   const bias = optionalFiniteNumber(shadow?.bias, 'light.shadow.bias')
   const normalBias = optionalFiniteNumber(shadow?.normalBias, 'light.shadow.normalBias')
   const radius = optionalNonNegativeFiniteNumber(shadow?.radius, 'light.shadow.radius')
+  const intensity = optionalNonNegativeFiniteNumber(shadow?.intensity, 'light.shadow.intensity')
   const blurSamples = optionalNonNegativeFiniteNumber(shadow?.blurSamples, 'light.shadow.blurSamples')
   if (bias !== undefined) out.shadowBias = bias
   if (normalBias !== undefined) out.shadowNormalBias = normalBias
   if (radius !== undefined) out.shadowRadius = radius
+  if (intensity !== undefined) out.shadowIntensity = intensity
   if (blurSamples !== undefined) out.shadowBlurSamples = blurSamples
 
   const cam = shadow?.camera

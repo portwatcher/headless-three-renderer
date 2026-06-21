@@ -31172,6 +31172,66 @@ test('VSMShadowMap blurSamples adjusts filtered shadow softness', () => {
   )
 })
 
+test('LightShadow intensity scales received shadows', () => {
+  function renderShadowIntensity(intensity) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.intensity = intensity
+    light.shadow.mapSize.set(128, 128)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+
+    const renderer = new Renderer()
+    const rgba = renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+    const mean = meanRegion(rgba, 96, 96, 4, 40, 30, 58)
+    return mean.r + mean.g + mean.b
+  }
+
+  const disabled = renderShadowIntensity(0)
+  const partial = renderShadowIntensity(0.35)
+  const full = renderShadowIntensity(1)
+
+  assert.ok(
+    disabled > partial + 80,
+    `shadow.intensity=0 should suppress received shadow darkening (${disabled} vs ${partial})`,
+  )
+  assert.ok(
+    partial > full + 80,
+    `partial shadow.intensity should be lighter than full intensity (${partial} vs ${full})`,
+  )
+})
+
 test('shadow lights over the native layer budget fail clearly', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -31250,6 +31310,7 @@ test('shadow bias options are extracted for native shadow lights', () => {
     light.shadow.bias = -0.004
     light.shadow.normalBias = 0.125
     light.shadow.radius = 3.5
+    light.shadow.intensity = 0.4
     light.shadow.camera.near = 0.2
     light.shadow.camera.far = 24
     if ('left' in light.shadow.camera) {
@@ -31272,6 +31333,7 @@ test('shadow bias options are extracted for native shadow lights', () => {
     assert.equal(nativeLight.shadowBias, -0.004)
     assert.equal(nativeLight.shadowNormalBias, 0.125)
     assert.equal(nativeLight.shadowRadius, 3.5)
+    assert.equal(nativeLight.shadowIntensity, 0.4)
     assert.equal(nativeLight.shadowCameraNear, 0.2)
     assert.equal(nativeLight.shadowCameraFar, 24)
     if (lightType === 'directional') {
@@ -31764,6 +31826,12 @@ test('invalid shadow numeric values fail clearly', () => {
     ['radius negative', (light) => {
       light.shadow.radius = -1
     }, /light\.shadow\.radius must be non-negative/i],
+    ['intensity', (light) => {
+      light.shadow.intensity = 'dark'
+    }, /light\.shadow\.intensity must be a finite number/i],
+    ['intensity negative', (light) => {
+      light.shadow.intensity = -1
+    }, /light\.shadow\.intensity must be non-negative/i],
     ['blurSamples', (light) => {
       light.shadow.blurSamples = 'many'
     }, /light\.shadow\.blurSamples must be a finite number/i],

@@ -46,6 +46,8 @@ pub struct ShadowCaster {
     pub normal_bias: f32,
     /// Effective shadow filter radius multiplier.
     pub radius: f32,
+    /// Shadow darkness multiplier. Defaults to 1; 0 disables received shadow darkening.
+    pub intensity: f32,
 }
 
 pub struct ShadowMapSet {
@@ -933,6 +935,11 @@ fn resolve_shadow_maps(scene: &RenderScene, shadow_map_type: f32) -> Result<Opti
             light.shadow_normal_bias.unwrap_or(0.0),
             &format!("{prefix}.shadow.normalBias"),
         )?;
+        let intensity = finite_f32(
+            light.shadow_intensity.unwrap_or(1.0),
+            &format!("{prefix}.shadow.intensity"),
+        )?
+        .max(0.0);
         let radius = shadow_radius(light, &prefix, shadow_map_type)?;
 
         let requested_layers = total_layers + layer_count;
@@ -952,6 +959,7 @@ fn resolve_shadow_maps(scene: &RenderScene, shadow_map_type: f32) -> Result<Opti
             bias,
             normal_bias,
             radius,
+            intensity,
         });
         total_layers = requested_layers;
         atlas_width = atlas_width.max(map_width);
