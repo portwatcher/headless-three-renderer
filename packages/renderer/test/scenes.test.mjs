@@ -87,6 +87,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
+import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader.js'
 import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
 import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
 import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
@@ -206,9 +207,13 @@ const UnsignedInt101111Type = THREE.UnsignedInt101111Type ?? 35899
 
 const JS_METHOD_DECLARATION_IGNORE = new Set(['constructor', 'if', 'for', 'while', 'switch', 'catch', 'resolve', 'reject'])
 
-function threeRendererSource(relativePath) {
+function threeRendererFile(relativePath) {
   const threeRoot = path.resolve(path.dirname(cjsRequire.resolve('three')), '..')
-  return readFileSync(path.resolve(threeRoot, relativePath), 'utf8')
+  return readFileSync(path.resolve(threeRoot, relativePath))
+}
+
+function threeRendererSource(relativePath) {
+  return threeRendererFile(relativePath).toString('utf8')
 }
 
 function extractJsClassBody(source, className) {
@@ -3386,6 +3391,234 @@ test('examples physics helpers expose external engine dependency boundaries', as
   }
 })
 
+test('examples WebXR button helpers build DOM fallback and session controls', async () => {
+  const { ARButton } = await import('three/examples/jsm/webxr/ARButton.js')
+  const { VRButton } = await import('three/examples/jsm/webxr/VRButton.js')
+  const { XRButton } = await import('three/examples/jsm/webxr/XRButton.js')
+  const previousNavigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
+  const previousWindow = globalThis.window
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+
+  const flushWebXrPromises = async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  }
+  const setNavigator = (value) => {
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value,
+    })
+  }
+  const makeElement = (tagName) => ({
+    tagName,
+    style: {},
+    children: [],
+    attributes: {},
+    listeners: {},
+    href: '',
+    id: '',
+    innerHTML: '',
+    textContent: '',
+    appendChild(child) {
+      this.children.push(child)
+      child.parentElement = this
+    },
+    setAttribute(name, value) {
+      this.attributes[name] = String(value)
+    },
+    addEventListener(type, listener) {
+      this.listeners[type] = listener
+    },
+    click() {
+      this.onclick?.({ type: 'click' })
+    },
+  })
+  const installBrowserGlobals = (navigatorValue) => {
+    const elements = []
+    globalThis.window = { isSecureContext: false }
+    globalThis.document = {
+      location: { href: 'http://example.test/xr.html' },
+      body: makeElement('body'),
+      createElement(tagName) {
+        const element = makeElement(tagName)
+        elements.push(element)
+        return element
+      },
+      createElementNS(namespaceURI, tagName) {
+        const element = makeElement(tagName)
+        element.namespaceURI = namespaceURI
+        elements.push(element)
+        return element
+      },
+    }
+    setNavigator(navigatorValue)
+    return elements
+  }
+  const makeRenderer = () => {
+    const calls = {
+      referenceSpaceTypes: [],
+      sessions: [],
+    }
+    return {
+      calls,
+      xr: {
+        setReferenceSpaceType(type) {
+          calls.referenceSpaceTypes.push(type)
+        },
+        async setSession(session) {
+          calls.sessions.push(session)
+        },
+      },
+    }
+  }
+  const makeSession = () => {
+    const listeners = new Map()
+    return {
+      ended: false,
+      addEventListener(type, listener) {
+        listeners.set(type, listener)
+      },
+      removeEventListener(type, listener) {
+        if (listeners.get(type) === listener) listeners.delete(type)
+      },
+      end() {
+        this.ended = true
+        listeners.get('end')?.({ type: 'end' })
+      },
+    }
+  }
+
+  try {
+    installBrowserGlobals({})
+    for (const [label, Button] of [
+      ['ARButton', ARButton],
+      ['VRButton', VRButton],
+      ['XRButton', XRButton],
+    ]) {
+      const fallback = Button.createButton(makeRenderer())
+      assert.equal(fallback.tagName, 'a', `${label} should return a fallback link without navigator.xr`)
+      assert.equal(fallback.innerHTML, 'WEBXR NEEDS HTTPS')
+      assert.equal(fallback.href, 'https://example.test/xr.html')
+    }
+
+    const arSession = makeSession()
+    const arRequests = []
+    const arSupportedModes = []
+    const arElements = installBrowserGlobals({
+      xr: {
+        async isSessionSupported(mode) {
+          arSupportedModes.push(mode)
+          return mode === 'immersive-ar'
+        },
+        async requestSession(mode, init) {
+          arRequests.push([mode, init])
+          return arSession
+        },
+      },
+    })
+    const arRenderer = makeRenderer()
+    const arSessionInit = {}
+    const arButton = ARButton.createButton(arRenderer, arSessionInit)
+    await flushWebXrPromises()
+    assert.equal(arButton.id, 'ARButton')
+    assert.equal(arButton.textContent, 'START AR')
+    assert.deepEqual(arSupportedModes, ['immersive-ar'])
+    assert.ok(arSessionInit.optionalFeatures.includes('dom-overlay'))
+    assert.equal(arSessionInit.domOverlay.root.style.display, 'none')
+    assert.ok(arElements.some((element) => element.tagName === 'svg'))
+
+    arButton.onclick()
+    await flushWebXrPromises()
+    assert.equal(arRequests[0][0], 'immersive-ar')
+    assert.equal(arRequests[0][1], arSessionInit)
+    assert.deepEqual(arRenderer.calls.referenceSpaceTypes, ['local'])
+    assert.deepEqual(arRenderer.calls.sessions, [arSession])
+    assert.equal(arButton.textContent, 'STOP AR')
+    assert.equal(arSessionInit.domOverlay.root.style.display, '')
+    arSession.end()
+    assert.equal(arButton.textContent, 'START AR')
+    assert.equal(arSessionInit.domOverlay.root.style.display, 'none')
+
+    const vrSession = makeSession()
+    const vrRequests = []
+    installBrowserGlobals({
+      xr: {
+        async isSessionSupported(mode) {
+          return mode === 'immersive-vr'
+        },
+        async requestSession(mode, init) {
+          vrRequests.push([mode, init])
+          return vrSession
+        },
+      },
+    })
+    const vrRenderer = makeRenderer()
+    const vrButton = VRButton.createButton(vrRenderer, { optionalFeatures: ['hand-tracking'] })
+    await flushWebXrPromises()
+    assert.equal(vrButton.id, 'VRButton')
+    assert.equal(vrButton.textContent, 'ENTER VR')
+    vrButton.onclick()
+    await flushWebXrPromises()
+    assert.equal(vrRequests[0][0], 'immersive-vr')
+    assert.deepEqual(vrRequests[0][1].optionalFeatures, ['local-floor', 'bounded-floor', 'layers', 'hand-tracking'])
+    assert.deepEqual(vrRenderer.calls.sessions, [vrSession])
+    assert.equal(vrButton.textContent, 'EXIT VR')
+    vrSession.end()
+    assert.equal(vrButton.textContent, 'ENTER VR')
+
+    const xrSession = makeSession()
+    const xrSupportedModes = []
+    const xrRequests = []
+    installBrowserGlobals({
+      xr: {
+        async isSessionSupported(mode) {
+          xrSupportedModes.push(mode)
+          return mode === 'immersive-vr'
+        },
+        async requestSession(mode, init) {
+          xrRequests.push([mode, init])
+          return xrSession
+        },
+      },
+    })
+    const xrRenderer = makeRenderer()
+    const xrButton = XRButton.createButton(xrRenderer, { optionalFeatures: ['anchors'] })
+    await flushWebXrPromises()
+    assert.equal(xrButton.id, 'XRButton')
+    assert.equal(xrButton.textContent, 'START XR')
+    assert.deepEqual(xrSupportedModes, ['immersive-ar', 'immersive-vr'])
+    xrButton.onclick()
+    await flushWebXrPromises()
+    assert.equal(xrRequests[0][0], 'immersive-vr')
+    assert.deepEqual(xrRequests[0][1].optionalFeatures, ['local-floor', 'bounded-floor', 'layers', 'anchors'])
+    assert.deepEqual(xrRenderer.calls.sessions, [xrSession])
+    assert.equal(xrButton.textContent, 'STOP XR')
+    xrSession.end()
+    assert.equal(xrButton.textContent, 'START XR')
+  } finally {
+    if (previousNavigatorDescriptor) {
+      Object.defineProperty(globalThis, 'navigator', previousNavigatorDescriptor)
+    } else {
+      delete globalThis.navigator
+    }
+    if (hadWindow) {
+      globalThis.window = previousWindow
+    } else {
+      delete globalThis.window
+    }
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
+  }
+})
+
 test('examples Addons barrel imports in Node and exposes covered helper modules', async () => {
   const Addons = await import('three/examples/jsm/Addons.js')
 
@@ -5901,6 +6134,50 @@ test('TextGeometry renders parsed example fonts through built-in mesh materials'
         return r > 100 && g > 50 && r > g && b < 90
       }) > 100,
       'TextGeometry should render visible text-colored pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
+  }
+})
+
+test('TTFLoader parses example fonts into renderable TextGeometry', () => {
+  const buffer = threeRendererFile('examples/fonts/ttf/kenpixel.ttf')
+  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  const typeface = new TTFLoader().parse(arrayBuffer)
+  const font = new FontLoader().parse(typeface)
+  const geometry = new TextGeometry('HUD', {
+    font,
+    size: 0.42,
+    depth: 0.04,
+    curveSegments: 1,
+    bevelEnabled: false,
+  })
+  geometry.center()
+  const material = new THREE.MeshBasicMaterial({ color: 0x66ddff, side: THREE.DoubleSide })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1.5, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 64
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.match(typeface.familyName, /KenPixel/i)
+    assert.equal(geometry.isBufferGeometry, true)
+    assert.ok(geometry.getAttribute('position')?.count > 0)
+    assert.ok(geometry.getAttribute('normal'), 'TTF-derived TextGeometry should generate normals')
+    assert.ok(geometry.getAttribute('uv'), 'TTF-derived TextGeometry should generate UVs')
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02,
+      'TTF-derived TextGeometry should render visible font geometry',
     )
   } finally {
     geometry.dispose()
