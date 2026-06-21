@@ -133,6 +133,7 @@ import { LUTPass } from 'three/examples/jsm/postprocessing/LUTPass.js'
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js'
 import { RenderTransitionPass } from 'three/examples/jsm/postprocessing/RenderTransitionPass.js'
@@ -7163,6 +7164,49 @@ test('ParallaxBarrierEffect internal shader pass fails clearly', () => {
     )
   } finally {
     effect.dispose()
+  }
+})
+
+test('Postprocessing Pass base state and FullScreenQuad render through renderer state', () => {
+  const pass = new Pass()
+  assert.equal(pass.isPass, true)
+  assert.equal(pass.enabled, true)
+  assert.equal(pass.needsSwap, true)
+  assert.equal(pass.clear, false)
+  assert.equal(pass.renderToScreen, false)
+  assert.equal(pass.setSize(16, 16), undefined)
+  assert.equal(pass.dispose(), undefined)
+
+  const previousError = console.error
+  const errors = []
+  try {
+    console.error = (message) => errors.push(String(message))
+    assert.equal(pass.render(), undefined)
+  } finally {
+    console.error = previousError
+  }
+  assert.ok(errors.some((message) => message.includes('THREE.Pass: .render() must be implemented')))
+
+  const renderer = new Renderer()
+  const target = { texture: {} }
+  renderer.setSize(48, 48)
+  renderer.setRenderTarget(target)
+  const material = new THREE.MeshBasicMaterial({ color: 0x33ccff, side: THREE.DoubleSide })
+  const quad = new FullScreenQuad(material)
+  assert.equal(quad.material, material)
+
+  try {
+    quad.render(renderer)
+    assert.ok(target.data instanceof Uint8Array, 'FullScreenQuad should write into the active render target')
+    assert.equal(target.width, 48)
+    assert.equal(target.height, 48)
+    assert.ok(
+      countRegionPixels(target.data, 48, 48, 0, 0, 48, 48, (r, g, b) => b > 120 && g > 100 && r < 130) > 1800,
+      'FullScreenQuad should render its material through the renderer scene path',
+    )
+  } finally {
+    material.dispose()
+    renderer.dispose()
   }
 })
 
