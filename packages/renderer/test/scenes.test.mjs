@@ -142,6 +142,7 @@ import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.j
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
+import { FlakesTexture } from 'three/examples/jsm/textures/FlakesTexture.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 import * as GeometryCompressionUtils from 'three/examples/jsm/utils/GeometryCompressionUtils.js'
@@ -4463,6 +4464,202 @@ test('examples UVsDebug canvas output renders through supported texture paths', 
       delete globalThis.document
     } else {
       globalThis.document = previousDocument
+    }
+  }
+})
+
+test('examples FlakesTexture canvas output renders through supported texture paths', () => {
+  function colorFromStyle(style) {
+    const match = /rgb\(\s*([-\d.]+),\s*([-\d.]+),\s*([-\d.]+)\s*\)/.exec(style)
+    return match
+      ? [
+          Math.max(0, Math.min(255, Number(match[1]))),
+          Math.max(0, Math.min(255, Number(match[2]))),
+          Math.max(0, Math.min(255, Number(match[3]))),
+          255,
+        ]
+      : [127, 127, 255, 255]
+  }
+
+  function makeCanvas() {
+    let activeArc = null
+    const canvas = {
+      _width: 0,
+      _height: 0,
+      _pixels: new Uint8ClampedArray(0),
+      get width() {
+        return this._width
+      },
+      set width(value) {
+        this._width = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      get height() {
+        return this._height
+      },
+      set height(value) {
+        this._height = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      getContext(type) {
+        if (type !== '2d') return null
+        const context = {
+          fillStyle: 'rgb(127,127,255)',
+          beginPath() {
+            activeArc = null
+          },
+          arc(x, y, radius) {
+            activeArc = { x, y, radius }
+          },
+          fill() {
+            if (!activeArc) return
+            const color = colorFromStyle(context.fillStyle)
+            const x0 = Math.max(0, Math.floor(activeArc.x - activeArc.radius))
+            const y0 = Math.max(0, Math.floor(activeArc.y - activeArc.radius))
+            const x1 = Math.min(canvas.width - 1, Math.ceil(activeArc.x + activeArc.radius))
+            const y1 = Math.min(canvas.height - 1, Math.ceil(activeArc.y + activeArc.radius))
+            const radiusSq = activeArc.radius * activeArc.radius
+            for (let row = y0; row <= y1; row += 1) {
+              for (let col = x0; col <= x1; col += 1) {
+                const dx = col + 0.5 - activeArc.x
+                const dy = row + 0.5 - activeArc.y
+                if (dx * dx + dy * dy <= radiusSq) {
+                  canvas._pixels.set(color, (row * canvas.width + col) * 4)
+                }
+              }
+            }
+          },
+          fillRect(x, y, width, height) {
+            const color = colorFromStyle(context.fillStyle)
+            const x0 = Math.max(0, Math.floor(x))
+            const y0 = Math.max(0, Math.floor(y))
+            const x1 = Math.min(canvas.width, Math.ceil(x + width))
+            const y1 = Math.min(canvas.height, Math.ceil(y + height))
+            for (let row = y0; row < y1; row += 1) {
+              for (let col = x0; col < x1; col += 1) {
+                canvas._pixels.set(color, (row * canvas.width + col) * 4)
+              }
+            }
+          },
+          getImageData(x, y, width, height) {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(width, canvas.width)
+            assert.equal(height, canvas.height)
+            return {
+              data: new Uint8ClampedArray(canvas._pixels),
+              width,
+              height,
+            }
+          },
+        }
+        return context
+      },
+    }
+    return canvas
+  }
+
+  const seededRandom = () => {
+    let seed = 99
+    return () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return seed / 0x100000000
+    }
+  }
+  const previousDocument = globalThis.document
+  const previousRandom = Math.random
+  const geometry = new THREE.PlaneGeometry(1.6, 1.6)
+  let texture
+  let material
+  try {
+    globalThis.document = {
+      createElement(type) {
+        assert.equal(type, 'canvas')
+        return makeCanvas()
+      },
+    }
+    Math.random = seededRandom()
+    const canvas = new FlakesTexture(32, 32)
+    const variedPixels = canvas._pixels.reduce((count, value, index) => {
+      const channel = index % 4
+      if (channel === 3) return count
+      const expected = channel === 2 ? 255 : 127
+      return count + (Math.abs(value - expected) > 2 ? 1 : 0)
+    }, 0)
+    assert.equal(canvas.width, 32)
+    assert.equal(canvas.height, 32)
+    assert.ok(variedPixels > 1200, 'FlakesTexture should write varied procedural normal colors')
+
+    texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.needsUpdate = true
+    material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    scene.add(new THREE.Mesh(geometry, material))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 4)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    const width = 64
+    const height = 64
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 130 && b > r + 20 && b > g + 20) > 1600,
+      'FlakesTexture canvas output should render as a blue-biased procedural texture',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => Math.abs(r - g) > 15 && b > 120) > 200,
+      'FlakesTexture canvas output should preserve varied flake colors through CanvasTexture reads',
+    )
+  } finally {
+    geometry.dispose()
+    texture?.dispose()
+    material?.dispose()
+    Math.random = previousRandom
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
+test('examples canvas-backed utilities require browser canvas creation APIs', () => {
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+  const sourceGeometry = new THREE.PlaneGeometry(1, 1)
+
+  try {
+    delete globalThis.document
+
+    const volume = new Volume(1, 1, 1, 'uint8', new Uint8Array([128]).buffer)
+    volume.RASDimensions = [1, 1, 1]
+    volume.inverseMatrix = new THREE.Matrix4().identity()
+
+    assert.throws(
+      () => volume.extractSlice('z', 0),
+      /document is not defined/i,
+      'VolumeSlice extraction should require browser-style canvas creation',
+    )
+    assert.throws(
+      () => UVsDebug(sourceGeometry, 16),
+      /document is not defined/i,
+      'UVsDebug should require browser-style canvas creation',
+    )
+    assert.throws(
+      () => new FlakesTexture(4, 4),
+      /document is not defined/i,
+      'FlakesTexture should require browser-style canvas creation',
+    )
+  } finally {
+    sourceGeometry.dispose()
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
     }
   }
 })
