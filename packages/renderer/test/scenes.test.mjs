@@ -35022,13 +35022,42 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.renderLists.lighting, renderer.lighting)
   assert.equal(renderer.renderLists.get(scene, 0), renderList)
   assert.equal(renderer.renderLists.get(scene, 1) === renderList, false)
+  const cameraRenderList = renderer.renderLists.get(scene, camera)
+  assert.equal(renderer.renderLists.get(scene, camera), cameraRenderList)
+  assert.notEqual(cameraRenderList, renderList)
+  assert.equal(cameraRenderList.scene, scene)
+  assert.equal(cameraRenderList.camera, camera)
+  assert.equal(cameraRenderList.lightsNode, renderer.lighting.getNode(scene, camera))
+  assert.equal(cameraRenderList.begin(), cameraRenderList)
+  const renderListLight = { id: 'render-list-light' }
+  cameraRenderList.pushBundle({ id: 'bundle' })
+  cameraRenderList.pushLight(renderListLight)
+  assert.deepEqual(cameraRenderList.bundles, [{ id: 'bundle' }])
+  assert.deepEqual(cameraRenderList.lightsArray, [renderListLight])
+  cameraRenderList.finish()
+  assert.deepEqual(cameraRenderList.lightsNode.getLights(), [renderListLight])
+  cameraRenderList.begin()
+  assert.deepEqual(cameraRenderList.bundles, [])
+  assert.deepEqual(cameraRenderList.lightsArray, [])
   renderList.init()
-  renderList.push({ id: 2, renderOrder: 0 }, {}, { id: 5, transparent: true }, 0, 2, null)
-  renderList.unshift({ id: 1, renderOrder: 0, isSkinnedMesh: true }, {}, { id: 4, transmission: 0.5 }, 0, 1, null)
+  renderList.push({ id: 2, renderOrder: 0, occlusionTest: true }, {}, { id: 5, transparent: true }, 0, 2, null, { clip: 1 })
+  renderList.unshift(
+    { id: 1, renderOrder: 0, isSkinnedMesh: true },
+    {},
+    { id: 4, transmission: 0.5, side: THREE.DoubleSide },
+    0,
+    1,
+    null,
+  )
   assert.equal(renderList.opaque.length, 0)
-  assert.equal(renderList.transparent.length, 1)
+  assert.equal(renderList.transparent.length, 2)
   assert.equal(renderList.transmissive.length, 1)
+  assert.equal(renderList.transparentDoublePass.length, 1)
+  assert.equal(renderList.occlusionQueryCount, 1)
+  assert.equal(renderList.transparent.find((item) => item.id === 2).clippingContext.clip, 1)
   assert.equal(renderList.transmissive[0].materialVariant, 1)
+  renderList.sort()
+  assert.deepEqual(renderList.transparent.map((item) => item.id), [2, 1])
   renderList.sort(null, (a, b) => b.z - a.z)
   renderList.finish()
   const renderState = renderer.renderStates.get(scene, 0)
@@ -35060,6 +35089,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.nodes.has(disposableNodeKey), false)
   assert.equal(renderer.properties.has(object), false)
   assert.equal(renderer.renderLists.get(scene, 0) === renderList, false)
+  assert.equal(renderer.renderLists.get(scene, camera) === cameraRenderList, false)
   assert.equal(renderer.renderStates.get(scene, 0) === renderState, false)
 
   const rgba = renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' })
@@ -35318,6 +35348,14 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.throws(
     () => renderer.renderLists.get(scene, -1),
     /Renderer\.renderLists\.get renderCallDepth must be a non-negative integer/i,
+  )
+  assert.throws(
+    () => renderer.renderLists.get(scene, null),
+    /Renderer\.renderLists\.get camera must be an object/i,
+  )
+  assert.throws(
+    () => renderer.renderLists.get(scene, 'camera'),
+    /Renderer\.renderLists\.get camera must be an object/i,
   )
   assert.throws(
     () => renderList.sort('front-to-back'),

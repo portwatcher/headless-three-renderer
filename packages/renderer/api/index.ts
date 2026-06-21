@@ -2015,26 +2015,51 @@ type RendererRenderListItem = {
   object: unknown
   geometry: unknown
   material: unknown
-  materialVariant: number
-  groupOrder: number
+  materialVariant: number | null
+  groupOrder: unknown
   renderOrder: unknown
-  z: number
+  z: unknown
   group: unknown
+  clippingContext: unknown
 }
 
 class RendererRenderList {
-  private readonly renderItems: RendererRenderListItem[] = []
-  private renderItemsIndex = 0
+  readonly renderItems: RendererRenderListItem[] = []
+  renderItemsIndex = 0
 
   readonly opaque: RendererRenderListItem[] = []
   readonly transmissive: RendererRenderListItem[] = []
+  readonly transparentDoublePass: RendererRenderListItem[] = []
   readonly transparent: RendererRenderListItem[] = []
+  readonly bundles: unknown[] = []
+  readonly lightsArray: unknown[] = []
+  readonly lightsNode: RendererLightingNodeState
+  occlusionQueryCount = 0
+
+  constructor(
+    lighting: RendererLightingState | null = null,
+    readonly scene: unknown = null,
+    readonly camera: unknown = null,
+  ) {
+    this.lightsNode = lighting && scene && typeof scene === 'object' && camera && typeof camera === 'object'
+      ? lighting.getNode(scene, camera)
+      : new RendererLightingNodeState()
+  }
 
   init(): void {
+    this.begin()
+  }
+
+  begin(): this {
     this.renderItemsIndex = 0
     this.opaque.length = 0
     this.transmissive.length = 0
+    this.transparentDoublePass.length = 0
     this.transparent.length = 0
+    this.bundles.length = 0
+    this.lightsArray.length = 0
+    this.occlusionQueryCount = 0
+    return this
   }
 
   push(
@@ -2044,9 +2069,13 @@ class RendererRenderList {
     groupOrder = 0,
     z = 0,
     group: unknown = null,
+    clippingContext: unknown = null,
   ): void {
-    const renderItem = this.getNextRenderItem(object, geometry, material, groupOrder, z, group)
-    this.bucketForMaterial(material).push(renderItem)
+    const renderItem = this.getNextRenderItem(object, geometry, material, groupOrder, z, group, clippingContext)
+    if ((object as { occlusionTest?: unknown } | null)?.occlusionTest === true) {
+      this.occlusionQueryCount += 1
+    }
+    this.pushRenderItem(renderItem, material, false)
   }
 
   unshift(
@@ -2056,9 +2085,18 @@ class RendererRenderList {
     groupOrder = 0,
     z = 0,
     group: unknown = null,
+    clippingContext: unknown = null,
   ): void {
-    const renderItem = this.getNextRenderItem(object, geometry, material, groupOrder, z, group)
-    this.bucketForMaterial(material).unshift(renderItem)
+    const renderItem = this.getNextRenderItem(object, geometry, material, groupOrder, z, group, clippingContext)
+    this.pushRenderItem(renderItem, material, true)
+  }
+
+  pushBundle(group: unknown): void {
+    this.bundles.push(group)
+  }
+
+  pushLight(light: unknown): void {
+    this.lightsArray.push(light)
   }
 
   sort(customOpaqueSort?: RendererRenderListSort | null, customTransparentSort?: RendererRenderListSort | null): void {
@@ -2068,20 +2106,25 @@ class RendererRenderList {
     if (customTransparentSort !== undefined && customTransparentSort !== null && typeof customTransparentSort !== 'function') {
       throw new TypeError('Renderer.renderLists list transparent sort must be a function or null.')
     }
-    if (customOpaqueSort) this.opaque.sort(customOpaqueSort)
-    if (customTransparentSort) {
-      this.transmissive.sort(customTransparentSort)
-      this.transparent.sort(customTransparentSort)
-    }
+    this.opaque.sort(customOpaqueSort ?? rendererRenderListOpaqueSort)
+    this.transmissive.sort(customTransparentSort ?? rendererRenderListTransparentSort)
+    this.transparentDoublePass.sort(customTransparentSort ?? rendererRenderListTransparentSort)
+    this.transparent.sort(customTransparentSort ?? rendererRenderListTransparentSort)
   }
 
   finish(): void {
+    this.lightsNode.setLights(this.lightsArray)
     for (let i = this.renderItemsIndex; i < this.renderItems.length; i += 1) {
       this.renderItems[i].id = null
       this.renderItems[i].object = null
       this.renderItems[i].geometry = null
       this.renderItems[i].material = null
+      this.renderItems[i].materialVariant = null
+      this.renderItems[i].groupOrder = null
+      this.renderItems[i].renderOrder = null
+      this.renderItems[i].z = null
       this.renderItems[i].group = null
+      this.renderItems[i].clippingContext = null
     }
   }
 
@@ -2092,6 +2135,7 @@ class RendererRenderList {
     groupOrder: number,
     z: number,
     group: unknown,
+    clippingContext: unknown,
   ): RendererRenderListItem {
     assertFiniteNumberOption(groupOrder, 'Renderer.renderLists list groupOrder')
     assertFiniteNumberOption(z, 'Renderer.renderLists list z')
@@ -2107,6 +2151,7 @@ class RendererRenderList {
         renderOrder: rendererRenderListRenderOrder(object),
         z,
         group,
+        clippingContext,
       }
       this.renderItems[this.renderItemsIndex] = renderItem
     } else {
@@ -2119,47 +2164,81 @@ class RendererRenderList {
       renderItem.renderOrder = rendererRenderListRenderOrder(object)
       renderItem.z = z
       renderItem.group = group
+      renderItem.clippingContext = clippingContext
     }
     this.renderItemsIndex += 1
     return renderItem
   }
 
-  private bucketForMaterial(material: unknown): RendererRenderListItem[] {
+  private pushRenderItem(renderItem: RendererRenderListItem, material: unknown, unshift: boolean): void {
     const record = material && typeof material === 'object' ? material as Record<string, unknown> : undefined
-    if (typeof record?.transmission === 'number' && record.transmission > 0) return this.transmissive
-    if (record?.transparent === true) return this.transparent
-    return this.opaque
+    const hasTransmission = typeof record?.transmission === 'number' && record.transmission > 0
+    const transparent = record?.transparent === true || hasTransmission
+    if (hasTransmission) {
+      this.pushInto(this.transmissive, renderItem, unshift)
+    }
+    if (transparent) {
+      if (rendererRenderListNeedsDoublePass(record)) {
+        this.pushInto(this.transparentDoublePass, renderItem, unshift)
+      }
+      this.pushInto(this.transparent, renderItem, unshift)
+      return
+    }
+    this.pushInto(this.opaque, renderItem, unshift)
+  }
+
+  private pushInto(list: RendererRenderListItem[], item: RendererRenderListItem, unshift: boolean): void {
+    if (unshift) list.unshift(item)
+    else list.push(item)
   }
 }
 
 class RendererRenderListsState {
   readonly lighting: RendererLightingState
-  private lists = new WeakMap<object, RendererRenderList[]>()
+  private depthLists = new WeakMap<object, RendererRenderList[]>()
+  private cameraLists = new WeakMap<object, WeakMap<object, RendererRenderList>>()
 
   constructor(lighting: RendererLightingState) {
     this.lighting = lighting
   }
 
-  get(scene: object, renderCallDepth = 0): RendererRenderList {
+  get(scene: object, renderCallDepthOrCamera: unknown = 0): RendererRenderList {
     assertWeakMapKey(scene, 'Renderer.renderLists.get scene')
+    if (typeof renderCallDepthOrCamera !== 'number') {
+      assertWeakMapKey(renderCallDepthOrCamera, 'Renderer.renderLists.get camera')
+      let cameraMap = this.cameraLists.get(scene)
+      if (cameraMap === undefined) {
+        cameraMap = new WeakMap()
+        this.cameraLists.set(scene, cameraMap)
+      }
+      let cameraList = cameraMap.get(renderCallDepthOrCamera)
+      if (cameraList === undefined) {
+        cameraList = new RendererRenderList(this.lighting, scene, renderCallDepthOrCamera)
+        cameraMap.set(renderCallDepthOrCamera, cameraList)
+      }
+      return cameraList
+    }
+
+    const renderCallDepth = renderCallDepthOrCamera
     if (!Number.isInteger(renderCallDepth) || renderCallDepth < 0) {
       throw new TypeError(`Renderer.renderLists.get renderCallDepth must be a non-negative integer; received ${String(renderCallDepth)}.`)
     }
-    let listArray = this.lists.get(scene)
+    let listArray = this.depthLists.get(scene)
     if (listArray === undefined) {
       listArray = []
-      this.lists.set(scene, listArray)
+      this.depthLists.set(scene, listArray)
     }
     let list = listArray[renderCallDepth]
     if (list === undefined) {
-      list = new RendererRenderList()
+      list = new RendererRenderList(this.lighting, scene, null)
       listArray[renderCallDepth] = list
     }
     return list
   }
 
   dispose(): void {
-    this.lists = new WeakMap()
+    this.depthLists = new WeakMap()
+    this.cameraLists = new WeakMap()
   }
 }
 
@@ -6734,6 +6813,41 @@ function rendererRenderListMaterialVariant(object: unknown): number {
   if (!object || typeof object !== 'object') return 0
   const record = object as Record<string, unknown>
   return (record.isInstancedMesh === true ? 2 : 0) + (record.isSkinnedMesh === true ? 1 : 0)
+}
+
+function rendererRenderListOpaqueSort(a: RendererRenderListItem, b: RendererRenderListItem): number {
+  const aMaterialId = rendererRenderListMaterialId(a.material)
+  const bMaterialId = rendererRenderListMaterialId(b.material)
+  return rendererRenderListSortNumber(a.groupOrder) - rendererRenderListSortNumber(b.groupOrder)
+    || rendererRenderListSortNumber(a.renderOrder) - rendererRenderListSortNumber(b.renderOrder)
+    || aMaterialId - bMaterialId
+    || rendererRenderListSortNumber(a.z) - rendererRenderListSortNumber(b.z)
+    || rendererRenderListSortNumber(a.id) - rendererRenderListSortNumber(b.id)
+}
+
+function rendererRenderListTransparentSort(a: RendererRenderListItem, b: RendererRenderListItem): number {
+  return rendererRenderListSortNumber(a.groupOrder) - rendererRenderListSortNumber(b.groupOrder)
+    || rendererRenderListSortNumber(a.renderOrder) - rendererRenderListSortNumber(b.renderOrder)
+    || rendererRenderListSortNumber(b.z) - rendererRenderListSortNumber(a.z)
+    || rendererRenderListSortNumber(a.id) - rendererRenderListSortNumber(b.id)
+}
+
+function rendererRenderListMaterialId(material: unknown): number {
+  return material && typeof material === 'object'
+    && typeof (material as { id?: unknown }).id === 'number'
+    && Number.isFinite((material as { id: number }).id)
+    ? (material as { id: number }).id
+    : 0
+}
+
+function rendererRenderListSortNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function rendererRenderListNeedsDoublePass(material: Record<string, unknown> | undefined): boolean {
+  const transmission = material?.transmission
+  const hasTransmission = typeof transmission === 'number' && transmission > 0
+  return hasTransmission && material?.side === 2 && material.forceSinglePass !== true
 }
 
 function validatePostProcessingOptions(value: unknown): void {
