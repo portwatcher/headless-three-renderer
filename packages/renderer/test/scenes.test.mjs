@@ -1416,6 +1416,61 @@ test('BatchedMesh material arrays honor non-indexed packed geometry groups', () 
   assert.ok(rightMean.g > rightMean.r + 80 && rightMean.g > rightMean.b + 80, `right non-indexed BatchedMesh group should use the green material (${rightMean.r}, ${rightMean.g}, ${rightMean.b})`)
 })
 
+test('BatchedMesh packed geometry groups default missing material indices to material zero', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+  batched.perObjectFrustumCulled = false
+
+  const range = batched.getGeometryRangeAt(geometryId, {})
+  batched.geometry.clearGroups()
+  batched.geometry.addGroup(range.start, 6)
+  batched.geometry.addGroup(range.start + 6, 6, 1)
+  batched._geometryInfo[geometryId].start = range.start + 3
+  batched._geometryInfo[geometryId].count = 6
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const redPixels = countRegionPixels(rgba, 96, 64, 12, 14, 42, 34, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(rgba, 96, 64, 62, 30, 90, 52, (r, g, b) => g > r + 40 && g > b + 40)
+
+  assert.ok(redPixels > 40, `missing materialIndex BatchedMesh group should use material zero (${redPixels})`)
+  assert.ok(greenPixels > 40, `explicit materialIndex BatchedMesh group should keep material one (${greenPixels})`)
+})
+
 test('BatchedMesh packed geometry groups clip to partial draw ranges', () => {
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 3)
