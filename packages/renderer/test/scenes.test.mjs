@@ -52,6 +52,7 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { Capsule } from 'three/examples/jsm/math/Capsule.js'
 import { ColorConverter } from 'three/examples/jsm/math/ColorConverter.js'
+import { DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearRec2020ColorSpace } from 'three/examples/jsm/math/ColorSpaces.js'
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js'
 import { ImprovedNoise } from 'three/examples/jsm/math/ImprovedNoise.js'
 import { Lut } from 'three/examples/jsm/math/Lut.js'
@@ -23719,6 +23720,40 @@ test('unsupported outputColorSpace values fail clearly', () => {
     () => renderToTarget(scene, camera, {}, { width: 32, height: 32, outputColorSpace: 'display-p3' }),
     /options\.outputColorSpace display-p3 is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
   )
+})
+
+test('examples ColorSpaces constants fail clearly outside the current sRGB contract', () => {
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff })))
+  const camera = makeCamera()
+
+  for (const colorSpace of [DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearRec2020ColorSpace]) {
+    const renderer = new Renderer()
+    assert.throws(
+      () => { renderer.outputColorSpace = colorSpace },
+      /Renderer\.outputColorSpace .* is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+      `${colorSpace} should fail clearly as renderer output color space`,
+    )
+    assert.throws(
+      () => renderer.render(scene, camera, { width: 32, height: 32, outputColorSpace: colorSpace }),
+      /options\.outputColorSpace .* is not supported.*SRGBColorSpace.*LinearSRGBColorSpace/i,
+      `${colorSpace} should fail clearly as render-option output color space`,
+    )
+
+    const texture = solidTexture(255, 255, 255)
+    texture.colorSpace = colorSpace
+    const textureScene = new THREE.Scene()
+    textureScene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: texture }),
+    ))
+    assert.throws(
+      () => renderRgba(textureScene, camera, { width: 32, height: 32 }),
+      /texture\.colorSpace .*not supported.*SRGBColorSpace.*LinearSRGBColorSpace.*NoColorSpace/i,
+      `${colorSpace} should fail clearly as texture color space`,
+    )
+    texture.dispose()
+  }
 })
 
 test('emissiveMap decodes sRGB colorSpace before shading', () => {

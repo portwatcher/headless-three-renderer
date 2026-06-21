@@ -147,6 +147,7 @@ The public API accepts only Three.js-like objects:
 - Three.js examples `Gyroscope` preserves child world orientation under transformed parents while the child renders through normal scene traversal and built-in material paths
 - Three.js examples `Timer` and `FixedTimer` can drive deterministic still-frame transform state before rendering
 - Three.js examples math utilities `Lut`, `ColorConverter`, `ImprovedNoise`, `SimplexNoise`, `Capsule`, `ConvexHull`, `OBB`, and `Octree` produce `THREE.Color` values, point paths, or collision/bounds-derived line and mesh geometry that render through supported material, vertex-color, line, and mesh paths
+- Three.js examples `ColorSpaces` Display-P3 and Rec.2020 constants fail clearly outside the current `THREE.SRGBColorSpace`/`THREE.LinearSRGBColorSpace` output and texture color-space contract
 - Three.js examples `MorphAnimMesh` and `MorphBlendMesh` update morph target influences through their helper APIs, and the resulting meshes render through the supported CPU morph-target baking path
 - Three.js examples `GeometryUtils.hilbert2D()` produces line point paths and `TubePainter` writes dynamic tube mesh attributes/draw ranges that render through supported line and mesh material paths
 - Three.js examples `SkeletonUtils.clone()` remaps cloned skinned meshes to cloned bones, and the resulting `SkinnedMesh` renders through the supported CPU skinning path
