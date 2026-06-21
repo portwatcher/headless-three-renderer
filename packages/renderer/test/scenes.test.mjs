@@ -3241,6 +3241,104 @@ test('examples WebGL and WebGPU capability helpers expose browser-context bounda
   }
 })
 
+test('examples offscreen demo modules expose DOM and worker browser boundaries', async () => {
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+  const hadSelf = Object.prototype.hasOwnProperty.call(globalThis, 'self')
+  const previousSelf = globalThis.self
+  const previousSetInterval = globalThis.setInterval
+  const previousClearInterval = globalThis.clearInterval
+  const previousWarn = console.warn
+  const warnings = []
+
+  try {
+    let buttonClick
+    const button = {
+      textContent: 'START JANK',
+      addEventListener(type, listener) {
+        assert.equal(type, 'click')
+        buttonClick = listener
+      },
+    }
+    const result = { textContent: 'busy' }
+    globalThis.document = {
+      getElementById(id) {
+        if (id === 'button') return button
+        if (id === 'result') return result
+        throw new Error(`unexpected offscreen jank element id ${id}`)
+      },
+    }
+
+    const intervals = []
+    const clearedIntervals = []
+    globalThis.setInterval = (callback, delay) => {
+      const handle = { callback, delay }
+      intervals.push(handle)
+      return handle
+    }
+    globalThis.clearInterval = (handle) => {
+      clearedIntervals.push(handle)
+    }
+
+    const { default: initJank } = await import('three/examples/jsm/offscreen/jank.js')
+    initJank()
+    assert.equal(typeof buttonClick, 'function')
+
+    buttonClick()
+    assert.equal(button.textContent, 'STOP JANK')
+    assert.equal(intervals.length, 1)
+    assert.equal(intervals[0].delay, 1000 / 60)
+    assert.equal(typeof intervals[0].callback, 'function')
+
+    result.textContent = 'computed'
+    buttonClick()
+    assert.equal(button.textContent, 'START JANK')
+    assert.equal(result.textContent, '')
+    assert.deepEqual(clearedIntervals, [intervals[0]])
+
+    console.warn = (message) => warnings.push(String(message))
+    const workerSelf = {}
+    globalThis.self = workerSelf
+    await import('three/examples/jsm/offscreen/offscreen.js')
+    assert.equal(typeof workerSelf.onmessage, 'function')
+    workerSelf.onmessage({
+      data: {
+        drawingSurface: {},
+        width: 32,
+        height: 24,
+        pixelRatio: 2,
+        path: '',
+      },
+    })
+    assert.ok(
+      warnings.some((message) => message.includes('ImageBitmapLoader') && message.includes('createImageBitmap')),
+      'offscreen worker scene should reach the browser ImageBitmap dependency boundary',
+    )
+
+    warnings.length = 0
+    const { default: initOffscreenScene } = await import('three/examples/jsm/offscreen/scene.js')
+    initOffscreenScene({}, 16, 16, 1, '')
+    assert.ok(
+      warnings.some((message) => message.includes('ImageBitmapLoader') && message.includes('createImageBitmap')),
+      'direct offscreen scene init should expose the same browser ImageBitmap dependency boundary',
+    )
+  } finally {
+    console.warn = previousWarn
+    globalThis.setInterval = previousSetInterval
+    globalThis.clearInterval = previousClearInterval
+    if (hadSelf) {
+      globalThis.self = previousSelf
+    } else {
+      delete globalThis.self
+    }
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
+  }
+})
+
 test('examples Addons barrel imports in Node and exposes covered helper modules', async () => {
   const Addons = await import('three/examples/jsm/Addons.js')
 
