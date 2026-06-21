@@ -51,6 +51,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
+import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
 import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
@@ -98,6 +99,7 @@ import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { hilbert2D } from 'three/examples/jsm/utils/GeometryUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
@@ -4154,6 +4156,58 @@ test('examples SceneUtils and MeshSurfaceSampler produce renderable scene data',
     sampleSource.material.dispose()
     pointsGeometry.dispose()
     pointsMaterial.dispose()
+  }
+})
+
+test('examples GeometryUtils and TubePainter produce renderable geometry paths', () => {
+  const hilbertGeometry = new THREE.BufferGeometry().setFromPoints(hilbert2D(new THREE.Vector3(), 0.75, 2))
+  const hilbertMaterial = new THREE.LineBasicMaterial({ color: 0xff55ff, linewidth: 4 })
+  const hilbertLine = new THREE.Line(hilbertGeometry, hilbertMaterial)
+  hilbertLine.position.x = -0.8
+
+  const painter = new TubePainter()
+  painter.setSize(10)
+  painter.moveTo(new THREE.Vector3(-0.35, -0.25, 0))
+  painter.lineTo(new THREE.Vector3(0, 0.3, 0))
+  painter.lineTo(new THREE.Vector3(0.35, -0.25, 0))
+  painter.update()
+  painter.mesh.position.x = 0.8
+  painter.mesh.material.color.set(0xffaa44)
+  painter.mesh.material.side = THREE.DoubleSide
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.AmbientLight(0xffffff, 2))
+  scene.add(hilbertLine, painter.mesh)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.equal(hilbertGeometry.getAttribute('position').count, 64)
+    assert.equal(painter.mesh.geometry.drawRange.count, 120)
+    assert.ok(painter.mesh.geometry.getAttribute('position')?.count >= 120)
+    assert.ok(painter.mesh.geometry.getAttribute('normal'), 'TubePainter should generate normals')
+    assert.ok(painter.mesh.geometry.getAttribute('color'), 'TubePainter should generate vertex colors')
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 180 && b > 160 && g < 140) > 100,
+      'GeometryUtils.hilbert2D line should render magenta pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 200 && g > 150 && b < 180) > 120,
+      'TubePainter mesh should render orange pixels',
+    )
+  } finally {
+    hilbertGeometry.dispose()
+    hilbertMaterial.dispose()
+    painter.mesh.geometry.dispose()
+    painter.mesh.material.dispose()
   }
 })
 
