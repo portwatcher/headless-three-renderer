@@ -2061,8 +2061,9 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
-    `${kind} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
+    `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
   )
 }
 
@@ -2070,6 +2071,12 @@ function isThreePmremShaderMaterial(material: ThreeMaterialLike): material is Th
   return material.name === 'EquirectangularToCubeUV' ||
     material.name === 'CubemapToCubeUV' ||
     material.name === 'SphericalGaussianBlur'
+}
+
+function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {
+  return typeof material.name === 'string' && material.name.trim().length > 0
+    ? `${kind} "${material.name}"`
+    : kind
 }
 
 function assertSupportedOnBeforeCompile(

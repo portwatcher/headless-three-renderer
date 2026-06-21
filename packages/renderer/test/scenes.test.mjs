@@ -23406,6 +23406,9 @@ test('ShaderMaterial without headless WGSL override fails clearly', () => {
       vertexShader: 'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: 'void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }',
     }), /ShaderMaterial.*fragmentWgsl/i],
+    ['named ShaderMaterial', Object.assign(new THREE.ShaderMaterial(), {
+      name: 'ColorifyShader',
+    }), /ShaderMaterial "ColorifyShader".*fragmentWgsl/i],
     ['RawShaderMaterial', new THREE.RawShaderMaterial(), /RawShaderMaterial.*fragmentWgsl/i],
     ['NodeMaterial', Object.assign(new THREE.MeshBasicMaterial({ color: 0xffffff }), {
       isNodeMaterial: true,
