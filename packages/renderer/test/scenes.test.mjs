@@ -54,6 +54,8 @@ import { TextureHelper } from 'three/examples/jsm/helpers/TextureHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
+import { InteractiveGroup } from 'three/examples/jsm/interactive/InteractiveGroup.js'
+import { SelectionBox } from 'three/examples/jsm/interactive/SelectionBox.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
@@ -6334,6 +6336,115 @@ test('examples camera controls drive renderable still-frame camera and helper st
     blueMaterial.dispose()
     transformTargetGeometry.dispose()
     transformTargetMaterial.dispose()
+  }
+})
+
+test('examples interactive selection utilities produce renderable selected scene state', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+
+  const redGeometry = new THREE.PlaneGeometry(0.34, 0.34)
+  const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
+  const red = new THREE.Mesh(redGeometry, redMaterial)
+  red.name = 'selectable-red'
+  red.position.x = -0.45
+  scene.add(red)
+
+  const blueGeometry = new THREE.PlaneGeometry(0.34, 0.34)
+  const blueMaterial = new THREE.MeshBasicMaterial({ color: 0x4488ff, side: THREE.DoubleSide })
+  const blue = new THREE.Mesh(blueGeometry, blueMaterial)
+  blue.name = 'unselected-blue'
+  blue.position.x = 0.45
+  scene.add(blue)
+
+  const instancedGeometry = new THREE.BoxGeometry(0.12, 0.12, 0.12)
+  const instancedMaterial = new THREE.MeshBasicMaterial({ color: 0xffff44 })
+  const instanced = new THREE.InstancedMesh(instancedGeometry, instancedMaterial, 2)
+  instanced.setMatrixAt(0, new THREE.Matrix4().makeTranslation(-0.72, -0.38, 0))
+  instanced.setMatrixAt(1, new THREE.Matrix4().makeTranslation(0.72, -0.38, 0))
+  scene.add(instanced)
+
+  const interactiveGroup = new InteractiveGroup()
+  const interactiveGeometry = new THREE.PlaneGeometry(0.3, 0.3)
+  const interactiveMaterial = new THREE.MeshBasicMaterial({ color: 0xaa66ff, side: THREE.DoubleSide })
+  const interactiveMesh = new THREE.Mesh(interactiveGeometry, interactiveMaterial)
+  interactiveMesh.position.y = 0.45
+  interactiveGroup.add(interactiveMesh)
+  scene.add(interactiveGroup)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+  scene.updateMatrixWorld(true)
+
+  const selectionBox = new SelectionBox(camera, scene)
+  const selected = selectionBox.select(
+    new THREE.Vector3(-1, 0.2, 0),
+    new THREE.Vector3(0.05, -1, 0),
+  )
+  assert.deepEqual(selected.map((object) => object.name), ['selectable-red'])
+  assert.deepEqual(selectionBox.instances[instanced.uuid], [0])
+  red.material.color.set(0x33ff66)
+  instanced.setColorAt(0, new THREE.Color(0xffaa33))
+  instanced.setColorAt(1, new THREE.Color(0x333333))
+
+  const listeners = new Map()
+  const fakeRenderer = {
+    domElement: {
+      addEventListener(type, listener) {
+        listeners.set(type, listener)
+      },
+      getBoundingClientRect() {
+        return { left: 0, top: 0, width: 100, height: 100 }
+      },
+    },
+  }
+  let clickUv = null
+  interactiveMesh.addEventListener('click', (event) => {
+    clickUv = event.data.clone()
+  })
+  interactiveGroup.listenToPointerEvents(fakeRenderer, camera)
+  listeners.get('click')({
+    type: 'click',
+    clientX: 50,
+    clientY: 28,
+    stopPropagation() {},
+  })
+  assert.ok(clickUv, 'InteractiveGroup should dispatch pointer events to intersected child meshes')
+  assert.ok(Math.abs(clickUv.x - 0.5) < 0.05)
+  assert.ok(Math.abs(clickUv.y - 0.47) < 0.08)
+
+  try {
+    const width = 128
+    const height = 96
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width / 2, height, (r, g, b) => g > 150 && g > r + 30 && g > b + 20) > 150,
+      'SelectionBox-selected mesh should render with updated green material state',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, width / 2, 0, width, height, (r, g, b) => b > 150 && r < 120) > 150,
+      'Objects outside the SelectionBox frustum should remain blue',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 100 && b < 100) > 20,
+      'SelectionBox instance IDs can drive visible selected instance color state',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 120 && b > 150 && g < 140) > 100,
+      'InteractiveGroup child mesh should render through normal group traversal',
+    )
+  } finally {
+    redGeometry.dispose()
+    redMaterial.dispose()
+    blueGeometry.dispose()
+    blueMaterial.dispose()
+    instancedGeometry.dispose()
+    instancedMaterial.dispose()
+    interactiveGeometry.dispose()
+    interactiveMaterial.dispose()
   }
 })
 
