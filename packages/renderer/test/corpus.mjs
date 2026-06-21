@@ -67,6 +67,7 @@ export function createSceneCorpus() {
     linearFogCorpus(),
     fogExp2MixedObjectCorpus(),
     textureMatrixColorSpaceCorpus(),
+    phongSpecularMapMatrixCorpus(),
     textureSlotMatrixCorpus(),
     lightMapCorpus(),
     linearOutputColorSpaceCorpus(),
@@ -92,6 +93,7 @@ export function createSceneCorpus() {
     skinnedMorphCorpus(),
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
+    physicalIridescenceMapCorpus(),
     physicalTransmissionDispersionCorpus(),
     transmissionResolutionScaleCorpus(),
     multipleDirectionalShadowCorpus(),
@@ -1194,6 +1196,48 @@ function textureMatrixColorSpaceCorpus() {
       const transformedDark = pixelAt(rgba, width, 30, 37)
       if (!(transformedBright.r > 180 && transformedBright.g > 180 && transformedBright.b > 180 && transformedDark.r < 80 && transformedDark.g < 80 && transformedDark.b < 80)) {
         throw new Error(`texture matrix corpus should sample distinct sRGB bright/dark texels, got bright=${JSON.stringify(transformedBright)} dark=${JSON.stringify(transformedDark)}`)
+      }
+    },
+  }
+}
+
+function phongSpecularMapMatrixCorpus() {
+  const specularMap = new THREE.DataTexture(new Uint8Array([
+    0, 0, 0, 255,
+    255, 0, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  specularMap.magFilter = THREE.NearestFilter
+  specularMap.minFilter = THREE.NearestFilter
+  setTextureMatrixOffset(specularMap, 0.5)
+  specularMap.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    constantUvPlane(0.25, 0.5, 1.3, 1.3),
+    new THREE.MeshPhongMaterial({
+      color: 0x000000,
+      specular: 0xffffff,
+      shininess: 4,
+      specularMap,
+    }),
+  ))
+
+  const light = new THREE.DirectionalLight(0xffffff, 8)
+  light.position.set(0, 0, 3)
+  scene.add(light)
+
+  return {
+    name: 'phong-specular-map-matrix',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    validate(rgba, { width }) {
+      const center = meanRegion(rgba, width, 31, 31, 65, 65)
+      if (!(center.r > 80 && center.g > 80 && center.b > 80)) {
+        throw new Error(`specularMap explicit matrix should sample the bright specular texel, got ${JSON.stringify(center)}`)
       }
     },
   }
@@ -4935,6 +4979,108 @@ function physicalIblShadowCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(sphere.r > 200 && sphere.g > 210 && sphere.b > 220 && ground.r > 80 && ground.g > 80 && ground.b > 90 && corner.r === 56 && corner.g === 56 && corner.b === 63)) {
         throw new Error(`physical IBL shadow corpus should render a bright physical sphere and visible shadowed ground, got sphere=${JSON.stringify(sphere)} ground=${JSON.stringify(ground)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function physicalIridescenceMapCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let factorDiff = 0
+  let thicknessDiff = 0
+  let factorCenter = null
+  let thicknessCenter = null
+
+  function physicalLight(scene) {
+    const light = new THREE.PointLight(0xffffff, 300)
+    light.position.set(0, 0, 2)
+    scene.add(light)
+  }
+
+  function makeMap(data, offsetX) {
+    const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, offsetX)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeFactorScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceMap: makeMap([
+          0, 0, 0, 255,
+          255, 0, 0, 255,
+        ], offsetX),
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      }),
+    ))
+    physicalLight(scene)
+    return scene
+  }
+
+  function makeThicknessScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [120, 760],
+        iridescenceThicknessMap: makeMap([
+          0, 0, 0, 255,
+          0, 255, 0, 255,
+        ], offsetX),
+      }),
+    ))
+    physicalLight(scene)
+    return scene
+  }
+
+  return {
+    name: 'physical-iridescence-texture-maps',
+    scene: makeFactorScene(0.5),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.2,
+    browserReference: false,
+    render(renderer) {
+      const factorDisabled = renderer.render(makeFactorScene(0), camera, options).slice()
+      const factorEnabled = renderer.render(makeFactorScene(0.5), camera, options).slice()
+      const thicknessLow = renderer.render(makeThicknessScene(0), camera, options).slice()
+      const thicknessHigh = renderer.render(makeThicknessScene(0.5), camera, options).slice()
+      factorDiff = meanAbsDiff(factorDisabled, factorEnabled)
+      thicknessDiff = meanAbsDiff(thicknessLow, thicknessHigh)
+      factorCenter = meanRegion(factorEnabled, options.width, 24, 24, 72, 72)
+      thicknessCenter = meanRegion(thicknessHigh, options.width, 24, 24, 72, 72)
+      return factorEnabled
+    },
+    validate() {
+      if (!(factorDiff > 10)) {
+        throw new Error(`iridescenceMap corpus should modulate scalar iridescence, diff=${factorDiff.toFixed(3)} center=${JSON.stringify(factorCenter)}`)
+      }
+      if (!(thicknessDiff > 5)) {
+        throw new Error(`iridescenceThicknessMap corpus should select a different film thickness, diff=${thicknessDiff.toFixed(3)} center=${JSON.stringify(thicknessCenter)}`)
+      }
+      if (!(factorCenter && factorCenter.r > 15 && thicknessCenter && Math.max(thicknessCenter.r, thicknessCenter.g, thicknessCenter.b) > 15)) {
+        throw new Error(`iridescence texture corpus should render visible specular highlights, factor=${JSON.stringify(factorCenter)} thickness=${JSON.stringify(thicknessCenter)}`)
       }
     },
   }
