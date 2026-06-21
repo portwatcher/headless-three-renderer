@@ -14,6 +14,7 @@ import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
@@ -2447,6 +2448,17 @@ test('KTX2Loader detects conservative renderer texture compression support', asy
   const asyncLoader = new KTX2Loader()
   assert.equal(await asyncLoader.detectSupportAsync(renderer), asyncLoader)
   assert.deepEqual(asyncLoader.workerConfig, expectedSupport)
+})
+
+test('GPUComputationRenderer stops at conservative vertex texture support detection', () => {
+  const renderer = new Renderer()
+  const gpuCompute = new GPUComputationRenderer(2, 2, renderer)
+  const initialState = gpuCompute.createTexture()
+  assert.equal(initialState.image.data.length, 2 * 2 * 4)
+
+  gpuCompute.addVariable('textureState', 'void main() { gl_FragColor = vec4( 1.0 ); }', initialState)
+  assert.equal(gpuCompute.init(), 'No support for vertex shader textures.')
+  gpuCompute.dispose()
 })
 
 test('ProgressiveLightMap internal shader rewrite fails clearly', () => {
