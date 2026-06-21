@@ -109,6 +109,8 @@ const SupportedInstancedBufferGeometryAttributes = new Set([
   'translation',
 ])
 
+const NativeRenderOrderLimit = 1_000_000_000
+
 interface ThickLineExpansion {
   center: [number, number, number]
   colors?: number[]
@@ -521,7 +523,7 @@ function visitObject(
   if (optionalObjectBoolean(object.visible, 'object.visible') === false) return
 
   const nextGroupOrder = object.isGroup === true
-    ? finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
+    ? renderOrderNumber(object.renderOrder, 'object.renderOrder', 0)
     : groupOrder
   const visibleToCamera = objectLayersMatchCamera(object, camera)
   const nextClippingContext = visibleToCamera
@@ -2686,11 +2688,17 @@ function clipShadowsForMaterial(material: ThreeMaterialLike | undefined, clippin
 }
 
 function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh, sortItem: RenderSortItem): void {
+  const groupOrder = mesh.groupOrder ?? 0
+  const renderOrder = mesh.renderOrder ?? 0
   meshes.push({
-    mesh,
+    mesh: {
+      ...mesh,
+      groupOrder: nativeRenderOrderKey(groupOrder),
+      renderOrder: nativeRenderOrderKey(renderOrder),
+    },
     sortItem,
-    groupOrder: mesh.groupOrder ?? 0,
-    renderOrder: mesh.renderOrder ?? 0,
+    groupOrder,
+    renderOrder,
     sortZ: mesh.sortZ ?? 0,
     materialSortKey: mesh.materialSortKey ?? 0,
     materialVariant: mesh.materialVariant ?? 0,
@@ -2710,7 +2718,7 @@ function sortInfoForObject(
   sortItemObject?: ThreeObject3DLike,
   sortItemZOverride?: number,
 ): MeshSortInfo {
-  const renderOrder = finiteMaterialOrObjectNumber(object.renderOrder, 'object.renderOrder', 0)
+  const renderOrder = renderOrderNumber(object.renderOrder, 'object.renderOrder', 0)
   const z = camera ? projectedObjectZ(object, camera, transform) : 0
   const itemZ = sortItemZOverride ?? z
   const id = unsignedSortKey(object.id, sortIndex)
@@ -3262,6 +3270,20 @@ function finiteMaterialOrObjectNumber(value: unknown, label: string, fallback: n
   if (value == null) return fallback
   if (typeof value === 'number' && Number.isFinite(value)) return value
   throw new TypeError(`${label} must be a finite number.`)
+}
+
+function renderOrderNumber(value: unknown, label: string, fallback: number): number {
+  if (value == null) return fallback
+  if (typeof value === 'number' && (Number.isFinite(value) || value === Infinity || value === -Infinity)) {
+    return value
+  }
+  throw new TypeError(`${label} must be a finite number or +/-Infinity.`)
+}
+
+function nativeRenderOrderKey(value: number): number {
+  if (value === Infinity) return NativeRenderOrderLimit
+  if (value === -Infinity) return -NativeRenderOrderLimit
+  return value
 }
 
 function nonNegativeMaterialOrObjectNumber(value: unknown, label: string, fallback: number): number {

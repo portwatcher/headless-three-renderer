@@ -13,6 +13,7 @@ import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExp
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
@@ -8162,6 +8163,33 @@ test('transparent renderOrder overrides traversal order', () => {
   const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
   const mean = meanRgba(rgba)
   assert.ok(mean.r > mean.b + 10, `higher renderOrder red plane should render on top (${mean.r} vs ${mean.b})`)
+})
+
+test('renderOrder Infinity is accepted as a Three.js helper sentinel', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const blue = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0x0000ff, opacity: 0.55, transparent: true }),
+  )
+  blue.renderOrder = 0
+  scene.add(blue)
+
+  const red = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.55, transparent: true }),
+  )
+  red.renderOrder = Infinity
+  scene.add(red)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 10, `renderOrder Infinity red plane should sort after finite blue (${mean.r} vs ${mean.b})`)
 })
 
 test('Group renderOrder supplies groupOrder for transparent children', () => {
@@ -35561,6 +35589,29 @@ test('Renderer renderBufferDirect fails clearly as unsupported', () => {
       new RegExp(`Renderer\\.${method} slot must be a non-negative integer`, 'i'),
     )
   }
+})
+
+test('Lensflare renderOrder Infinity reaches framebuffer texture clear failure', () => {
+  const renderer = new Renderer()
+  renderer.setSize(32, 32)
+  renderer.setViewport(0, 0, 32, 32)
+  const target = new THREE.WebGLRenderTarget(32, 32)
+  renderer.setRenderTarget(target)
+  renderer.clear()
+
+  const scene = new THREE.Scene()
+  scene.add(new Lensflare())
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld()
+
+  assert.throws(
+    () => renderer.render(scene, camera, { width: 32, height: 32 }),
+    /Renderer\.copyFramebufferToTexture texture uses a FramebufferTexture.*not supported.*texture copy/i,
+  )
+  assert.strictEqual(renderer.getRenderTarget(), target)
 })
 
 test('Renderer common compute and GPU readback APIs fail clearly as unsupported', async () => {
