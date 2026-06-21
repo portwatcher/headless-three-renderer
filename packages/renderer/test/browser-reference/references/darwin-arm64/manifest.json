@@ -1,0 +1,738 @@
+{
+  "schemaVersion": 1,
+  "generator": "@headless-three/renderer/test/browser-reference",
+  "renderer": "THREE.WebGLRenderer",
+  "threeRevision": "172",
+  "toneMapping": 0,
+  "toneMappingExposure": 1,
+  "fixtures": [
+    {
+      "file": "transparent-layer-stack.png",
+      "name": "transparent-layer-stack",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "alpha-to-coverage-msaa-plane.png",
+      "name": "alpha-to-coverage-msaa-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "alpha-to-coverage-alpha-test-threshold.png",
+      "name": "alpha-to-coverage-alpha-test-threshold",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "alpha-to-coverage-clipping-plane.png",
+      "name": "alpha-to-coverage-clipping-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "stencil-masked-render-state.png",
+      "name": "stencil-masked-render-state",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "custom-blending-reverse-subtract.png",
+      "name": "custom-blending-reverse-subtract",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "material-render-state-noops.png",
+      "name": "material-render-state-noops",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "option-background-override-color.png",
+      "name": "option-background-override-color",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "option-background-texture-controls.png",
+      "name": "option-background-texture-controls",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "two-dimensional-background-texture-transform.png",
+      "name": "two-dimensional-background-texture-transform",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "equirectangular-background-rotation.png",
+      "name": "equirectangular-background-rotation",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "cube-background-texture-rotation.png",
+      "name": "cube-background-texture-rotation",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "cube-background-option-rotation.png",
+      "name": "cube-background-option-rotation",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "packed-cubeuv-background-texture.png",
+      "name": "packed-cubeuv-background-texture",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "array-camera-viewport-split.png",
+      "name": "array-camera-viewport-split",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "viewport-scissor-rectangle.png",
+      "name": "viewport-scissor-rectangle",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "camera-layer-filtering.png",
+      "name": "camera-layer-filtering",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "custom-opaque-sort-group-items.png",
+      "name": "custom-opaque-sort-group-items",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "custom-transparent-sort-group-items.png",
+      "name": "custom-transparent-sort-group-items",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "material-env-map-phong.png",
+      "name": "material-env-map-phong",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "material-env-map-basic-lambert.png",
+      "name": "material-env-map-basic-lambert",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-basic-material-wireframe.png",
+      "name": "mesh-basic-material-wireframe",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-depth-material-basic.png",
+      "name": "mesh-depth-material-basic",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-depth-material-packed-depth-variants.png",
+      "name": "mesh-depth-material-packed-depth-variants",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-depth-material-displacement-map.png",
+      "name": "mesh-depth-material-displacement-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-depth-material-wireframe.png",
+      "name": "mesh-depth-material-wireframe",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-distance-material-range.png",
+      "name": "mesh-distance-material-range",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-distance-material-displacement-map.png",
+      "name": "mesh-distance-material-displacement-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-distance-material-wireframe.png",
+      "name": "mesh-distance-material-wireframe",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-standard-displacement-map.png",
+      "name": "mesh-standard-displacement-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-flat.png",
+      "name": "mesh-normal-material-flat",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-normal-map.png",
+      "name": "mesh-normal-material-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-object-space-normal-map.png",
+      "name": "mesh-normal-material-object-space-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-normal-material-bump-map.png",
+      "name": "mesh-normal-material-bump-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-map.png",
+      "name": "mesh-matcap-material-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-flat-shading.png",
+      "name": "mesh-matcap-material-flat-shading",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-normal-map.png",
+      "name": "mesh-matcap-material-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-object-space-normal-map.png",
+      "name": "mesh-matcap-material-object-space-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-matcap-material-bump-map.png",
+      "name": "mesh-matcap-material-bump-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-fallback-bands.png",
+      "name": "mesh-toon-fallback-bands",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-gradient-map.png",
+      "name": "mesh-toon-gradient-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-material-normal-map.png",
+      "name": "mesh-toon-material-normal-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-material-bump-map.png",
+      "name": "mesh-toon-material-bump-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-texture-slot-uv-channel.png",
+      "name": "mesh-toon-texture-slot-uv-channel",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mesh-toon-alpha-map-cutout.png",
+      "name": "mesh-toon-alpha-map-cutout",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "global-clipping-plane.png",
+      "name": "global-clipping-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "material-local-clipping-plane.png",
+      "name": "material-local-clipping-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "renderer-clipping-state-options.png",
+      "name": "renderer-clipping-state-options",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "light-probe-diffuse.png",
+      "name": "light-probe-diffuse",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "light-probe-lit-material-models.png",
+      "name": "light-probe-lit-material-models",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "linear-fog-material-opt-out.png",
+      "name": "linear-fog-material-opt-out",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "fog-exp2-mixed-object-types.png",
+      "name": "fog-exp2-mixed-object-types",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "texture-matrix-srgb-map.png",
+      "name": "texture-matrix-srgb-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "phong-specular-map-matrix.png",
+      "name": "phong-specular-map-matrix",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "texture-slot-explicit-matrices.png",
+      "name": "texture-slot-explicit-matrices",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "light-map-material-texture.png",
+      "name": "light-map-material-texture",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "linear-output-color-space.png",
+      "name": "linear-output-color-space",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "scene-override-material.png",
+      "name": "scene-override-material",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mask-render-mode-plane.png",
+      "name": "mask-render-mode-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "object-id-render-mode-planes.png",
+      "name": "object-id-render-mode-planes",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "normal-render-mode-tilted-plane.png",
+      "name": "normal-render-mode-tilted-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "depth-render-mode-plane.png",
+      "name": "depth-render-mode-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "sprite-material-map-billboard.png",
+      "name": "sprite-material-map-billboard",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "sprite-material-alpha-map-cutout.png",
+      "name": "sprite-material-alpha-map-cutout",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "billboard-alpha-cutouts.png",
+      "name": "billboard-alpha-cutouts",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "billboard-receive-shadow-noop.png",
+      "name": "billboard-receive-shadow-noop",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "sprite-shadow-caster.png",
+      "name": "sprite-shadow-caster",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "point-spot-light-materials.png",
+      "name": "point-spot-light-materials",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "rect-area-light-plane.png",
+      "name": "rect-area-light-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "skinned-morphed-plane.png",
+      "name": "skinned-morphed-plane",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "avatar-like-skinned-toon.png",
+      "name": "avatar-like-skinned-toon",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "physical-ibl-shadow.png",
+      "name": "physical-ibl-shadow",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "physical-transmission-dispersion.png",
+      "name": "physical-transmission-dispersion",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "multiple-directional-shadows.png",
+      "name": "multiple-directional-shadows",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "mixed-shadow-light-types.png",
+      "name": "mixed-shadow-light-types",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "shadow-map-enabled-gating.png",
+      "name": "shadow-map-enabled-gating",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "shadow-map-type-filtering.png",
+      "name": "shadow-map-type-filtering",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "shadow-material-receiver.png",
+      "name": "shadow-material-receiver",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "shadow-material-opacity-scaling.png",
+      "name": "shadow-material-opacity-scaling",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "shadow-material-output-color-space.png",
+      "name": "shadow-material-output-color-space",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb-linear"
+    },
+    {
+      "file": "shadow-material-fog-opt-out.png",
+      "name": "shadow-material-fog-opt-out",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "line-dashed-material-pattern.png",
+      "name": "line-dashed-material-pattern",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "line-dashed-material-textured-alpha.png",
+      "name": "line-dashed-material-textured-alpha",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "line-dashed-material-uv-channel-selection.png",
+      "name": "line-dashed-material-uv-channel-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "line-dashed-material-lineloop-distance.png",
+      "name": "line-dashed-material-lineloop-distance",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "line-basic-material-uv-channel-selection.png",
+      "name": "line-basic-material-uv-channel-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "points-material-textured-alpha.png",
+      "name": "points-material-textured-alpha",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "points-material-uv-channel-selection.png",
+      "name": "points-material-uv-channel-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "instanced-lines-and-points.png",
+      "name": "instanced-lines-and-points",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "instanced-texture-uv-streams.png",
+      "name": "instanced-texture-uv-streams",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "renderable-frustum-culling.png",
+      "name": "renderable-frustum-culling",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-instance-colors.png",
+      "name": "batched-mesh-instance-colors",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-inactive-geometry.png",
+      "name": "batched-mesh-inactive-geometry",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-optimized-ranges.png",
+      "name": "batched-mesh-optimized-ranges",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-indexed-groups.png",
+      "name": "batched-mesh-indexed-groups",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-non-indexed-groups.png",
+      "name": "batched-mesh-non-indexed-groups",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-partial-group-range.png",
+      "name": "batched-mesh-partial-group-range",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-sparse-material-groups.png",
+      "name": "batched-mesh-sparse-material-groups",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-per-object-culling.png",
+      "name": "batched-mesh-per-object-culling",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-culling-opt-outs.png",
+      "name": "batched-mesh-culling-opt-outs",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "batched-mesh-custom-sort.png",
+      "name": "batched-mesh-custom-sort",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "lod-groups-material-array.png",
+      "name": "lod-groups-material-array",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "lod-zoom-selection.png",
+      "name": "lod-zoom-selection",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
+      "file": "pathological-degenerate-geometry.png",
+      "name": "pathological-degenerate-geometry",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    }
+  ]
+}
