@@ -2223,6 +2223,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeShadowMapViewerShaderMaterial(material)) {
+    throw new Error(
+      "THREE.ShadowMapViewer internal UnpackDepthRGBAShader ShaderMaterial is not translated by @headless-three/renderer yet. Use supported shadow/depth render-target readback paths, provide a custom WGSL fragment for an equivalent depth visualization, or compose the shadow-map preview outside this helper.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2923,6 +2929,21 @@ function isThreeRefractorShaderMaterial(material: ThreeMaterialLike): boolean {
     compact.includes('vec3blendOverlay(vec3base,vec3blend)') &&
     compact.includes('vec4base=texture2DProj(tDiffuse,vUv);') &&
     compact.includes('gl_FragColor=vec4(blendOverlay(base.rgb,color),1.0);')
+}
+
+function isThreeShadowMapViewerShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.tDiffuse == null || values.opacity == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatopacity;') &&
+    compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('floatdepth=1.0-unpackRGBAToDepth(texture2D(tDiffuse,vUv));') &&
+    compact.includes('gl_FragColor=vec4(vec3(depth),opacity);')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

@@ -51,6 +51,7 @@ import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.j
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
+import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
@@ -2464,6 +2465,31 @@ test('ProgressiveLightMap internal shader rewrite fails clearly', () => {
     () => lightMap.update(makeCamera(), 1, false),
     /material\.onBeforeCompile customizations.*fragmentWgsl/i,
   )
+})
+
+test('ShadowMapViewer depth-unpack shader fails clearly', () => {
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
+  const previousWindow = globalThis.window
+  globalThis.window = { innerWidth: 64, innerHeight: 64 }
+
+  try {
+    const renderer = new Renderer()
+    renderer.setSize(64, 64)
+    const light = new THREE.DirectionalLight(0xffffff, 1)
+    light.shadow.map = { texture: solidTexture(255, 255, 255) }
+
+    const viewer = new ShadowMapViewer(light)
+    assert.throws(
+      () => viewer.render(renderer),
+      /ShadowMapViewer internal UnpackDepthRGBAShader ShaderMaterial.*not translated.*depth visualization/i,
+    )
+  } finally {
+    if (hadWindow) {
+      globalThis.window = previousWindow
+    } else {
+      delete globalThis.window
+    }
+  }
 })
 
 test('ViewHelper render uses domElement offset size and restores viewport', () => {
