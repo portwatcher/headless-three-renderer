@@ -2229,6 +2229,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeLightProbeHelperShaderMaterial(material)) {
+    throw new Error(
+      'THREE.LightProbeHelper internal LightProbeHelperMaterial ShaderMaterial is not translated by @headless-three/renderer yet. Native THREE.LightProbe lighting and LightProbeGenerator cube-target readback are supported directly; use a built-in material, provide a custom WGSL fragment for an equivalent probe visualization, or inspect spherical-harmonics coefficients outside this helper.',
+    )
+  }
+
   if (isThreeLineMaterialShaderMaterial(material)) {
     throw new Error(
       'THREE.LineMaterial ShaderMaterial used by Line2, LineSegments2, and Wireframe is not translated by @headless-three/renderer yet. Use THREE.Line, THREE.LineSegments, or THREE.LineLoop with LineBasicMaterial or LineDashedMaterial for covered CPU-expanded line rendering, or provide a custom WGSL fragment for an equivalent line material.',
@@ -2950,6 +2956,22 @@ function isThreeShadowMapViewerShaderMaterial(material: ThreeMaterialLike): bool
     compact.includes('uniformsampler2DtDiffuse;') &&
     compact.includes('floatdepth=1.0-unpackRGBAToDepth(texture2D(tDiffuse,vUv));') &&
     compact.includes('gl_FragColor=vec4(vec3(depth),opacity);')
+}
+
+function isThreeLightProbeHelperShaderMaterial(material: ThreeMaterialLike): boolean {
+  if (material.type === 'LightProbeHelperMaterial') return true
+
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.sh == null || values.intensity == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformvec3sh[9];') &&
+    compact.includes('vec3shGetIrradianceAt(invec3normal,invec3shCoefficients[9])') &&
+    compact.includes('vec3outgoingLight=RECIPROCAL_PI*irradiance*intensity;')
 }
 
 function isThreeLineMaterialShaderMaterial(material: ThreeMaterialLike): boolean {

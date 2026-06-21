@@ -13,6 +13,7 @@ import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffec
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
@@ -2434,6 +2435,18 @@ test('LightProbeGenerator reads cube targets through the WebGLRenderer marker pa
   ), 0)
   assert.ok(Number.isFinite(energy), `generated LightProbe coefficients should stay finite (${energy})`)
   assert.ok(energy > 0.01, `generated LightProbe should contain captured cube radiance (${energy})`)
+})
+
+test('LightProbeHelper shader fails clearly', () => {
+  const scene = new THREE.Scene()
+  const probe = new THREE.LightProbe()
+  scene.add(probe)
+  scene.add(new LightProbeHelper(probe, 0.6))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /LightProbeHelper internal LightProbeHelperMaterial ShaderMaterial.*not translated.*Native THREE\.LightProbe lighting.*LightProbeGenerator/i,
+  )
 })
 
 test('KTX2Loader detects conservative renderer texture compression support', async () => {
