@@ -2468,6 +2468,8 @@ test('GPUComputationRenderer stops at conservative vertex texture support detect
 test('CSM material shader injection fails clearly', () => {
   const scene = new THREE.Scene()
   const camera = makeCamera()
+  const previousLightsFragmentBegin = THREE.ShaderChunk.lights_fragment_begin
+  const previousLightsParsBegin = THREE.ShaderChunk.lights_pars_begin
   const csm = new CSM({
     camera,
     parent: scene,
@@ -2486,6 +2488,8 @@ test('CSM material shader injection fails clearly', () => {
   } finally {
     csm.dispose()
     csm.remove()
+    THREE.ShaderChunk.lights_fragment_begin = previousLightsFragmentBegin
+    THREE.ShaderChunk.lights_pars_begin = previousLightsParsBegin
   }
 })
 
