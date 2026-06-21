@@ -92,6 +92,7 @@ export function createSceneCorpus() {
     physicalTransmissionDispersionCorpus(),
     transmissionResolutionScaleCorpus(),
     multipleDirectionalShadowCorpus(),
+    mixedShadowLightTypesCorpus(),
     shadowMapEnabledGatingCorpus(),
     shadowMapTypeFilteringCorpus(),
     shadowMaterialReceiverCorpus(),
@@ -4979,6 +4980,134 @@ function multipleDirectionalShadowCorpus() {
       }
       if (!(stats.bothLeft < stats.secondLeft - 25 && stats.bothRight < stats.firstRight - 25)) {
         throw new Error(`dual directional shadow maps should preserve both shadow regions, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
+function mixedShadowLightTypesCorpus() {
+  const lightTypes = ['directional', 'spot', 'point']
+  const regions = {
+    directional: [32, 40, 40, 56],
+    spot: [56, 40, 72, 56],
+    point: [40, 24, 56, 32],
+  }
+  const stats = {}
+
+  function makeScene(activeLightTypes, castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        colorWrite: false,
+        depthWrite: false,
+      }),
+    )
+    caster.position.y = 0.75
+    caster.castShadow = castShadow
+    scene.add(caster)
+
+    if (activeLightTypes.includes('directional')) {
+      const light = new THREE.DirectionalLight(0xffffff, 2)
+      light.position.set(5, 6, 0)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.left = -7
+      light.shadow.camera.right = 7
+      light.shadow.camera.top = 7
+      light.shadow.camera.bottom = -7
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 16
+      scene.add(light)
+      scene.add(light.target)
+    }
+
+    if (activeLightTypes.includes('spot')) {
+      const light = new THREE.SpotLight(0xffffff, 3.2, 16, Math.PI / 4, 0.1, 1)
+      light.position.set(-5, 6, 0)
+      light.target.position.set(0, 0, 0)
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 16
+      scene.add(light)
+      scene.add(light.target)
+    }
+
+    if (activeLightTypes.includes('point')) {
+      const light = new THREE.PointLight(0xffffff, 2.5, 16)
+      light.position.set(0, 5, 4)
+      light.castShadow = true
+      light.shadow.mapSize.set(256, 256)
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 16
+      scene.add(light)
+    }
+
+    return scene
+  }
+
+  const mixedScene = makeScene(lightTypes, true)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 10, 0)
+  camera.up.set(0, 0, -1)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+
+  function luminance(rgba, region) {
+    const mean = meanRegion(rgba, options.width, ...region)
+    return mean.r + mean.g + mean.b
+  }
+
+  return {
+    name: 'mixed-shadow-light-types',
+    scene: mixedScene,
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.04,
+    browserReference: false,
+    render(renderer) {
+      const unshadowedMixed = renderer.render(makeScene(lightTypes, false), camera, options)
+      const shadowedMixed = renderer.render(mixedScene, camera, options)
+
+      for (const lightType of lightTypes) {
+        const singleUnshadowed = renderer.render(makeScene([lightType], false), camera, options)
+        const singleShadowed = renderer.render(makeScene([lightType], true), camera, options)
+        stats[lightType] = {
+          unshadowed: luminance(singleUnshadowed, regions[lightType]),
+          shadowed: luminance(singleShadowed, regions[lightType]),
+          mixedUnshadowed: luminance(unshadowedMixed, regions[lightType]),
+          mixedShadowed: luminance(shadowedMixed, regions[lightType]),
+        }
+      }
+
+      return shadowedMixed
+    },
+    validate() {
+      for (const lightType of lightTypes) {
+        const result = stats[lightType]
+        if (!result) {
+          throw new Error(`mixed shadow-light corpus did not record ${lightType} stats`)
+        }
+        if (!(result.shadowed < result.unshadowed - 50)) {
+          throw new Error(`${lightType} light should cast an isolated shadow, stats=${JSON.stringify(stats)}`)
+        }
+        if (!(result.mixedShadowed < result.mixedUnshadowed - 50)) {
+          throw new Error(`${lightType} shadow region should remain dark in the mixed shadow-light scene, stats=${JSON.stringify(stats)}`)
+        }
       }
     },
   }
