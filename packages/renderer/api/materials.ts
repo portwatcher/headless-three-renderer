@@ -166,6 +166,53 @@ export function isCompressedTextureFormat(format: unknown): boolean {
 
 const DefaultOnBeforeCompileSource = 'onBeforeCompile( /* shaderobject, renderer */ ) {}'
 
+const MaterialNodeHookProperties = new Set<string>([
+  'alphaTestNode',
+  'aoNode',
+  'attenuationColorNode',
+  'attenuationDistanceNode',
+  'backdropAlphaNode',
+  'backdropNode',
+  'castShadowNode',
+  'clearcoatNode',
+  'clearcoatRoughnessNode',
+  'colorNode',
+  'dashScaleNode',
+  'dashSizeNode',
+  'depthNode',
+  'dispersionNode',
+  'emissiveNode',
+  'envNode',
+  'fragmentNode',
+  'gapSizeNode',
+  'geometryNode',
+  'iorNode',
+  'iridescenceIORNode',
+  'iridescenceNode',
+  'iridescenceThicknessNode',
+  'lightMapNode',
+  'lightsNode',
+  'metalnessNode',
+  'mrtNode',
+  'normalNode',
+  'offsetNode',
+  'opacityNode',
+  'outputNode',
+  'positionNode',
+  'receivedShadowNode',
+  'rotationNode',
+  'roughnessNode',
+  'scaleNode',
+  'shadowPositionNode',
+  'sheenNode',
+  'sheenRoughnessNode',
+  'shininessNode',
+  'specularNode',
+  'thicknessNode',
+  'transmissionNode',
+  'vertexNode',
+])
+
 export interface EnvironmentMapInfo {
   data: Buffer
   width: number
@@ -705,6 +752,7 @@ export function extractPbrProperties(
   const customFragmentShader = extractCustomFragmentShader(material)
   assertSupportedShaderMaterial(material, customFragmentShader)
   assertSupportedOnBeforeCompile(material, customFragmentShader)
+  assertSupportedMaterialNodeHooks(material)
   assertSupportedMaterialClass(material, customFragmentShader)
   assertSupportedMaterialState(material, context)
   optionalBoolean(material.visible, 'material.visible')
@@ -3023,6 +3071,39 @@ function assertSupportedOnBeforeCompile(
   throw new Error(
     'material.onBeforeCompile customizations are not translated by @headless-three/renderer yet. Provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer custom material path.',
   )
+}
+
+function assertSupportedMaterialNodeHooks(material: ThreeMaterialLike): void {
+  const nodeHooks = activeMaterialNodeHooks(material)
+  if (nodeHooks.length === 0) return
+
+  throw new Error(
+    `material node hooks (${nodeHooks.join(', ')}) are not translated by @headless-three/renderer yet. Use a supported built-in material without Three.js TSL node hooks, bake the effect into geometry/textures, or provide equivalent fragment output through material.userData.headlessThreeRenderer.fragmentWgsl when only fragment color needs customization.`,
+  )
+}
+
+function activeMaterialNodeHooks(material: ThreeMaterialLike): string[] {
+  const materialRecord = material as Record<string, unknown>
+  const hookNames = new Set<string>(MaterialNodeHookProperties)
+
+  for (const name of Object.keys(materialRecord)) {
+    if (name.endsWith('Node')) hookNames.add(name)
+  }
+
+  const active: string[] = []
+  for (const name of hookNames) {
+    const value = materialRecord[name]
+    if (value == null) continue
+    if (MaterialNodeHookProperties.has(name) || materialNodeHookValue(value)) active.push(name)
+  }
+  return active
+}
+
+function materialNodeHookValue(value: unknown): boolean {
+  if (typeof value === 'function') return true
+  if (typeof value !== 'object') return false
+  return (value as { isNode?: unknown }).isNode === true ||
+    (value as { isMRTNode?: unknown }).isMRTNode === true
 }
 
 function isThreeCsmPatchedMaterial(material: ThreeMaterialLike): boolean {

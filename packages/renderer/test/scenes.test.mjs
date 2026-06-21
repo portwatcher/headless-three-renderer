@@ -116,6 +116,7 @@ import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { Volume } from 'three/examples/jsm/misc/Volume.js'
 import { VolumeSlice } from 'three/examples/jsm/misc/VolumeSlice.js'
 import { Flow, InstancedFlow } from 'three/examples/jsm/modifiers/CurveModifier.js'
+import { Flow as GPUFlow, getUniforms as getGPUCurveUniforms, initSplineTexture as initGPUCurveSplineTexture, updateSplineTexture as updateGPUCurveSplineTexture } from 'three/examples/jsm/modifiers/CurveModifierGPU.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
 import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
@@ -3861,6 +3862,79 @@ test('CurveModifier Flow shader injection fails clearly', () => {
         }
       })
     }
+  }
+})
+
+test('CurveModifierGPU Flow writes spline textures and fails clearly on material node hooks', () => {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.8, 0, 0),
+    new THREE.Vector3(0, 0.4, 0),
+    new THREE.Vector3(0.8, 0, 0),
+  ])
+  const texture = initGPUCurveSplineTexture(2)
+  try {
+    assert.equal(texture.isDataTexture, true)
+    assert.equal(texture.image.width, 1024)
+    assert.equal(texture.image.height, 8)
+    assert.ok(texture.image.data instanceof Uint16Array)
+    assert.equal(texture.format, THREE.RGBAFormat)
+    assert.equal(texture.type, THREE.HalfFloatType)
+    assert.equal(texture.wrapS, THREE.RepeatWrapping)
+    assert.equal(texture.wrapY, THREE.RepeatWrapping)
+    assert.equal(texture.magFilter, THREE.LinearFilter)
+    assert.equal(texture.minFilter, THREE.LinearFilter)
+
+    const version = texture.version
+    updateGPUCurveSplineTexture(texture, curve, 1)
+    assert.ok(texture.version > version, 'updating a CurveModifierGPU spline texture should mark it dirty')
+    const secondCurveRowOffset = 1024 * 4 * 4
+    assert.ok(
+      Array.from(texture.image.data.slice(secondCurveRowOffset, secondCurveRowOffset + 64)).some((value) => value !== 0),
+      'offset curve rows should receive packed half-float spline data',
+    )
+
+    const uniforms = getGPUCurveUniforms(texture)
+    assert.equal(uniforms.spineTexture, texture)
+    assert.equal(uniforms.pathOffset, 0)
+    assert.equal(uniforms.pathSegment, 1)
+    assert.equal(uniforms.spineOffset, 161)
+    assert.equal(uniforms.spineLength, 400)
+    assert.equal(uniforms.flow, 1)
+  } finally {
+    texture.dispose()
+  }
+
+  const geometry = new THREE.BoxGeometry(0.5, 0.18, 0.18)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff5533 })
+  const flow = new GPUFlow(new THREE.Mesh(geometry, material), 2)
+  try {
+    flow.updateCurve(0, curve)
+    flow.moveAlongCurve(0.25)
+
+    assert.equal(flow.curveArray[0], curve)
+    assert.ok(Math.abs(flow.curveLengthArray[0] - curve.getLength()) < 1e-6)
+    assert.equal(flow.uniforms.pathOffset, 0.25)
+    assert.notEqual(flow.object3D.material, material)
+    assert.equal(flow.object3D.material.positionNode?.isNode, true)
+    assert.equal(flow.object3D.material.normalNode?.isNode, true)
+
+    const scene = new THREE.Scene()
+    scene.add(flow.object3D)
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 16, height: 16 }),
+      /material node hooks.*normalNode.*positionNode.*TSL.*fragmentWgsl/i,
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
+    flow.splineTexture.dispose()
+    flow.object3D.traverse((child) => {
+      if (Array.isArray(child.material)) {
+        for (const childMaterial of child.material) childMaterial.dispose()
+      } else {
+        child.material?.dispose?.()
+      }
+    })
   }
 })
 
