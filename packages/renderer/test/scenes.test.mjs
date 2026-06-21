@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
 import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
@@ -14,6 +15,9 @@ import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
+import { Sky } from 'three/examples/jsm/objects/Sky.js'
+import { Water } from 'three/examples/jsm/objects/Water.js'
+import { Water as FlowWater } from 'three/examples/jsm/objects/Water2.js'
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js'
 import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
@@ -2639,6 +2643,87 @@ test('ParallaxBarrierEffect internal shader pass fails clearly', () => {
     )
   } finally {
     effect.dispose()
+  }
+})
+
+test('Three.js scene helper shader materials fail clearly with helper guidance', () => {
+  function makeFlatCamera() {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+    camera.position.z = 2
+    camera.updateProjectionMatrix()
+    camera.updateMatrixWorld()
+    return camera
+  }
+
+  function makePlaneScene(material = new THREE.MeshBasicMaterial({ color: 0xff0000 })) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material))
+    return scene
+  }
+
+  const cases = [
+    [
+      'OutlineEffect',
+      () => {
+        const renderer = new Renderer()
+        renderer.setSize(16, 16)
+        const effect = new OutlineEffect(renderer)
+        const scene = makePlaneScene()
+        const camera = makeFlatCamera()
+        return () => effect.render(scene, camera)
+      },
+      /OutlineEffect internal outline ShaderMaterial.*not translated.*renderMode.*custom WGSL/i,
+    ],
+    [
+      'Sky',
+      () => {
+        const renderer = new Renderer()
+        const scene = new THREE.Scene()
+        scene.add(new Sky())
+        const camera = makeFlatCamera()
+        return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
+      },
+      /Sky internal SkyShader ShaderMaterial.*not translated.*scene\.background.*custom WGSL/i,
+    ],
+    [
+      'Water',
+      () => {
+        const renderer = new Renderer()
+        const scene = new THREE.Scene()
+        scene.add(new Water(new THREE.PlaneGeometry(1, 1), {
+          textureWidth: 16,
+          textureHeight: 16,
+          waterNormals: solidTexture(128, 128, 255),
+        }))
+        const camera = makeFlatCamera()
+        return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
+      },
+      /Water internal MirrorShader ShaderMaterial.*not translated.*reflection targets.*custom WGSL/i,
+    ],
+    [
+      'Water2',
+      () => {
+        const renderer = new Renderer()
+        const scene = new THREE.Scene()
+        scene.add(new FlowWater(new THREE.PlaneGeometry(1, 1), {
+          textureWidth: 16,
+          textureHeight: 16,
+          normalMap0: solidTexture(128, 128, 255),
+          normalMap1: solidTexture(128, 128, 255),
+        }))
+        const camera = makeFlatCamera()
+        return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
+      },
+      /Water2 internal WaterShader ShaderMaterial.*not translated.*reflection\/refraction targets.*custom WGSL/i,
+    ],
+  ]
+
+  for (const [name, createRender, pattern] of cases) {
+    assert.throws(
+      createRender(),
+      pattern,
+      `${name} should fail with helper-specific guidance`,
+    )
   }
 })
 
