@@ -448,13 +448,6 @@
       "outputColorSpace": "srgb"
     },
     {
-      "file": "mixed-shadow-light-types.png",
-      "name": "mixed-shadow-light-types",
-      "width": 96,
-      "height": 96,
-      "outputColorSpace": "srgb"
-    },
-    {
       "file": "shadow-material-receiver.png",
       "name": "shadow-material-receiver",
       "width": 96,
