@@ -48,6 +48,7 @@ import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
@@ -97,6 +98,7 @@ import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
@@ -4047,6 +4049,111 @@ test('examples geometry modifiers and BufferGeometryUtils render CPU-transformed
     mergeRightGeometry.dispose()
     mergedGeometry.dispose()
     mergedMaterial.dispose()
+  }
+})
+
+test('examples SceneUtils and MeshSurfaceSampler produce renderable scene data', () => {
+  const splitGeometry = new THREE.PlaneGeometry(0.7, 0.7, 1, 1)
+  splitGeometry.clearGroups()
+  splitGeometry.addGroup(0, 3, 0)
+  splitGeometry.addGroup(3, 3, 1)
+  const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444, side: THREE.DoubleSide })
+  const greenMaterial = new THREE.MeshBasicMaterial({ color: 0x44ff66, side: THREE.DoubleSide })
+  const splitSource = new THREE.Mesh(splitGeometry, [redMaterial, greenMaterial])
+  const splitGroup = SceneUtils.createMeshesFromMultiMaterialMesh(splitSource)
+  splitGroup.position.x = -1.15
+
+  const instancedGeometry = new THREE.BoxGeometry(0.18, 0.18, 0.18)
+  const instancedMaterial = new THREE.MeshBasicMaterial({ color: 0x4488ff })
+  const instancedMesh = new THREE.InstancedMesh(instancedGeometry, instancedMaterial, 3)
+  const instanceMatrix = new THREE.Matrix4()
+  for (const [index, position] of [
+    [0, new THREE.Vector3(-0.22, -0.08, 0)],
+    [1, new THREE.Vector3(0, 0.16, 0)],
+    [2, new THREE.Vector3(0.22, -0.08, 0)],
+  ]) {
+    instanceMatrix.makeTranslation(position.x, position.y, position.z)
+    instancedMesh.setMatrixAt(index, instanceMatrix)
+  }
+  const instancedGroup = SceneUtils.createMeshesFromInstancedMesh(instancedMesh)
+
+  const sampleSourceGeometry = new THREE.PlaneGeometry(0.72, 0.72, 1, 1)
+  const sampleSource = new THREE.Mesh(sampleSourceGeometry, new THREE.MeshBasicMaterial())
+  const randomValues = [
+    0.05, 0.1, 0.25, 0.2, 0.45, 0.3, 0.65, 0.4,
+    0.85, 0.5, 0.15, 0.6, 0.35, 0.7, 0.55, 0.8,
+    0.75, 0.9, 0.95, 0.12, 0.22, 0.32, 0.42, 0.52,
+  ]
+  let randomIndex = 0
+  const sampler = new MeshSurfaceSampler(sampleSource)
+    .setRandomGenerator(() => randomValues[randomIndex++ % randomValues.length])
+    .build()
+  const sampledPositions = []
+  const sampledNormal = new THREE.Vector3()
+  const sampledUv = new THREE.Vector2()
+  for (let i = 0; i < 24; i += 1) {
+    const sampledPosition = new THREE.Vector3()
+    sampler.sample(sampledPosition, sampledNormal, undefined, sampledUv)
+    sampledPositions.push(sampledPosition.x, sampledPosition.y, sampledPosition.z)
+  }
+  const pointsGeometry = new THREE.BufferGeometry()
+  pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(sampledPositions, 3))
+  const pointsMaterial = new THREE.PointsMaterial({ color: 0xffdd44, size: 8, sizeAttenuation: false })
+  const sampledPoints = new THREE.Points(pointsGeometry, pointsMaterial)
+  sampledPoints.position.x = 1.15
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(splitGroup, instancedGroup, sampledPoints)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 0.9, -0.9, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.equal(splitGroup.children.length, 2, 'SceneUtils should split a two-group material mesh')
+    assert.equal(instancedGroup.children.length, 3, 'SceneUtils should expand three instanced meshes')
+    assert.equal(pointsGeometry.getAttribute('position').count, 24)
+    assert.ok(sampledNormal.z > 0.9, 'MeshSurfaceSampler should sample source normals')
+    assert.ok(sampledUv.x >= 0 && sampledUv.x <= 1 && sampledUv.y >= 0 && sampledUv.y <= 1)
+
+    const maxSplitX = SceneUtils.reduceVertices(splitGroup, (max, vertex) => Math.max(max, vertex.x), -Infinity)
+    assert.ok(maxSplitX > -0.9 && maxSplitX < -0.75, `reduceVertices should see transformed split geometry (${maxSplitX})`)
+    assert.equal([...SceneUtils.traverseVisibleGenerator(splitGroup)].length, 3)
+    assert.strictEqual([...SceneUtils.traverseAncestorsGenerator(splitGroup.children[0])][0], splitGroup)
+
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 120) > 40,
+      'SceneUtils split red material should render visible pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 20 && g > b + 20) > 30,
+      'SceneUtils split green material should render visible pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && r < 140 && g < 170) > 35,
+      'SceneUtils expanded instanced meshes should render blue pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 130 && b < 170) > 35,
+      'MeshSurfaceSampler points should render yellow pixels',
+    )
+  } finally {
+    for (const child of splitGroup.children) child.geometry?.dispose()
+    splitGeometry.dispose()
+    redMaterial.dispose()
+    greenMaterial.dispose()
+    instancedGeometry.dispose()
+    instancedMaterial.dispose()
+    sampleSourceGeometry.dispose()
+    sampleSource.material.dispose()
+    pointsGeometry.dispose()
+    pointsMaterial.dispose()
   }
 })
 
