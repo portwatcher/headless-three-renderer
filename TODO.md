@@ -46,6 +46,7 @@ Already supported in the current implementation:
 - Three.js `OctreeHelper` renders generated box edges through supported `LineSegments` plus `LineBasicMaterial` paths.
 - Three.js examples `GroundedSkybox` renders generated textured sky geometry through supported `SphereGeometry` plus `MeshBasicMaterial` map paths.
 - Three.js examples `ShadowMesh` renders projected helper geometry through supported source geometry plus `MeshBasicMaterial` transparent/stencil state.
+- Three.js examples `MarchingCubes` generates metaball `BufferGeometry` on the CPU and renders it through supported built-in material paths.
 - Three.js `LightProbeHelper` fails clearly on its internal `LightProbeHelperMaterial` shader path with guidance to use native `THREE.LightProbe` lighting, `LightProbeGenerator` readback, or a custom WGSL visualizer.
 - Three.js `TextureHelper` fails clearly on its internal `TextureHelperMaterial` shader path with guidance to render supported texture inputs directly or provide a custom WGSL visualizer.
 - Three.js examples `Line2`, `LineSegments2`, and `Wireframe` fail clearly on their `LineMaterial` shader path with guidance to use the renderer's supported built-in `Line`/`LineSegments`/`LineLoop` plus `LineBasicMaterial`/`LineDashedMaterial` paths.

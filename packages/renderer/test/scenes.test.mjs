@@ -32,6 +32,7 @@ import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRe
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
+import { MarchingCubes } from 'three/examples/jsm/objects/MarchingCubes.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
@@ -3329,6 +3330,42 @@ test('GroundedSkybox renders generated textured sky geometry', () => {
     skybox.geometry.dispose()
     skybox.material.dispose()
     texture.dispose()
+  }
+})
+
+test('MarchingCubes renders generated BufferGeometry with built-in materials', () => {
+  const material = new THREE.MeshBasicMaterial({ color: 0x00ff80 })
+  const cubes = new MarchingCubes(16, material, false, false, 2000)
+  cubes.isolation = 50
+  cubes.addBall(0.5, 0.5, 0.5, 1.2, 12)
+  cubes.update()
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(cubes)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    const center = meanRegion(rgba, 64, 64, 24, 24, 40, 40)
+    assert.equal(cubes.isMarchingCubes, true)
+    assert.ok(cubes.count > 0, 'MarchingCubes should generate triangles after adding a metaball')
+    assert.equal(cubes.geometry.drawRange.count, cubes.count)
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.02,
+      'MarchingCubes generated geometry should render visible pixels',
+    )
+    assert.ok(
+      center.g > center.r + 20 && center.b > center.r,
+      `MarchingCubes material color should appear in the generated mesh (${center.r}, ${center.g}, ${center.b})`,
+    )
+  } finally {
+    cubes.geometry.dispose()
+    material.dispose()
   }
 })
 
