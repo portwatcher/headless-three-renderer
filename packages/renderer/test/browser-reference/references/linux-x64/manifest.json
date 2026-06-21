@@ -350,6 +350,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "fog-exp2-mixed-object-types.png",
+      "name": "fog-exp2-mixed-object-types",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "texture-matrix-srgb-map.png",
       "name": "texture-matrix-srgb-map",
       "width": 96,

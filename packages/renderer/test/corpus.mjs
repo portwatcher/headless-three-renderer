@@ -1158,7 +1158,6 @@ function fogExp2MixedObjectCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.02,
-    browserReference: false,
     validate(rgba, { width, height }) {
       const isFoggedBlue = (r, g, b) => b > 130 && b > r + 60 && b > g + 50
       const regions = [
