@@ -78,6 +78,7 @@ export function createSceneCorpus() {
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
     physicalTransmissionDispersionCorpus(),
+    transmissionResolutionScaleCorpus(),
     multipleDirectionalShadowCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialFogOptOutCorpus(),
@@ -3741,6 +3742,103 @@ function physicalTransmissionDispersionCorpus() {
       const dispersedSeparation = Math.abs(dispersedEdge.r - dispersedEdge.b)
       if (!(diff > 8 && Math.abs(dispersedSeparation - normalSeparation) > 18)) {
         throw new Error(`physical dispersion corpus should shift transmitted color channels, diff=${diff.toFixed(2)} normal=${JSON.stringify(normalEdge)} dispersed=${JSON.stringify(dispersedEdge)}`)
+      }
+    },
+  }
+}
+
+function transmissionResolutionScaleCorpus() {
+  const width = CORPUS_RENDER_SIZE
+  const height = CORPUS_RENDER_SIZE
+  const camera = makeCamera([0, 0, 3])
+  const options = { width, height, format: 'rgba' }
+  let fullContrast = 0
+  let lowContrast = 0
+  let optionFullContrast = 0
+
+  function makeScene() {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const left = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    )
+    left.position.set(-0.8, 0, -0.1)
+    scene.add(left)
+
+    const right = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 3),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    right.position.set(0.8, 0, -0.1)
+    scene.add(right)
+
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(3, 3),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness: 0.02,
+        transmission: 1,
+        thickness: 0,
+        ior: 1.5,
+      }),
+    ))
+    return scene
+  }
+
+  function centerEdgeContrast(rgba) {
+    const left = meanRegion(rgba, width, 38, 30, 46, 66)
+    const right = meanRegion(rgba, width, 50, 30, 58, 66)
+    return Math.abs((left.r - left.b) - (right.r - right.b))
+  }
+
+  return {
+    name: 'physical-transmission-resolution-scale',
+    scene: makeScene(),
+    camera,
+    options: { ...options, transmissionResolutionScale: 0.125 },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.9,
+    browserReference: false,
+    render(renderer) {
+      const previousScale = renderer.transmissionResolutionScale
+      try {
+        renderer.transmissionResolutionScale = 1
+        const fullResolution = renderer.render(makeScene(), camera, options)
+        renderer.transmissionResolutionScale = 0.125
+        const lowResolution = renderer.render(makeScene(), camera, options)
+        const optionLowResolution = renderer.render(makeScene(), camera, {
+          ...options,
+          transmissionResolutionScale: 0.125,
+        })
+        const optionFullResolution = renderer.render(makeScene(), camera, {
+          ...options,
+          transmissionResolutionScale: 1,
+        })
+
+        fullContrast = centerEdgeContrast(fullResolution)
+        lowContrast = centerEdgeContrast(lowResolution)
+        optionFullContrast = centerEdgeContrast(optionFullResolution)
+        return optionLowResolution
+      } finally {
+        renderer.transmissionResolutionScale = previousScale
+      }
+    },
+    validate(rgba) {
+      const optionLowContrast = centerEdgeContrast(rgba)
+      if (!(fullContrast > 80)) {
+        throw new Error(`full-resolution transmission scene color should preserve the edge, contrast=${fullContrast.toFixed(1)}`)
+      }
+      if (!(lowContrast < fullContrast - 20)) {
+        throw new Error(`low renderer transmissionResolutionScale should soften the scene-color edge, low=${lowContrast.toFixed(1)} full=${fullContrast.toFixed(1)}`)
+      }
+      if (!(optionLowContrast < fullContrast - 20)) {
+        throw new Error(`options.transmissionResolutionScale should soften the scene-color edge, optionLow=${optionLowContrast.toFixed(1)} full=${fullContrast.toFixed(1)}`)
+      }
+      if (!(optionFullContrast > 80)) {
+        throw new Error(`options.transmissionResolutionScale should override low renderer state, optionFull=${optionFullContrast.toFixed(1)}`)
       }
     },
   }
