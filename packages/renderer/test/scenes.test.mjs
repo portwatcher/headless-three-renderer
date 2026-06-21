@@ -26872,7 +26872,12 @@ test('reusable renderer reuses cached base texture sampler state until texture s
 
     texture.rotation = 0.61
     renderer.render(scene, camera, options)
-    assert.ok(rotationCosCalls > callsAfterFirstRender, 'texture transform changes should invalidate cached base texture sampler state')
+    const callsAfterTransformStateChange = rotationCosCalls
+    assert.ok(callsAfterTransformStateChange > callsAfterFirstRender, 'texture transform changes should invalidate cached base texture sampler state')
+
+    texture.wrapS = THREE.RepeatWrapping
+    renderer.render(scene, camera, options)
+    assert.ok(rotationCosCalls > callsAfterTransformStateChange, 'texture sampler changes should invalidate cached base texture sampler state')
   } finally {
     Math.cos = originalCos
   }
@@ -27032,7 +27037,12 @@ test('reusable renderer reuses cached PBR map sampler state until texture state 
 
     texture.rotation = 0.61
     renderer.render(scene, camera, options)
-    assert.ok(rotationCosCalls > callsAfterFirstRender, 'PBR map texture transform changes should invalidate cached sampler state')
+    const callsAfterTransformStateChange = rotationCosCalls
+    assert.ok(callsAfterTransformStateChange > callsAfterFirstRender, 'PBR map texture transform changes should invalidate cached sampler state')
+
+    texture.wrapT = THREE.RepeatWrapping
+    renderer.render(scene, camera, options)
+    assert.ok(rotationCosCalls > callsAfterTransformStateChange, 'PBR map texture sampler changes should invalidate cached sampler state')
   } finally {
     Math.cos = originalCos
   }
