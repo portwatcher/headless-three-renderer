@@ -83,6 +83,7 @@ export function createSceneCorpus() {
     depthRenderModeCorpus(),
     renderModeAlphaHashCutoutCorpus(),
     renderModeTextureAlphaCutoutCorpus(),
+    renderModeMrtAuxiliaryCorpus(),
     spriteMaterialCorpus(),
     spriteAlphaMapCorpus(),
     billboardAlphaCutoutCorpus(),
@@ -105,6 +106,7 @@ export function createSceneCorpus() {
     customShadowDisplacementCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialOpacityCorpus(),
+    shadowMaterialOutputColorSpaceCorpus(),
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
     dashedLineMaterialTextureCorpus(),
@@ -1975,6 +1977,110 @@ function renderModeTextureAlphaCutoutCorpus() {
         if (!(rightPixels > 110)) {
           throw new Error(`${label} render-mode texture cutout should keep the right region, right=${rightPixels}`)
         }
+      }
+    },
+  }
+}
+
+function renderModeMrtAuxiliaryCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.3, 1.3),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  mesh.rotation.y = Math.PI * 0.22
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const options = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }
+  let target
+
+  function objectIdBytes(id) {
+    const value = Math.max(1, Math.trunc(id)) & 0xffffff
+    return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff]
+  }
+
+  function assertRgbClose(mean, expected, label) {
+    for (const [channel, index] of [['r', 0], ['g', 1], ['b', 2]]) {
+      if (Math.abs(mean[channel] - expected[index]) > 1) {
+        throw new Error(`${label} ${channel} should be ${expected[index]}, got ${mean[channel]}`)
+      }
+    }
+  }
+
+  return {
+    name: 'render-mode-mrt-auxiliary-attachments',
+    scene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      target = {
+        isWebGLMultipleRenderTargets: true,
+        textures: [
+          {},
+          { format: THREE.RGFormat, type: THREE.FloatType, userData: { headlessThreeRenderer: { renderMode: 'color' } } },
+          { userData: { headlessThreeRenderer: { renderMode: 'mask' } } },
+          { userData: { headlessThreeRenderer: { renderMode: 'object-id' } } },
+          { userData: { headlessThreeRenderer: { renderMode: 'normal' } } },
+          { userData: { headlessThreeRenderer: { renderMode: 'depth' } } },
+        ],
+      }
+      return renderer.render(scene, camera, { ...options, target })
+    },
+    validate(rgba, { width }) {
+      if (!target) {
+        throw new Error('MRT auxiliary corpus did not render a target')
+      }
+
+      const primary = meanRegion(rgba, width, 40, 40, 56, 56)
+      if (!(primary.r > 180 && primary.g < 10 && primary.b < 10)) {
+        throw new Error(`primary MRT color attachment should render the red mesh, got ${JSON.stringify(primary)}`)
+      }
+      if (target.textures[0].image.data !== target.data) {
+        throw new Error('primary MRT texture should reference the target RGBA data')
+      }
+
+      const colorCopy = target.textures[1].image.data
+      const center = ((48 * width) + 48) * 2
+      if (!(colorCopy instanceof Float32Array && colorCopy[center] > 0.7 && colorCopy[center + 1] < 0.05)) {
+        throw new Error(`secondary MRT color attachment should render normalized RG floats, red=${colorCopy?.[center]} green=${colorCopy?.[center + 1]}`)
+      }
+
+      const maskCenter = meanRegion(target.textures[2].image.data, width, 40, 40, 56, 56)
+      const maskCorner = meanRegion(target.textures[2].image.data, width, 0, 0, 8, 8)
+      if (!(maskCenter.r > 250 && maskCenter.g > 250 && maskCenter.b > 250 && maskCorner.r < 2 && maskCorner.g < 2 && maskCorner.b < 2)) {
+        throw new Error(`mask MRT attachment should render white geometry on black, center=${JSON.stringify(maskCenter)} corner=${JSON.stringify(maskCorner)}`)
+      }
+
+      const objectIdCenter = meanRegion(target.textures[3].image.data, width, 40, 40, 56, 56)
+      const encoded = mesh.id + 1
+      assertRgbClose(objectIdCenter, objectIdBytes(encoded), 'object-id MRT attachment')
+      if (target.objectIdMap?.[String(encoded)]?.id !== mesh.id) {
+        throw new Error('object-id MRT attachment should expose reverse lookup metadata')
+      }
+
+      const normalCenter = meanRegion(target.textures[4].image.data, width, 40, 40, 56, 56)
+      if (!(normalCenter.r > 140 && normalCenter.b > 200)) {
+        throw new Error(`normal MRT attachment should encode the tilted view normal, got ${JSON.stringify(normalCenter)}`)
+      }
+
+      const depthCenter = meanRegion(target.textures[5].image.data, width, 40, 40, 56, 56)
+      const depthCorner = meanRegion(target.textures[5].image.data, width, 0, 0, 8, 8)
+      if (!(depthCenter.r > depthCorner.r + 20 && depthCenter.r > 150)) {
+        throw new Error(`depth MRT attachment should encode nearer mesh depth, center=${JSON.stringify(depthCenter)} corner=${JSON.stringify(depthCorner)}`)
       }
     },
   }
@@ -6067,6 +6173,77 @@ function shadowMaterialOpacityCorpus() {
       }
       if (!(stats.translucentLum > stats.opaqueLum + 40)) {
         throw new Error(`lower ShadowMaterial opacity should blend more background through received shadows, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
+function shadowMaterialOutputColorSpaceCorpus() {
+  const camera = makeCamera([0, 6, 8], [0, 0, 0])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeScene() {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ color: 0x808080, opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.mapSize.set(512, 512)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light, light.target)
+
+    return scene
+  }
+
+  function shadowMean(rgba) {
+    return meanRegion(rgba, options.width, 32, 32, 64, 64)
+  }
+
+  return {
+    name: 'shadow-material-output-color-space',
+    scene: makeScene(),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.01,
+    browserReference: false,
+    render(renderer) {
+      const srgb = renderer.render(makeScene(), camera, { ...options, outputColorSpace: THREE.SRGBColorSpace })
+      const linear = renderer.render(makeScene(), camera, { ...options, outputColorSpace: THREE.LinearSRGBColorSpace })
+      stats.srgb = shadowMean(srgb)
+      stats.linear = shadowMean(linear)
+      return srgb
+    },
+    validate() {
+      if (!(stats.srgb.r > stats.linear.r + 15)) {
+        throw new Error(`sRGB ShadowMaterial output should apply display conversion, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(Math.abs(stats.srgb.r - stats.srgb.g) < 2 && Math.abs(stats.linear.r - stats.linear.g) < 2)) {
+        throw new Error(`ShadowMaterial gray output should stay neutral across color spaces, stats=${JSON.stringify(stats)}`)
       }
     },
   }
