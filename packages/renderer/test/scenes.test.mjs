@@ -130,6 +130,7 @@ import { SceneOptimizer } from 'three/examples/jsm/utils/SceneOptimizer.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { radixSort } from 'three/examples/jsm/utils/SortUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
+import * as WebGLTextureUtils from 'three/examples/jsm/utils/WebGLTextureUtils.js'
 import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
@@ -3086,6 +3087,22 @@ test('TextureHelper shader fails clearly', () => {
     () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
     /TextureHelper internal TextureHelperMaterial ShaderMaterial.*not translated.*supported material, background, scene\.environment.*target pixels.*custom WGSL/i,
   )
+})
+
+test('WebGLTextureUtils decompression shader path fails clearly', () => {
+  const renderer = new Renderer()
+  const texture = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1)
+  texture.needsUpdate = true
+
+  try {
+    assert.throws(
+      () => WebGLTextureUtils.decompress(texture, Infinity, renderer),
+      /ShaderMaterial is not supported directly.*fragmentWgsl/i,
+    )
+  } finally {
+    renderer.dispose?.()
+    texture.dispose()
+  }
 })
 
 test('KTX2Loader detects conservative renderer texture compression support', async () => {
