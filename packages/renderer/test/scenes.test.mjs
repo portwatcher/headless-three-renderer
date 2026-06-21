@@ -8983,6 +8983,55 @@ test('SpriteMaterial alphaMap honors horizontal and vertical repeat wrapping', (
   assert.ok(mirroredVertical.b > mirroredVertical.g + 40, `mirrored sprite alphaMap V coordinates should reflect to the transparent texel (${mirroredVertical.b} vs ${mirroredVertical.g})`)
 })
 
+test('SpriteMaterial and PointsMaterial alphaMap decode sRGB colorSpace before alpha testing', () => {
+  function frontCamera() {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+
+  function renderBillboard(kind, colorSpace) {
+    const alphaMap = solidTexture(255, 128, 255, 255)
+    alphaMap.colorSpace = colorSpace
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    const materialProps = {
+      alphaMap,
+      alphaTest: 0.3,
+      color: 0x00ff00,
+    }
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial(materialProps))
+      sprite.scale.set(2, 2, 1)
+      scene.add(sprite)
+    } else {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+        ...materialProps,
+        size: 48,
+        sizeAttenuation: false,
+      })))
+    }
+
+    return meanRegion(renderRgba(scene, frontCamera(), { width: 64, height: 64 }), 64, 64, 20, 20, 44, 44)
+  }
+
+  const spriteSrgb = renderBillboard('sprite', THREE.SRGBColorSpace)
+  const spriteLinear = renderBillboard('sprite', THREE.LinearSRGBColorSpace)
+  assert.ok(spriteSrgb.b > 240 && spriteSrgb.g < 5, `decoded sRGB sprite alphaMap should fall below alphaTest and show blue background (${spriteSrgb.b} vs ${spriteSrgb.g})`)
+  assert.ok(spriteLinear.g > spriteSrgb.g + 80, `linear sprite alphaMap should stay visible after alpha testing (${spriteLinear.g} vs ${spriteSrgb.g})`)
+  assert.ok(spriteLinear.b < spriteSrgb.b - 40, `linear sprite alphaMap should reduce blue background coverage (${spriteLinear.b} vs ${spriteSrgb.b})`)
+
+  const pointSrgb = renderBillboard('points', THREE.SRGBColorSpace)
+  const pointLinear = renderBillboard('points', THREE.LinearSRGBColorSpace)
+  assert.ok(pointSrgb.b > pointSrgb.g + 80, `decoded sRGB point alphaMap should fall below alphaTest and show blue background (${pointSrgb.b} vs ${pointSrgb.g})`)
+  assert.ok(pointLinear.g > pointLinear.b + 40, `linear point alphaMap should stay visible after alpha testing (${pointLinear.g} vs ${pointLinear.b})`)
+})
+
 test('SpriteMaterial and PointsMaterial alphaHash produce main-pass stochastic coverage', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
