@@ -21,6 +21,7 @@ import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
 import { ParametricGeometry } from 'three/examples/jsm/geometries/ParametricGeometry.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { TeapotGeometry } from 'three/examples/jsm/geometries/TeapotGeometry.js'
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
 import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
 import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js'
 import { PositionalAudioHelper } from 'three/examples/jsm/helpers/PositionalAudioHelper.js'
@@ -33,6 +34,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
@@ -3521,6 +3523,48 @@ test('examples BoxLineGeometry and TeapotGeometry render generated geometry path
     lineMaterial.dispose()
     teapotGeometry.dispose()
     teapotMaterial.dispose()
+  }
+})
+
+test('TextGeometry renders parsed example fonts through built-in mesh materials', () => {
+  const font = new FontLoader().parse(JSON.parse(threeRendererSource('examples/fonts/helvetiker_regular.typeface.json')))
+  const geometry = new TextGeometry('Node', {
+    font,
+    size: 0.42,
+    depth: 0.08,
+    curveSegments: 4,
+    bevelEnabled: false,
+  })
+  geometry.center()
+  const material = new THREE.MeshBasicMaterial({ color: 0xffaa33, side: THREE.DoubleSide })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1.5, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 64
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.equal(geometry.isBufferGeometry, true)
+    assert.ok(geometry.getAttribute('position')?.count > 0)
+    assert.ok(geometry.getAttribute('normal'), 'TextGeometry should generate normals')
+    assert.ok(geometry.getAttribute('uv'), 'TextGeometry should generate UVs')
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => {
+        return r > 100 && g > 50 && r > g && b < 90
+      }) > 100,
+      'TextGeometry should render visible text-colored pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
   }
 })
 

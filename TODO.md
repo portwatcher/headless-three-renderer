@@ -44,7 +44,7 @@ Already supported in the current implementation:
 - Three.js `RectAreaLightHelper` renders its light outline and fill visualization through supported `LineBasicMaterial` and `MeshBasicMaterial` geometry.
 - Three.js `PositionalAudioHelper` renders grouped cone line geometry through supported `Line` material-array groups with `LineBasicMaterial`.
 - Three.js `OctreeHelper` renders generated box edges through supported `LineSegments` plus `LineBasicMaterial` paths.
-- Three.js examples geometry generators `ConvexGeometry`, `RoundedBoxGeometry`, `DecalGeometry`, `ParametricGeometry`, `BoxLineGeometry`, and `TeapotGeometry` produce CPU-side `BufferGeometry` that renders through supported built-in mesh and line material paths.
+- Three.js examples geometry generators `ConvexGeometry`, `RoundedBoxGeometry`, `DecalGeometry`, `ParametricGeometry`, `BoxLineGeometry`, `TeapotGeometry`, and `TextGeometry` produce CPU-side `BufferGeometry` that renders through supported built-in mesh and line material paths, including parsed example fonts.
 - Three.js examples `GroundedSkybox` renders generated textured sky geometry through supported `SphereGeometry` plus `MeshBasicMaterial` map paths.
 - Three.js examples `ShadowMesh` renders projected helper geometry through supported source geometry plus `MeshBasicMaterial` transparent/stencil state.
 - Three.js examples `MarchingCubes` generates metaball `BufferGeometry` on the CPU and renders it through supported built-in material paths.
