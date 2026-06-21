@@ -17,6 +17,9 @@ import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffec
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
+import { PLYExporter } from 'three/examples/jsm/exporters/PLYExporter.js'
+import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { DebugEnvironment } from 'three/examples/jsm/environments/DebugEnvironment.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { TrefoilKnot } from 'three/examples/jsm/curves/CurveExtras.js'
@@ -29975,6 +29978,115 @@ test('Three.js exporters read targets through the WebGLRenderer marker path', as
     [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a],
     'KTX2Exporter output should start with the KTX2 identifier',
   )
+})
+
+test('Three.js scene graph exporters serialize renderer-visible geometry', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+
+  const meshGeometry = new THREE.PlaneGeometry(0.6, 0.6)
+  meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute([
+    1, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+    0, 1, 0,
+  ], 3))
+  const meshMaterial = new THREE.MeshBasicMaterial({
+    name: 'export-red-green',
+    vertexColors: true,
+    side: THREE.DoubleSide,
+  })
+  const mesh = new THREE.Mesh(meshGeometry, meshMaterial)
+  mesh.name = 'export-mesh'
+  mesh.position.x = -0.45
+
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-0.2, -0.35, 0),
+    new THREE.Vector3(0.2, 0.35, 0),
+  ])
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x44aaff })
+  const line = new THREE.Line(lineGeometry, lineMaterial)
+  line.name = 'export-line'
+  line.position.x = 0.35
+
+  const pointsGeometry = new THREE.BufferGeometry()
+  pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+    0, -0.18, 0,
+    0.12, 0.16, 0,
+    -0.12, 0.16, 0,
+  ], 3))
+  pointsGeometry.setAttribute('color', new THREE.Float32BufferAttribute([
+    1, 1, 0,
+    1, 1, 0,
+    1, 1, 0,
+  ], 3))
+  const pointsMaterial = new THREE.PointsMaterial({
+    vertexColors: true,
+    size: 8,
+    sizeAttenuation: false,
+  })
+  const points = new THREE.Points(pointsGeometry, pointsMaterial)
+  points.name = 'export-points'
+  points.position.x = 0.75
+
+  scene.add(mesh, line, points)
+  scene.updateMatrixWorld(true)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 0.8, -0.8, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 80
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 160 && g < 130 && b < 130) > 80,
+      'exporter mesh scene should render red vertex-colored pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 130 && g > r + 20 && g > b + 20) > 80,
+      'exporter mesh scene should render green vertex-colored pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && r < 140 && g > 120) > 20,
+      'exporter line scene should render blue line pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 130 && b < 140) > 20,
+      'exporter point scene should render yellow point pixels',
+    )
+
+    const obj = new OBJExporter().parse(scene)
+    assert.match(obj, /^o export-mesh$/m)
+    assert.match(obj, /^usemtl export-red-green$/m)
+    assert.match(obj, /^f \d+\/\d+\/\d+ \d+\/\d+\/\d+ \d+\/\d+\/\d+$/m)
+    assert.match(obj, /^o export-line$/m)
+    assert.match(obj, /^l \d+ \d+ $/m)
+    assert.match(obj, /^o export-points$/m)
+    assert.match(obj, /^p \d+ \d+ \d+ $/m)
+
+    const stl = new STLExporter().parse(scene)
+    assert.match(stl, /^solid exported/)
+    assert.match(stl, /\bfacet normal\b/)
+    assert.match(stl, /\bvertex -?[\d.]+ -?[\d.]+ 0\b/)
+    assert.match(stl, /endsolid exported\s*$/)
+
+    const ply = new PLYExporter().parse(mesh)
+    assert.match(ply, /^ply\nformat ascii 1\.0/m)
+    assert.match(ply, /^element vertex 4$/m)
+    assert.match(ply, /^element face 2$/m)
+    assert.match(ply, /^property uchar red$/m)
+    assert.match(ply, /^3 0 2 1$/m)
+  } finally {
+    meshGeometry.dispose()
+    meshMaterial.dispose()
+    lineGeometry.dispose()
+    lineMaterial.dispose()
+    pointsGeometry.dispose()
+    pointsMaterial.dispose()
+  }
 })
 
 test('single-attachment target array paths honor typed color readback requests', () => {
