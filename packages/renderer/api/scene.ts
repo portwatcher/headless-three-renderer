@@ -52,6 +52,7 @@ import {
 interface FlattenedMesh {
   mesh: NativeSceneMesh
   sortItem: RenderSortItem
+  transparentDoubleSidePass?: boolean
   groupOrder: number
   renderOrder: number
   sortZ: number
@@ -501,8 +502,7 @@ export function flattenScene(
     clipShadows: false,
   }
   visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
-  return sortFlattenedMeshes(meshes, sortOptions)
-    .map(({ mesh }) => mesh)
+  return nativeMeshesFromSortedFlattened(sortFlattenedMeshes(meshes, sortOptions))
 }
 
 function visitObject(
@@ -758,7 +758,7 @@ function appendMesh(
           ...clipping,
           ...sortKeys,
           ...pbrProps,
-        }, sortInfo.item)
+        }, sortInfo.item, needsTransparentDoubleSidePass(material, pbrProps, wireframe))
       }
     } else {
       if (group.count % 3 !== 0) {
@@ -821,7 +821,7 @@ function appendMesh(
           ...clipping,
           ...sortKeys,
           ...pbrProps,
-        }, sortInfo.item)
+        }, sortInfo.item, needsTransparentDoubleSidePass(material, pbrProps, wireframe))
       }
     }
 
@@ -2687,7 +2687,12 @@ function clipShadowsForMaterial(material: ThreeMaterialLike | undefined, clippin
   return optionalObjectBoolean(material?.clipShadows, 'material.clipShadows') === true || clippingContext.clipShadows ? true : undefined
 }
 
-function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh, sortItem: RenderSortItem): void {
+function pushMesh(
+  meshes: FlattenedMesh[],
+  mesh: NativeSceneMesh,
+  sortItem: RenderSortItem,
+  transparentDoubleSidePass = false,
+): void {
   const groupOrder = mesh.groupOrder ?? 0
   const renderOrder = mesh.renderOrder ?? 0
   meshes.push({
@@ -2703,7 +2708,28 @@ function pushMesh(meshes: FlattenedMesh[], mesh: NativeSceneMesh, sortItem: Rend
     materialSortKey: mesh.materialSortKey ?? 0,
     materialVariant: mesh.materialVariant ?? 0,
     sortIndex: mesh.sortIndex ?? meshes.length,
+    transparentDoubleSidePass,
   })
+}
+
+function needsTransparentDoubleSidePass(material: ThreeMaterialLike | undefined, props: PbrProperties, wireframe: boolean): boolean {
+  return !wireframe
+    && material?.transparent === true
+    && material.forceSinglePass === false
+    && props.side === 'double'
+}
+
+function nativeMeshesFromSortedFlattened(meshes: FlattenedMesh[]): NativeSceneMesh[] {
+  const nativeMeshes: NativeSceneMesh[] = []
+  for (const { mesh, transparentDoubleSidePass } of meshes) {
+    if (transparentDoubleSidePass) {
+      nativeMeshes.push({ ...mesh, side: 'back' })
+      nativeMeshes.push({ ...mesh, side: 'front' })
+    } else {
+      nativeMeshes.push(mesh)
+    }
+  }
+  return nativeMeshes
 }
 
 function sortInfoForObject(

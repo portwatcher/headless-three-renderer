@@ -11072,26 +11072,79 @@ test('unsupported material side values fail clearly', () => {
   )
 })
 
-test('material forceSinglePass is accepted as a native single-pass no-op', () => {
-  const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0, 0, 0)
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xff0000,
-    opacity: 0.5,
-    side: THREE.DoubleSide,
-    transparent: true,
-  })
-  material.forceSinglePass = true
-  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+test('transparent DoubleSide materials render back side before front side unless forceSinglePass is true', () => {
+  function renderDoubleSide(forceSinglePass) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
-  camera.position.set(0, 0, 3)
-  camera.lookAt(0, 0, 0)
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -1, -1, 0,
+      1, -1, 0,
+      1, 1, 0,
+      -1, -1, 0,
+      1, 1, 0,
+      -1, 1, 0,
+      -1, -1, 0,
+      1, 1, 0,
+      1, -1, 0,
+      -1, -1, 0,
+      -1, 1, 0,
+      1, 1, 0,
+    ]), 3))
+    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, -1,
+      0, 0, -1,
+      0, 0, -1,
+      0, 0, -1,
+      0, 0, -1,
+      0, 0, -1,
+    ]), 3))
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array([
+      1, 0, 0,
+      1, 0, 0,
+      1, 0, 0,
+      1, 0, 0,
+      1, 0, 0,
+      1, 0, 0,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+      0, 0, 1,
+    ]), 3))
 
-  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
-  assert.ok(mean.r > 40, `forceSinglePass material should still render visible red output (${mean.r})`)
-  assert.ok(mean.r > mean.g + 40, `forceSinglePass material should still render red output (${mean.r} vs ${mean.g})`)
-  assert.ok(mean.r > mean.b + 40, `forceSinglePass material should still render red output (${mean.r} vs ${mean.b})`)
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthWrite: false,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+      transparent: true,
+      vertexColors: true,
+    })
+    material.forceSinglePass = forceSinglePass
+    scene.add(new THREE.Mesh(geometry, material))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  }
+
+  const doublePass = renderDoubleSide(false)
+  const singlePass = renderDoubleSide(true)
+
+  assert.ok(doublePass.r > doublePass.b + 25, `default transparent DoubleSide should draw front red after back blue (${doublePass.r} vs ${doublePass.b})`)
+  assert.ok(singlePass.b > singlePass.r + 25, `forceSinglePass should keep source order and leave blue on top (${singlePass.b} vs ${singlePass.r})`)
 })
 
 test('material dithering is accepted as a compatibility no-op', () => {
