@@ -14,6 +14,7 @@ import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
+import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
@@ -2708,6 +2709,31 @@ test('vertex normal and tangent helpers render generated line geometry', () => {
     tangentHelper.dispose()
     geometry.dispose()
     mesh.material.dispose()
+  }
+})
+
+test('RectAreaLightHelper renders supported light visualization geometry', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const light = new THREE.RectAreaLight(0xff8844, 3, 1.4, 0.9)
+  light.position.set(0, 0, 0)
+  light.lookAt(0, 0, 1)
+  const helper = new RectAreaLightHelper(light, 0x00ffaa)
+  light.add(helper)
+  scene.add(light)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0.2, 0.1, 3)
+  camera.lookAt(0, 0, 0)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.001,
+      'RectAreaLightHelper should render visible helper geometry',
+    )
+  } finally {
+    helper.dispose()
   }
 })
 
