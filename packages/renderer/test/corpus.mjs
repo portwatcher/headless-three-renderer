@@ -82,6 +82,7 @@ export function createSceneCorpus() {
     physicalTransmissionDispersionCorpus(),
     transmissionResolutionScaleCorpus(),
     multipleDirectionalShadowCorpus(),
+    shadowMapEnabledGatingCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
@@ -4113,6 +4114,85 @@ function multipleDirectionalShadowCorpus() {
       }
       if (!(stats.bothLeft < stats.secondLeft - 25 && stats.bothRight < stats.firstRight - 25)) {
         throw new Error(`dual directional shadow maps should preserve both shadow regions, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
+function shadowMapEnabledGatingCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 1, 1)
+
+  const receiver = new THREE.Mesh(
+    new THREE.PlaneGeometry(12, 12),
+    new THREE.ShadowMaterial({ opacity: 1 }),
+  )
+  receiver.rotation.x = -Math.PI / 2
+  receiver.receiveShadow = true
+  scene.add(receiver)
+
+  const caster = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 1.5, 1.5),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      colorWrite: false,
+      depthWrite: false,
+    }),
+  )
+  caster.position.y = 0.75
+  caster.castShadow = true
+  scene.add(caster)
+
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(5, 6, 0)
+  light.target.position.set(0, 0, 0)
+  light.castShadow = true
+  light.shadow.mapSize.set(256, 256)
+  light.shadow.camera.left = -6
+  light.shadow.camera.right = 6
+  light.shadow.camera.top = 6
+  light.shadow.camera.bottom = -6
+  light.shadow.camera.near = 0.1
+  light.shadow.camera.far = 14
+  scene.add(light)
+  scene.add(light.target)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 6, 8)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let disabledOutput
+
+  function luminance(rgba) {
+    const mean = meanRegion(rgba, options.width, 28, 42, 68, 82)
+    return mean.r + mean.g + mean.b
+  }
+
+  return {
+    name: 'shadow-map-enabled-gating',
+    scene,
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    render(renderer) {
+      const previousEnabled = renderer.shadowMap.enabled
+      try {
+        renderer.shadowMap.enabled = true
+        const enabled = renderer.render(scene, camera, options)
+        renderer.shadowMap.enabled = false
+        disabledOutput = renderer.render(scene, camera, options)
+        return enabled
+      } finally {
+        renderer.shadowMap.enabled = previousEnabled
+      }
+    },
+    validate(rgba) {
+      const enabledLum = luminance(rgba)
+      const disabledLum = luminance(disabledOutput)
+      if (!(enabledLum < disabledLum - 25)) {
+        throw new Error(`shadowMap.enabled corpus should darken the receiver only when enabled, enabled=${enabledLum.toFixed(1)} disabled=${disabledLum.toFixed(1)}`)
       }
     },
   }
