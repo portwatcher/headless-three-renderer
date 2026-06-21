@@ -15,10 +15,12 @@ import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffec
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { BoxLineGeometry } from 'three/examples/jsm/geometries/BoxLineGeometry.js'
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
 import { ParametricGeometry } from 'three/examples/jsm/geometries/ParametricGeometry.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { TeapotGeometry } from 'three/examples/jsm/geometries/TeapotGeometry.js'
 import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
 import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js'
 import { PositionalAudioHelper } from 'three/examples/jsm/helpers/PositionalAudioHelper.js'
@@ -3471,6 +3473,54 @@ test('examples geometry generators render BufferGeometry with built-in materials
     for (const material of materials) material.dispose()
     sourceGeometry.dispose()
     sourceMesh.material.dispose()
+  }
+})
+
+test('examples BoxLineGeometry and TeapotGeometry render generated geometry paths', () => {
+  const lineGeometry = new BoxLineGeometry(1, 1, 1, 2, 2, 2)
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff })
+  const line = new THREE.LineSegments(lineGeometry, lineMaterial)
+  line.position.x = -0.7
+
+  const teapotGeometry = new TeapotGeometry(0.4, 4, true, true, true, true, true)
+  const teapotMaterial = new THREE.MeshBasicMaterial({ color: 0x44ff88, side: THREE.DoubleSide })
+  const teapot = new THREE.Mesh(teapotGeometry, teapotMaterial)
+  teapot.position.x = 0.7
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(line, teapot)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 96, height: 96 })
+    assert.equal(lineGeometry.isBufferGeometry, true)
+    assert.ok(lineGeometry.getAttribute('position')?.count >= 72)
+    assert.equal(teapotGeometry.isBufferGeometry, true)
+    assert.ok(teapotGeometry.getAttribute('position')?.count > 0)
+    assert.ok(teapotGeometry.getAttribute('normal'), 'TeapotGeometry should generate normals')
+    assert.ok(teapotGeometry.getAttribute('uv'), 'TeapotGeometry should generate UVs')
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12,
+      'BoxLineGeometry and TeapotGeometry should produce visible pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => r > 100 && b > 100 && g < 100) > 150,
+      'BoxLineGeometry should render visible magenta line pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, 96, 96, 0, 0, 96, 96, (r, g, b) => g > 120 && g > r + 30 && g > b + 20) > 150,
+      'TeapotGeometry should render visible green mesh pixels',
+    )
+  } finally {
+    lineGeometry.dispose()
+    lineMaterial.dispose()
+    teapotGeometry.dispose()
+    teapotMaterial.dispose()
   }
 })
 
