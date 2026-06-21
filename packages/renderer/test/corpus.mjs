@@ -101,6 +101,7 @@ export function createSceneCorpus() {
     dashedLineMaterialUvChannelCorpus(),
     dashedLineMaterialWideLineCorpus(),
     lineMaterialNoopCorpus(),
+    lineBasicMaterialUvChannelCorpus(),
     pointsMaterialTextureCorpus(),
     pointsMaterialUvChannelCorpus(),
     instancedLinesPointsCorpus(),
@@ -5567,6 +5568,90 @@ function lineMaterialNoopCorpus() {
         if (!(diff < 0.1)) {
           throw new Error(`${kind} receiveShadow should be accepted as an unlit line no-op, stats=${JSON.stringify(stats)}`)
         }
+      }
+    },
+  }
+}
+
+function lineBasicMaterialUvChannelCorpus() {
+  const map = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  map.channel = 1
+  map.magFilter = THREE.NearestFilter
+  map.minFilter = THREE.NearestFilter
+  map.needsUpdate = true
+
+  const alphaMap = new THREE.DataTexture(new Uint8Array([
+    255, 0, 255, 255,
+    255, 255, 255, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  alphaMap.channel = 2
+  alphaMap.magFilter = THREE.NearestFilter
+  alphaMap.minFilter = THREE.NearestFilter
+  alphaMap.needsUpdate = true
+
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-1.45, 0, 0),
+    new THREE.Vector3(1.45, 0, 0),
+  ])
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+    0.25, 0.5,
+    0.25, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+  geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array([
+    0.75, 0.5,
+    0.75, 0.5,
+  ]), 2))
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  const material = new THREE.LineBasicMaterial({
+    alphaTest: 0.5,
+    color: 0xffffff,
+    linewidth: 8,
+    map,
+  })
+  material.alphaMap = alphaMap
+  scene.add(new THREE.Line(
+    geometry,
+    material,
+  ))
+
+  return {
+    name: 'line-basic-material-uv-channel-selection',
+    scene,
+    camera: makeCamera([0, 0, 3]),
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.01,
+    browserReference: false,
+    validate(rgba, { width, height }) {
+      const greenPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => g > 100 && g > r + 40 && g > b + 40,
+      )
+      const redPixels = countRegionPixels(
+        rgba,
+        width,
+        0,
+        0,
+        width,
+        height,
+        (r, g, b) => r > 100 && r > g + 40 && r > b + 40,
+      )
+      if (!(greenPixels > 500 && redPixels < 5)) {
+        throw new Error(`LineBasicMaterial UV-channel corpus should render green uv1-selected color while uv2 keeps alpha opaque, green=${greenPixels} red=${redPixels}`)
       }
     },
   }
