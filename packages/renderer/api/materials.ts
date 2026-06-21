@@ -2109,6 +2109,30 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeBokehPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.BokehPass internal BokehShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent depth-of-field pass, or compose the bokeh effect outside this helper.",
+    )
+  }
+
+  if (isThreeRenderPixelatedPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.RenderPixelatedPass internal pixelation ShaderMaterial is not translated by @headless-three/renderer yet. Use options.renderMode for supported depth/normal auxiliary outputs, provide a custom WGSL fragment for an equivalent pixelated composite pass, or compose the pixelated effect outside this helper.",
+    )
+  }
+
+  if (isThreeRenderTransitionPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.RenderTransitionPass internal transition ShaderMaterial is not translated by @headless-three/renderer yet. Render the two scenes separately and blend them outside this helper, or provide a custom WGSL fragment for an equivalent transition pass.",
+    )
+  }
+
+  if (isThreeCubeTexturePassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.CubeTexturePass internal cube ShaderMaterial is not translated by @headless-three/renderer yet. Use scene.background, options.background, or a supported cube background texture directly, or provide a custom WGSL fragment for an equivalent cube-texture pass.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2301,6 +2325,105 @@ function isThreeHalftonePassShaderMaterial(material: ThreeMaterialLike): boolean
     compact.includes('vec4getSample(vec2point)') &&
     compact.includes('CellgetReferenceCell(vec2p,vec2origin,floatgrid_angle,floatstep)') &&
     compact.includes('gl_FragColor=vec4(r,g,b,1.0);')
+}
+
+function isThreeBokehPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tColor == null ||
+    values.tDepth == null ||
+    values.focus == null ||
+    values.aspect == null ||
+    values.aperture == null ||
+    values.maxblur == null ||
+    values.nearClip == null ||
+    values.farClip == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtColor;') &&
+    compact.includes('uniformsampler2DtDepth;') &&
+    compact.includes('uniformfloataperture;') &&
+    compact.includes('uniformfloatnearClip;') &&
+    compact.includes('floatviewZ=getViewZ(getDepth(vUv));') &&
+    compact.includes('vec2dofblur=vec2(clamp(factor*aperture,-maxblur,maxblur));') &&
+    compact.includes('gl_FragColor=col/41.0;')
+}
+
+function isThreeRenderPixelatedPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse == null ||
+    values.tDepth == null ||
+    values.tNormal == null ||
+    values.resolution == null ||
+    values.normalEdgeStrength == null ||
+    values.depthEdgeStrength == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtNormal;') &&
+    compact.includes('uniformvec4resolution;') &&
+    compact.includes('floatgetDepth(intx,inty)') &&
+    compact.includes('vec3getNormal(intx,inty)') &&
+    compact.includes('floatdepthEdgeIndicator(floatdepth,vec3normal)') &&
+    compact.includes('floatnormalEdgeIndicator(floatdepth,vec3normal)') &&
+    compact.includes('gl_FragColor=texel*Strength;')
+}
+
+function isThreeRenderTransitionPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse1 == null ||
+    values.tDiffuse2 == null ||
+    values.mixRatio == null ||
+    values.threshold == null ||
+    values.useTexture == null ||
+    values.tMixTexture == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtDiffuse1;') &&
+    compact.includes('uniformsampler2DtDiffuse2;') &&
+    compact.includes('uniformsampler2DtMixTexture;') &&
+    compact.includes('uniformfloatmixRatio;') &&
+    compact.includes('floatmixf=clamp((transitionTexel.r-r)*(1.0/threshold),0.0,1.0);') &&
+    compact.includes('gl_FragColor=mix(texel1,texel2,mixf);') &&
+    compact.includes('gl_FragColor=mix(texel2,texel1,mixRatio);')
+}
+
+function isThreeCubeTexturePassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.tCube == null || values.tFlip == null || values.opacity == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsamplerCubetCube;') &&
+    compact.includes('uniformfloattFlip;') &&
+    compact.includes('uniformfloatopacity;') &&
+    compact.includes('textureCube(tCube,vec3(tFlip*vWorldDirection.x,vWorldDirection.yz))') &&
+    compact.includes('gl_FragColor.a*=opacity;')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

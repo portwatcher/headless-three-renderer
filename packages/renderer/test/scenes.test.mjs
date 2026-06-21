@@ -16,7 +16,9 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js'
 import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
+import { CubeTexturePass } from 'three/examples/jsm/postprocessing/CubeTexturePass.js'
 import { DotScreenPass } from 'three/examples/jsm/postprocessing/DotScreenPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js'
@@ -25,6 +27,8 @@ import { HalftonePass } from 'three/examples/jsm/postprocessing/HalftonePass.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { RenderPixelatedPass } from 'three/examples/jsm/postprocessing/RenderPixelatedPass.js'
+import { RenderTransitionPass } from 'three/examples/jsm/postprocessing/RenderTransitionPass.js'
 import { SavePass } from 'three/examples/jsm/postprocessing/SavePass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass.js'
@@ -2888,6 +2892,76 @@ test('EffectComposer lightweight shader passes fail clearly with helper guidance
       'HalftonePass',
       () => new HalftonePass(16, 16, {}),
       /HalftonePass internal HalftoneShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+  ]
+
+  for (const [name, createPass, pattern] of cases) {
+    const renderer = new Renderer()
+    const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const pass = createPass()
+
+    try {
+      assert.throws(
+        () => pass.render(renderer, writeBuffer, readBuffer, 0.016, false),
+        pattern,
+        `${name} should fail with helper-specific guidance`,
+      )
+    } finally {
+      pass.dispose()
+    }
+  }
+})
+
+test('EffectComposer scene-backed shader passes fail clearly with helper guidance', () => {
+  function makeScene(color) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color }),
+    ))
+    return scene
+  }
+
+  function makeCamera() {
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10)
+    camera.position.z = 2
+    return camera
+  }
+
+  const cases = [
+    [
+      'BokehPass',
+      () => new BokehPass(makeScene(0xff0000), makeCamera(), { focus: 1, aperture: 0.025, maxblur: 0.01 }),
+      /BokehPass internal BokehShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'RenderPixelatedPass',
+      () => {
+        const pass = new RenderPixelatedPass(2, makeScene(0x00ff00), makeCamera())
+        pass.setSize(16, 16)
+        return pass
+      },
+      /RenderPixelatedPass internal pixelation ShaderMaterial.*not translated.*renderMode.*custom WGSL/i,
+    ],
+    [
+      'RenderTransitionPass',
+      () => {
+        const pass = new RenderTransitionPass(
+          makeScene(0xff0000),
+          makeCamera(),
+          makeScene(0x0000ff),
+          makeCamera(),
+        )
+        pass.setSize(16, 16)
+        return pass
+      },
+      /RenderTransitionPass internal transition ShaderMaterial.*not translated.*two scenes separately.*custom WGSL/i,
+    ],
+    [
+      'CubeTexturePass',
+      () => new CubeTexturePass(makeCamera(), new THREE.CubeTexture(), 1),
+      /CubeTexturePass internal cube ShaderMaterial.*not translated.*scene\.background.*custom WGSL/i,
     ],
   ]
 
