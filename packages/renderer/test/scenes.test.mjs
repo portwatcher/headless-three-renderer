@@ -147,6 +147,8 @@ import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass
 import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
+import { CSS3DObject, CSS3DRenderer, CSS3DSprite } from 'three/examples/jsm/renderers/CSS3DRenderer.js'
 import { Projector, RenderableFace, RenderableLine, RenderableSprite } from 'three/examples/jsm/renderers/Projector.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import { FlakesTexture } from 'three/examples/jsm/textures/FlakesTexture.js'
@@ -163,6 +165,7 @@ import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import { UVsDebug } from 'three/examples/jsm/utils/UVsDebug.js'
 import * as WebGLTextureUtils from 'three/examples/jsm/utils/WebGLTextureUtils.js'
 import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js'
+import { createText } from 'three/examples/jsm/webxr/Text2D.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
 import lightsApi from '../dist/lights.js'
@@ -3281,6 +3284,111 @@ test('Projector produces CPU render data for supported scene objects', () => {
     pointsGeometry.dispose()
     pointsMaterial.dispose()
     spriteMaterial.dispose()
+  }
+})
+
+test('CSS2DRenderer and CSS3DRenderer maintain browser DOM overlay state', () => {
+  class FakeElement {}
+
+  function makeElement(tagName, ownerDocument) {
+    const element = new FakeElement()
+    Object.assign(element, {
+      tagName,
+      ownerDocument,
+      style: {},
+      attributes: new Map(),
+      children: [],
+      parentNode: null,
+      setAttribute(name, value) {
+        this.attributes.set(name, value)
+      },
+      appendChild(child) {
+        if (child.parentNode && child.parentNode !== this) child.parentNode.removeChild(child)
+        child.parentNode = this
+        this.children.push(child)
+      },
+      removeChild(child) {
+        this.children = this.children.filter((entry) => entry !== child)
+        child.parentNode = null
+      },
+      remove() {
+        this.parentNode?.removeChild(this)
+      },
+      cloneNode() {
+        return makeElement(tagName, ownerDocument)
+      },
+    })
+    return element
+  }
+
+  function makeDocument() {
+    const document = {
+      defaultView: { Element: FakeElement },
+      createElement(tagName) {
+        return makeElement(tagName, document)
+      },
+    }
+    return document
+  }
+
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const previousDocument = globalThis.document
+
+  try {
+    delete globalThis.document
+    assert.throws(() => new CSS2DObject(), /document is not defined/i)
+    assert.throws(() => new CSS2DRenderer(), /document is not defined/i)
+    assert.throws(() => new CSS3DObject(), /document is not defined/i)
+    assert.throws(() => new CSS3DRenderer(), /document is not defined/i)
+
+    globalThis.document = makeDocument()
+    const scene = new THREE.Scene()
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+    camera.position.z = 3
+    camera.lookAt(0, 0, 0)
+
+    const labelElement = document.createElement('label')
+    const label = new CSS2DObject(labelElement)
+    label.position.set(-0.3, 0.2, 0)
+    scene.add(label)
+
+    const css2d = new CSS2DRenderer()
+    css2d.setSize(100, 50)
+    css2d.render(scene, camera)
+    assert.deepEqual(css2d.getSize(), { width: 100, height: 50 })
+    assert.equal(css2d.domElement.style.width, '100px')
+    assert.equal(css2d.domElement.style.height, '50px')
+    assert.equal(labelElement.parentNode, css2d.domElement)
+    assert.match(labelElement.style.transform, /translate/)
+    assert.equal(labelElement.attributes.get('draggable'), false)
+
+    const panelElement = document.createElement('panel')
+    const panel = new CSS3DObject(panelElement)
+    panel.position.set(0.2, -0.1, 0)
+    const spriteElement = document.createElement('sprite')
+    const sprite = new CSS3DSprite(spriteElement)
+    sprite.position.set(0.1, 0.3, 0)
+    scene.add(panel, sprite)
+
+    const css3d = new CSS3DRenderer()
+    css3d.setSize(120, 90)
+    css3d.render(scene, camera)
+    const viewElement = css3d.domElement.children[0]
+    const cameraElement = viewElement.children[0]
+    assert.deepEqual(css3d.getSize(), { width: 120, height: 90 })
+    assert.equal(css3d.domElement.style.width, '120px')
+    assert.equal(viewElement.style.width, '120px')
+    assert.equal(cameraElement.style.transformStyle, 'preserve-3d')
+    assert.equal(panelElement.parentNode, cameraElement)
+    assert.equal(spriteElement.parentNode, cameraElement)
+    assert.match(panelElement.style.transform, /matrix3d/)
+    assert.match(spriteElement.style.transform, /matrix3d/)
+  } finally {
+    if (hadDocument) {
+      globalThis.document = previousDocument
+    } else {
+      delete globalThis.document
+    }
   }
 })
 
