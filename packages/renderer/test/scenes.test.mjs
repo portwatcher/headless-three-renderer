@@ -156,7 +156,7 @@ function extractCommonBackendMethodNames() {
   return names
 }
 
-function extractCommonClassSurfaceNames(relativePath, className) {
+function extractJsClassSurfaceNames(relativePath, className) {
   const names = new Set()
   const source = extractJsClassBody(threeRendererSource(relativePath), className)
   for (const match of source.matchAll(/^\t(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/gm)) {
@@ -165,6 +165,29 @@ function extractCommonClassSurfaceNames(relativePath, className) {
   for (const match of source.matchAll(/^\tget\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
     names.add(match[1])
   }
+  for (const match of source.matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=/g)) {
+    names.add(match[1])
+  }
+  return names
+}
+
+function extractJsFunctionReturnSurfaceNames(relativePath, functionName) {
+  const names = new Set()
+  const source = extractJsFunctionBody(threeRendererSource(relativePath), functionName)
+  const returnIndex = source.lastIndexOf('\treturn {')
+  const closeIndex = returnIndex >= 0 ? source.indexOf('\n\t};', returnIndex) : -1
+  if (returnIndex < 0 || closeIndex < 0) throw new Error(`Unable to locate Three.js ${functionName} return surface.`)
+
+  const returnedObject = source.slice(returnIndex, closeIndex)
+  for (const match of returnedObject.matchAll(/^\t\t([A-Za-z_$][\w$]*)\s*:/gm)) {
+    names.add(match[1])
+  }
+  return names
+}
+
+function extractJsFunctionThisSurfaceNames(relativePath, functionName) {
+  const names = new Set()
+  const source = extractJsFunctionBody(threeRendererSource(relativePath), functionName)
   for (const match of source.matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=/g)) {
     names.add(match[1])
   }
@@ -35120,11 +35143,11 @@ test('Renderer render lists and node registries track installed CommonRenderer s
   const renderList = renderer.renderLists.get(scene, camera)
 
   for (const [label, names, actual, minimum] of [
-    ['nodes', extractCommonClassSurfaceNames('src/renderers/common/nodes/Nodes.js', 'Nodes'), renderer.nodes, 20],
-    ['library', extractCommonClassSurfaceNames('src/renderers/common/nodes/NodeLibrary.js', 'NodeLibrary'), renderer.library, 8],
-    ['lighting', extractCommonClassSurfaceNames('src/renderers/common/Lighting.js', 'Lighting'), renderer.lighting, 2],
-    ['renderLists', extractCommonClassSurfaceNames('src/renderers/common/RenderLists.js', 'RenderLists'), renderer.renderLists, 4],
-    ['renderList', extractCommonClassSurfaceNames('src/renderers/common/RenderList.js', 'RenderList'), renderList, 10],
+    ['nodes', extractJsClassSurfaceNames('src/renderers/common/nodes/Nodes.js', 'Nodes'), renderer.nodes, 20],
+    ['library', extractJsClassSurfaceNames('src/renderers/common/nodes/NodeLibrary.js', 'NodeLibrary'), renderer.library, 8],
+    ['lighting', extractJsClassSurfaceNames('src/renderers/common/Lighting.js', 'Lighting'), renderer.lighting, 2],
+    ['renderLists', extractJsClassSurfaceNames('src/renderers/common/RenderLists.js', 'RenderLists'), renderer.renderLists, 4],
+    ['renderList', extractJsClassSurfaceNames('src/renderers/common/RenderList.js', 'RenderList'), renderList, 10],
   ]) {
     assert.ok(names.size >= minimum, `Expected to find installed Three.js CommonRenderer ${label} surface names.`)
     const missing = [...names]
@@ -35155,6 +35178,26 @@ test('Renderer render lists and node registries track installed CommonRenderer s
     () => renderer.renderLists.lists.delete('keys'),
     /Renderer\.renderLists\.lists\.delete keys must be a non-empty array of objects/i,
   )
+})
+
+test('Renderer helper objects track installed WebGL and WebXR helper surfaces', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  const renderState = renderer.renderStates.get(scene, 0)
+
+  for (const [label, names, actual, minimum] of [
+    ['properties', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLProperties.js', 'WebGLProperties'), renderer.properties, 4],
+    ['renderStates', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLRenderStates.js', 'WebGLRenderStates'), renderer.renderStates, 2],
+    ['renderState', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLRenderStates.js', 'WebGLRenderState'), renderState, 5],
+    ['shadowMap', extractJsFunctionThisSurfaceNames('src/renderers/webgl/WebGLShadowMap.js', 'WebGLShadowMap'), renderer.shadowMap, 5],
+    ['xr', extractJsClassSurfaceNames('src/renderers/webxr/WebXRManager.js', 'WebXRManager'), renderer.xr, 20],
+  ]) {
+    assert.ok(names.size >= minimum, `Expected to find installed Three.js ${label} helper surface names.`)
+    const missing = [...names]
+      .filter((name) => !objectSurfaceNames(actual).has(name))
+      .sort()
+    assert.deepEqual(missing, [], `Renderer ${label} is missing installed Three.js ${label} helper names: ${missing.join(', ')}`)
+  }
 })
 
 test('Renderer exposes inert WebGLRenderer helper objects', async () => {
