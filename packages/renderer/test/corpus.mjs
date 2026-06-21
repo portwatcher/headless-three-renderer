@@ -66,6 +66,7 @@ export function createSceneCorpus() {
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
     toneMappingStateCorpus(),
+    postProcessingOptionsCorpus(),
     customWgslPremultipliedCorpus(),
     sceneOverrideMaterialCorpus(),
     maskRenderModeCorpus(),
@@ -1075,6 +1076,101 @@ function toneMappingStateCorpus() {
       }
       if (!(stats.agx > 0 && stats.agx < stats.linear - 20 && stats.neutral > 0 && stats.neutral < stats.linear - 5)) {
         throw new Error(`AgX and Neutral tone mapping should produce finite compressed output, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
+function postProcessingOptionsCorpus() {
+  const colorScene = new THREE.Scene()
+  colorScene.background = new THREE.Color(0.25, 0.5, 0.75)
+
+  const redScene = new THREE.Scene()
+  redScene.background = new THREE.Color(1, 0, 0)
+
+  const camera = makeCamera([0, 0, 3])
+  const options = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    toneMapping: THREE.NoToneMapping,
+  }
+  const stats = {}
+
+  function frameMean(rgba) {
+    return meanRegion(rgba, options.width, 0, 0, options.width, options.height)
+  }
+
+  return {
+    name: 'post-processing-options',
+    scene: redScene,
+    camera,
+    options,
+    background: [255, 0, 0],
+    minNonBackgroundRatio: 0.9,
+    browserReference: false,
+    render(renderer) {
+      const base = renderer.render(colorScene, camera, options)
+      stats.base = frameMean(base)
+      stats.exposed = frameMean(renderer.render(colorScene, camera, {
+        ...options,
+        postProcessing: { exposure: 1 },
+      }))
+      stats.contrasted = frameMean(renderer.render(colorScene, camera, {
+        ...options,
+        postProcessing: { contrast: 2 },
+      }))
+      stats.grayscale = frameMean(renderer.render(colorScene, camera, {
+        ...options,
+        postProcessing: { grayscale: true },
+      }))
+      const disabled = renderer.render(colorScene, camera, {
+        ...options,
+        postProcessing: {
+          enabled: false,
+          exposure: 4,
+          contrast: 4,
+          saturation: 0,
+          vignette: 1,
+          grayscale: true,
+          invert: true,
+        },
+      })
+      stats.disabledDiff = meanAbsDiff(base, disabled)
+
+      const vignette = renderer.render(redScene, camera, {
+        ...options,
+        postProcessing: { vignette: 1 },
+      })
+      stats.vignetteCenter = meanRegion(vignette, options.width, 36, 36, 60, 60)
+      stats.vignetteCorner = meanRegion(vignette, options.width, 0, 0, 16, 16)
+
+      const processed = renderer.render(redScene, camera, {
+        ...options,
+        postProcessing: { invert: 1, saturation: 1.5, vignette: 0.25 },
+      })
+      stats.processedCenter = meanRegion(processed, options.width, 36, 36, 60, 60)
+      return processed
+    },
+    validate() {
+      if (!(stats.exposed.r > stats.base.r + 45 && stats.exposed.g > stats.base.g + 80)) {
+        throw new Error(`post-processing exposure should brighten output, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.contrasted.r < stats.base.r - 45 && stats.contrasted.b > stats.base.b + 45)) {
+        throw new Error(`post-processing contrast should expand color values around mid gray, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(Math.max(stats.grayscale.r, stats.grayscale.g, stats.grayscale.b) - Math.min(stats.grayscale.r, stats.grayscale.g, stats.grayscale.b) < 3)) {
+        throw new Error(`post-processing grayscale should equalize color channels, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.disabledDiff < 0.1)) {
+        throw new Error(`postProcessing.enabled=false should bypass effects, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.processedCenter.g > stats.processedCenter.r + 80 && stats.processedCenter.b > stats.processedCenter.r + 80)) {
+        throw new Error(`post-processing invert/saturation should turn red toward cyan, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.vignetteCenter.r > stats.vignetteCorner.r + 180 && stats.vignetteCorner.r < 40)) {
+        throw new Error(`post-processing vignette should darken image corners, stats=${JSON.stringify(stats)}`)
       }
     },
   }

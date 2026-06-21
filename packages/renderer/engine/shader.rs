@@ -2031,7 +2031,9 @@ fn fs_post(input: PostVertexOutput) -> @location(0) vec4<f32> {
   if uniforms.params1.w > 0.0 {
     let centered = input.uv * 2.0 - vec2<f32>(1.0);
     let radius = dot(centered, centered);
-    let vignette = mix(1.0, smoothstep(1.35, 0.15, radius), clamp(uniforms.params1.w, 0.0, 1.0));
+    let edge = clamp((radius - 0.15) / 1.2, 0.0, 1.0);
+    let falloff = edge * edge * (3.0 - 2.0 * edge);
+    let vignette = mix(1.0, 1.0 - falloff, clamp(uniforms.params1.w, 0.0, 1.0));
     color *= vignette;
   }
 
