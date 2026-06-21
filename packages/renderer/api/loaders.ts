@@ -1005,8 +1005,10 @@ function optionalLoadingManager(value: ThreeLoadingManagerLike | null | undefine
   if (typeof (value as any).addHandler !== 'function') {
     throw new TypeError(`${label} must provide an addHandler() function.`)
   }
-  if ((value as any).resolveURL != null && typeof (value as any).resolveURL !== 'function') {
-    throw new TypeError(`${label}.resolveURL must be a function when provided.`)
+  for (const method of ['itemStart', 'itemEnd', 'itemError', 'resolveURL']) {
+    if ((value as any)[method] != null && typeof (value as any)[method] !== 'function') {
+      throw new TypeError(`${label}.${method} must be a function when provided.`)
+    }
   }
   return value
 }

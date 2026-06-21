@@ -582,6 +582,12 @@ test('Node loader helper path and option containers fail clearly', async () => {
     () => createEncodedImageTextureLoader(process.cwd(), { addHandler() {}, resolveURL: 'url' }),
     /manager\.resolveURL must be a function when provided/i,
   )
+  for (const method of ['itemStart', 'itemEnd', 'itemError']) {
+    assert.throws(
+      () => createEncodedImageTextureLoader(process.cwd(), { addHandler() {}, [method]: 'hook' }),
+      new RegExp(`manager\\.${method} must be a function when provided`, 'i'),
+    )
+  }
   assert.throws(
     () => createEncodedImageTextureLoader('https://example.com/assets'),
     /rootDir is not a local directory path/i,
@@ -659,6 +665,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
   await assert.rejects(
     () => createNodeGltfLoader(process.cwd(), { manager: {} }),
     /options\.manager must provide an addHandler\(\) function/i,
+  )
+  await assert.rejects(
+    () => createNodeGltfLoader(process.cwd(), { manager: { addHandler() {}, itemStart: 'hook' } }),
+    /options\.manager\.itemStart must be a function when provided/i,
   )
   await assert.rejects(
     () => loadGltfFromFile(123),
