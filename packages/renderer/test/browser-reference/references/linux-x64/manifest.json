@@ -63,6 +63,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "option-background-texture-controls.png",
+      "name": "option-background-texture-controls",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "two-dimensional-background-texture-transform.png",
       "name": "two-dimensional-background-texture-transform",
       "width": 96,

@@ -824,6 +824,7 @@ function optionBackgroundTextureControlsCorpus() {
     height: CORPUS_RENDER_SIZE,
     format: 'rgba',
     background,
+    backgroundIntensity: 1,
   }
   const samples = {}
 
@@ -834,7 +835,6 @@ function optionBackgroundTextureControlsCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
-    browserReference: false,
     render(renderer) {
       const sharp = renderer.render(scene, camera, options)
       const dimmed = renderer.render(scene, camera, {
