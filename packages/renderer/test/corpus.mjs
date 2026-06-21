@@ -717,7 +717,6 @@ function materialRenderStateNoopCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.1,
-    browserReference: false,
     render(renderer) {
       const baseline = renderPlane(renderer)
       stats.center = meanRegion(baseline, options.width, 32, 32, 64, 64)
