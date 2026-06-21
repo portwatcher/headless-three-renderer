@@ -68,6 +68,8 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js'
 import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
+import { RectAreaLightTexturesLib } from 'three/examples/jsm/lights/RectAreaLightTexturesLib.js'
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { Capsule } from 'three/examples/jsm/math/Capsule.js'
@@ -3556,6 +3558,49 @@ test('RectAreaLightHelper renders supported light visualization geometry', () =>
     )
   } finally {
     helper.dispose()
+  }
+})
+
+test('RectAreaLight examples LTC uniform helpers expose renderable data textures', () => {
+  RectAreaLightUniformsLib.init()
+
+  const ltcFloat = RectAreaLightTexturesLib.LTC_FLOAT_1
+  const ltcHalf = RectAreaLightTexturesLib.LTC_HALF_1
+  assert.equal(THREE.UniformsLib.LTC_FLOAT_1, ltcFloat)
+  assert.equal(THREE.UniformsLib.LTC_HALF_1, ltcHalf)
+  assert.equal(ltcFloat.isDataTexture, true)
+  assert.equal(ltcHalf.isDataTexture, true)
+  assert.equal(ltcFloat.image.width, 64)
+  assert.equal(ltcFloat.image.height, 64)
+  assert.equal(ltcHalf.image.width, 64)
+  assert.equal(ltcHalf.image.height, 64)
+  assert.equal(ltcFloat.type, THREE.FloatType)
+  assert.equal(ltcHalf.type, THREE.HalfFloatType)
+  assert.ok(ltcFloat.image.data instanceof Float32Array)
+  assert.ok(ltcHalf.image.data instanceof Uint16Array)
+
+  const geometry = new THREE.PlaneGeometry(1.6, 1.6)
+  const material = new THREE.MeshBasicMaterial({ map: ltcFloat, side: THREE.DoubleSide })
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.Mesh(geometry, material))
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 64
+    const height = 64
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 20 || g > 20 || b > 20) > 1200,
+      'RectAreaLight LTC data texture should render through regular texture map reads',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
   }
 })
 
