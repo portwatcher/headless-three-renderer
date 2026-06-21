@@ -156,6 +156,35 @@ function extractCommonBackendMethodNames() {
   return names
 }
 
+function extractCommonInfoSurfaceNames() {
+  const names = new Set()
+  const source = extractJsClassBody(threeRendererSource('src/renderers/common/Info.js'), 'Info')
+  for (const match of source.matchAll(/^\t(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    if (!JS_METHOD_DECLARATION_IGNORE.has(match[1])) names.add(match[1])
+  }
+  for (const match of source.matchAll(/^\tget\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    names.add(match[1])
+  }
+  for (const match of source.matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=/g)) {
+    names.add(match[1])
+  }
+  return names
+}
+
+function extractWebGlInfoSurfaceNames() {
+  const names = new Set()
+  const source = threeRendererSource('src/renderers/webgl/WebGLInfo.js')
+  const returnIndex = source.lastIndexOf('\treturn {')
+  const closeIndex = returnIndex >= 0 ? source.indexOf('\n\t};', returnIndex) : -1
+  if (returnIndex < 0 || closeIndex < 0) throw new Error('Unable to locate Three.js WebGLInfo return surface.')
+
+  const returnedObject = source.slice(returnIndex, closeIndex)
+  for (const match of returnedObject.matchAll(/^\t\t([A-Za-z_$][\w$]*)\s*:/gm)) {
+    names.add(match[1])
+  }
+  return names
+}
+
 function extractWebGlStateMethodNames() {
   const names = new Set()
   const source = threeRendererSource('src/renderers/webgl/WebGLState.js')
@@ -37519,6 +37548,20 @@ test('Renderer resetState is a no-op compatibility hook', () => {
   const clear = meanRgba(renderer.render(scene, camera, { width: 32, height: 32, format: 'rgba' }))
   assertRgbClose(clear, [0x20, 0x40, 0x80], 'Renderer resetState should preserve renderer state')
   assert.ok(Math.abs(clear.a - 128) <= 1, `Renderer resetState should preserve renderer clear alpha (${clear.a})`)
+})
+
+test('Renderer.info tracks installed Three info surfaces', () => {
+  const renderer = new Renderer()
+  const infoSurface = objectSurfaceNames(renderer.info)
+
+  for (const [label, names, minimum] of [
+    ['WebGLInfo', extractWebGlInfoSurfaceNames(), 5],
+    ['CommonRenderer Info', extractCommonInfoSurfaceNames(), 8],
+  ]) {
+    assert.ok(names.size >= minimum, `Expected to find installed Three.js ${label} surface names.`)
+    const missing = [...names].filter((name) => !infoSurface.has(name)).sort()
+    assert.deepEqual(missing, [], `Renderer.info is missing installed Three.js ${label} names: ${missing.join(', ')}`)
+  }
 })
 
 test('Renderer info exposes inert compatibility counters', () => {
