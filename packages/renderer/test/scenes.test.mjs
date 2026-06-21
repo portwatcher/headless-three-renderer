@@ -22299,6 +22299,44 @@ test('invalid physical material scalar values fail clearly', () => {
   }
 })
 
+test('invalid physical material color values fail clearly', () => {
+  const cases = [
+    ['sheenColor component', (material) => {
+      material.sheenColor = { isColor: true, r: 1, g: 'warm', b: 0 }
+    }, /material\.sheenColor\.g must be a finite number/i],
+    ['sheenColor container', (material) => {
+      material.sheenColor = 42
+    }, /material\.sheenColor must be a color-like object, CSS color string, or \[r, g, b\]/i],
+    ['attenuationColor component', (material) => {
+      material.attenuationColor = [0.2, Number.NaN, 1]
+    }, /material\.attenuationColor\[1\] must be a finite number/i],
+    ['attenuationColor container', (material) => {
+      material.attenuationColor = {}
+    }, /material\.attenuationColor must be a color-like object, CSS color string, or \[r, g, b\]/i],
+    ['specularColor CSS', (material) => {
+      material.specularColor = 'not-a-color'
+    }, /material\.specularColor "not-a-color" is not a supported CSS color string/i],
+  ]
+
+  for (const [name, mutate, pattern] of cases) {
+    const material = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      sheen: 1,
+      transmission: 1,
+      specularIntensity: 1,
+    })
+    mutate(material)
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material))
+
+    assert.throws(
+      () => renderRgba(scene, makeCamera(), { width: 64, height: 64 }),
+      pattern,
+      `${name} should fail clearly`,
+    )
+  }
+})
+
 test('MeshPhysicalMaterial specular intensity and color affect direct specular', () => {
   function renderMaterial(material) {
     const scene = new THREE.Scene()
