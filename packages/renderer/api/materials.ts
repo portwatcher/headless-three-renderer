@@ -2958,9 +2958,24 @@ function assertSupportedOnBeforeCompile(
 ): void {
   if (customFragmentShader || !hasCustomOnBeforeCompile(material)) return
 
+  if (isThreeCsmPatchedMaterial(material)) {
+    throw new Error(
+      'THREE.CSM material onBeforeCompile customization is not translated by @headless-three/renderer yet. Use regular supported native lights and shadows, pre-bake cascaded shadowing into textures, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer custom material path.',
+    )
+  }
+
   throw new Error(
     'material.onBeforeCompile customizations are not translated by @headless-three/renderer yet. Provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer custom material path.',
   )
+}
+
+function isThreeCsmPatchedMaterial(material: ThreeMaterialLike): boolean {
+  const defines = (material as { defines?: unknown }).defines
+  return defines != null &&
+    typeof defines === 'object' &&
+    !Array.isArray(defines) &&
+    (defines as Record<string, unknown>).USE_CSM != null &&
+    (defines as Record<string, unknown>).CSM_CASCADES != null
 }
 
 function assertSupportedMaterialState(

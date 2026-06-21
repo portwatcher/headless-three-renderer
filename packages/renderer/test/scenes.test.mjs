@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
+import { CSM } from 'three/examples/jsm/csm/CSM.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
@@ -2459,6 +2460,30 @@ test('GPUComputationRenderer stops at conservative vertex texture support detect
   gpuCompute.addVariable('textureState', 'void main() { gl_FragColor = vec4( 1.0 ); }', initialState)
   assert.equal(gpuCompute.init(), 'No support for vertex shader textures.')
   gpuCompute.dispose()
+})
+
+test('CSM material shader injection fails clearly', () => {
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const csm = new CSM({
+    camera,
+    parent: scene,
+    cascades: 2,
+    shadowMapSize: 16,
+  })
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff })
+  csm.setupMaterial(material)
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material))
+
+  try {
+    assert.throws(
+      () => renderRgba(scene, camera, { width: 16, height: 16 }),
+      /CSM material onBeforeCompile customization.*not translated.*native lights and shadows.*fragmentWgsl/i,
+    )
+  } finally {
+    csm.dispose()
+    csm.remove()
+  }
 })
 
 test('ProgressiveLightMap internal shader rewrite fails clearly', () => {
