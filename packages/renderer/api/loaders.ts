@@ -176,7 +176,7 @@ export class EncodedImageTextureLoader {
   }
 
   setPath(loaderPath: string): this {
-    this.loaderPath = requiredString(loaderPath, 'loaderPath')
+    this.loaderPath = validatedTextureLoaderPath(loaderPath, 'loaderPath')
     return this
   }
 
@@ -453,6 +453,15 @@ function resolveTextureLoaderSource(url: string, loaderPath: string): string {
     return new URL(url, ensureDirectoryUrl(loaderPath)).href
   }
   return path.join(loaderPath, url)
+}
+
+function validatedTextureLoaderPath(loaderPath: unknown, label: string): string {
+  const value = requiredString(loaderPath, label)
+  if (!value || path.isAbsolute(value) || path.win32.isAbsolute(value) || /^file:/i.test(value)) return value
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    throw new Error(`${label} is not a local directory path: ${value}`)
+  }
+  return value
 }
 
 function resolveLoadingManagerUrl(manager: ThreeLoadingManagerLike | undefined, url: string): string {

@@ -599,6 +599,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
     /loaderPath must be a string/i,
   )
   assert.throws(
+    () => imageLoader.setPath('https://example.com/assets/'),
+    /loaderPath is not a local directory path/i,
+  )
+  assert.throws(
     () => imageLoader.load(123),
     /url must be a string/i,
   )
