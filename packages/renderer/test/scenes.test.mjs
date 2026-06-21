@@ -15,6 +15,8 @@ import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffec
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { DebugEnvironment } from 'three/examples/jsm/environments/DebugEnvironment.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { BoxLineGeometry } from 'three/examples/jsm/geometries/BoxLineGeometry.js'
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
@@ -3366,6 +3368,36 @@ test('GroundedSkybox renders generated textured sky geometry', () => {
     skybox.geometry.dispose()
     skybox.material.dispose()
     texture.dispose()
+  }
+})
+
+test('examples DebugEnvironment and RoomEnvironment render generated scene geometry', () => {
+  for (const [label, Environment, minVisibleRatio] of [
+    ['DebugEnvironment', DebugEnvironment, 0.9],
+    ['RoomEnvironment', RoomEnvironment, 0.75],
+  ]) {
+    const scene = new Environment()
+    scene.background = new THREE.Color(0x000000)
+
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100)
+    camera.position.set(0, 2, 12)
+    camera.lookAt(0, 2, 0)
+    camera.updateMatrixWorld(true)
+
+    try {
+      const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+      const mean = meanRgba(rgba)
+      assert.ok(
+        nonBackgroundRatio(rgba, [0, 0, 0], 3) > minVisibleRatio,
+        `${label} should render substantial generated environment geometry`,
+      )
+      assert.ok(
+        mean.r > 40 && mean.g > 40 && mean.b > 40,
+        `${label} should render lit built-in materials (${mean.r}, ${mean.g}, ${mean.b})`,
+      )
+    } finally {
+      scene.dispose?.()
+    }
   }
 })
 
