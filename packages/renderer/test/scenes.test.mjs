@@ -50,11 +50,16 @@ import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { Capsule } from 'three/examples/jsm/math/Capsule.js'
 import { ColorConverter } from 'three/examples/jsm/math/ColorConverter.js'
+import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js'
 import { ImprovedNoise } from 'three/examples/jsm/math/ImprovedNoise.js'
 import { Lut } from 'three/examples/jsm/math/Lut.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
+import { OBB } from 'three/examples/jsm/math/OBB.js'
+import { Octree } from 'three/examples/jsm/math/Octree.js'
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js'
+import { ConvexObjectBreaker } from 'three/examples/jsm/misc/ConvexObjectBreaker.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
 import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
@@ -3362,6 +3367,108 @@ test('OctreeHelper renders generated box line geometry', () => {
   }
 })
 
+test('examples collision math utilities produce renderable helper geometry', () => {
+  const sourceGeometry = new THREE.BoxGeometry(0.6, 0.42, 0.36).toNonIndexed()
+  const sourceMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
+  const sourceMesh = new THREE.Mesh(sourceGeometry, sourceMaterial)
+  sourceMesh.rotation.set(0.15, 0.3, -0.1)
+  sourceMesh.updateMatrixWorld(true)
+
+  const octree = new Octree().fromGraphNode(sourceMesh)
+  const octreeHelper = new OctreeHelper(octree, 0xffff00)
+  octreeHelper.position.x = -1.05
+
+  const capsule = new Capsule(
+    new THREE.Vector3(-0.15, -0.65, 0),
+    new THREE.Vector3(0.15, 0.65, 0),
+    0.2,
+  )
+  const capsuleGeometry = new THREE.BufferGeometry().setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([
+      capsule.start.x, capsule.start.y, capsule.start.z,
+      capsule.end.x, capsule.end.y, capsule.end.z,
+    ], 3),
+  )
+  const capsuleMaterial = new THREE.LineBasicMaterial({ color: 0xff44ff, linewidth: 6 })
+  const capsuleLine = new THREE.LineSegments(capsuleGeometry, capsuleMaterial)
+  capsuleLine.position.x = 1.05
+
+  const obb = new OBB().fromBox3(octree.box)
+  const obbSize = obb.getSize(new THREE.Vector3())
+  const obbGeometry = new THREE.BoxGeometry(obbSize.x, obbSize.y, obbSize.z)
+  const obbMaterial = new THREE.MeshBasicMaterial({ color: 0x0044ff, side: THREE.DoubleSide })
+  const obbMesh = new THREE.Mesh(obbGeometry, obbMaterial)
+  obbMesh.position.copy(obb.center)
+  obbMesh.position.y = -0.72
+
+  const hull = new ConvexHull().setFromObject(sourceMesh)
+  const hullPositions = []
+  for (const face of hull.faces) {
+    let edge = face.edge
+    do {
+      const a = edge.tail().point
+      const b = edge.head().point
+      hullPositions.push(a.x, a.y, a.z, b.x, b.y, b.z)
+      edge = edge.next
+    } while (edge !== face.edge)
+  }
+  const hullGeometry = new THREE.BufferGeometry().setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute(hullPositions, 3),
+  )
+  const hullMaterial = new THREE.LineBasicMaterial({ color: 0x44ffcc, linewidth: 5 })
+  const hullLine = new THREE.LineSegments(hullGeometry, hullMaterial)
+  hullLine.position.y = 0.72
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(octreeHelper, capsuleLine, obbMesh, hullLine)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 88
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(octree.subTrees.length > 0, 'Octree.fromGraphNode should build visible helper boxes')
+    assert.ok(octree.box.intersectsBox(new THREE.Box3().setFromObject(sourceMesh)))
+    assert.ok(capsule.intersectsBox(octree.box), 'Capsule should intersect the Octree bounds')
+    assert.ok(obb.containsPoint(octree.box.getCenter(new THREE.Vector3())), 'OBB should contain the Octree center')
+    assert.ok(hull.faces.length > 0, 'ConvexHull.setFromObject should build hull faces')
+    assert.ok(hull.containsPoint(sourceMesh.position), 'ConvexHull should contain the source mesh center')
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 130 && b < 80) > 20,
+      'Octree helper boxes should render yellow line pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 44, width, height, (r, g, b) => b > 120 && r < 80 && g < 120) > 120,
+      'OBB-derived mesh should render blue pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 180 && b > 160 && g > r + 40 && b > r + 20) > 20,
+      'ConvexHull-derived line segments should render cyan pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && b > 120 && g < 120) > 10,
+      'Capsule segment should render magenta line pixels',
+    )
+  } finally {
+    sourceGeometry.dispose()
+    sourceMaterial.dispose()
+    octreeHelper.dispose()
+    capsuleGeometry.dispose()
+    capsuleMaterial.dispose()
+    obbGeometry.dispose()
+    obbMaterial.dispose()
+    hullGeometry.dispose()
+    hullMaterial.dispose()
+  }
+})
+
 test('core Three helpers render supported line and basic material geometry', () => {
   const makeCameraForHelper = () => {
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
@@ -4157,6 +4264,65 @@ test('examples geometry modifiers and BufferGeometryUtils render CPU-transformed
     mergeRightGeometry.dispose()
     mergedGeometry.dispose()
     mergedMaterial.dispose()
+  }
+})
+
+test('examples ConvexObjectBreaker cuts debris into renderable mesh geometry', () => {
+  const sourceGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.4).toNonIndexed()
+  const sourceMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+  const source = new THREE.Mesh(sourceGeometry, sourceMaterial)
+  const breaker = new ConvexObjectBreaker(0.05)
+  breaker.prepareBreakableObject(source, 2, new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), true)
+
+  const output = {}
+  const pieces = breaker.cutByPlane(source, new THREE.Plane(new THREE.Vector3(1, 0, 0), 0), output)
+  const leftPiece = output.object1
+  const rightPiece = output.object2
+  const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff4455, side: THREE.DoubleSide })
+  const cyanMaterial = new THREE.MeshBasicMaterial({ color: 0x44e8ff, side: THREE.DoubleSide })
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+
+  try {
+    assert.equal(pieces, 2)
+    assert.ok(leftPiece?.isMesh)
+    assert.ok(rightPiece?.isMesh)
+    assert.equal(leftPiece.userData.mass, 1)
+    assert.equal(rightPiece.userData.mass, 1)
+    assert.equal(leftPiece.userData.breakable, true)
+    assert.equal(rightPiece.userData.breakable, true)
+    assert.ok(leftPiece.geometry.getAttribute('position').count > 12)
+    assert.ok(rightPiece.geometry.getAttribute('position').count > 12)
+
+    leftPiece.material = redMaterial
+    rightPiece.material = cyanMaterial
+    scene.add(leftPiece, rightPiece)
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 140 && b < 140) > 150,
+      'ConvexObjectBreaker negative-side debris should render red pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && b > 120 && b > r + 30 && g > r + 30) > 150,
+      'ConvexObjectBreaker positive-side debris should render cyan pixels',
+    )
+  } finally {
+    sourceGeometry.dispose()
+    sourceMaterial.dispose()
+    leftPiece?.geometry?.dispose()
+    rightPiece?.geometry?.dispose()
+    redMaterial.dispose()
+    cyanMaterial.dispose()
   }
 })
 
