@@ -3219,6 +3219,23 @@ test('examples WebGL and WebGPU capability helpers expose browser-context bounda
   }
 })
 
+test('examples Addons barrel imports in Node and exposes covered helper modules', async () => {
+  const Addons = await import('three/examples/jsm/Addons.js')
+
+  assert.ok(Object.keys(Addons).length > 250)
+  assert.equal(Addons.WebGL, WebGL)
+  assert.equal(Addons.AnimationClipCreator, AnimationClipCreator)
+  assert.equal(Addons.CCDIKSolver, CCDIKSolver)
+  assert.equal(Addons.CSS2DRenderer, CSS2DRenderer)
+  assert.equal(Addons.CSS3DRenderer, CSS3DRenderer)
+  assert.equal(Addons.Projector, Projector)
+  assert.equal(Addons.SVGRenderer, SVGRenderer)
+  assert.equal(Addons.Pass, Pass)
+  assert.equal(Addons.FullScreenQuad, FullScreenQuad)
+  assert.equal(Addons.FlakesTexture, FlakesTexture)
+  assert.equal(Addons.WorkerPool, WorkerPool)
+})
+
 test('Projector produces CPU render data for supported scene objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
