@@ -105,6 +105,7 @@ import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 import { hilbert2D } from 'three/examples/jsm/utils/GeometryUtils.js'
 import { LDrawUtils } from 'three/examples/jsm/utils/LDrawUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
+import { SceneOptimizer } from 'three/examples/jsm/utils/SceneOptimizer.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
@@ -4219,6 +4220,62 @@ test('examples SceneUtils and MeshSurfaceSampler produce renderable scene data',
     sampleSource.material.dispose()
     pointsGeometry.dispose()
     pointsMaterial.dispose()
+  }
+})
+
+test('examples SceneOptimizer batches compatible meshes into renderable BatchedMesh output', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const colors = [0xff4455, 0x44ff66, 0x4488ff]
+  const positions = [-0.55, 0, 0.55]
+  for (let i = 0; i < colors.length; i += 1) {
+    const geometry = new THREE.BoxGeometry(0.28, 0.28, 0.28)
+    const material = new THREE.MeshBasicMaterial({ color: colors[i], side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.name = `optimizer-piece-${i}`
+    mesh.position.x = positions[i]
+    scene.add(mesh)
+  }
+
+  const optimizedScene = new SceneOptimizer(scene).toBatchedMesh()
+  const batchedMesh = optimizedScene.children.find((child) => child.isBatchedMesh)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(optimizedScene, camera, { width, height })
+
+    assert.strictEqual(optimizedScene, scene)
+    assert.equal(optimizedScene.children.length, 1, 'SceneOptimizer should replace compatible meshes with one batch')
+    assert.ok(batchedMesh?.isBatchedMesh, 'SceneOptimizer should create a BatchedMesh')
+    assert.equal(batchedMesh.name, 'optimizer-piece-0_batch')
+    assert.equal(batchedMesh._maxInstanceCount, 3)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 140) > 150,
+      'SceneOptimizer BatchedMesh should render red instance pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 150 && g > r + 30 && g > b + 20) > 150,
+      'SceneOptimizer BatchedMesh should render green instance pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && r < 120 && g < 170) > 150,
+      'SceneOptimizer BatchedMesh should render blue instance pixels',
+    )
+  } finally {
+    for (const child of optimizedScene.children) {
+      child.geometry?.dispose()
+      if (Array.isArray(child.material)) {
+        for (const material of child.material) material.dispose()
+      } else {
+        child.material?.dispose()
+      }
+    }
   }
 })
 
