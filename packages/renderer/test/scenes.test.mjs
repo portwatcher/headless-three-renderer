@@ -106,6 +106,23 @@ function extractJsClassBody(source, className) {
   throw new Error(`Unable to locate the end of Three.js class ${className}.`)
 }
 
+function extractJsFunctionBody(source, functionName) {
+  const match = new RegExp(`function\\s+${functionName}\\b`).exec(source)
+  if (!match) throw new Error(`Unable to locate Three.js function ${functionName}.`)
+
+  const open = source.indexOf('{', match.index)
+  let depth = 0
+  for (let index = open; index < source.length; index += 1) {
+    const character = source[index]
+    if (character === '{') depth += 1
+    if (character === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open + 1, index)
+    }
+  }
+  throw new Error(`Unable to locate the end of Three.js function ${functionName}.`)
+}
+
 function extractWebGlRendererMethodNames() {
   const names = new Set()
   const source = threeRendererSource('src/renderers/WebGLRenderer.js')
@@ -127,6 +144,29 @@ function extractCommonRendererMethodNames() {
   return names
 }
 
+function extractWebGlStateMethodNames() {
+  const names = new Set()
+  const source = threeRendererSource('src/renderers/webgl/WebGLState.js')
+  const returnIndex = source.lastIndexOf('\treturn {')
+  const closeIndex = returnIndex >= 0 ? source.indexOf('\n\t};', returnIndex) : -1
+  if (returnIndex < 0 || closeIndex < 0) throw new Error('Unable to locate Three.js WebGLState return surface.')
+
+  const returnedObject = source.slice(returnIndex, closeIndex)
+  for (const match of returnedObject.matchAll(/^\t\t([A-Za-z_$][\w$]*)\s*:/gm)) {
+    names.add(match[1])
+  }
+  return names
+}
+
+function extractWebGlStateBufferMethodNames(bufferFunctionName) {
+  const names = new Set()
+  const source = extractJsFunctionBody(threeRendererSource('src/renderers/webgl/WebGLState.js'), bufferFunctionName)
+  for (const match of source.matchAll(/^\t\t\t([A-Za-z_$][\w$]*)\s*:/gm)) {
+    names.add(match[1])
+  }
+  return names
+}
+
 function rendererPrototypeSurfaceNames() {
   const names = new Set()
   for (const name of Object.getOwnPropertyNames(Renderer.prototype)) {
@@ -135,6 +175,22 @@ function rendererPrototypeSurfaceNames() {
     if (typeof descriptor?.value === 'function' || descriptor?.get || descriptor?.set) {
       names.add(name)
     }
+  }
+  return names
+}
+
+function objectSurfaceNames(object) {
+  const names = new Set(Object.keys(object))
+  let prototype = Object.getPrototypeOf(object)
+  while (prototype && prototype !== Object.prototype) {
+    for (const name of Object.getOwnPropertyNames(prototype)) {
+      if (name === 'constructor') continue
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, name)
+      if (typeof descriptor?.value === 'function' || descriptor?.get || descriptor?.set) {
+        names.add(name)
+      }
+    }
+    prototype = Object.getPrototypeOf(prototype)
   }
   return names
 }
@@ -34956,6 +35012,34 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.equal(rgba.length, 40 * 20 * 4)
   const mean = meanRegion(rgba, 40, 20, 12, 6, 28, 14)
   assert.ok(mean.r > mean.b + 80, `domElement size mirroring should preserve normal rendering (${mean.r} vs ${mean.b})`)
+})
+
+test('Renderer.state tracks the installed WebGLState method surface', () => {
+  const renderer = new Renderer()
+  const webGlStateMethods = extractWebGlStateMethodNames()
+  assert.ok(webGlStateMethods.size > 20, 'Expected to find installed Three.js WebGLState methods.')
+
+  const missingStateMethods = [...webGlStateMethods]
+    .filter((methodName) => !objectSurfaceNames(renderer.state).has(methodName))
+    .sort()
+  assert.deepEqual(missingStateMethods, [], `Renderer.state is missing installed Three.js WebGLState methods: ${missingStateMethods.join(', ')}`)
+
+  for (const [label, functionName, stateBuffer] of [
+    ['color', 'ColorBuffer', renderer.state.buffers.color],
+    ['depth', 'DepthBuffer', renderer.state.buffers.depth],
+    ['stencil', 'StencilBuffer', renderer.state.buffers.stencil],
+  ]) {
+    const webGlBufferMethods = extractWebGlStateBufferMethodNames(functionName)
+    assert.ok(webGlBufferMethods.size > 3, `Expected to find installed Three.js WebGLState ${label} buffer methods.`)
+    const missingBufferMethods = [...webGlBufferMethods]
+      .filter((methodName) => !objectSurfaceNames(stateBuffer).has(methodName))
+      .sort()
+    assert.deepEqual(
+      missingBufferMethods,
+      [],
+      `Renderer.state.buffers.${label} is missing installed Three.js WebGLState ${label} buffer methods: ${missingBufferMethods.join(', ')}`,
+    )
+  }
 })
 
 test('Renderer exposes inert WebGLRenderer helper objects', async () => {
