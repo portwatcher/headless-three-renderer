@@ -2959,6 +2959,11 @@ test('core Three helpers render supported line and basic material geometry', () 
       return new THREE.HemisphereLightHelper(light, 0.45)
     }],
   ]
+  assert.deepEqual(
+    helperCases.map(([label]) => label).sort(),
+    Object.keys(THREE).filter((name) => name.endsWith('Helper')).sort(),
+    'core helper coverage should track installed Three.js helper exports',
+  )
 
   for (const [label, makeHelper] of helperCases) {
     const helper = makeHelper()
