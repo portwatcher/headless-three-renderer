@@ -4,52 +4,22 @@ import { performance } from 'node:perf_hooks'
 import * as THREE from 'three'
 import { Renderer } from '../dist/index.js'
 
+const PROFILE_MODES = ['mixed', 'transform', 'material', 'static', 'instanced']
+
 const options = parseArgs(process.argv.slice(2))
 if (options.help) {
   printHelp()
   process.exit(0)
 }
 
-const renderer = new Renderer()
-const { scene, camera, meshes, materials } = createScene(options)
-const renderOptions = {
-  width: options.width,
-  height: options.height,
-  format: 'rgba',
-  outputColorSpace: THREE.LinearSRGBColorSpace,
-}
-
-let checksum = 0
-for (let frame = 0; frame < options.warmup; frame += 1) {
-  updateScene(scene, meshes, materials, frame)
-  const rgba = renderer.render(scene, camera, renderOptions)
-  checksum = updateChecksum(checksum, rgba)
-}
-
-const startMemory = process.memoryUsage()
-const frameTimes = []
-const totalStart = performance.now()
-for (let frame = 0; frame < options.frames; frame += 1) {
-  updateScene(scene, meshes, materials, frame + options.warmup)
-  const start = performance.now()
-  const rgba = renderer.render(scene, camera, renderOptions)
-  frameTimes.push(performance.now() - start)
-  checksum = updateChecksum(checksum, rgba)
-}
-const totalMs = performance.now() - totalStart
-const endMemory = process.memoryUsage()
-
-const summary = summarize({
-  options,
-  frameTimes,
-  totalMs,
-  checksum,
-  startMemory,
-  endMemory,
-})
+const summary = options.allModes
+  ? runAllModes(options)
+  : runProfile(options)
 
 if (options.json) {
   console.log(JSON.stringify(summary, null, 2))
+} else if (options.allModes) {
+  printAllModesSummary(summary)
 } else {
   printSummary(summary)
 }
@@ -62,6 +32,7 @@ function parseArgs(args) {
     width: 128,
     height: 128,
     mode: 'mixed',
+    allModes: false,
     json: false,
     help: false,
   }
@@ -78,6 +49,10 @@ function parseArgs(args) {
       parsed.json = true
       continue
     }
+    if (arg === '--all-modes') {
+      parsed.allModes = true
+      continue
+    }
 
     const match = arg.match(/^--([a-z-]+)=(.+)$/)
     if (!match) {
@@ -85,6 +60,10 @@ function parseArgs(args) {
     }
     const [, name, rawValue] = match
     if (name === 'mode') {
+      if (rawValue === 'all') {
+        parsed.allModes = true
+        continue
+      }
       parsed.mode = profileMode(rawValue)
       continue
     }
@@ -100,10 +79,10 @@ function parseArgs(args) {
 }
 
 function profileMode(value) {
-  if (['mixed', 'transform', 'material', 'static', 'instanced'].includes(value)) {
+  if (PROFILE_MODES.includes(value)) {
     return value
   }
-  throw new Error('--mode must be "mixed", "transform", "material", "static", or "instanced".')
+  throw new Error('--mode must be "mixed", "transform", "material", "static", "instanced", or "all".')
 }
 
 function positiveInteger(value, label) {
@@ -120,6 +99,66 @@ function nonNegativeInteger(value, label) {
     throw new Error(`${label} must be a non-negative integer.`)
   }
   return parsed
+}
+
+function runAllModes(options) {
+  const profiles = PROFILE_MODES.map((mode) => runProfile({ ...options, mode, allModes: false }))
+  const byMeanFrame = [...profiles].sort((a, b) => a.meanFrameMs - b.meanFrameMs)
+  return {
+    frames: options.frames,
+    warmupFrames: options.warmup,
+    meshes: options.meshes,
+    width: options.width,
+    height: options.height,
+    modes: PROFILE_MODES,
+    fastestMode: byMeanFrame[0].mode,
+    slowestMode: byMeanFrame[byMeanFrame.length - 1].mode,
+    profiles,
+  }
+}
+
+function runProfile(options) {
+  const renderer = new Renderer()
+  try {
+    const { scene, camera, meshes, materials } = createScene(options)
+    const renderOptions = {
+      width: options.width,
+      height: options.height,
+      format: 'rgba',
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    }
+
+    let checksum = 0
+    for (let frame = 0; frame < options.warmup; frame += 1) {
+      updateScene(scene, meshes, materials, frame, options)
+      const rgba = renderer.render(scene, camera, renderOptions)
+      checksum = updateChecksum(checksum, rgba)
+    }
+
+    const startMemory = process.memoryUsage()
+    const frameTimes = []
+    const totalStart = performance.now()
+    for (let frame = 0; frame < options.frames; frame += 1) {
+      updateScene(scene, meshes, materials, frame + options.warmup, options)
+      const start = performance.now()
+      const rgba = renderer.render(scene, camera, renderOptions)
+      frameTimes.push(performance.now() - start)
+      checksum = updateChecksum(checksum, rgba)
+    }
+    const totalMs = performance.now() - totalStart
+    const endMemory = process.memoryUsage()
+
+    return summarize({
+      options,
+      frameTimes,
+      totalMs,
+      checksum,
+      startMemory,
+      endMemory,
+    })
+  } finally {
+    renderer.dispose?.()
+  }
 }
 
 function createScene(options) {
@@ -261,7 +300,7 @@ function createInstancedScene(instanceCount) {
   return { scene, camera, meshes: [mesh], materials: [material] }
 }
 
-function updateScene(scene, meshes, materials, frame) {
+function updateScene(scene, meshes, materials, frame, options) {
   const time = frame * 0.071
   if (options.mode === 'instanced') {
     const mesh = meshes[0]
@@ -346,6 +385,15 @@ function printSummary(summary) {
   console.log(`min=${summary.minFrameMs}ms max=${summary.maxFrameMs}ms rssDelta=${summary.rssDeltaMb}MB heapDelta=${summary.heapUsedDeltaMb}MB checksum=${summary.checksum}`)
 }
 
+function printAllModesSummary(summary) {
+  console.log('Animated scene profile')
+  console.log(`frames=${summary.frames} warmup=${summary.warmupFrames} meshes=${summary.meshes} size=${summary.width}x${summary.height} modes=all`)
+  for (const profile of summary.profiles) {
+    console.log(`${profile.mode.padEnd(9)} total=${profile.totalMs}ms mean=${profile.meanFrameMs}ms median=${profile.medianFrameMs}ms p95=${profile.p95FrameMs}ms rssDelta=${profile.rssDeltaMb}MB checksum=${profile.checksum}`)
+  }
+  console.log(`fastest=${summary.fastestMode} slowest=${summary.slowestMode}`)
+}
+
 function printHelp() {
   console.log(`Usage: pnpm -C packages/renderer run profile:animated -- [options]
 
@@ -355,7 +403,8 @@ Options:
   --meshes=N   Animated mesh count, or instance count for --mode=instanced. Default: 256
   --width=N    Output width in pixels. Default: 128
   --height=N   Output height in pixels. Default: 128
-  --mode=NAME  Workload: mixed, transform, material, static, or instanced. Default: mixed
+  --mode=NAME  Workload: mixed, transform, material, static, instanced, or all. Default: mixed
+  --all-modes  Run every workload mode with the same settings.
   --json       Print machine-readable JSON.
   --help       Show this message.
 `)

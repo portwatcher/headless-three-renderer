@@ -191,6 +191,11 @@ test('animated-scene profiler stays exposed as a package script', async () => {
   )
   assert.match(
     profileScript,
+    /--all-modes/,
+    'profile:animated should document same-settings all-mode profile runs',
+  )
+  assert.match(
+    profileScript,
     /mixed.*transform.*material.*static.*instanced/s,
     'profile:animated should keep mixed, transform, material, static, and instanced workload modes available',
   )
