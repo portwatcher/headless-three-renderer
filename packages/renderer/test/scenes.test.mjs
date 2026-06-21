@@ -35186,6 +35186,8 @@ test('Renderer helper objects track installed WebGL and WebXR helper surfaces', 
   const renderState = renderer.renderStates.get(scene, 0)
 
   for (const [label, names, actual, minimum] of [
+    ['extensions', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLExtensions.js', 'WebGLExtensions'), renderer.extensions, 3],
+    ['capabilities', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLCapabilities.js', 'WebGLCapabilities'), renderer.capabilities, 10],
     ['properties', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLProperties.js', 'WebGLProperties'), renderer.properties, 4],
     ['renderStates', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLRenderStates.js', 'WebGLRenderStates'), renderer.renderStates, 2],
     ['renderState', extractJsFunctionReturnSurfaceNames('src/renderers/webgl/WebGLRenderStates.js', 'WebGLRenderState'), renderState, 5],
