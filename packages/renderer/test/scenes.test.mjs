@@ -91,6 +91,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
 import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader.js'
 import { VTKLoader } from 'three/examples/jsm/loaders/VTKLoader.js'
@@ -6822,6 +6823,57 @@ test('examples MTLLoader parses material libraries for renderable mesh paths', (
   } finally {
     geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples RGBELoader parses HDR buffers into renderable DataTexture payloads', () => {
+  const header = new TextEncoder().encode([
+    '#?RADIANCE',
+    'FORMAT=32-bit_rle_rgbe',
+    '-Y 1 +X 2',
+    '',
+  ].join('\n'))
+  const buffer = new Uint8Array(header.length + 8)
+  buffer.set(header)
+  buffer.set([
+    255, 0, 0, 128,
+    0, 255, 0, 128,
+  ], header.length)
+  const texData = new RGBELoader().setDataType(THREE.FloatType).parse(buffer.buffer)
+  const texture = new THREE.DataTexture(texData.data, texData.width, texData.height, THREE.RGBAFormat, texData.type)
+  texture.colorSpace = THREE.LinearSRGBColorSpace
+  texture.needsUpdate = true
+  const geometry = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({ map: texture })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    assert.equal(texData.width, 2)
+    assert.equal(texData.height, 1)
+    assert.equal(texData.type, THREE.FloatType)
+    assert.ok(texData.data instanceof Float32Array)
+    assert.deepEqual(Array.from(texData.data), [
+      1, 0, 0, 1,
+      0, 1, 0, 1,
+    ])
+    assert.match(texData.header, /FORMAT=32-bit_rle_rgbe/)
+    assert.ok(
+      nonBackgroundRatio(renderRgba(scene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.12,
+      'RGBELoader-decoded DataTexture should render visible HDR texture pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
+    texture.dispose()
   }
 })
 
