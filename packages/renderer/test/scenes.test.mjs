@@ -8,6 +8,8 @@ import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { AnimationClipCreator } from 'three/examples/jsm/animation/AnimationClipCreator.js'
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
+import { ArcballControls } from 'three/examples/jsm/controls/ArcballControls.js'
+import { DragControls } from 'three/examples/jsm/controls/DragControls.js'
 import { FirstPersonControls } from 'three/examples/jsm/controls/FirstPersonControls.js'
 import { FlyControls } from 'three/examples/jsm/controls/FlyControls.js'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
@@ -6290,6 +6292,66 @@ test('examples camera controls drive renderable still-frame camera and helper st
   pointerLock.moveRight(0.25)
   assert.ok(pointerCamera.position.z < 2.6 && pointerCamera.position.x > 0.2, 'PointerLockControls should move the camera on the XZ plane')
 
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
+  const previousWindow = globalThis.window
+  globalThis.window = {
+    devicePixelRatio: 1,
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  const arcballScene = new THREE.Scene()
+  arcballScene.background = new THREE.Color(0x000000)
+  const arcballCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  arcballCamera.position.set(0, 0, 4)
+  arcballCamera.lookAt(0, 0, 0)
+  arcballCamera.updateMatrixWorld(true)
+  const arcballDom = {
+    style: {},
+    addEventListener() {},
+    removeEventListener() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 100, height: 100 }
+    },
+  }
+  const arcball = new ArcballControls(arcballCamera, arcballDom, arcballScene)
+  arcball.setGizmosVisible(true)
+  arcball.update()
+  arcballScene.updateMatrixWorld(true)
+
+  const dragScene = new THREE.Scene()
+  dragScene.background = new THREE.Color(0x000000)
+  const dragCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  dragCamera.position.set(0, 0, 3)
+  dragCamera.lookAt(0, 0, 0)
+  dragCamera.updateMatrixWorld(true)
+  const dragGeometry = new THREE.PlaneGeometry(0.25, 0.25)
+  const dragMaterial = new THREE.MeshBasicMaterial({ color: 0x33ff66, side: THREE.DoubleSide })
+  const draggable = new THREE.Mesh(dragGeometry, dragMaterial)
+  dragScene.add(draggable)
+  dragScene.updateMatrixWorld(true)
+  const dragListeners = new Map()
+  const dragDom = {
+    style: {},
+    addEventListener(type, listener) {
+      dragListeners.set(type, listener)
+    },
+    removeEventListener() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 100, height: 100 }
+    },
+  }
+  const drag = new DragControls([draggable], dragCamera, dragDom)
+  const dragEvents = []
+  drag.addEventListener('dragstart', (event) => dragEvents.push(event.type))
+  drag.addEventListener('drag', (event) => dragEvents.push(event.type))
+  drag.addEventListener('dragend', (event) => dragEvents.push(event.type))
+  dragListeners.get('pointerdown')({ clientX: 50, clientY: 50, pointerType: 'mouse', button: 0 })
+  dragListeners.get('pointermove')({ clientX: 70, clientY: 50, pointerType: 'mouse', button: 0 })
+  dragListeners.get('pointerup')({})
+  dragScene.updateMatrixWorld(true)
+  assert.deepEqual(dragEvents, ['dragstart', 'drag', 'dragend'])
+  assert.ok(draggable.position.x > 0.35, 'DragControls pointer listeners should move selected objects')
+
   const transformCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
   transformCamera.position.set(0, 0, 4)
   transformCamera.lookAt(0, 0, 0)
@@ -6318,6 +6380,8 @@ test('examples camera controls drive renderable still-frame camera and helper st
     const width = 128
     const height = 96
     const controlsRgba = renderRgba(scene, orbitCamera, { width, height })
+    const arcballRgba = renderRgba(arcballScene, arcballCamera, { width, height })
+    const dragRgba = renderRgba(dragScene, dragCamera, { width, height })
     const helperRgba = renderRgba(transformScene, transformCamera, { width, height })
 
     assert.ok(
@@ -6325,15 +6389,32 @@ test('examples camera controls drive renderable still-frame camera and helper st
       'OrbitControls-targeted camera should render the red target mesh',
     )
     assert.ok(
+      countRegionPixels(arcballRgba, width, height, 0, 0, width, height, (r, g, b) => r > 20 || g > 20 || b > 20) > 250,
+      'ArcballControls should render built-in gizmo geometry',
+    )
+    assert.ok(
+      countRegionPixels(dragRgba, width, height, width / 2, 0, width, height, (r, g, b) => g > 180 && g > r + 50 && b < 170) > 100,
+      'DragControls-moved object should render on the right side',
+    )
+    assert.ok(
       countRegionPixels(helperRgba, width, height, 0, 0, width, height, (r, g, b) => r > 20 || g > 20 || b > 20) > 80,
       'TransformControls helper should render built-in transform gizmo geometry',
     )
   } finally {
+    arcball.dispose()
+    drag.dispose()
+    if (hadWindow) {
+      globalThis.window = previousWindow
+    } else {
+      delete globalThis.window
+    }
     transformControls.dispose()
     redGeometry.dispose()
     redMaterial.dispose()
     blueGeometry.dispose()
     blueMaterial.dispose()
+    dragGeometry.dispose()
+    dragMaterial.dispose()
     transformTargetGeometry.dispose()
     transformTargetMaterial.dispose()
   }
