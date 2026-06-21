@@ -70,6 +70,7 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js'
 import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.js'
+import { TiledLighting } from 'three/examples/jsm/lighting/TiledLighting.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { RectAreaLightTexturesLib } from 'three/examples/jsm/lights/RectAreaLightTexturesLib.js'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
@@ -153,6 +154,11 @@ import { Projector, RenderableFace, RenderableLine, RenderableSprite } from 'thr
 import { SVGObject, SVGRenderer } from 'three/examples/jsm/renderers/SVGRenderer.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import { FlakesTexture } from 'three/examples/jsm/textures/FlakesTexture.js'
+import * as TranspilerAST from 'three/examples/jsm/transpiler/AST.js'
+import GLSLDecoder from 'three/examples/jsm/transpiler/GLSLDecoder.js'
+import ShaderToyDecoder from 'three/examples/jsm/transpiler/ShaderToyDecoder.js'
+import TSLEncoder from 'three/examples/jsm/transpiler/TSLEncoder.js'
+import Transpiler from 'three/examples/jsm/transpiler/Transpiler.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 import * as GeometryCompressionUtils from 'three/examples/jsm/utils/GeometryCompressionUtils.js'
@@ -3236,6 +3242,84 @@ test('examples Addons barrel imports in Node and exposes covered helper modules'
   assert.equal(Addons.WorkerPool, WorkerPool)
 })
 
+test('examples transpiler utilities parse GLSL and emit TSL source', () => {
+  const program = new TranspilerAST.Program()
+  const variable = new TranspilerAST.VariableDeclaration('float', 'value', new TranspilerAST.Number('1.0'))
+  const ternary = new TranspilerAST.Ternary(
+    new TranspilerAST.Operator('>', new TranspilerAST.Accessor('value'), new TranspilerAST.Number('0.0')),
+    new TranspilerAST.String('positive'),
+    new TranspilerAST.String('zero'),
+  )
+  const accessorElements = new TranspilerAST.AccessorElements(new TranspilerAST.Accessor('coord'), [
+    new TranspilerAST.StaticElement(new TranspilerAST.Accessor('x')),
+    new TranspilerAST.DynamicElement(new TranspilerAST.Number('0', 'int')),
+  ])
+  const loop = new TranspilerAST.For(
+    new TranspilerAST.VariableDeclaration('int', 'i', new TranspilerAST.Number('0', 'int')),
+    new TranspilerAST.Operator('<', new TranspilerAST.Accessor('i'), new TranspilerAST.Number('2', 'int')),
+    new TranspilerAST.Unary('++', new TranspilerAST.Accessor('i'), true),
+  )
+  const func = new TranspilerAST.FunctionDeclaration('float', 'manual', [
+    new TranspilerAST.FunctionParameter('float', 'input', 'in'),
+  ])
+  func.body.push(new TranspilerAST.Return(new TranspilerAST.FunctionCall('float', [new TranspilerAST.Accessor('input')])))
+  program.body.push(new TranspilerAST.Uniform('float', 'amount'), new TranspilerAST.Varying('vec2', 'vUv'), variable, ternary, accessorElements, loop, func)
+
+  assert.equal(program.isProgram, true)
+  assert.equal(variable.isVariableDeclaration, true)
+  assert.equal(ternary.isTernary, true)
+  assert.equal(accessorElements.isAccessorElements, true)
+  assert.equal(loop.isFor, true)
+  assert.equal(func.isFunctionDeclaration, true)
+
+  const decoder = new GLSLDecoder().addPolyfill('customValue', 'float customValue = 2.0;')
+  const ast = decoder.parse(`
+    uniform float amount;
+    varying vec2 vUv;
+    float shade(inout float value) {
+      value += amount;
+      if (value > 1.0) {
+        value = inversesqrt(value);
+      } else {
+        value = value * customValue;
+      }
+      return value;
+    }
+  `)
+  const shade = ast.body.find((node) => node.isFunctionDeclaration && node.name === 'shade')
+  assert.equal(ast.isProgram, true)
+  assert.ok(ast.body.some((node) => node.isUniform && node.name === 'amount'))
+  assert.ok(ast.body.some((node) => node.isVarying && node.name === 'vUv'))
+  assert.equal(shade.params[0].qualifier, 'inout')
+  assert.equal(shade.params[0].immutable, false)
+  assert.ok(shade.body.some((node) => node.isConditional))
+
+  const encodableAst = new TranspilerAST.Program()
+  encodableAst.body.push(...ast.body.filter((node) => !node.isVarying))
+  const encoded = new TSLEncoder().emit(encodableAst)
+  assert.match(encoded, /Three\.js Transpiler/)
+  assert.match(encoded, /import \{[^}]*uniform[^}]*Fn/)
+  assert.match(encoded, /const customValue = float\( 2\.0 \)/)
+  assert.match(encoded, /inverseSqrt/)
+  assert.match(encoded, /If\(/)
+  assert.match(encoded, /return value/)
+
+  const transpiled = new Transpiler(new GLSLDecoder(), new TSLEncoder()).parse('float halfValue(float value) { return value * 0.5; }')
+  assert.match(transpiled, /const halfValue/)
+  assert.match(transpiled, /return value\.mul\( 0\.5 \)/)
+
+  const shaderToy = new Transpiler(new ShaderToyDecoder(), new TSLEncoder()).parse(`
+    void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+      fragColor = vec4(iTime / iResolution.x);
+    }
+  `)
+  assert.match(shaderToy, /const mainImage/)
+  assert.match(shaderToy, /const fragColor = vec4\(\)\.toVar\(\)/)
+  assert.match(shaderToy, /return fragColor/)
+  assert.match(shaderToy, /screenSize/)
+  assert.match(shaderToy, /time/)
+})
+
 test('Projector produces CPU render data for supported scene objects', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
@@ -3606,6 +3690,44 @@ test('GPUComputationRenderer stops at conservative vertex texture support detect
   gpuCompute.addVariable('textureState', 'void main() { gl_FragColor = vec4( 1.0 ); }', initialState)
   assert.equal(gpuCompute.init(), 'No support for vertex shader textures.')
   gpuCompute.dispose()
+})
+
+test('examples TiledLighting builds tiled point-light metadata before compute boundary', () => {
+  const point = new THREE.PointLight(0x804020, 2, 5, 1.5)
+  point.position.set(1, 2, 3)
+  point.updateMatrixWorld(true)
+  const directional = new THREE.DirectionalLight(0xffffff, 1)
+
+  const node = new TiledLighting().createNode([point, directional])
+  assert.equal(node.tiledLights.length, 1)
+  assert.equal(node.tiledLights[0], point)
+  assert.equal(node.materialLights.length, 1)
+  assert.equal(node.materialLights[0], directional)
+  assert.equal(node.hasLights, true)
+
+  node.setSize(33, 63)
+  assert.equal(node._bufferSize.width, 64)
+  assert.equal(node._bufferSize.height, 64)
+  assert.equal(node._lightsTexture.image.width, 1024)
+  assert.equal(node._lightsTexture.image.height, 2)
+
+  node.updateLightsTexture()
+  const positionLine = node._lightsTexture.image.data
+  const colorLineOffset = node._lightsTexture.image.width * 4
+  assert.deepEqual(Array.from(positionLine.slice(0, 4)), [1, 2, 3, 5])
+  assert.ok(positionLine[colorLineOffset] > positionLine[colorLineOffset + 1])
+  assert.equal(positionLine[colorLineOffset + 3], 1.5)
+
+  const renderer = new Renderer({ width: 16, height: 16 })
+  const camera = makeCamera()
+  try {
+    assert.throws(
+      () => node.updateBefore({ renderer, camera }),
+      /Renderer\.compute\(\) is not supported.*WebGPU compute pipelines/i,
+    )
+  } finally {
+    renderer.dispose()
+  }
 })
 
 test('CSM material shader injection fails clearly', () => {
