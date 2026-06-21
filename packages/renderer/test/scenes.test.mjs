@@ -9032,6 +9032,72 @@ test('SpriteMaterial and PointsMaterial alphaMap decode sRGB colorSpace before a
   assert.ok(pointLinear.g > pointLinear.b + 40, `linear point alphaMap should stay visible after alpha testing (${pointLinear.g} vs ${pointLinear.b})`)
 })
 
+test('SpriteMaterial and PointsMaterial maps honor nearest and linear filters', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderBillboard(kind, slot, filter) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, slot === 'alphaMap' ? 1 : 0)
+    const materialProps = {
+      color: slot === 'alphaMap' ? 0x00ff00 : 0xffffff,
+      transparent: false,
+    }
+
+    if (slot === 'map') {
+      const map = rgbaTexture([
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+      ], 2, 1)
+      map.magFilter = filter
+      map.minFilter = filter
+      map.offset.set(-0.05, 0)
+      materialProps.map = map
+    } else {
+      const alphaMap = rgbaTexture([
+        255, 0, 255, 255,
+        255, 255, 255, 255,
+      ], 2, 1)
+      alphaMap.magFilter = filter
+      alphaMap.minFilter = filter
+      alphaMap.offset.set(-0.05, 0)
+      materialProps.alphaMap = alphaMap
+      materialProps.alphaTest = 0.3
+    }
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial(materialProps))
+      sprite.scale.set(2, 2, 1)
+      scene.add(sprite)
+      return meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 30, 30, 34, 34)
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+    scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+      ...materialProps,
+      size: 48,
+      sizeAttenuation: false,
+    })))
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 46, 46, 50, 50)
+  }
+
+  for (const kind of ['sprite', 'points']) {
+    const nearestMap = renderBillboard(kind, 'map', THREE.NearestFilter)
+    const linearMap = renderBillboard(kind, 'map', THREE.LinearFilter)
+    assert.ok(nearestMap.r > nearestMap.g + 100, `${kind} NearestFilter color map should choose the red texel (${nearestMap.r} vs ${nearestMap.g})`)
+    assert.ok(linearMap.g > nearestMap.g + 80, `${kind} LinearFilter color map should blend in the green texel (${linearMap.g} vs ${nearestMap.g})`)
+    assert.ok(nearestMap.r > linearMap.r + 25, `${kind} NearestFilter color map should preserve a stronger red texel (${nearestMap.r} vs ${linearMap.r})`)
+
+    const nearestAlpha = renderBillboard(kind, 'alphaMap', THREE.NearestFilter)
+    const linearAlpha = renderBillboard(kind, 'alphaMap', THREE.LinearFilter)
+    assert.ok(nearestAlpha.b > nearestAlpha.g + 100, `${kind} NearestFilter alphaMap should choose the transparent texel (${nearestAlpha.b} vs ${nearestAlpha.g})`)
+    assert.ok(linearAlpha.g > linearAlpha.b + 80, `${kind} LinearFilter alphaMap should blend in enough opacity to pass alphaTest (${linearAlpha.g} vs ${linearAlpha.b})`)
+    assert.ok(linearAlpha.g > nearestAlpha.g + 120, `${kind} LinearFilter alphaMap should keep the billboard visible (${linearAlpha.g} vs ${nearestAlpha.g})`)
+  }
+})
+
 test('SpriteMaterial and PointsMaterial alphaHash produce main-pass stochastic coverage', () => {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
   camera.position.set(0, 0, 3)
@@ -11165,6 +11231,73 @@ test('material premultipliedAlpha premultiplies shader output before blending', 
   const premultiplied = renderNoBlending(true)
   assert.ok(straight.r > premultiplied.r + 60, `premultipliedAlpha should reduce raw RGB output (${straight.r} vs ${premultiplied.r})`)
   assert.ok(premultiplied.r > 60, `premultiplied output should retain source contribution (${premultiplied.r})`)
+})
+
+test('unlit sprite, point, and line materials honor premultipliedAlpha before blending', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderPrimitive(kind, premultipliedAlpha) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const materialProps = {
+      blending: THREE.NoBlending,
+      color: 0xff0000,
+      opacity: 0.5,
+      premultipliedAlpha,
+      transparent: true,
+    }
+
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial(materialProps))
+      sprite.scale.set(2, 2, 1)
+      scene.add(sprite)
+    } else if (kind === 'points') {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0, 0]), 3))
+      scene.add(new THREE.Points(geometry, new THREE.PointsMaterial({
+        ...materialProps,
+        size: 48,
+        sizeAttenuation: false,
+      })))
+    } else {
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-1.5, 0, 0),
+        new THREE.Vector3(1.5, 0, 0),
+      ])
+      const material = kind === 'dashed-line'
+        ? new THREE.LineDashedMaterial({
+          ...materialProps,
+          dashSize: 10,
+          gapSize: 0,
+          linewidth: 8,
+          scale: 1,
+        })
+        : new THREE.LineBasicMaterial({
+          ...materialProps,
+          linewidth: 8,
+        })
+      const line = new THREE.Line(geometry, material)
+      if (kind === 'dashed-line') line.computeLineDistances()
+      scene.add(line)
+    }
+
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    return kind === 'sprite' || kind === 'points'
+      ? meanRegion(rgba, 64, 64, 20, 20, 44, 44)
+      : meanRegion(rgba, 64, 64, 0, 30, 64, 34)
+  }
+
+  for (const kind of ['sprite', 'points', 'line', 'dashed-line']) {
+    const straight = renderPrimitive(kind, false)
+    const premultiplied = renderPrimitive(kind, true)
+    assert.ok(
+      straight.r > premultiplied.r + 80,
+      `${kind} premultipliedAlpha should reduce raw RGB output (${straight.r} vs ${premultiplied.r})`,
+    )
+    assert.ok(premultiplied.r > 80, `${kind} premultiplied output should retain source contribution (${premultiplied.r})`)
+  }
 })
 
 test('AdditiveBlending adds source color to destination', () => {
