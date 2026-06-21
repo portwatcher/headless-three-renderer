@@ -21984,6 +21984,40 @@ test('LightProbe spherical harmonics contribute diffuse lighting', () => {
   assert.ok(mean.r > mean.b + 40, `LightProbe should tint diffuse lighting red (${mean.r} vs ${mean.b})`)
 })
 
+test('LightProbe spherical harmonics accumulate multiple visible probes', () => {
+  function makeProbe(r, g, b, intensity) {
+    const probe = new THREE.LightProbe(undefined, intensity)
+    for (const coefficient of probe.sh.coefficients) {
+      coefficient.set(0, 0, 0)
+    }
+    probe.sh.coefficients[0].set(r, g, b)
+    return probe
+  }
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(makeProbe(1, 0, 0, 0.9))
+  scene.add(makeProbe(0, 1, 0, 0.7))
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 }),
+  ))
+
+  const extracted = extractLightProbe(scene)
+  assert.ok(extracted, 'combined LightProbe coefficients should be extracted')
+  assert.ok(Math.abs(extracted[0] - 0.9) < 1e-6, `red probe coefficient should be accumulated (${extracted[0]})`)
+  assert.ok(Math.abs(extracted[1] - 0.7) < 1e-6, `green probe coefficient should be accumulated (${extracted[1]})`)
+  assert.equal(extracted[2], 0)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const mean = meanRgba(renderRgba(scene, camera, { width: 64, height: 64 }))
+  assert.ok(mean.r > mean.b + 30, `combined LightProbes should add red diffuse lighting (${mean.r} vs ${mean.b})`)
+  assert.ok(mean.g > mean.b + 20, `combined LightProbes should add green diffuse lighting (${mean.g} vs ${mean.b})`)
+})
+
 test('LightProbe ignores invisible probes and hidden ancestors', () => {
   function makeProbe(r, g, b) {
     const probe = new THREE.LightProbe(undefined, 1.8)

@@ -213,7 +213,7 @@ Compressed KTX2/Basis/`THREE.CompressedTexture` inputs and compressed texture fo
 - `THREE.SpotLight` — cone light with angle, penumbra, distance, and decay
 - `THREE.HemisphereLight` — sky/ground gradient ambient light
 - `THREE.RectAreaLight` — one-sided finite-area direct-light approximation
-- `THREE.LightProbe` — diffuse spherical-harmonics indirect lighting plus `LightProbeGenerator.fromCubeRenderTarget()` cube-target readback interop, with invalid coefficient values failing clearly
+- `THREE.LightProbe` — summed visible spherical-harmonics indirect lighting plus `LightProbeGenerator.fromCubeRenderTarget()` cube-target readback interop, with invalid coefficient values failing clearly
 
 Lights are automatically extracted from the scene, with CSS string light colors accepted and malformed light color/target containers, invalid light color, numeric controls, transform matrix values, shadow flags, and shadow option containers failing clearly. The shader uses a Cook-Torrance PBR BRDF (GGX/Trowbridge-Reitz distribution, Schlick-GGX geometry, Schlick Fresnel) with Three.js-compatible physically-based attenuation for punctual lights. Up to 64 direct lights per scene are supported. Visible directional, spot, and point lights may cast shadows while their packed native shadow-map usage stays within twelve array layers. When no lights are present, meshes render with a hemispherical ambient fallback.
 
