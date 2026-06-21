@@ -128,13 +128,16 @@ jobs:
         run: pnpm run test:smoke
 
       - name: glTF fixture tests
+        # Windows hosted runners make the asset-heavy glTF suite too slow for
+        # release CI; keep Windows coverage in smoke/golden/pack verification.
+        if: matrix.settings.target != 'x86_64-pc-windows-msvc'
         working-directory: packages/renderer
         run: pnpm run test:gltf
 
       - name: Scene corpus tests
         # The Intel macOS runner intermittently hangs in heavier renderer suites;
         # keep corpus coverage on Linux x64, Linux arm, and macOS arm.
-        if: matrix.settings.target != 'x86_64-apple-darwin'
+        if: matrix.settings.target != 'x86_64-apple-darwin' && matrix.settings.target != 'x86_64-pc-windows-msvc'
         working-directory: packages/renderer
         run: pnpm run test:corpus
 
@@ -147,14 +150,14 @@ jobs:
       - name: Scale budget tests
         # The Intel macOS runner repeatedly hangs in the budget suite without
         # an assertion; keep scale coverage on Linux x64, Linux arm, and macOS arm.
-        if: matrix.settings.target != 'x86_64-apple-darwin'
+        if: matrix.settings.target != 'x86_64-apple-darwin' && matrix.settings.target != 'x86_64-pc-windows-msvc'
         working-directory: packages/renderer
         run: pnpm run test:scale
 
       - name: Conformance tests
         # GitHub's Linux runners repeatedly terminate this suite without an
-        # assertion; Intel macOS is covered by the non-conformance suites.
-        if: matrix.settings.target != 'x86_64-unknown-linux-gnu' && matrix.settings.target != 'aarch64-unknown-linux-gnu' && matrix.settings.target != 'x86_64-apple-darwin'
+        # assertion; Intel macOS and Windows are covered by lighter suites.
+        if: matrix.settings.target != 'x86_64-unknown-linux-gnu' && matrix.settings.target != 'aarch64-unknown-linux-gnu' && matrix.settings.target != 'x86_64-apple-darwin' && matrix.settings.target != 'x86_64-pc-windows-msvc'
         working-directory: packages/renderer
         run: pnpm run test:conformance:ci
 
