@@ -20,6 +20,7 @@ import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { PLYExporter } from 'three/examples/jsm/exporters/PLYExporter.js'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
+import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js'
 import { DebugEnvironment } from 'three/examples/jsm/environments/DebugEnvironment.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { TrefoilKnot } from 'three/examples/jsm/curves/CurveExtras.js'
@@ -29980,7 +29981,7 @@ test('Three.js exporters read targets through the WebGLRenderer marker path', as
   )
 })
 
-test('Three.js scene graph exporters serialize renderer-visible geometry', () => {
+test('Three.js scene graph exporters serialize renderer-visible geometry', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
 
@@ -30079,6 +30080,41 @@ test('Three.js scene graph exporters serialize renderer-visible geometry', () =>
     assert.match(ply, /^element face 2$/m)
     assert.match(ply, /^property uchar red$/m)
     assert.match(ply, /^3 0 2 1$/m)
+
+    const usdzScene = new THREE.Scene()
+    usdzScene.background = new THREE.Color(0x000000)
+    const usdzGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.7)
+    const usdzMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff3344,
+      roughness: 0.6,
+      metalness: 0,
+    })
+    const usdzMesh = new THREE.Mesh(usdzGeometry, usdzMaterial)
+    usdzMesh.name = 'export-usdz-standard'
+    usdzScene.add(new THREE.AmbientLight(0xffffff, 1.5), usdzMesh)
+    usdzScene.updateMatrixWorld(true)
+
+    try {
+      const usdzRgba = renderRgba(usdzScene, camera, { width, height })
+      assert.ok(
+        countRegionPixels(usdzRgba, width, height, 0, 0, width, height, (r, g, b) => r > 80 && r > g + 20 && r > b + 10) > 100,
+        'USDZ-exportable Standard material scene should render visible red pixels',
+      )
+      const usdz = await new USDZExporter().parseAsync(usdzScene)
+      assert.ok(usdz instanceof Uint8Array, 'USDZExporter should return Uint8Array data')
+      assert.ok(usdz.length > 512, `USDZ output should contain zipped USDA content (${usdz.length})`)
+      assert.deepEqual(
+        Array.from(usdz.subarray(0, 4)),
+        [0x50, 0x4b, 0x03, 0x04],
+        'USDZ output should start with a ZIP local file header',
+      )
+      const usdzText = new TextDecoder().decode(usdz)
+      assert.match(usdzText, /model\.usda/)
+      assert.match(usdzText, /geometries\/Geometry_/)
+    } finally {
+      usdzGeometry.dispose()
+      usdzMaterial.dispose()
+    }
   } finally {
     meshGeometry.dispose()
     meshMaterial.dispose()
