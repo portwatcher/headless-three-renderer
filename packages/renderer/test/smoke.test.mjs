@@ -123,6 +123,29 @@ test('Node loader helpers expose encoded image buffers and local file fetch', as
       ['end', 'tex.png'],
     ])
 
+    const modifierEvents = []
+    const modifierManager = {
+      addHandler() {},
+      resolveURL(url) {
+        modifierEvents.push(['resolve', url])
+        return 'textures/tex.png'
+      },
+      itemStart(url) {
+        modifierEvents.push(['start', url])
+      },
+      itemEnd(url) {
+        modifierEvents.push(['end', url])
+      },
+    }
+    const modifierLoader = createEncodedImageTextureLoader(dir, modifierManager)
+    const modifiedTexture = await modifierLoader.loadAsync('virtual.png')
+    assert.deepEqual(Buffer.from(modifiedTexture.image), imageBytes)
+    assert.deepEqual(modifierEvents, [
+      ['resolve', 'virtual.png'],
+      ['start', 'textures/tex.png'],
+      ['end', 'textures/tex.png'],
+    ])
+
     managerEvents.length = 0
     await assert.rejects(
       () => managedLoader.loadAsync('missing-manager.png'),
@@ -556,6 +579,10 @@ test('Node loader helper path and option containers fail clearly', async () => {
     /manager must provide an addHandler\(\) function/i,
   )
   assert.throws(
+    () => createEncodedImageTextureLoader(process.cwd(), { addHandler() {}, resolveURL: 'url' }),
+    /manager\.resolveURL must be a function when provided/i,
+  )
+  assert.throws(
     () => createEncodedImageTextureLoader('https://example.com/assets'),
     /rootDir is not a local directory path/i,
   )
@@ -572,6 +599,15 @@ test('Node loader helper path and option containers fail clearly', async () => {
   await assert.rejects(
     () => imageLoader.loadAsync(123),
     /url must be a string/i,
+  )
+  await assert.rejects(
+    () => createEncodedImageTextureLoader(process.cwd(), {
+      addHandler() {},
+      resolveURL() {
+        return 1
+      },
+    }).loadAsync('tex.png'),
+    /manager\.resolveURL return value must be a string/i,
   )
   assert.throws(
     () => imageLoader.load('tex.png', 'yes'),

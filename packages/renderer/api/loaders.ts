@@ -47,6 +47,7 @@ export type ThreeLoadingManagerLike = {
   itemEnd?(url: string): unknown
   itemError?(url: string): unknown
   itemStart?(url: string): unknown
+  resolveURL?(url: string): string
 }
 export type ThreeGltfLoaderLike = {
   parse(data: ArrayBuffer | string, path: string, onLoad: (gltf: unknown) => void, onError?: (error: unknown) => void): void
@@ -186,10 +187,13 @@ export class EncodedImageTextureLoader {
     onError?: TextureErrorCallback,
   ): TextureLike {
     const texture = new Texture()
-    const assetUrl = requiredString(url, 'url')
+    const requestedUrl = requiredString(url, 'url')
     const loadCallback = optionalFunction(onLoad, 'onLoad')
     const errorCallback = optionalFunction(onError, 'onError')
-    const source = resolveTextureLoaderSource(assetUrl, this.loaderPath)
+    const source = resolveLoadingManagerUrl(
+      this.manager,
+      resolveTextureLoaderSource(requestedUrl, this.loaderPath),
+    )
     const encodedDataUri = encodedImageDataUriBuffer(source)
     const data = encodedDataUri
       ? Promise.resolve(encodedDataUri)
@@ -197,7 +201,7 @@ export class EncodedImageTextureLoader {
         ? readBlobUrlBuffer(source)
         : readFile(resolveLocalAssetPath(source, this.rootDir))
 
-    this.manager?.itemStart?.(assetUrl)
+    this.manager?.itemStart?.(source)
     data.then((buffer) => {
       texture.image = buffer
       texture.source.data = buffer
@@ -205,11 +209,11 @@ export class EncodedImageTextureLoader {
       try {
         loadCallback?.(texture)
       } finally {
-        this.manager?.itemEnd?.(assetUrl)
+        this.manager?.itemEnd?.(source)
       }
     }, (error) => {
-      this.manager?.itemError?.(assetUrl)
-      this.manager?.itemEnd?.(assetUrl)
+      this.manager?.itemError?.(source)
+      this.manager?.itemEnd?.(source)
       errorCallback?.(error)
     })
 
@@ -449,6 +453,13 @@ function resolveTextureLoaderSource(url: string, loaderPath: string): string {
     return new URL(url, ensureDirectoryUrl(loaderPath)).href
   }
   return path.join(loaderPath, url)
+}
+
+function resolveLoadingManagerUrl(manager: ThreeLoadingManagerLike | undefined, url: string): string {
+  const resolveURL = manager?.resolveURL
+  if (resolveURL == null) return url
+  const resolved = resolveURL.call(manager, url)
+  return requiredString(resolved, 'manager.resolveURL return value')
 }
 
 function isAbsoluteOrSpecialAssetUrl(url: string): boolean {
@@ -991,8 +1002,13 @@ function optionalFunction<T>(value: T | null | undefined, label: string): T | un
 
 function optionalLoadingManager(value: ThreeLoadingManagerLike | null | undefined, label: string): ThreeLoadingManagerLike | undefined {
   if (value == null) return undefined
-  if (typeof (value as any).addHandler === 'function') return value
-  throw new TypeError(`${label} must provide an addHandler() function.`)
+  if (typeof (value as any).addHandler !== 'function') {
+    throw new TypeError(`${label} must provide an addHandler() function.`)
+  }
+  if ((value as any).resolveURL != null && typeof (value as any).resolveURL !== 'function') {
+    throw new TypeError(`${label}.resolveURL must be a function when provided.`)
+  }
+  return value
 }
 
 function registerLoaderPlugin(
