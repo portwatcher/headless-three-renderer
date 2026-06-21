@@ -30,9 +30,13 @@ import { TextureHelper } from 'three/examples/jsm/helpers/TextureHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
+import { Line2 } from 'three/examples/jsm/lines/Line2.js'
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
+import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js'
+import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
@@ -2849,18 +2853,40 @@ test('CSMHelper renders supported cascade visualization geometry', () => {
   }
 })
 
-test('LineSegments2 LineMaterial shader fails clearly', () => {
-  const geometry = new LineSegmentsGeometry()
-  geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
-  const material = new LineMaterial({ color: 0xff0000, linewidth: 2 })
-  const line = new LineSegments2(geometry, material)
-  const scene = new THREE.Scene()
-  scene.add(line)
+test('examples Line2, LineSegments2, and Wireframe LineMaterial shaders fail clearly', () => {
+  const cases = [
+    ['Line2', () => {
+      const geometry = new LineGeometry()
+      geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
+      return new Line2(geometry, new LineMaterial({ color: 0xff0000, linewidth: 2 }))
+    }],
+    ['LineSegments2', () => {
+      const geometry = new LineSegmentsGeometry()
+      geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
+      return new LineSegments2(geometry, new LineMaterial({ color: 0xff0000, linewidth: 2 }))
+    }],
+    ['Wireframe', () => {
+      const geometry = new WireframeGeometry2(new THREE.BoxGeometry(0.75, 0.75, 0.75))
+      return new Wireframe(geometry, new LineMaterial({ color: 0xff0000, linewidth: 2 }))
+    }],
+  ]
 
-  assert.throws(
-    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
-    /LineMaterial ShaderMaterial.*not translated.*LineBasicMaterial.*LineDashedMaterial/i,
-  )
+  for (const [label, makeLine] of cases) {
+    const line = makeLine()
+    const scene = new THREE.Scene()
+    scene.add(line)
+
+    try {
+      assert.throws(
+        () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+        /LineMaterial ShaderMaterial.*not translated.*LineBasicMaterial.*LineDashedMaterial/i,
+        `${label} should fail with built-in line-material guidance`,
+      )
+    } finally {
+      line.geometry.dispose()
+      line.material.dispose()
+    }
+  }
 })
 
 test('ProgressiveLightMap internal shader rewrite fails clearly', () => {
