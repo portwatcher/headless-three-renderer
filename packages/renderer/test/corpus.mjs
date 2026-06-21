@@ -69,6 +69,7 @@ export function createSceneCorpus() {
     objectIdRenderModeCorpus(),
     normalRenderModeCorpus(),
     depthRenderModeCorpus(),
+    renderModeAlphaHashCutoutCorpus(),
     spriteMaterialCorpus(),
     spriteAlphaMapCorpus(),
     billboardAlphaCutoutCorpus(),
@@ -1114,6 +1115,70 @@ function depthRenderModeCorpus() {
       const corner = meanRegion(rgba, width, 0, 0, 8, 8)
       if (!(center.r > 150 && Math.abs(center.r - center.g) < 2 && Math.abs(center.r - center.b) < 2 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
         throw new Error(`depth render corpus should render grayscale depth on black, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function renderModeAlphaHashCutoutCorpus() {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+  const renderModes = ['mask', 'object-id', 'normal', 'depth']
+
+  function makeScene(alphaHash) {
+    const scene = new THREE.Scene()
+    scene.add(new THREE.Mesh(
+      new THREE.PlaneGeometry(1.2, 1.2),
+      new THREE.MeshBasicMaterial({
+        alphaHash,
+        color: 0xffffff,
+        opacity: alphaHash ? 0.35 : 1,
+      }),
+    ))
+    return scene
+  }
+
+  function visiblePixels(rgba) {
+    return countRegionPixels(rgba, options.width, 30, 30, 66, 66, (r, g, b) => r > 0 || g > 0 || b > 0)
+  }
+
+  return {
+    name: 'render-mode-alpha-hash-cutouts',
+    scene: makeScene(true),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    render(renderer) {
+      let hashedMask
+      for (const renderMode of renderModes) {
+        const opaque = renderer.render(makeScene(false), camera, { ...options, renderMode })
+        const hashed = renderer.render(makeScene(true), camera, { ...options, renderMode })
+        stats[renderMode] = {
+          opaquePixels: visiblePixels(opaque),
+          hashedPixels: visiblePixels(hashed),
+        }
+        if (renderMode === 'mask') {
+          hashedMask = hashed
+        }
+      }
+      return hashedMask
+    },
+    validate() {
+      for (const [renderMode, { opaquePixels, hashedPixels }] of Object.entries(stats)) {
+        if (!(opaquePixels > 1100)) {
+          throw new Error(`${renderMode} render mode should fill the sampled opaque region, opaque=${opaquePixels}`)
+        }
+        if (!(hashedPixels > 100)) {
+          throw new Error(`${renderMode} render mode should retain some alphaHash pixels, hashed=${hashedPixels}`)
+        }
+        if (!(hashedPixels < opaquePixels - 250)) {
+          throw new Error(`${renderMode} render mode should discard alphaHash pixels, hashed=${hashedPixels} opaque=${opaquePixels}`)
+        }
       }
     },
   }
