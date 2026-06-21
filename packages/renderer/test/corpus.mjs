@@ -43,6 +43,7 @@ export function createSceneCorpus() {
     meshDistanceMaterialCorpus(),
     meshDistanceDisplacementMapCorpus(),
     meshDistanceMaterialWireframeCorpus(),
+    meshStandardMaterialDisplacementCorpus(),
     meshNormalMaterialCorpus(),
     meshNormalMaterialNormalMapCorpus(),
     meshNormalMaterialObjectSpaceNormalMapCorpus(),
@@ -101,6 +102,7 @@ export function createSceneCorpus() {
     mixedShadowLightTypesCorpus(),
     shadowMapEnabledGatingCorpus(),
     shadowMapTypeFilteringCorpus(),
+    customShadowDisplacementCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialOpacityCorpus(),
     shadowMaterialFogOptOutCorpus(),
@@ -3534,6 +3536,82 @@ function meshDistanceMaterialWireframeCorpus() {
   }
 }
 
+function meshStandardMaterialDisplacementCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  let flatPixels = 0
+  let displacedPixels = 0
+
+  function makeDisplacementMap(offsetX) {
+    const displacementMap = new THREE.DataTexture(new Uint8Array([
+      0, 0, 0, 255,
+      255, 0, 0, 255,
+    ]), 2, 1, THREE.RGBAFormat)
+    displacementMap.magFilter = THREE.NearestFilter
+    displacementMap.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(displacementMap, offsetX)
+    displacementMap.needsUpdate = true
+    return displacementMap
+  }
+
+  function makeScene(displacementScale) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+
+    const light = new THREE.DirectionalLight(0xffffff, 2.4)
+    light.position.set(0.8, 1.4, 3)
+    scene.add(light)
+
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5, 1.2, 1.2),
+      new THREE.MeshStandardMaterial({
+        color: 0x66ccff,
+        roughness: 0.35,
+        metalness: 0,
+        displacementMap: makeDisplacementMap(0.5),
+        displacementScale,
+        displacementBias: 0,
+      }),
+    ))
+    return scene
+  }
+
+  function visiblePixels(rgba) {
+    return countRegionPixels(
+      rgba,
+      options.width,
+      0,
+      0,
+      options.width,
+      options.height,
+      (r, g, b) => r > 20 || g > 20 || b > 20,
+    )
+  }
+
+  return {
+    name: 'mesh-standard-displacement-map',
+    scene: makeScene(0.8),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.2,
+    browserReference: false,
+    render(renderer) {
+      const flat = renderer.render(makeScene(0), camera, options).slice()
+      const displaced = renderer.render(makeScene(0.8), camera, options).slice()
+      flatPixels = visiblePixels(flat)
+      displacedPixels = visiblePixels(displaced)
+      return displaced
+    },
+    validate() {
+      if (!(displacedPixels > flatPixels + 750)) {
+        throw new Error(`standard displacement corpus should expand the visible main-pass plane, flat=${flatPixels} displaced=${displacedPixels}`)
+      }
+    },
+  }
+}
+
 function meshNormalMaterialCorpus() {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.015, 0.015, 0.02)
@@ -5735,6 +5813,137 @@ function shadowMapTypeFilteringCorpus() {
       }
       if (!(stats.pcfLargeRadius < stats.basicLargeRadius - 10)) {
         throw new Error(`PCFShadowMap should use radius-based PCF sampling in corpus, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
+function customShadowDisplacementCorpus() {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 6, 8)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = new Map()
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function displacementMaterial(displacementScale) {
+    return new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      displacementMap: solidTexture(255, 0, 0),
+      displacementScale,
+      displacementBias: 0,
+      colorWrite: false,
+      depthWrite: false,
+    })
+  }
+
+  function makeCaster(kind, displacementScale, inheritFromSource) {
+    const caster = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 2.5, 8, 8),
+      inheritFromSource
+        ? displacementMaterial(displacementScale)
+        : new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          colorWrite: false,
+          depthWrite: false,
+        }),
+    )
+    caster.position.set(0, 1.7, 0)
+    caster.rotation.x = -Math.PI / 2
+    caster.castShadow = true
+
+    if (kind === 'depth') {
+      caster.customDepthMaterial = inheritFromSource
+        ? new THREE.MeshDepthMaterial()
+        : new THREE.MeshDepthMaterial({
+          displacementMap: solidTexture(255, 0, 0),
+          displacementScale,
+          displacementBias: 0,
+        })
+    } else {
+      caster.customDistanceMaterial = inheritFromSource
+        ? new THREE.MeshDistanceMaterial()
+        : new THREE.MeshDistanceMaterial({
+          displacementMap: solidTexture(255, 0, 0),
+          displacementScale,
+          displacementBias: 0,
+        })
+    }
+
+    return caster
+  }
+
+  function addShadowLight(scene, kind) {
+    if (kind === 'depth') {
+      const light = new THREE.DirectionalLight(0xffffff, 2)
+      light.castShadow = true
+      light.position.set(8, 6, 0)
+      light.target.position.set(0, 0, 0)
+      light.shadow.camera.left = -7
+      light.shadow.camera.right = 7
+      light.shadow.camera.top = 7
+      light.shadow.camera.bottom = -7
+      light.shadow.camera.near = 0.1
+      light.shadow.camera.far = 16
+      scene.add(light)
+      scene.add(light.target)
+      return
+    }
+
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+  }
+
+  function makeScene(kind, displacementScale, inheritFromSource) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+    scene.add(makeCaster(kind, displacementScale, inheritFromSource))
+    addShadowLight(scene, kind)
+    return scene
+  }
+
+  return {
+    name: 'custom-shadow-displacement-maps',
+    scene: makeScene('depth', 2, false),
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.008,
+    browserReference: false,
+    render(renderer) {
+      for (const [kind, inheritFromSource] of [
+        ['depth', false],
+        ['depth', true],
+        ['distance', false],
+        ['distance', true],
+      ]) {
+        const flat = renderer.render(makeScene(kind, 0, inheritFromSource), camera, options)
+        const displaced = renderer.render(makeScene(kind, 2, inheritFromSource), camera, options)
+        stats.set(`${kind}:${inheritFromSource ? 'source' : 'custom'}`, meanAbsDiff(flat, displaced))
+      }
+      return renderer.render(makeScene('depth', 2, false), camera, options)
+    },
+    validate() {
+      for (const [label, diff] of stats) {
+        if (!(diff > 5)) {
+          throw new Error(`custom shadow displacement corpus expected ${label} to move the shadow, diff=${diff.toFixed(3)}`)
+        }
       }
     },
   }
