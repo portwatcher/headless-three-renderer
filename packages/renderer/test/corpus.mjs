@@ -133,6 +133,7 @@ export function createSceneCorpus() {
     batchedMeshOptimizedRangeCorpus(),
     batchedMeshIndexedGroupsCorpus(),
     batchedMeshNonIndexedGroupsCorpus(),
+    batchedMeshDefaultGroupMaterialCorpus(),
     batchedMeshPartialGroupRangeCorpus(),
     batchedMeshSparseMaterialGroupsCorpus(),
     batchedMeshCullingCorpus(),
@@ -8037,6 +8038,71 @@ function batchedMeshNonIndexedGroupsCorpus() {
       const right = meanRegion(rgba, width, 66, 42, 76, 54)
       if (!(left.r > left.g + 80 && left.r > left.b + 80 && right.g > right.r + 70 && right.g > right.b + 80)) {
         throw new Error(`BatchedMesh non-indexed material groups should render left red and right green, got left=${JSON.stringify(left)} right=${JSON.stringify(right)}`)
+      }
+    },
+  }
+}
+
+function batchedMeshDefaultGroupMaterialCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+
+  const batch = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batch.addGeometry(source)
+  batch.addInstance(geometryId)
+  batch.perObjectFrustumCulled = false
+
+  const range = batch.getGeometryRangeAt(geometryId, {})
+  batch.geometry.clearGroups()
+  batch.geometry.addGroup(range.start, 6)
+  batch.geometry.addGroup(range.start + 6, 6, 1)
+  batch._geometryInfo[geometryId].start = range.start + 3
+  batch._geometryInfo[geometryId].count = 6
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-default-group-material',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    browserReference: false,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.015,
+    validate(rgba, { width }) {
+      const redPixels = countRegionPixels(rgba, width, 12, 21, 42, 51, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
+      const greenPixels = countRegionPixels(rgba, width, 62, 45, 90, 78, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
+      if (!(redPixels > 150 && greenPixels > 150)) {
+        throw new Error(`BatchedMesh missing materialIndex group should default to red material zero while explicit group stays green, red=${redPixels} green=${greenPixels}`)
       }
     },
   }

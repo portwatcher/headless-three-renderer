@@ -32333,6 +32333,68 @@ test('LineDashedMaterial map decodes sRGB colorSpace before shading', () => {
   assert.ok(linear.r > srgb.r + 5, `linear dashed-line map should render brighter than decoded sRGB texture (${linear.r} vs ${srgb.r})`)
 })
 
+test('LineBasicMaterial and LineDashedMaterial alphaMap decode sRGB colorSpace before alpha testing', () => {
+  function renderColorSpace(kind, colorSpace) {
+    const alphaMap = solidTexture(255, 128, 255, 255)
+    alphaMap.colorSpace = colorSpace
+
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.5, 0.5,
+      0.5, 0.5,
+    ]), 2))
+
+    let line
+    if (kind === 'basic') {
+      const material = new THREE.LineBasicMaterial({
+        alphaTest: 0.3,
+        color: 0x00ff00,
+        linewidth: 8,
+      })
+      material.alphaMap = alphaMap
+      line = new THREE.Line(geom, material)
+    } else {
+      const material = new THREE.LineDashedMaterial({
+        alphaTest: 0.3,
+        color: 0x00ff00,
+        dashSize: 4,
+        gapSize: 0,
+        linewidth: 8,
+        scale: 1,
+      })
+      material.alphaMap = alphaMap
+      line = new THREE.Line(
+        geom,
+        material,
+      )
+      line.computeLineDistances()
+    }
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 1)
+    scene.add(line)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return renderRgba(scene, camera, { width: 96, height: 96 })
+  }
+
+  for (const kind of ['basic', 'dashed']) {
+    const srgb = renderColorSpace(kind, THREE.SRGBColorSpace)
+    const linear = renderColorSpace(kind, THREE.LinearSRGBColorSpace)
+    const srgbBluePixels = countRegionPixels(srgb, 96, 96, 4, 42, 92, 54, (_r, g, b) => b > g + 40)
+    const srgbGreenPixels = countRegionPixels(srgb, 96, 96, 4, 42, 92, 54, (_r, g, b) => g > b + 40)
+    const linearGreenPixels = countRegionPixels(linear, 96, 96, 4, 42, 92, 54, (_r, g, b) => g > b + 40)
+    assert.ok(srgbBluePixels > 900, `${kind} decoded sRGB alphaMap should fall below alphaTest and show blue background pixels (${srgbBluePixels})`)
+    assert.ok(srgbGreenPixels < 40, `${kind} decoded sRGB alphaMap should discard the green line (${srgbGreenPixels})`)
+    assert.ok(linearGreenPixels > 300, `${kind} linear alphaMap should stay above alphaTest and keep green line pixels (${linearGreenPixels})`)
+  }
+})
+
 test('LineBasicMaterial map samples the selected secondary UV channel', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
