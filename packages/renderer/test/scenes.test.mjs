@@ -1138,6 +1138,13 @@ test('malformed BatchedMesh inputs fail clearly', () => {
       mesh._geometryInfo = [{ start: 0, count: 6 }]
       mesh._matricesTexture = { image: { data: 'matrices' } }
     }, /THREE\.BatchedMesh\._matricesTexture\.image\.data must be an array-like object/i],
+    ['matrix texture finite values', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      const matrix = new THREE.Matrix4().toArray()
+      matrix[5] = Number.NaN
+      mesh._matricesTexture = { image: { data: matrix } }
+    }, /THREE\.BatchedMesh\._matricesTexture\.image\.data\[5\] must be a finite number/i],
     ['color texture image container', (mesh) => {
       mesh._instanceInfo = [{ geometryIndex: 0 }]
       mesh._geometryInfo = [{ start: 0, count: 6 }]
@@ -1150,6 +1157,12 @@ test('malformed BatchedMesh inputs fail clearly', () => {
       mesh._matricesTexture = { image: { data: new Float32Array(16) } }
       mesh._colorsTexture = { image: { data: 'colors' } }
     }, /THREE\.BatchedMesh\._colorsTexture\.image\.data must be an array-like object/i],
+    ['color texture finite values', (mesh) => {
+      mesh._instanceInfo = [{ geometryIndex: 0 }]
+      mesh._geometryInfo = [{ start: 0, count: 6 }]
+      mesh._matricesTexture = { image: { data: new THREE.Matrix4().toArray() } }
+      mesh._colorsTexture = { image: { data: [1, Number.POSITIVE_INFINITY, 0, 1] } }
+    }, /THREE\.BatchedMesh\._colorsTexture\.image\.data\[1\] must be a finite number/i],
   ]
 
   for (const [name, setup, pattern] of matrixCases) {
