@@ -2193,10 +2193,51 @@ class RendererRenderList {
   }
 }
 
+class RendererChainMapState {
+  weakMap = new WeakMap<object, WeakMap<object, unknown>>()
+
+  get(keys: unknown): unknown {
+    const keyPath = assertWeakMapKeyArray(keys, 'Renderer.renderLists.lists.get keys')
+    let map: WeakMap<object, unknown> | undefined = this.weakMap
+    for (let i = 0; i < keyPath.length; i += 1) {
+      map = map.get(keyPath[i]) as WeakMap<object, unknown> | undefined
+      if (map === undefined) return undefined
+    }
+    return map.get(keyPath[keyPath.length - 1])
+  }
+
+  set(keys: unknown, value: unknown): this {
+    const keyPath = assertWeakMapKeyArray(keys, 'Renderer.renderLists.lists.set keys')
+    let map: WeakMap<object, unknown> = this.weakMap
+    for (const key of keyPath) {
+      if (!map.has(key)) {
+        map.set(key, new WeakMap<object, unknown>())
+      }
+      map = map.get(key) as WeakMap<object, unknown>
+    }
+    map.set(keyPath[keyPath.length - 1], value)
+    return this
+  }
+
+  delete(keys: unknown): boolean {
+    const keyPath = assertWeakMapKeyArray(keys, 'Renderer.renderLists.lists.delete keys')
+    let map: WeakMap<object, unknown> | undefined = this.weakMap
+    for (let i = 0; i < keyPath.length; i += 1) {
+      map = map.get(keyPath[i]) as WeakMap<object, unknown> | undefined
+      if (map === undefined) return false
+    }
+    return map.delete(keyPath[keyPath.length - 1])
+  }
+
+  clear(): void {
+    this.weakMap = new WeakMap()
+  }
+}
+
 class RendererRenderListsState {
   readonly lighting: RendererLightingState
+  readonly lists = new RendererChainMapState()
   private depthLists = new WeakMap<object, RendererRenderList[]>()
-  private cameraLists = new WeakMap<object, WeakMap<object, RendererRenderList>>()
 
   constructor(lighting: RendererLightingState) {
     this.lighting = lighting
@@ -2206,15 +2247,11 @@ class RendererRenderListsState {
     assertWeakMapKey(scene, 'Renderer.renderLists.get scene')
     if (typeof renderCallDepthOrCamera !== 'number') {
       assertWeakMapKey(renderCallDepthOrCamera, 'Renderer.renderLists.get camera')
-      let cameraMap = this.cameraLists.get(scene)
-      if (cameraMap === undefined) {
-        cameraMap = new WeakMap()
-        this.cameraLists.set(scene, cameraMap)
-      }
-      let cameraList = cameraMap.get(renderCallDepthOrCamera)
+      const keys = [scene, renderCallDepthOrCamera]
+      let cameraList = this.lists.get(keys) as RendererRenderList | undefined
       if (cameraList === undefined) {
         cameraList = new RendererRenderList(this.lighting, scene, renderCallDepthOrCamera)
-        cameraMap.set(renderCallDepthOrCamera, cameraList)
+        this.lists.set(keys, cameraList)
       }
       return cameraList
     }
@@ -2238,7 +2275,7 @@ class RendererRenderListsState {
 
   dispose(): void {
     this.depthLists = new WeakMap()
-    this.cameraLists = new WeakMap()
+    this.lists.clear()
   }
 }
 

@@ -156,6 +156,21 @@ function extractCommonBackendMethodNames() {
   return names
 }
 
+function extractCommonClassSurfaceNames(relativePath, className) {
+  const names = new Set()
+  const source = extractJsClassBody(threeRendererSource(relativePath), className)
+  for (const match of source.matchAll(/^\t(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    if (!JS_METHOD_DECLARATION_IGNORE.has(match[1])) names.add(match[1])
+  }
+  for (const match of source.matchAll(/^\tget\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    names.add(match[1])
+  }
+  for (const match of source.matchAll(/\bthis\.([A-Za-z_$][\w$]*)\s*=/g)) {
+    names.add(match[1])
+  }
+  return names
+}
+
 function extractCommonInfoSurfaceNames() {
   const names = new Set()
   const source = extractJsClassBody(threeRendererSource('src/renderers/common/Info.js'), 'Info')
@@ -35098,6 +35113,50 @@ test('Renderer.state tracks the installed WebGLState method surface', () => {
   }
 })
 
+test('Renderer render lists and node registries track installed CommonRenderer surfaces', () => {
+  const renderer = new Renderer()
+  const scene = new THREE.Scene()
+  const camera = makeCamera()
+  const renderList = renderer.renderLists.get(scene, camera)
+
+  for (const [label, names, actual, minimum] of [
+    ['nodes', extractCommonClassSurfaceNames('src/renderers/common/nodes/Nodes.js', 'Nodes'), renderer.nodes, 20],
+    ['library', extractCommonClassSurfaceNames('src/renderers/common/nodes/NodeLibrary.js', 'NodeLibrary'), renderer.library, 8],
+    ['lighting', extractCommonClassSurfaceNames('src/renderers/common/Lighting.js', 'Lighting'), renderer.lighting, 2],
+    ['renderLists', extractCommonClassSurfaceNames('src/renderers/common/RenderLists.js', 'RenderLists'), renderer.renderLists, 4],
+    ['renderList', extractCommonClassSurfaceNames('src/renderers/common/RenderList.js', 'RenderList'), renderList, 10],
+  ]) {
+    assert.ok(names.size >= minimum, `Expected to find installed Three.js CommonRenderer ${label} surface names.`)
+    const missing = [...names]
+      .filter((name) => !objectSurfaceNames(actual).has(name))
+      .sort()
+    assert.deepEqual(missing, [], `Renderer ${label} is missing installed Three.js CommonRenderer ${label} names: ${missing.join(', ')}`)
+  }
+
+  assert.equal(renderer.renderLists.lists.get([scene, camera]), renderList)
+  const manualScene = {}
+  const manualCamera = {}
+  const manualList = { id: 'manual' }
+  assert.strictEqual(renderer.renderLists.lists.set([manualScene, manualCamera], manualList), renderer.renderLists.lists)
+  assert.equal(renderer.renderLists.lists.get([manualScene, manualCamera]), manualList)
+  assert.equal(renderer.renderLists.get(manualScene, manualCamera), manualList)
+  assert.equal(renderer.renderLists.lists.delete([manualScene, manualCamera]), true)
+  assert.equal(renderer.renderLists.lists.get([manualScene, manualCamera]), undefined)
+  assert.equal(renderer.renderLists.lists.delete([manualScene, manualCamera]), false)
+  assert.throws(
+    () => renderer.renderLists.lists.get([]),
+    /Renderer\.renderLists\.lists\.get keys must be a non-empty array of objects/i,
+  )
+  assert.throws(
+    () => renderer.renderLists.lists.set([scene, null], {}),
+    /Renderer\.renderLists\.lists\.set keys\[1\] must be an object/i,
+  )
+  assert.throws(
+    () => renderer.renderLists.lists.delete('keys'),
+    /Renderer\.renderLists\.lists\.delete keys must be a non-empty array of objects/i,
+  )
+})
+
 test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 1)
@@ -35666,6 +35725,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.renderLists.get(scene, 1) === renderList, false)
   const cameraRenderList = renderer.renderLists.get(scene, camera)
   assert.equal(renderer.renderLists.get(scene, camera), cameraRenderList)
+  assert.equal(renderer.renderLists.lists.get([scene, camera]), cameraRenderList)
   assert.notEqual(cameraRenderList, renderList)
   assert.equal(cameraRenderList.scene, scene)
   assert.equal(cameraRenderList.camera, camera)
@@ -35731,6 +35791,7 @@ test('Renderer exposes inert WebGLRenderer helper objects', async () => {
   assert.equal(renderer.nodes.has(disposableNodeKey), false)
   assert.equal(renderer.properties.has(object), false)
   assert.equal(renderer.renderLists.get(scene, 0) === renderList, false)
+  assert.equal(renderer.renderLists.lists.get([scene, camera]), undefined)
   assert.equal(renderer.renderLists.get(scene, camera) === cameraRenderList, false)
   assert.equal(renderer.renderStates.get(scene, 0) === renderState, false)
 
