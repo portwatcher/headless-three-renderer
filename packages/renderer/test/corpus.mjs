@@ -4485,7 +4485,6 @@ function meshToonTextureSlotsCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.35,
-    browserReference: false,
     render(renderer) {
       const map = renderer.render(makeScene('map'), camera, options).slice()
       const emissive = renderer.render(makeScene('emissive'), camera, options).slice()

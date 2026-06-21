@@ -294,6 +294,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-toon-texture-slot-uv-channel.png",
+      "name": "mesh-toon-texture-slot-uv-channel",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-toon-alpha-map-cutout.png",
       "name": "mesh-toon-alpha-map-cutout",
       "width": 96,
