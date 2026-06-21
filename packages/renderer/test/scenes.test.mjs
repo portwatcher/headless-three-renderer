@@ -86,6 +86,7 @@ import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { LUT3dlLoader } from 'three/examples/jsm/loaders/LUT3dlLoader.js'
 import { LUTCubeLoader } from 'three/examples/jsm/loaders/LUTCubeLoader.js'
+import { MDDLoader } from 'three/examples/jsm/loaders/MDDLoader.js'
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
@@ -8497,6 +8498,76 @@ test('examples BVHLoader parses animation clips into renderable skeleton helper 
   } finally {
     helper.geometry.dispose()
     helper.material.dispose()
+  }
+})
+
+test('examples MDDLoader parses morph clips into renderable still-frame state', () => {
+  const totalFrames = 2
+  const totalPoints = 3
+  const buffer = new ArrayBuffer(8 + (totalFrames * 4) + (totalFrames * totalPoints * 3 * 4))
+  const view = new DataView(buffer)
+  let offset = 0
+
+  view.setUint32(offset, totalFrames)
+  offset += 4
+  view.setUint32(offset, totalPoints)
+  offset += 4
+  view.setFloat32(offset, 0)
+  offset += 4
+  view.setFloat32(offset, 1)
+  offset += 4
+
+  for (const value of [
+    -3.6, -0.5, 0,
+    -2.4, -0.5, 0,
+    -3.0, 0.6, 0,
+    -0.6, -0.5, 0,
+    0.6, -0.5, 0,
+    0.0, 0.6, 0,
+  ]) {
+    view.setFloat32(offset, value)
+    offset += 4
+  }
+
+  const { morphTargets, clip } = new MDDLoader().parse(buffer)
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', morphTargets[0].clone())
+  geometry.setIndex([0, 1, 2])
+  geometry.morphAttributes.position = morphTargets.map((attribute) => attribute.clone())
+  const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const mixer = new THREE.AnimationMixer(mesh)
+  const action = mixer.clipAction(clip)
+  action.setLoop(THREE.LoopOnce, 0)
+  action.clampWhenFinished = true
+  action.play()
+  mixer.setTime(1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(mesh)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    assert.equal(morphTargets.length, 2)
+    assert.equal(morphTargets[0].name, 'morph_0')
+    assert.equal(morphTargets[1].name, 'morph_1')
+    assert.equal(clip.name, 'default')
+    assert.equal(clip.tracks[0].name, '.morphTargetInfluences')
+    assert.deepEqual(Array.from(clip.tracks[0].times), [0, 1])
+    assert.deepEqual(mesh.morphTargetInfluences, [0, 1])
+    assert.ok(
+      nonBackgroundRatio(renderRgba(scene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.12,
+      'MDDLoader morph clip should render visible morphed mesh pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
   }
 })
 
