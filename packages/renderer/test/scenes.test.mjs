@@ -78,7 +78,10 @@ import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerat
 import { RectAreaLightTexturesLib } from 'three/examples/jsm/lights/RectAreaLightTexturesLib.js'
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
+import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
+import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
 import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
 import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
 import { MeshPostProcessingMaterial } from 'three/examples/jsm/materials/MeshPostProcessingMaterial.js'
@@ -3920,6 +3923,13 @@ test('examples custom material helpers fail clearly on shader customization boun
       object.material.dispose()
     }
   }
+})
+
+test('examples LDrawConditionalLineNodeMaterial import fails clearly under installed TSL entrypoint', async () => {
+  await assert.rejects(
+    () => import('three/examples/jsm/materials/LDrawConditionalLineNodeMaterial.js'),
+    /does not provide an export named 'NodeMaterial'/i,
+  )
 })
 
 test('WebGPU Line2, LineSegments2, and Wireframe helpers fail clearly on NodeMaterial paths', () => {
