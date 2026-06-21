@@ -120,6 +120,7 @@ import { LDrawUtils } from 'three/examples/jsm/utils/LDrawUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
 import { SceneOptimizer } from 'three/examples/jsm/utils/SceneOptimizer.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
+import { radixSort } from 'three/examples/jsm/utils/SortUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
@@ -2232,6 +2233,56 @@ test('BatchedMesh customSort controls instance draw order', () => {
   assert.deepEqual(callbackList.map((item) => item.index).sort(), [near, far].sort())
   assert.ok(callbackList.every((item) => item.count > 0 && item.start >= 0 && Number.isFinite(item.z)))
   assert.ok(mean.b > mean.r + 80, `BatchedMesh customSort should draw custom-ordered blue instance last (${mean.b} vs ${mean.r})`)
+})
+
+test('examples SortUtils radixSort can order BatchedMesh customSort draw lists', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const nearGeometry = new THREE.PlaneGeometry(2, 2)
+  nearGeometry.translate(0, 0, 0.35)
+  const farGeometry = new THREE.PlaneGeometry(2, 2)
+  farGeometry.translate(0, 0, -0.35)
+
+  const batched = new THREE.BatchedMesh(
+    2,
+    nearGeometry.getAttribute('position').count + farGeometry.getAttribute('position').count,
+    nearGeometry.index.count + farGeometry.index.count,
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      depthWrite: false,
+      transparent: true,
+    }),
+  )
+  const nearGeometryId = batched.addGeometry(nearGeometry)
+  const farGeometryId = batched.addGeometry(farGeometry)
+  const near = batched.addInstance(nearGeometryId)
+  const far = batched.addInstance(farGeometryId)
+  batched.setMatrixAt(near, new THREE.Matrix4())
+  batched.setMatrixAt(far, new THREE.Matrix4())
+  batched.setColorAt(near, new THREE.Color(1, 0, 0))
+  batched.setColorAt(far, new THREE.Color(0, 0, 1))
+
+  const sortedKeys = new Uint32Array([7, 3, 11, 5])
+  radixSort(sortedKeys)
+  assert.deepEqual([...sortedKeys], [3, 5, 7, 11])
+
+  let sortedInstanceOrder = null
+  batched.setCustomSort((list) => {
+    radixSort(list, {
+      get: (item) => item.index === far ? 1 : 0,
+    })
+    sortedInstanceOrder = list.map((item) => item.index)
+  })
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const mean = meanRegion(renderRgba(scene, camera, { width: 64, height: 64 }), 64, 64, 24, 24, 40, 40)
+  assert.deepEqual(sortedInstanceOrder, [near, far])
+  assert.ok(mean.b > mean.r + 80, `SortUtils-ordered BatchedMesh draw list should render blue last (${mean.b} vs ${mean.r})`)
 })
 
 test('BatchedMesh default onBeforeRender does not re-enter customSort', () => {
