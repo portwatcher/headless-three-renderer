@@ -82,6 +82,7 @@ export function createSceneCorpus() {
     billboardAlphaCutoutCorpus(),
     billboardReceiveShadowNoopCorpus(),
     spriteShadowCorpus(),
+    billboardPointLightShadowCorpus(),
     billboardCustomShadowCutoutCorpus(),
     pointSpotLightCorpus(),
     rectAreaLightCorpus(),
@@ -2055,6 +2056,106 @@ function spriteShadowCorpus() {
       const litLum = lit.r + lit.g + lit.b
       if (!(shadowedLum < litLum - 120)) {
         throw new Error(`sprite shadow corpus should darken the receiver (${shadowedLum} vs ${litLum})`)
+      }
+    },
+  }
+}
+
+function billboardPointLightShadowCorpus() {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 6, 8)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = new Map()
+
+  function addReceiver(scene) {
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+  }
+
+  function addBillboard(scene, kind, castShadow) {
+    if (kind === 'sprite') {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffffff }))
+      sprite.position.set(0, 2.2, 1.8)
+      sprite.scale.set(4, 4, 1)
+      sprite.castShadow = castShadow
+      scene.add(sprite)
+      return
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 2.2, 1.8]), 3))
+    const points = new THREE.Points(geometry, new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 48,
+      sizeAttenuation: false,
+    }))
+    points.castShadow = castShadow
+    scene.add(points)
+  }
+
+  function addPointLight(scene) {
+    const light = new THREE.PointLight(0xffffff, 2)
+    light.position.set(0, 5, 4)
+    light.distance = 12
+    light.castShadow = true
+    light.shadow.mapSize.set(256, 256)
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 12
+    scene.add(light)
+  }
+
+  function makeScene(kind, castShadow) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+    addReceiver(scene)
+    addBillboard(scene, kind, castShadow)
+    addPointLight(scene)
+    return scene
+  }
+
+  function shadowLuminance(rgba) {
+    const mean = meanRegion(rgba, options.width, 28, 42, 68, 82)
+    return mean.r + mean.g + mean.b
+  }
+
+  return {
+    name: 'billboard-point-light-shadow-casters',
+    scene: makeScene('points', true),
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    render(renderer) {
+      let output = null
+      for (const kind of ['sprite', 'points']) {
+        const unshadowed = renderer.render(makeScene(kind, false), camera, options)
+        const shadowed = renderer.render(makeScene(kind, true), camera, options)
+        stats.set(kind, {
+          shadowedLum: shadowLuminance(shadowed),
+          unshadowedLum: shadowLuminance(unshadowed),
+        })
+        if (kind === 'points') {
+          output = shadowed
+        }
+      }
+      return output
+    },
+    validate() {
+      for (const kind of ['sprite', 'points']) {
+        const result = stats.get(kind)
+        if (!result) {
+          throw new Error(`billboard point-light shadow corpus did not record ${kind} stats`)
+        }
+        if (!(result.shadowedLum < result.unshadowedLum - 10)) {
+          throw new Error(`${kind} point-light billboard shadow should darken the receiver, stats=${JSON.stringify(Object.fromEntries(stats))}`)
+        }
       }
     },
   }
