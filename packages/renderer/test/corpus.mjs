@@ -12,6 +12,7 @@ export function createSceneCorpus() {
     customBlendingCorpus(),
     materialRenderStateNoopCorpus(),
     backgroundOverrideCorpus(),
+    optionBackgroundTextureControlsCorpus(),
     rendererClearColorFallbackCorpus(),
     twoDimensionalBackgroundTextureCorpus(),
     signedRawTextureCorpus(),
@@ -762,6 +763,66 @@ function backgroundOverrideCorpus() {
       const corner = meanRegion(rgba, width, 4, 4, 20, 20)
       if (!(center.g > center.r + 80 && center.g > center.b + 40 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
         throw new Error(`background override corpus should render green mesh on black option background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function optionBackgroundTextureControlsCorpus() {
+  const background = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]), 2, 1, THREE.RGBAFormat)
+  background.magFilter = THREE.NearestFilter
+  background.minFilter = THREE.NearestFilter
+  background.needsUpdate = true
+
+  const scene = new THREE.Scene()
+  scene.background = solidTexture(0, 0, 255)
+  scene.backgroundIntensity = 0
+  scene.backgroundBlurriness = 1
+
+  const camera = makeCamera([0, 0, 3])
+  const options = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    background,
+  }
+  const samples = {}
+
+  return {
+    name: 'option-background-texture-controls',
+    scene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.95,
+    browserReference: false,
+    render(renderer) {
+      const sharp = renderer.render(scene, camera, options)
+      const dimmed = renderer.render(scene, camera, {
+        ...options,
+        backgroundIntensity: 0.25,
+      })
+      const blurred = renderer.render(scene, camera, {
+        ...options,
+        backgroundBlurriness: 1,
+      })
+      samples.sharp = meanRegion(sharp, options.width, 42, 28, 47, 68)
+      samples.dimmed = meanRegion(dimmed, options.width, 42, 28, 47, 68)
+      samples.blurred = meanRegion(blurred, options.width, 42, 28, 47, 68)
+      return sharp
+    },
+    validate() {
+      if (!(samples.sharp.r > samples.sharp.g + 120 && samples.sharp.r > 180)) {
+        throw new Error(`option background texture controls should keep the option texture sharp and ignore scene intensity, samples=${JSON.stringify(samples)}`)
+      }
+      if (!(samples.dimmed.r < samples.sharp.r - 60)) {
+        throw new Error(`options.backgroundIntensity should dim the option texture, samples=${JSON.stringify(samples)}`)
+      }
+      if (!(samples.blurred.g > samples.sharp.g + 80 && samples.sharp.r > samples.blurred.r + 20)) {
+        throw new Error(`options.backgroundBlurriness should soften the option texture, samples=${JSON.stringify(samples)}`)
       }
     },
   }
