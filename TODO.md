@@ -59,7 +59,7 @@ Already supported in the current implementation:
 - Three.js examples `SkeletonUtils.clone()` remaps cloned skinned meshes to cloned bones, and the resulting `SkinnedMesh` renders through the supported CPU skinning path.
 - Three.js examples `AnimationClipCreator` material color and visibility clips apply through `AnimationMixer` before rendering, and `CCDIKSolver` updates bone chains with `CCDIKHelper` target/effector/link visualization rendering through supported built-in mesh and line material paths.
 - Three.js examples `CameraUtils.frameCorners()` writes an off-axis `PerspectiveCamera` projection/quaternion that renders framed scene content through the normal camera path.
-- Three.js examples environment scenes `DebugEnvironment` and `RoomEnvironment` render generated built-in geometry, mesh materials, and lights as normal scene graphs; CurveExtras and NURBS helpers generate curve, surface, and volume-derived geometry that renders through supported mesh and line paths.
+- Three.js examples environment scenes `DebugEnvironment` and `RoomEnvironment` render generated built-in geometry, mesh materials, and lights as normal scene graphs; CurveExtras, NURBS helpers, and low-level `NURBSUtils` samplers generate curve, surface, and volume-derived geometry that renders through supported mesh, line, and point paths.
 - Three.js examples `GroundedSkybox` renders generated textured sky geometry through supported `SphereGeometry` plus `MeshBasicMaterial` map paths.
 - Three.js examples `ShadowMesh` renders projected helper geometry through supported source geometry plus `MeshBasicMaterial` transparent/stencil state.
 - Three.js examples `MarchingCubes` generates metaball `BufferGeometry` on the CPU and renders it through supported built-in material paths.

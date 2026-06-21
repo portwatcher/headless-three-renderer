@@ -22,6 +22,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { TrefoilKnot } from 'three/examples/jsm/curves/CurveExtras.js'
 import { NURBSCurve } from 'three/examples/jsm/curves/NURBSCurve.js'
 import { NURBSSurface } from 'three/examples/jsm/curves/NURBSSurface.js'
+import * as NURBSUtils from 'three/examples/jsm/curves/NURBSUtils.js'
 import { NURBSVolume } from 'three/examples/jsm/curves/NURBSVolume.js'
 import { BoxLineGeometry } from 'three/examples/jsm/geometries/BoxLineGeometry.js'
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
@@ -4397,6 +4398,120 @@ test('examples CurveExtras and NURBS helpers render generated geometry paths', (
     curveMaterial.dispose()
     nurbsCurveGeometry.dispose()
     nurbsCurveMaterial.dispose()
+    surfaceGeometry.dispose()
+    surfaceMaterial.dispose()
+    volumeGeometry.dispose()
+    volumeMaterial.dispose()
+  }
+})
+
+test('examples NURBSUtils low-level samplers produce renderable geometry paths', () => {
+  const curveKnots = [0, 0, 0, 1, 1, 1]
+  const curveControls = [
+    new THREE.Vector4(-0.42, -0.26, 0, 1),
+    new THREE.Vector4(-0.05, 0.38, 0.18, 0.75),
+    new THREE.Vector4(0.42, -0.18, 0, 1),
+  ]
+
+  const span = NURBSUtils.findSpan(2, 0.5, curveKnots)
+  const basis = NURBSUtils.calcBasisFunctions(span, 0.5, 2, curveKnots)
+  const derivatives = NURBSUtils.calcNURBSDerivatives(2, curveKnots, curveControls, 0.5, 1)
+  assert.equal(span, 2)
+  assert.ok(Math.abs(basis.reduce((sum, value) => sum + value, 0) - 1) < 1e-12, 'basis functions should partition unity')
+  assert.ok(derivatives[1].length() > 0.1, 'curve derivative should expose a usable tangent')
+  assert.equal(NURBSUtils.calcKoverI(4, 2), 6)
+
+  const curvePoints = []
+  for (let i = 0; i <= 24; i++) {
+    const point = NURBSUtils.calcBSplinePoint(2, curveKnots, curveControls, i / 24)
+    curvePoints.push(new THREE.Vector3(point.x / point.w, point.y / point.w, point.z / point.w))
+  }
+  const curveGeometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(curvePoints), 32, 0.022, 6, false)
+  const curveMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444, side: THREE.DoubleSide })
+  const curveMesh = new THREE.Mesh(curveGeometry, curveMaterial)
+  curveMesh.position.x = -0.78
+
+  const surfaceKnots = [0, 0, 0, 1, 1, 1]
+  const surfaceControls = [
+    [
+      new THREE.Vector4(-0.3, -0.28, 0.02, 1),
+      new THREE.Vector4(-0.32, 0, 0.18, 1),
+      new THREE.Vector4(-0.3, 0.28, 0.02, 1),
+    ],
+    [
+      new THREE.Vector4(0, -0.3, 0.16, 1),
+      new THREE.Vector4(0, 0, 0.34, 0.8),
+      new THREE.Vector4(0, 0.3, 0.16, 1),
+    ],
+    [
+      new THREE.Vector4(0.3, -0.28, 0.02, 1),
+      new THREE.Vector4(0.32, 0, 0.18, 1),
+      new THREE.Vector4(0.3, 0.28, 0.02, 1),
+    ],
+  ]
+  const surfaceGeometry = new ParametricGeometry((u, v, target) => {
+    NURBSUtils.calcSurfacePoint(2, 2, surfaceKnots, surfaceKnots, surfaceControls, u, v, target)
+  }, 10, 10)
+  const surfaceMaterial = new THREE.MeshBasicMaterial({ color: 0x55ff66, side: THREE.DoubleSide })
+  const surfaceMesh = new THREE.Mesh(surfaceGeometry, surfaceMaterial)
+
+  const volumeKnots = [0, 0, 1, 1]
+  const volumeControls = [
+    [
+      [new THREE.Vector4(-0.22, -0.22, -0.05, 1), new THREE.Vector4(-0.18, -0.14, 0.18, 1)],
+      [new THREE.Vector4(-0.2, 0.22, 0.02, 1), new THREE.Vector4(-0.12, 0.24, 0.22, 1)],
+    ],
+    [
+      [new THREE.Vector4(0.2, -0.2, 0.02, 1), new THREE.Vector4(0.28, -0.14, 0.18, 1)],
+      [new THREE.Vector4(0.18, 0.2, 0.08, 1), new THREE.Vector4(0.3, 0.24, 0.26, 1)],
+    ],
+  ]
+  const volumePoints = [
+    [0, 0, 0],
+    [0.5, 0.5, 0.5],
+    [1, 1, 1],
+    [0, 1, 0],
+    [1, 0, 1],
+  ].map(([u, v, w]) => {
+    const point = new THREE.Vector3()
+    NURBSUtils.calcVolumePoint(1, 1, 1, volumeKnots, volumeKnots, volumeKnots, volumeControls, u, v, w, point)
+    return point.add(new THREE.Vector3(0.78, 0, 0))
+  })
+  const volumeGeometry = new THREE.BufferGeometry().setFromPoints(volumePoints)
+  const volumeMaterial = new THREE.PointsMaterial({ color: 0x6688ff, size: 8, sizeAttenuation: false })
+  const volumePointsObject = new THREE.Points(volumeGeometry, volumeMaterial)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(curveMesh, surfaceMesh, volumePointsObject)
+
+  const camera = new THREE.OrthographicCamera(-1.4, 1.4, 0.9, -0.9, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 80
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.equal(curveGeometry.getAttribute('position')?.count > 0, true)
+    assert.equal(surfaceGeometry.getAttribute('normal')?.count > 0, true)
+    assert.equal(volumeGeometry.getAttribute('position')?.count, 5)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 180 && g < 120 && b < 120) > 40,
+      'NURBSUtils curve samples should render red tube pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 140 && g > r + 35 && g > b + 20) > 70,
+      'NURBSUtils surface samples should render green mesh pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 170 && r < 140 && g < 170) > 40,
+      'NURBSUtils volume samples should render blue point pixels',
+    )
+  } finally {
+    curveGeometry.dispose()
+    curveMaterial.dispose()
     surfaceGeometry.dispose()
     surfaceMaterial.dispose()
     volumeGeometry.dispose()
