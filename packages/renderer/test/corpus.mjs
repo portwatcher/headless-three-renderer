@@ -2343,7 +2343,6 @@ function billboardReceiveShadowNoopCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.04,
-    browserReference: false,
     render(renderer) {
       let returned
       for (const kind of ['sprite', 'points']) {

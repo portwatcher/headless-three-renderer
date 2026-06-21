@@ -462,6 +462,13 @@
       "outputColorSpace": "srgb-linear"
     },
     {
+      "file": "billboard-receive-shadow-noop.png",
+      "name": "billboard-receive-shadow-noop",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "sprite-shadow-caster.png",
       "name": "sprite-shadow-caster",
       "width": 96,
