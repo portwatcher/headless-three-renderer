@@ -1454,6 +1454,70 @@ test('BatchedMesh packed geometry groups clip to partial draw ranges', () => {
   assert.ok(clippedRight.r < 5 && clippedRight.g < 5 && clippedRight.b < 5, `last skipped triangle should stay clipped out (${clippedRight.r}, ${clippedRight.g}, ${clippedRight.b})`)
 })
 
+test('BatchedMesh packed geometry groups preserve sparse gaps through clipped ranges', () => {
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.95, -0.45, 0,
+    -0.35, -0.45, 0,
+    -0.35, 0.45, 0,
+    -0.95, 0.45, 0,
+    -0.2, -0.45, 0,
+    0.2, -0.45, 0,
+    0.2, 0.45, 0,
+    -0.2, 0.45, 0,
+    0.35, -0.45, 0,
+    0.95, -0.45, 0,
+    0.95, 0.45, 0,
+    0.35, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+    8, 9, 10,
+    8, 10, 11,
+  ])
+
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batched.addGeometry(source)
+  batched.addInstance(geometryId)
+  batched.perObjectFrustumCulled = false
+
+  const range = batched.getGeometryRangeAt(geometryId, {})
+  batched.geometry.clearGroups()
+  batched.geometry.addGroup(range.start, 6, 0)
+  batched.geometry.addGroup(range.start + 12, 6, 1)
+
+  batched._geometryInfo[geometryId].start = range.start + 3
+  batched._geometryInfo[geometryId].count = 12
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 96, height: 64 })
+  const redPixels = countRegionPixels(rgba, 96, 64, 10, 14, 40, 52, (r, g, b) => r > g + 40 && r > b + 40)
+  const greenPixels = countRegionPixels(rgba, 96, 64, 62, 14, 92, 52, (r, g, b) => g > r + 40 && g > b + 40)
+  const gapMean = meanRegion(rgba, 96, 64, 42, 24, 54, 40)
+
+  assert.ok(redPixels > 40, `clipped sparse left group should keep visible red pixels (${redPixels})`)
+  assert.ok(greenPixels > 40, `clipped sparse right group should keep visible green pixels (${greenPixels})`)
+  assert.ok(gapMean.r < 5 && gapMean.g < 5 && gapMean.b < 5, `ungrouped packed geometry gap should stay skipped (${gapMean.r}, ${gapMean.g}, ${gapMean.b})`)
+})
+
 test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
   camera.position.set(0, 0, 3)
