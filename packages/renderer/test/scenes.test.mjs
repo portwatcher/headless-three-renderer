@@ -76,6 +76,7 @@ import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModif
 import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js'
 import InstancedPoints from 'three/examples/jsm/objects/InstancedPoints.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
+import { LensflareMesh } from 'three/examples/jsm/objects/LensflareMesh.js'
 import { MarchingCubes } from 'three/examples/jsm/objects/MarchingCubes.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
@@ -5689,10 +5690,22 @@ test('Three.js WebGPU examples NodeMaterial objects fail clearly', () => {
       normalMap1: solidTexture(128, 128, 255),
     })],
     ['InstancedPoints', () => new InstancedPoints()],
+    ['LensflareMesh', () => new LensflareMesh(), () => {
+      const previousWindow = globalThis.window
+      globalThis.window = { devicePixelRatio: 1 }
+      return () => {
+        if (previousWindow === undefined) {
+          delete globalThis.window
+        } else {
+          globalThis.window = previousWindow
+        }
+      }
+    }],
   ]
 
-  for (const [name, createObject] of cases) {
+  for (const [name, createObject, setup] of cases) {
     const renderer = new Renderer()
+    const cleanup = setup?.()
     try {
       const scene = new THREE.Scene()
       scene.add(createObject())
@@ -5703,6 +5716,7 @@ test('Three.js WebGPU examples NodeMaterial objects fail clearly', () => {
         `${name} should fail with NodeMaterial guidance`,
       )
     } finally {
+      cleanup?.()
       renderer.dispose?.()
     }
   }
