@@ -59,6 +59,7 @@ export function createSceneCorpus() {
     lightProbeCorpus(),
     lightProbeMaterialModelsCorpus(),
     linearFogCorpus(),
+    fogExp2MixedObjectCorpus(),
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
     customWgslPremultipliedCorpus(),
@@ -761,6 +762,72 @@ function linearFogCorpus() {
       const unfogged = meanRegion(rgba, width, 58, 24, 76, 72)
       if (!(fogged.b > fogged.r + 180 && unfogged.r > unfogged.b + 180)) {
         throw new Error(`linear fog corpus should keep only the opt-out panel red, got fogged=${JSON.stringify(fogged)} unfogged=${JSON.stringify(unfogged)}`)
+      }
+    },
+  }
+}
+
+function fogExp2MixedObjectCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.fog = new THREE.FogExp2(0x2255ff, 0.45)
+
+  const foggedColor = 0xff2200
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.44, 0.44),
+    new THREE.MeshBasicMaterial({ color: foggedColor }),
+  )
+  mesh.position.set(-0.55, 0.42, 0)
+  scene.add(mesh)
+
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ color: foggedColor, fog: true }))
+  sprite.position.set(0.55, 0.42, 0)
+  sprite.scale.set(0.46, 0.46, 1)
+  scene.add(sprite)
+
+  const pointGeometry = new THREE.BufferGeometry()
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.55, -0.42, 0]), 3))
+  scene.add(new THREE.Points(pointGeometry, new THREE.PointsMaterial({
+    color: foggedColor,
+    fog: true,
+    size: 28,
+    sizeAttenuation: false,
+  })))
+
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0.26, -0.55, 0),
+    new THREE.Vector3(0.84, -0.25, 0),
+  ])
+  scene.add(new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({
+    color: foggedColor,
+    fog: true,
+    linewidth: 8,
+  })))
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'fog-exp2-mixed-object-types',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    validate(rgba, { width, height }) {
+      const isFoggedBlue = (r, g, b) => b > 130 && b > r + 60 && b > g + 50
+      const regions = [
+        ['mesh', countRegionPixels(rgba, width, 18, 20, 34, 36, isFoggedBlue)],
+        ['sprite', countRegionPixels(rgba, width, 62, 20, 78, 36, isFoggedBlue)],
+        ['point', countRegionPixels(rgba, width, 15, 58, 37, 80, isFoggedBlue)],
+        ['line', countRegionPixels(rgba, width, 58, 52, 84, height, isFoggedBlue)],
+      ]
+      for (const [label, pixels] of regions) {
+        if (pixels < 20) {
+          throw new Error(`FogExp2 mixed-object corpus should tint ${label} toward blue, got ${pixels} blue pixels`)
+        }
       }
     },
   }
