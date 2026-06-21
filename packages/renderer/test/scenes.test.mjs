@@ -65,6 +65,7 @@ import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
 import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
 import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
+import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
@@ -3772,6 +3773,68 @@ test('MarchingCubes renders generated BufferGeometry with built-in materials', (
   } finally {
     cubes.geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples RollerCoaster geometries render generated track, lifter, and shadow meshes', () => {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-1.2, 0.35, -0.5),
+    new THREE.Vector3(-0.45, 0.9, 0.1),
+    new THREE.Vector3(0.35, 0.5, 0.5),
+    new THREE.Vector3(1.15, 0.75, -0.45),
+  ])
+  const trackGeometry = new RollerCoasterGeometry(curve, 18)
+  const liftersGeometry = new RollerCoasterLiftersGeometry(curve, 18)
+  const shadowGeometry = new RollerCoasterShadowGeometry(curve, 18)
+  const trackMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
+  const liftersMaterial = new THREE.MeshBasicMaterial({ color: 0xff6622, side: THREE.DoubleSide })
+  const shadowMaterial = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide })
+  const track = new THREE.Mesh(trackGeometry, trackMaterial)
+  const lifters = new THREE.Mesh(liftersGeometry, liftersMaterial)
+  const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial)
+  shadow.position.y = -0.02
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(shadow, lifters, track)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.3, -0.5, 0.01, 10)
+  camera.position.set(0, 2.0, 3.2)
+  camera.lookAt(0, 0.35, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 88
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(trackGeometry.getAttribute('position').count > 1000)
+    assert.ok(trackGeometry.getAttribute('normal').count > 1000)
+    assert.equal(trackGeometry.getAttribute('color').count, trackGeometry.getAttribute('position').count)
+    assert.ok(liftersGeometry.getAttribute('position').count > 100)
+    assert.ok(shadowGeometry.getAttribute('position').count > 50)
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.2,
+      'RollerCoaster generated geometries should render visible pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 180 && g > 180 && b > 180) > 120,
+      'RollerCoasterGeometry vertex colors should render white track pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 70 && g < 170 && b < 90) > 300,
+      'RollerCoasterLiftersGeometry should render orange support pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 20 && r < 80 && g > 20 && g < 80 && b > 20 && b < 80) > 120,
+      'RollerCoasterShadowGeometry should render dark projected pixels',
+    )
+  } finally {
+    trackGeometry.dispose()
+    liftersGeometry.dispose()
+    shadowGeometry.dispose()
+    trackMaterial.dispose()
+    liftersMaterial.dispose()
+    shadowMaterial.dispose()
   }
 })
 

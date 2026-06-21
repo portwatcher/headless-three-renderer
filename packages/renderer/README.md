@@ -150,7 +150,7 @@ The public API accepts only Three.js-like objects:
 - Three.js examples `AnimationClipCreator` material color and visibility clips apply through `AnimationMixer` before rendering, and `CCDIKSolver` updates bone chains with `CCDIKHelper` target/effector/link visualization rendering through supported built-in mesh and line material paths
 - Three.js examples `CameraUtils.frameCorners()` writes an off-axis `PerspectiveCamera` projection/quaternion that renders framed scene content through the normal camera path
 - Three.js examples `DebugEnvironment` and `RoomEnvironment` generate regular scene graphs with built-in geometry, mesh materials, and lights that render through the normal scene path; CurveExtras and NURBS helpers generate curve, surface, and volume-derived geometry that renders through supported mesh and line paths
-- Three.js examples `GroundedSkybox`, `ShadowMesh`, and `MarchingCubes` render generated helper geometry through supported built-in material paths after their normal example-object update steps
+- Three.js examples `GroundedSkybox`, `ShadowMesh`, `MarchingCubes`, `RollerCoasterGeometry`, `RollerCoasterLiftersGeometry`, and `RollerCoasterShadowGeometry` render generated helper geometry through supported built-in material paths after their normal example-object update steps
 - Three.js WebGPU/TSL examples `SkyMesh`, `WaterMesh`, `Water2Mesh`, and `InstancedPoints` fail clearly on their `NodeMaterial` paths with custom-WGSL guidance
 - Three.js `RectAreaLightHelper` renders its light outline and fill visualization through supported `LineBasicMaterial` and `MeshBasicMaterial` geometry
 - Three.js `PositionalAudioHelper` renders grouped cone line geometry through supported `Line` material-array groups with `LineBasicMaterial`
