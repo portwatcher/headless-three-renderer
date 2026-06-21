@@ -70,6 +70,7 @@ export function createSceneCorpus() {
     normalRenderModeCorpus(),
     depthRenderModeCorpus(),
     renderModeAlphaHashCutoutCorpus(),
+    renderModeTextureAlphaCutoutCorpus(),
     spriteMaterialCorpus(),
     spriteAlphaMapCorpus(),
     billboardAlphaCutoutCorpus(),
@@ -1178,6 +1179,96 @@ function renderModeAlphaHashCutoutCorpus() {
         }
         if (!(hashedPixels < opaquePixels - 250)) {
           throw new Error(`${renderMode} render mode should discard alphaHash pixels, hashed=${hashedPixels} opaque=${opaquePixels}`)
+        }
+      }
+    },
+  }
+}
+
+function renderModeTextureAlphaCutoutCorpus() {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const renderModes = ['mask', 'object-id', 'normal', 'depth']
+  const stats = {}
+  const leftRegion = [24, 42, 35, 54]
+  const rightRegion = [61, 42, 72, 54]
+
+  const cases = [
+    {
+      name: 'baseTextureAlpha',
+      makeDiscardedMaterial: () => new THREE.MeshBasicMaterial({
+        map: solidTexture(255, 255, 255, 0),
+        alphaTest: 0.5,
+      }),
+      makeVisibleMaterial: () => new THREE.MeshBasicMaterial({
+        map: solidTexture(255, 255, 255, 255),
+        alphaTest: 0.5,
+      }),
+    },
+    {
+      name: 'alphaMapGreen',
+      makeDiscardedMaterial: () => new THREE.MeshBasicMaterial({
+        alphaMap: solidTexture(255, 0, 255),
+        alphaTest: 0.5,
+      }),
+      makeVisibleMaterial: () => new THREE.MeshBasicMaterial({
+        alphaMap: solidTexture(255, 255, 255),
+        alphaTest: 0.5,
+      }),
+    },
+  ]
+
+  function makeScene(makeDiscardedMaterial, makeVisibleMaterial) {
+    const scene = new THREE.Scene()
+    const discarded = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), makeDiscardedMaterial())
+    const visible = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.8), makeVisibleMaterial())
+    discarded.position.x = -0.5
+    visible.position.x = 0.5
+    scene.add(discarded, visible)
+    return scene
+  }
+
+  function visiblePixels(rgba, region) {
+    return countRegionPixels(rgba, options.width, ...region, (r, g, b) => r > 0 || g > 0 || b > 0)
+  }
+
+  return {
+    name: 'render-mode-texture-alpha-cutouts',
+    scene: makeScene(cases[0].makeDiscardedMaterial, cases[0].makeVisibleMaterial),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.04,
+    browserReference: false,
+    render(renderer) {
+      let referenceOutput
+      for (const testCase of cases) {
+        for (const renderMode of renderModes) {
+          const rgba = renderer.render(
+            makeScene(testCase.makeDiscardedMaterial, testCase.makeVisibleMaterial),
+            camera,
+            { ...options, renderMode },
+          )
+          stats[`${testCase.name}:${renderMode}`] = {
+            leftPixels: visiblePixels(rgba, leftRegion),
+            rightPixels: visiblePixels(rgba, rightRegion),
+          }
+          if (testCase.name === 'baseTextureAlpha' && renderMode === 'mask') {
+            referenceOutput = rgba
+          }
+        }
+      }
+      return referenceOutput
+    },
+    validate() {
+      for (const [label, { leftPixels, rightPixels }] of Object.entries(stats)) {
+        if (!(leftPixels < 3)) {
+          throw new Error(`${label} render-mode texture cutout should discard the left region, left=${leftPixels}`)
+        }
+        if (!(rightPixels > 110)) {
+          throw new Error(`${label} render-mode texture cutout should keep the right region, right=${rightPixels}`)
         }
       }
     },
