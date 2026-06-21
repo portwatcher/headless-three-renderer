@@ -3339,6 +3339,53 @@ test('examples offscreen demo modules expose DOM and worker browser boundaries',
   }
 })
 
+test('examples physics helpers expose external engine dependency boundaries', async () => {
+  const { AmmoPhysics } = await import('three/examples/jsm/physics/AmmoPhysics.js')
+  const { JoltPhysics } = await import('three/examples/jsm/physics/JoltPhysics.js')
+  const { RapierPhysics } = await import('three/examples/jsm/physics/RapierPhysics.js')
+
+  assert.equal(typeof AmmoPhysics, 'function')
+  assert.equal(typeof JoltPhysics, 'function')
+  assert.equal(typeof RapierPhysics, 'function')
+
+  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
+  const previousWindow = globalThis.window
+  const previousError = console.error
+  const errors = []
+
+  try {
+    delete globalThis.window
+    await assert.rejects(
+      () => AmmoPhysics(),
+      /window is not defined/i,
+      'AmmoPhysics should expose its browser window dependency in plain Node',
+    )
+
+    globalThis.window = {}
+    console.error = (message) => errors.push(String(message))
+    assert.equal(await AmmoPhysics(), undefined)
+    assert.deepEqual(errors, ['AmmoPhysics: Couldn\'t find Ammo.js'])
+
+    await assert.rejects(
+      () => JoltPhysics(),
+      /Only URLs with a scheme in: file and data.*https/i,
+      'JoltPhysics should expose its CDN ESM dependency under Node',
+    )
+    await assert.rejects(
+      () => RapierPhysics(),
+      /Only URLs with a scheme in: file and data.*https/i,
+      'RapierPhysics should expose its CDN ESM dependency under Node',
+    )
+  } finally {
+    console.error = previousError
+    if (hadWindow) {
+      globalThis.window = previousWindow
+    } else {
+      delete globalThis.window
+    }
+  }
+})
+
 test('examples Addons barrel imports in Node and exposes covered helper modules', async () => {
   const Addons = await import('three/examples/jsm/Addons.js')
 
