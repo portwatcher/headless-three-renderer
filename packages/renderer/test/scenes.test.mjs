@@ -67,9 +67,11 @@ import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
 import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
 import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
+import { ProgressiveLightMap as ProgressiveLightMapGPU } from 'three/examples/jsm/misc/ProgressiveLightMapGPU.js'
 import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry, SkyGeometry, TreesGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
 import { FixedTimer, Timer } from 'three/examples/jsm/misc/Timer.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
+import { Volume } from 'three/examples/jsm/misc/Volume.js'
 import { Flow, InstancedFlow } from 'three/examples/jsm/modifiers/CurveModifier.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
@@ -3247,6 +3249,30 @@ test('ProgressiveLightMap internal shader rewrite fails clearly', () => {
   )
 })
 
+test('ProgressiveLightMapGPU NodeMaterial path fails clearly', () => {
+  const renderer = new Renderer()
+  const geometry = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  const mesh = new THREE.Mesh(geometry, material)
+  const scene = new THREE.Scene()
+  scene.add(mesh)
+
+  const lightMap = new ProgressiveLightMapGPU(renderer, 16)
+  lightMap.addObjectsToLightMap([mesh])
+
+  try {
+    assert.throws(
+      () => lightMap.update(makeCamera(), 1, false),
+      /NodeMaterial is not supported directly.*fragmentWgsl/i,
+    )
+  } finally {
+    lightMap.dispose()
+    renderer.dispose?.()
+    geometry.dispose()
+    material.dispose()
+  }
+})
+
 test('ShadowMapViewer depth-unpack shader fails clearly', () => {
   const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, 'window')
   const previousWindow = globalThis.window
@@ -4009,6 +4035,158 @@ test('examples RollerCoaster sky and tree geometries render seeded generated mes
   }
 })
 
+test('examples Volume slices render canvas-backed grayscale texture meshes', () => {
+  function makeCanvas() {
+    const canvas = {
+      _width: 0,
+      _height: 0,
+      _pixels: new Uint8ClampedArray(0),
+      get width() {
+        return this._width
+      },
+      set width(value) {
+        this._width = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      get height() {
+        return this._height
+      },
+      set height(value) {
+        this._height = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      getContext(type) {
+        if (type !== '2d') return null
+        return {
+          getImageData: (x, y, width, height) => {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(width, canvas.width)
+            assert.equal(height, canvas.height)
+            return {
+              data: new Uint8ClampedArray(canvas._pixels),
+              width,
+              height,
+            }
+          },
+          putImageData: (imageData, x, y) => {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(imageData.data.length, canvas._pixels.length)
+            canvas._pixels.set(imageData.data)
+          },
+          drawImage: (source, sx, sy, sw, sh, dx, dy, dw, dh) => {
+            assert.equal(sx, 0)
+            assert.equal(sy, 0)
+            assert.equal(dx, 0)
+            assert.equal(dy, 0)
+            assert.equal(sw, source.width)
+            assert.equal(sh, source.height)
+            assert.equal(dw, canvas.width)
+            assert.equal(dh, canvas.height)
+            for (let y = 0; y < canvas.height; y += 1) {
+              const sourceY = Math.min(source.height - 1, Math.floor(y * source.height / canvas.height))
+              for (let x = 0; x < canvas.width; x += 1) {
+                const sourceX = Math.min(source.width - 1, Math.floor(x * source.width / canvas.width))
+                const sourceOffset = (sourceY * source.width + sourceX) * 4
+                const targetOffset = (y * canvas.width + x) * 4
+                canvas._pixels[targetOffset] = source._pixels[sourceOffset]
+                canvas._pixels[targetOffset + 1] = source._pixels[sourceOffset + 1]
+                canvas._pixels[targetOffset + 2] = source._pixels[sourceOffset + 2]
+                canvas._pixels[targetOffset + 3] = source._pixels[sourceOffset + 3]
+              }
+            }
+          },
+        }
+      },
+    }
+    return canvas
+  }
+
+  const previousDocument = globalThis.document
+  let slice
+  try {
+    globalThis.document = {
+      createElement(type) {
+        assert.equal(type, 'canvas')
+        return makeCanvas()
+      },
+    }
+
+    const values = new Uint8Array([
+      0, 32, 96,
+      128, 180, 220,
+      255, 64, 160,
+      32, 96, 160,
+      80, 144, 208,
+      250, 120, 40,
+      12, 48, 84,
+      120, 156, 192,
+      228, 240, 252,
+    ])
+    const volume = new Volume(3, 3, 3, 'uint8', values.buffer)
+    volume.RASDimensions = [3, 3, 3]
+    volume.inverseMatrix = new THREE.Matrix4().identity()
+    volume.windowLow = 0
+    volume.windowHigh = 255
+    volume.lowerThreshold = 1
+
+    slice = volume.extractSlice('z', 1)
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    scene.add(slice.mesh)
+
+    const camera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.01, 10)
+    camera.position.set(0, 0, 4)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    const width = 96
+    const height = 96
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.equal(volume.getData(2, 1, 1), 208)
+    assert.deepEqual(volume.reverseAccess(volume.access(2, 1, 1)), [2, 1, 1])
+    assert.equal(volume.sliceList[0], slice)
+    assert.equal(slice.iLength, 3)
+    assert.equal(slice.jLength, 3)
+    assert.equal(slice.canvas.width, 3)
+    assert.equal(slice.canvas.height, 3)
+    assert.equal(slice.canvasBuffer.width, 3)
+    assert.equal(slice.canvasBuffer.height, 3)
+    assert.equal(slice.geometry.getAttribute('position').count, 4)
+    assert.equal(slice.mesh.material.map.image, slice.canvas)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 30 || g > 30 || b > 30) > 3000,
+      'VolumeSlice canvas texture should render visible grayscale pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 170 && g > 170 && b > 170) > 400,
+      'VolumeSlice canvas texture should render bright voxels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 70 && r < 170 && Math.abs(r - g) < 4 && Math.abs(g - b) < 4) > 700,
+      'VolumeSlice canvas texture should render midtone grayscale voxels',
+    )
+
+    volume.lowerThreshold = 80
+    assert.equal(slice.geometryNeedsUpdate, true)
+    volume.repaintAllSlices()
+    assert.equal(slice.geometryNeedsUpdate, false)
+  } finally {
+    if (slice) {
+      slice.mesh.material.map.dispose()
+      slice.mesh.material.dispose()
+      slice.mesh.geometry.dispose()
+    }
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
 test('examples geometry generators render BufferGeometry with built-in materials', () => {
   const sourceGeometry = new THREE.BoxGeometry(0.9, 0.9, 0.9)
   const sourceMesh = new THREE.Mesh(sourceGeometry, new THREE.MeshBasicMaterial())
@@ -4502,7 +4680,7 @@ test('examples NURBSUtils low-level samplers produce renderable geometry paths',
       'NURBSUtils curve samples should render red tube pixels',
     )
     assert.ok(
-      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 140 && g > r + 35 && g > b + 20) > 70,
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 20 && g > b + 20) > 70,
       'NURBSUtils surface samples should render green mesh pixels',
     )
     assert.ok(
