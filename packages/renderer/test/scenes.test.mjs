@@ -27743,10 +27743,15 @@ test('reusable renderer reuses cached dashed-line expansion until dash inputs ch
   assert.ok(secondCenter.g > secondCenter.r + 80, `material color should remain live while dashed-line expansion is cached (${secondCenter.r}, ${secondCenter.g}, ${secondCenter.b})`)
   assert.equal(lineDistanceReads, readsAfterFirstRender, 'material/transform animation should reuse cached dashed-line expansion')
 
+  material.scale = 2
+  renderer.render(scene, camera, options)
+  const readsAfterScaleStateChange = lineDistanceReads
+  assert.ok(readsAfterScaleStateChange > readsAfterFirstRender, 'dash scale changes should invalidate cached dashed-line expansion')
+
   material.gapSize = 0.15
   renderer.render(scene, camera, options)
   const readsAfterDashStateChange = lineDistanceReads
-  assert.ok(readsAfterDashStateChange > readsAfterFirstRender, 'dash-state changes should invalidate cached dashed-line expansion')
+  assert.ok(readsAfterDashStateChange > readsAfterScaleStateChange, 'dash-state changes should invalidate cached dashed-line expansion')
 
   lineDistance.array[1] = 1.4
   lineDistance.needsUpdate = true
@@ -27822,12 +27827,19 @@ test('reusable renderer reuses cached instanced dashed-line expansion until inpu
   assert.equal(offsetReads, offsetReadsAfterFirstRender, 'material/transform animation should reuse cached instanced dashed-line offsets')
   assert.equal(lineDistanceReads, lineDistanceReadsAfterFirstRender, 'material/transform animation should reuse cached instanced dashed-line distances')
 
+  material.scale = 2
+  renderer.render(scene, camera, options)
+  const offsetReadsAfterScaleStateChange = offsetReads
+  const lineDistanceReadsAfterScaleStateChange = lineDistanceReads
+  assert.ok(offsetReadsAfterScaleStateChange > offsetReadsAfterFirstRender, 'dash scale changes should invalidate cached instanced dashed-line offsets')
+  assert.ok(lineDistanceReadsAfterScaleStateChange > lineDistanceReadsAfterFirstRender, 'dash scale changes should invalidate cached instanced dashed-line distances')
+
   material.gapSize = 0.1
   renderer.render(scene, camera, options)
   const offsetReadsAfterDashStateChange = offsetReads
   const lineDistanceReadsAfterDashStateChange = lineDistanceReads
-  assert.ok(offsetReadsAfterDashStateChange > offsetReadsAfterFirstRender, 'dash-state changes should invalidate cached instanced dashed-line offsets')
-  assert.ok(lineDistanceReadsAfterDashStateChange > lineDistanceReadsAfterFirstRender, 'dash-state changes should invalidate cached instanced dashed-line distances')
+  assert.ok(offsetReadsAfterDashStateChange > offsetReadsAfterScaleStateChange, 'dash-state changes should invalidate cached instanced dashed-line offsets')
+  assert.ok(lineDistanceReadsAfterDashStateChange > lineDistanceReadsAfterScaleStateChange, 'dash-state changes should invalidate cached instanced dashed-line distances')
 
   offset.array[0] = -0.3
   offset.needsUpdate = true
