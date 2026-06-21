@@ -15,7 +15,9 @@ import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
 import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
+import { DRACOExporter } from 'three/examples/jsm/exporters/DRACOExporter.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { PLYExporter } from 'three/examples/jsm/exporters/PLYExporter.js'
@@ -29982,6 +29984,21 @@ test('Three.js exporters read targets through the WebGLRenderer marker path', as
 })
 
 test('Three.js scene graph exporters serialize renderer-visible geometry', async () => {
+  class FileReaderShim {
+    result = null
+    onloadend = null
+
+    async readAsArrayBuffer(blob) {
+      this.result = await blob.arrayBuffer()
+      this.onloadend?.({ target: this })
+    }
+
+    async readAsDataURL(blob) {
+      this.result = `data:${blob.type || 'application/octet-stream'};base64,${Buffer.from(await blob.arrayBuffer()).toString('base64')}`
+      this.onloadend?.({ target: this })
+    }
+  }
+
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
 
@@ -30081,6 +30098,28 @@ test('Three.js scene graph exporters serialize renderer-visible geometry', async
     assert.match(ply, /^property uchar red$/m)
     assert.match(ply, /^3 0 2 1$/m)
 
+    const previousFileReader = globalThis.FileReader
+    try {
+      globalThis.FileReader = FileReaderShim
+      const gltf = await new GLTFExporter().parseAsync(mesh, { binary: false })
+      assert.equal(gltf.asset.version, '2.0')
+      assert.equal(gltf.meshes.length, 1)
+      assert.equal(gltf.nodes.some((node) => node.name === 'export-mesh'), true)
+      assert.match(gltf.buffers[0].uri, /^data:application\/octet-stream;base64,/)
+
+      const glb = await new GLTFExporter().parseAsync(mesh, { binary: true })
+      const glbHeader = new DataView(glb)
+      assert.equal(glbHeader.getUint32(0, true), 0x46546c67)
+      assert.equal(glbHeader.getUint32(4, true), 2)
+      assert.equal(glbHeader.getUint32(8, true), glb.byteLength)
+    } finally {
+      if (previousFileReader === undefined) {
+        delete globalThis.FileReader
+      } else {
+        globalThis.FileReader = previousFileReader
+      }
+    }
+
     const usdzScene = new THREE.Scene()
     usdzScene.background = new THREE.Color(0x000000)
     const usdzGeometry = new THREE.BoxGeometry(0.7, 0.7, 0.7)
@@ -30122,6 +30161,20 @@ test('Three.js scene graph exporters serialize renderer-visible geometry', async
     lineMaterial.dispose()
     pointsGeometry.dispose()
     pointsMaterial.dispose()
+  }
+})
+
+test('DRACOExporter external encoder requirement fails clearly', () => {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial())
+
+  try {
+    assert.throws(
+      () => new DRACOExporter().parse(mesh),
+      /required the draco_encoder to work|DracoEncoderModule is not defined/i,
+    )
+  } finally {
+    mesh.geometry.dispose()
+    mesh.material.dispose()
   }
 })
 
