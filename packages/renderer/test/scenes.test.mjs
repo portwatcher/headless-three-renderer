@@ -14,6 +14,7 @@ import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
+import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 import { Water } from 'three/examples/jsm/objects/Water.js'
@@ -2715,6 +2716,51 @@ test('Three.js scene helper shader materials fail clearly with helper guidance',
         return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
       },
       /Water2 internal WaterShader ShaderMaterial.*not translated.*reflection\/refraction targets.*custom WGSL/i,
+    ],
+    [
+      'Reflector',
+      () => {
+        const renderer = new Renderer()
+        const scene = new THREE.Scene()
+        scene.add(new Reflector(new THREE.PlaneGeometry(1, 1), {
+          textureWidth: 16,
+          textureHeight: 16,
+          multisample: 0,
+        }))
+        const camera = makeFlatCamera()
+        return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
+      },
+      /Reflector internal ReflectorShader ShaderMaterial.*not translated.*target prepass.*custom WGSL/i,
+    ],
+    [
+      'Refractor',
+      () => {
+        const renderer = new Renderer()
+        const scene = new THREE.Scene()
+        scene.add(new Refractor(new THREE.PlaneGeometry(1, 1), {
+          textureWidth: 16,
+          textureHeight: 16,
+          multisample: 0,
+        }))
+        const camera = makeFlatCamera()
+        return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
+      },
+      /Refractor internal RefractorShader ShaderMaterial.*not translated.*target prepass.*custom WGSL/i,
+    ],
+    [
+      'ReflectorForSSRPass',
+      () => {
+        const renderer = new Renderer()
+        const scene = new THREE.Scene()
+        scene.add(new ReflectorForSSRPass(new THREE.PlaneGeometry(1, 1), {
+          textureWidth: 16,
+          textureHeight: 16,
+          resolution: new THREE.Vector2(16, 16),
+        }))
+        const camera = makeFlatCamera()
+        return () => renderer.render(scene, camera, { width: 16, height: 16, format: 'rgba' })
+      },
+      /ReflectorForSSRPass internal ReflectorShader ShaderMaterial.*not translated.*custom WGSL.*SSR reflector/i,
     ],
   ]
 

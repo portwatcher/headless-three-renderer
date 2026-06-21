@@ -2205,6 +2205,24 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeReflectorForSsrPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.ReflectorForSSRPass internal ReflectorShader ShaderMaterial is not translated by @headless-three/renderer yet. Use supported scene/environment/material inputs, render reflector targets separately, provide a custom WGSL fragment for an equivalent SSR reflector material, or compose SSR reflections outside this helper.",
+    )
+  }
+
+  if (isThreeReflectorShaderMaterial(material)) {
+    throw new Error(
+      "THREE.Reflector internal ReflectorShader ShaderMaterial is not translated by @headless-three/renderer yet. The helper-owned target prepass is covered, but the final projective reflection material still needs a custom WGSL fragment or an external composition step.",
+    )
+  }
+
+  if (isThreeRefractorShaderMaterial(material)) {
+    throw new Error(
+      "THREE.Refractor internal RefractorShader ShaderMaterial is not translated by @headless-three/renderer yet. The helper-owned target prepass is covered, but the final projective refraction material still needs a custom WGSL fragment or an external composition step.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2824,6 +2842,87 @@ function isThreeWater2ShaderMaterial(material: ThreeMaterialLike): boolean {
     compact.includes('vec4normalColor0=texture2D(tNormalMap0,(vUv*scale)+flow*flowMapOffset0);') &&
     compact.includes('vec4reflectColor=texture2D(tReflectionMap,vec2(1.0-uv.x,uv.y));') &&
     compact.includes('gl_FragColor=vec4(color,1.0)*mix(refractColor,reflectColor,reflectance);')
+}
+
+function isThreeReflectorForSsrPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    material.name !== 'ReflectorShader' ||
+    values.color == null ||
+    values.tDiffuse == null ||
+    values.tDepth == null ||
+    values.textureMatrix == null ||
+    values.maxDistance == null ||
+    values.opacity == null ||
+    values.fresnelCoe == null ||
+    values.virtualCameraNear == null ||
+    values.virtualCameraFar == null ||
+    values.virtualCameraProjectionMatrix == null ||
+    values.virtualCameraMatrixWorld == null ||
+    values.virtualCameraProjectionMatrixInverse == null ||
+    values.resolution == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtDepth;') &&
+    compact.includes('uniformfloatmaxDistance;') &&
+    compact.includes('floatgetViewZ(constinfloatdepth)') &&
+    compact.includes('returnperspectiveDepthToViewZ(depth,virtualCameraNear,virtualCameraFar);') &&
+    compact.includes('vec3worldPosition=(virtualCameraMatrixWorld*vec4(viewPosition,1)).xyz;') &&
+    compact.includes('gl_FragColor=vec4(blendOverlay(base.rgb,color),op);')
+}
+
+function isThreeReflectorShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    material.name !== 'ReflectorShader' ||
+    values.color == null ||
+    values.tDiffuse == null ||
+    values.textureMatrix == null ||
+    values.tDepth != null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('floatblendOverlay(floatbase,floatblend)') &&
+    compact.includes('vec3blendOverlay(vec3base,vec3blend)') &&
+    compact.includes('vec4base=texture2DProj(tDiffuse,vUv);') &&
+    compact.includes('gl_FragColor=vec4(blendOverlay(base.rgb,color),1.0);')
+}
+
+function isThreeRefractorShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    material.name !== 'RefractorShader' ||
+    values.color == null ||
+    values.tDiffuse == null ||
+    values.textureMatrix == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('floatblendOverlay(floatbase,floatblend)') &&
+    compact.includes('vec3blendOverlay(vec3base,vec3blend)') &&
+    compact.includes('vec4base=texture2DProj(tDiffuse,vUv);') &&
+    compact.includes('gl_FragColor=vec4(blendOverlay(base.rgb,color),1.0);')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {
