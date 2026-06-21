@@ -15,6 +15,7 @@ import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerat
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js'
+import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
@@ -2843,6 +2844,22 @@ test('EffectComposer AfterimagePass internal shader pass fails clearly', () => {
     } else {
       delete globalThis.window
     }
+  }
+})
+
+test('EffectComposer BloomPass internal convolution shader pass fails clearly', () => {
+  const renderer = new Renderer()
+  const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+  const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+  const pass = new BloomPass(1, 3, 1)
+
+  try {
+    assert.throws(
+      () => pass.render(renderer, writeBuffer, readBuffer, 0.016, false),
+      /BloomPass internal convolution ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    )
+  } finally {
+    pass.dispose()
   }
 })
 

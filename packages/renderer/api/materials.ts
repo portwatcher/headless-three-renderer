@@ -2079,6 +2079,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeBloomPassConvolutionShaderMaterial(material)) {
+    throw new Error(
+      "THREE.BloomPass internal convolution ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent blur/composite pass, or compose bloom outside this helper.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2145,6 +2151,23 @@ function isThreeAfterimagePassShaderMaterial(material: ThreeMaterialLike): boole
     compact.includes('uniformsampler2DtNew;') &&
     compact.includes('texelOld*=damp*when_gt(texelOld,0.1);') &&
     compact.includes('gl_FragColor=max(texelNew,texelOld);')
+}
+
+function isThreeBloomPassConvolutionShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.tDiffuse == null || values.uImageIncrement == null || values.cKernel == null) return false
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatcKernel[KERNEL_SIZE_INT];') &&
+    compact.includes('uniformsampler2DtDiffuse;') &&
+    compact.includes('uniformvec2uImageIncrement;') &&
+    compact.includes('sum+=texture2D(tDiffuse,imageCoord)*cKernel[i];') &&
+    compact.includes('imageCoord+=uImageIncrement;') &&
+    compact.includes('gl_FragColor=sum;')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {
