@@ -3625,7 +3625,9 @@ test('examples WebXR hand and controller model helpers update renderable local g
   const { OculusHandModel } = await import('three/examples/jsm/webxr/OculusHandModel.js')
   const { OculusHandPointerModel } = await import('three/examples/jsm/webxr/OculusHandPointerModel.js')
   const { XRControllerModelFactory } = await import('three/examples/jsm/webxr/XRControllerModelFactory.js')
+  const { XRHandMeshModel } = await import('three/examples/jsm/webxr/XRHandMeshModel.js')
   const { XRHandModelFactory } = await import('three/examples/jsm/webxr/XRHandModelFactory.js')
+  assert.equal(typeof XRHandMeshModel, 'function')
 
   const jointNames = [
     'wrist',
