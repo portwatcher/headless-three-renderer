@@ -2922,6 +2922,18 @@ test('core Three helpers render supported line and basic material geometry', () 
       sourceCamera.updateMatrixWorld(true)
       return new THREE.CameraHelper(sourceCamera)
     }],
+    ['SkeletonHelper', () => {
+      const root = new THREE.Bone()
+      root.position.set(-0.35, -0.25, 0)
+      const elbow = new THREE.Bone()
+      elbow.position.set(0.35, 0.5, 0)
+      const tip = new THREE.Bone()
+      tip.position.set(0.28, -0.15, 0.2)
+      root.add(elbow)
+      elbow.add(tip)
+      root.updateMatrixWorld(true)
+      return new THREE.SkeletonHelper(root)
+    }],
     ['DirectionalLightHelper', () => {
       const light = new THREE.DirectionalLight(0xffffff, 1)
       light.position.set(0, 0, 0.35)
