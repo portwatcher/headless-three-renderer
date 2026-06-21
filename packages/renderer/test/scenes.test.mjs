@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
 import { AnimationClipCreator } from 'three/examples/jsm/animation/AnimationClipCreator.js'
+import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
 import { CSM } from 'three/examples/jsm/csm/CSM.js'
 import { CSMHelper } from 'three/examples/jsm/csm/CSMHelper.js'
 import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
@@ -4367,6 +4368,86 @@ test('examples AnimationClipCreator clips apply renderable still-frame state', (
     colorMaterial.dispose()
     hiddenGeometry.dispose()
     hiddenMaterial.dispose()
+  }
+})
+
+test('examples CCDIKSolver updates and renders supported helper geometry', () => {
+  const geometry = new THREE.BufferGeometry()
+  const material = new THREE.MeshBasicMaterial()
+  const mesh = new THREE.SkinnedMesh(geometry, material)
+  const rootBone = new THREE.Bone()
+  rootBone.name = 'root'
+  const targetBone = new THREE.Bone()
+  targetBone.name = 'target'
+  targetBone.position.set(0.4, 0.35, 0)
+  rootBone.add(targetBone)
+  const linkBone = new THREE.Bone()
+  linkBone.name = 'link'
+  rootBone.add(linkBone)
+  const effectorBone = new THREE.Bone()
+  effectorBone.name = 'effector'
+  effectorBone.position.set(0, 0.55, 0)
+  linkBone.add(effectorBone)
+  mesh.add(rootBone)
+  mesh.bind(new THREE.Skeleton([targetBone, linkBone, effectorBone]))
+  mesh.updateMatrixWorld(true)
+
+  const targetPosition = new THREE.Vector3().setFromMatrixPosition(targetBone.matrixWorld)
+  const beforeEffectorPosition = new THREE.Vector3().setFromMatrixPosition(effectorBone.matrixWorld)
+  const beforeDistance = beforeEffectorPosition.distanceTo(targetPosition)
+
+  const ik = {
+    target: 0,
+    effector: 2,
+    links: [{ index: 1 }],
+    iteration: 8,
+    minAngle: 0,
+    maxAngle: 0.35,
+  }
+  const solver = new CCDIKSolver(mesh, [ik])
+  solver.update()
+  mesh.updateMatrixWorld(true)
+  const afterEffectorPosition = new THREE.Vector3().setFromMatrixPosition(effectorBone.matrixWorld)
+  const afterDistance = afterEffectorPosition.distanceTo(targetPosition)
+
+  const helper = solver.createHelper(0.1)
+  helper.lineMaterial.linewidth = 4
+  helper.updateMatrixWorld(true)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(helper)
+
+  const camera = new THREE.OrthographicCamera(-0.8, 0.8, 0.8, -0.2, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(afterDistance < beforeDistance, `CCDIKSolver should move effector closer to target (${beforeDistance} -> ${afterDistance})`)
+    assert.ok(Math.abs(linkBone.rotation.z) > 0.2, 'CCDIKSolver should rotate the IK link bone')
+    assert.equal(helper.children.length, 4, 'CCDIKHelper should create target, effector, link, and line children')
+    assert.ok(helper.children.some((child) => child.isLine), 'CCDIKHelper should include a line path')
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 120) > 100,
+      'CCDIKHelper line path should render red pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 140 && g > r + 30 && g > b + 20) > 80,
+      'CCDIKHelper effector sphere should render green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 140 && b > r + 20 && b > g + 20) > 80,
+      'CCDIKHelper link sphere should render blue pixels',
+    )
+  } finally {
+    helper.dispose()
+    geometry.dispose()
+    material.dispose()
   }
 })
 
