@@ -70,6 +70,8 @@ import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js'
 import { ConvexObjectBreaker } from 'three/examples/jsm/misc/ConvexObjectBreaker.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
+import { MD2Character } from 'three/examples/jsm/misc/MD2Character.js'
+import { MD2CharacterComplex } from 'three/examples/jsm/misc/MD2CharacterComplex.js'
 import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
 import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
@@ -5695,6 +5697,195 @@ test('examples morph animation helpers drive renderable CPU morph target state',
     animMaterial.dispose()
     blendGeometry.dispose()
     blendMaterial.dispose()
+  }
+})
+
+test('examples MD2 character helpers manage renderable synthetic parts', () => {
+  const createSimplePart = (map, x) => {
+    const geometry = new THREE.BoxGeometry(0.32, 0.32, 0.18)
+    const materialTexture = new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide })
+    const materialWireframe = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true, side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(geometry, materialTexture)
+    mesh.position.x = x
+    mesh.materialTexture = materialTexture
+    mesh.materialWireframe = materialWireframe
+    mesh.animations = [new THREE.AnimationClip('idle', 1, [])]
+    return mesh
+  }
+
+  const createMd2MorphGeometry = () => {
+    const geometry = new THREE.BoxGeometry(0.28, 0.28, 0.18)
+    const position = geometry.getAttribute('position')
+    geometry.morphTargetsRelative = true
+    geometry.morphAttributes.position = ['idle_01', 'idle_02', 'move_01', 'move_02'].map((name, frame) => {
+      const values = new Float32Array(position.count * 3)
+      for (let i = 0; i < position.count; i += 1) values[i * 3] = frame >= 2 ? 0.04 : 0
+      const attribute = new THREE.Float32BufferAttribute(values, 3)
+      attribute.name = name
+      return attribute
+    })
+    return geometry
+  }
+
+  const simpleBodySkin = solidTexture(255, 80, 80)
+  const simpleBodyReplacementSkin = solidTexture(60, 255, 90)
+  const simpleWeaponSkin = solidTexture(80, 130, 255)
+  const simpleWeaponReplacementSkin = solidTexture(255, 220, 60)
+  const complexBodySkin = solidTexture(255, 80, 220)
+  const complexBodyReplacementSkin = solidTexture(80, 230, 255)
+  const complexWeaponSkin = solidTexture(255, 80, 255)
+
+  const simple = new MD2Character()
+  const simpleBody = createSimplePart(simpleBodySkin, -0.8)
+  const simpleWeapon = createSimplePart(simpleWeaponSkin, -0.45)
+  const simpleActiveWeapon = createSimplePart(simpleWeaponReplacementSkin, -0.45)
+  simpleWeapon.visible = false
+  simpleActiveWeapon.visible = false
+  simple.skinsBody = [simpleBodySkin, simpleBodyReplacementSkin]
+  simple.skinsWeapon = [simpleWeaponSkin, simpleWeaponReplacementSkin]
+  simple.meshBody = simpleBody
+  simple.meshWeapon = simpleWeapon
+  simple.weapons = [simpleWeapon, simpleActiveWeapon]
+  simple.mixer = new THREE.AnimationMixer(simpleBody)
+  simple.root.add(simpleBody, simpleWeapon, simpleActiveWeapon)
+
+  const complexSource = new MD2CharacterComplex()
+  complexSource.animations = {
+    idle: 'idle',
+    move: 'move',
+    crouchIdle: 'idle',
+    crouchMove: 'move',
+    jump: 'idle',
+    attack: 'move',
+    crouchAttack: 'move',
+  }
+  complexSource.walkSpeed = 1
+  complexSource.crouchSpeed = 0.5
+  complexSource.skinsBody = [complexBodySkin, complexBodyReplacementSkin]
+  complexSource.skinsWeapon = [complexWeaponSkin]
+  const complexBodyGeometry = createMd2MorphGeometry()
+  const complexWeaponGeometry = createMd2MorphGeometry()
+  const complexSourceBody = complexSource._createPart(complexBodyGeometry, complexBodySkin)
+  const complexSourceWeapon = complexSource._createPart(complexWeaponGeometry, complexWeaponSkin)
+  complexSourceWeapon.name = 'synthetic-md2-weapon'
+  complexSource.root.add(complexSourceBody, complexSourceWeapon)
+  complexSource.meshBody = complexSourceBody
+  complexSource.meshWeapon = complexSourceWeapon
+  complexSource.weapons = [complexSourceWeapon]
+  complexSource.meshes = [complexSourceBody, complexSourceWeapon]
+
+  const complex = new MD2CharacterComplex()
+  complex.shareParts(complexSource)
+  complex.root.position.x = 0.45
+  complex.meshBody.position.x = -0.15
+  complex.meshWeapon.position.x = 0.25
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.AmbientLight(0xffffff, 1), simple.root, complex.root)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 0.75, -0.75, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    simple.setPlaybackRate(2)
+    assert.equal(simple.mixer.timeScale, 0.5)
+    simple.setPlaybackRate(0)
+    assert.equal(simple.mixer.timeScale, 0)
+    simple.setPlaybackRate(1)
+    simple.setWireframe(true)
+    assert.equal(simpleBody.material, simpleBody.materialWireframe)
+    simple.setWireframe(false)
+    assert.equal(simpleBody.material, simpleBody.materialTexture)
+    simple.setSkin(1)
+    assert.equal(simpleBody.material.map, simpleBodyReplacementSkin)
+    simple.setAnimation('idle')
+    assert.ok(simpleBody.activeAction)
+    simple.setWeapon(1)
+    assert.equal(simpleWeapon.visible, false)
+    assert.equal(simpleActiveWeapon.visible, true)
+    assert.ok(simpleActiveWeapon.activeAction)
+    simple.update(0.05)
+
+    complex.enableShadows(true)
+    assert.equal(complex.meshes.every((mesh) => mesh.castShadow && mesh.receiveShadow), true)
+    complex.setVisible(true)
+    complex.setWireframe(true)
+    assert.equal(complex.meshBody.material, complex.meshBody.materialWireframe)
+    complex.setWireframe(false)
+    complex.setSkin(1)
+    assert.equal(complex.currentSkin, 1)
+    assert.equal(complex.meshBody.material.map, complexBodyReplacementSkin)
+    complex.meshBody.baseDuration = 2
+    complex.meshWeapon.baseDuration = 2
+    complex.setPlaybackRate(2)
+    assert.equal(complex.meshBody.duration, 1)
+    complex.setAnimation('idle')
+    complex.setWeapon(0)
+    complex.controls = {
+      moveForward: true,
+      moveBackward: false,
+      moveLeft: false,
+      moveRight: false,
+      crouch: false,
+      jump: false,
+      attack: false,
+    }
+    const previousZ = complex.root.position.z
+    complex.update(0.16)
+    assert.equal(complex.activeAnimation, 'move')
+    assert.ok(complex.root.position.z > previousZ)
+    assert.equal(complex.meshBody.animationsMap.move.active, true)
+
+    const width = 128
+    const height = 80
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 210 && r < 200 && b < 205) > 50,
+      'MD2Character skin switching should render the replacement green body skin',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 210 && g > 200 && b < 190) > 50,
+      'MD2Character weapon switching should render the active yellow weapon skin',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 200 && b > 210 && r < 205) > 30,
+      'MD2CharacterComplex shared body parts should render the replacement cyan skin',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 210 && b > 210 && g < 200) > 30,
+      'MD2CharacterComplex active weapon parts should render the magenta skin',
+    )
+  } finally {
+    const materials = new Set()
+    const geometries = new Set()
+    const textures = new Set([
+      simpleBodySkin,
+      simpleBodyReplacementSkin,
+      simpleWeaponSkin,
+      simpleWeaponReplacementSkin,
+      complexBodySkin,
+      complexBodyReplacementSkin,
+      complexWeaponSkin,
+    ])
+    for (const mesh of [
+      simpleBody,
+      simpleWeapon,
+      simpleActiveWeapon,
+      complexSourceBody,
+      complexSourceWeapon,
+      ...complex.meshes,
+    ]) {
+      geometries.add(mesh.geometry)
+      materials.add(mesh.material)
+      materials.add(mesh.materialTexture)
+      materials.add(mesh.materialWireframe)
+    }
+    for (const material of materials) material?.dispose()
+    for (const geometry of geometries) geometry?.dispose()
+    for (const texture of textures) texture.dispose()
   }
 })
 
