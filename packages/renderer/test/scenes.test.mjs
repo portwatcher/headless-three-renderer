@@ -2770,14 +2770,68 @@ test('KTX2Loader detects conservative renderer texture compression support', asy
     bptcSupported: false,
     pvrtcSupported: false,
   }
+  const syncFeatureChecks = []
+  const syncExtensionChecks = []
+  const originalHasFeature = renderer.hasFeature.bind(renderer)
+  const originalExtensionsHas = renderer.extensions.has.bind(renderer.extensions)
+  renderer.hasFeature = (name) => {
+    syncFeatureChecks.push(name)
+    return originalHasFeature(name)
+  }
+  renderer.extensions.has = (name) => {
+    syncExtensionChecks.push(name)
+    return originalExtensionsHas(name)
+  }
 
   const loader = new KTX2Loader()
+  assert.equal(renderer.isWebGPURenderer, false)
   assert.equal(loader.detectSupport(renderer), loader)
   assert.deepEqual(loader.workerConfig, expectedSupport)
+  assert.deepEqual(
+    syncFeatureChecks,
+    [],
+    'synchronous KTX2 detection should stay on WebGL extension probes when isWebGPURenderer is false',
+  )
+  assert.deepEqual(syncExtensionChecks, [
+    'WEBGL_compressed_texture_astc',
+    'WEBGL_compressed_texture_astc',
+    'WEBGL_compressed_texture_etc1',
+    'WEBGL_compressed_texture_etc',
+    'WEBGL_compressed_texture_s3tc',
+    'EXT_texture_compression_bptc',
+    'WEBGL_compressed_texture_pvrtc',
+    'WEBKIT_WEBGL_compressed_texture_pvrtc',
+  ])
 
+  const asyncRenderer = new Renderer()
+  const asyncFeatureChecks = []
+  const asyncExtensionChecks = []
+  const originalHasFeatureAsync = asyncRenderer.hasFeatureAsync.bind(asyncRenderer)
+  const originalAsyncExtensionsHas = asyncRenderer.extensions.has.bind(asyncRenderer.extensions)
+  asyncRenderer.hasFeatureAsync = async (name) => {
+    asyncFeatureChecks.push(name)
+    return originalHasFeatureAsync(name)
+  }
+  asyncRenderer.extensions.has = (name) => {
+    asyncExtensionChecks.push(name)
+    return originalAsyncExtensionsHas(name)
+  }
   const asyncLoader = new KTX2Loader()
-  assert.equal(await asyncLoader.detectSupportAsync(renderer), asyncLoader)
+  assert.equal(await asyncLoader.detectSupportAsync(asyncRenderer), asyncLoader)
   assert.deepEqual(asyncLoader.workerConfig, expectedSupport)
+  assert.deepEqual(asyncFeatureChecks, [
+    'texture-compression-astc',
+    'texture-compression-etc1',
+    'texture-compression-etc2',
+    'texture-compression-bc',
+    'texture-compression-bptc',
+    'texture-compression-pvrtc',
+  ])
+  assert.deepEqual(
+    asyncExtensionChecks,
+    [],
+    'asynchronous KTX2 detection should use renderer feature probes instead of WebGL extension probes',
+  )
 })
 
 test('GPUComputationRenderer stops at conservative vertex texture support detection', () => {
