@@ -72,6 +72,7 @@ import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShado
 import { FixedTimer, Timer } from 'three/examples/jsm/misc/Timer.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { Volume } from 'three/examples/jsm/misc/Volume.js'
+import { VolumeSlice } from 'three/examples/jsm/misc/VolumeSlice.js'
 import { Flow, InstancedFlow } from 'three/examples/jsm/modifiers/CurveModifier.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
@@ -130,6 +131,7 @@ import { SceneOptimizer } from 'three/examples/jsm/utils/SceneOptimizer.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { radixSort } from 'three/examples/jsm/utils/SortUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
+import { UVsDebug } from 'three/examples/jsm/utils/UVsDebug.js'
 import * as WebGLTextureUtils from 'three/examples/jsm/utils/WebGLTextureUtils.js'
 import { WorkerPool } from 'three/examples/jsm/utils/WorkerPool.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
@@ -4257,6 +4259,7 @@ test('examples Volume slices render canvas-backed grayscale texture meshes', () 
     assert.equal(volume.getData(2, 1, 1), 208)
     assert.deepEqual(volume.reverseAccess(volume.access(2, 1, 1)), [2, 1, 1])
     assert.equal(volume.sliceList[0], slice)
+    assert.equal(slice instanceof VolumeSlice, true)
     assert.equal(slice.iLength, 3)
     assert.equal(slice.jLength, 3)
     assert.equal(slice.canvas.width, 3)
@@ -4288,6 +4291,153 @@ test('examples Volume slices render canvas-backed grayscale texture meshes', () 
       slice.mesh.material.dispose()
       slice.mesh.geometry.dispose()
     }
+    if (previousDocument === undefined) {
+      delete globalThis.document
+    } else {
+      globalThis.document = previousDocument
+    }
+  }
+})
+
+test('examples UVsDebug canvas output renders through supported texture paths', () => {
+  function colorFromStyle(style) {
+    const match = /rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)/.exec(style)
+    return match
+      ? [Number(match[1]), Number(match[2]), Number(match[3]), 255]
+      : [255, 255, 255, 255]
+  }
+
+  function makeCanvas() {
+    const canvas = {
+      _width: 0,
+      _height: 0,
+      _pixels: new Uint8ClampedArray(0),
+      _commands: [],
+      get width() {
+        return this._width
+      },
+      set width(value) {
+        this._width = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      get height() {
+        return this._height
+      },
+      set height(value) {
+        this._height = Math.max(0, Math.trunc(value))
+        this._pixels = new Uint8ClampedArray(this._width * this._height * 4)
+      },
+      getContext(type) {
+        if (type !== '2d') return null
+        const context = {
+          fillStyle: 'rgb( 0, 0, 0 )',
+          strokeStyle: 'rgb( 0, 0, 0 )',
+          lineWidth: 1,
+          textAlign: 'left',
+          font: '10px sans-serif',
+          beginPath: () => canvas._commands.push('beginPath'),
+          moveTo: () => canvas._commands.push('moveTo'),
+          lineTo: () => canvas._commands.push('lineTo'),
+          closePath: () => canvas._commands.push('closePath'),
+          stroke: () => {
+            canvas._commands.push('stroke')
+            const color = colorFromStyle(context.strokeStyle)
+            const width = Math.min(canvas.width, canvas.height)
+            for (let i = 0; i < width; i += 1) {
+              const offset = (i * canvas.width + i) * 4
+              canvas._pixels.set(color, offset)
+            }
+          },
+          fillRect: (x, y, width, height) => {
+            canvas._commands.push('fillRect')
+            const color = colorFromStyle(context.fillStyle)
+            const x0 = Math.max(0, Math.floor(x))
+            const y0 = Math.max(0, Math.floor(y))
+            const x1 = Math.min(canvas.width, Math.ceil(x + width))
+            const y1 = Math.min(canvas.height, Math.ceil(y + height))
+            for (let row = y0; row < y1; row += 1) {
+              for (let col = x0; col < x1; col += 1) {
+                canvas._pixels.set(color, (row * canvas.width + col) * 4)
+              }
+            }
+          },
+          fillText: (_text, x, y) => {
+            canvas._commands.push('fillText')
+            const color = colorFromStyle(context.fillStyle)
+            const cx = Math.max(0, Math.min(canvas.width - 1, Math.round(x)))
+            const cy = Math.max(0, Math.min(canvas.height - 1, Math.round(y)))
+            for (let row = Math.max(0, cy - 1); row <= Math.min(canvas.height - 1, cy + 1); row += 1) {
+              for (let col = Math.max(0, cx - 1); col <= Math.min(canvas.width - 1, cx + 1); col += 1) {
+                canvas._pixels.set(color, (row * canvas.width + col) * 4)
+              }
+            }
+          },
+          getImageData: (x, y, width, height) => {
+            assert.equal(x, 0)
+            assert.equal(y, 0)
+            assert.equal(width, canvas.width)
+            assert.equal(height, canvas.height)
+            return {
+              data: new Uint8ClampedArray(canvas._pixels),
+              width,
+              height,
+            }
+          },
+        }
+        return context
+      },
+    }
+    return canvas
+  }
+
+  const previousDocument = globalThis.document
+  const sourceGeometry = new THREE.PlaneGeometry(1, 1)
+  const renderGeometry = new THREE.PlaneGeometry(1.5, 1.5)
+  let texture
+  let material
+  try {
+    globalThis.document = {
+      createElement(type) {
+        assert.equal(type, 'canvas')
+        return makeCanvas()
+      },
+    }
+
+    const canvas = UVsDebug(sourceGeometry, 32)
+    assert.equal(canvas.width, 32)
+    assert.equal(canvas.height, 32)
+    assert.ok(canvas._commands.includes('fillRect'))
+    assert.ok(canvas._commands.includes('stroke'))
+    assert.ok(canvas._commands.includes('fillText'))
+
+    texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+    material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    scene.add(new THREE.Mesh(renderGeometry, material))
+
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+    camera.position.set(0, 0, 4)
+    camera.lookAt(0, 0, 0)
+    camera.updateMatrixWorld(true)
+
+    const width = 64
+    const height = 64
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 180 && g > 180 && b > 180) > 900,
+      'UVsDebug canvas texture should render its white background',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 30 && r < 180 && Math.abs(r - g) < 8 && Math.abs(g - b) < 8) > 5,
+      'UVsDebug canvas texture should render gray annotation pixels',
+    )
+  } finally {
+    sourceGeometry.dispose()
+    renderGeometry.dispose()
+    texture?.dispose()
+    material?.dispose()
     if (previousDocument === undefined) {
       delete globalThis.document
     } else {
