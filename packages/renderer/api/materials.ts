@@ -2085,6 +2085,30 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeFilmPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.FilmPass internal FilmShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent film/noise pass, or compose the film effect outside this helper.",
+    )
+  }
+
+  if (isThreeDotScreenPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.DotScreenPass internal DotScreenShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent dot-screen pass, or compose the dot-screen effect outside this helper.",
+    )
+  }
+
+  if (isThreeGlitchPassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.GlitchPass internal DigitalGlitch ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent glitch pass, or compose the glitch effect outside this helper.",
+    )
+  }
+
+  if (isThreeHalftonePassShaderMaterial(material)) {
+    throw new Error(
+      "THREE.HalftonePass internal HalftoneShader ShaderMaterial is not translated by @headless-three/renderer yet. Use the renderer's postProcessing controls for supported image effects, provide a custom WGSL fragment for an equivalent halftone pass, or compose the halftone effect outside this helper.",
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2168,6 +2192,115 @@ function isThreeBloomPassConvolutionShaderMaterial(material: ThreeMaterialLike):
     compact.includes('sum+=texture2D(tDiffuse,imageCoord)*cKernel[i];') &&
     compact.includes('imageCoord+=uImageIncrement;') &&
     compact.includes('gl_FragColor=sum;')
+}
+
+function isThreeFilmPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (values.tDiffuse == null || values.time == null || values.intensity == null || values.grayscale == null) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatintensity;') &&
+    compact.includes('uniformboolgrayscale;') &&
+    compact.includes('uniformfloattime;') &&
+    compact.includes('floatnoise=rand(fract(vUv+time));') &&
+    compact.includes('color=mix(base.rgb,color,intensity);') &&
+    compact.includes('gl_FragColor=vec4(color,base.a);')
+}
+
+function isThreeDotScreenPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse == null ||
+    values.tSize == null ||
+    values.center == null ||
+    values.angle == null ||
+    values.scale == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformvec2center;') &&
+    compact.includes('uniformfloatscale;') &&
+    compact.includes('uniformvec2tSize;') &&
+    compact.includes('floatpattern()') &&
+    compact.includes('vec2tex=vUv*tSize-center;') &&
+    compact.includes('gl_FragColor=vec4(vec3(average*10.0-5.0+pattern()),color.a);')
+}
+
+function isThreeGlitchPassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse == null ||
+    values.tDisp == null ||
+    values.byp == null ||
+    values.amount == null ||
+    values.angle == null ||
+    values.seed == null ||
+    values.seed_x == null ||
+    values.seed_y == null ||
+    values.distortion_x == null ||
+    values.distortion_y == null ||
+    values.col_s == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformintbyp;') &&
+    compact.includes('uniformsampler2DtDisp;') &&
+    compact.includes('uniformfloatdistortion_x;') &&
+    compact.includes('floatdisp=texture2D(tDisp,p*seed*seed).r;') &&
+    compact.includes('vec4cr=texture2D(tDiffuse,p+offset);') &&
+    compact.includes('gl_FragColor=vec4(cr.r,cga.g,cb.b,cga.a);')
+}
+
+function isThreeHalftonePassShaderMaterial(material: ThreeMaterialLike): boolean {
+  const uniforms = material.uniforms
+  if (!uniforms || typeof uniforms !== 'object' || Array.isArray(uniforms)) return false
+
+  const values = uniforms as Record<string, unknown>
+  if (
+    values.tDiffuse == null ||
+    values.shape == null ||
+    values.radius == null ||
+    values.rotateR == null ||
+    values.rotateG == null ||
+    values.rotateB == null ||
+    values.scatter == null ||
+    values.width == null ||
+    values.height == null ||
+    values.blending == null ||
+    values.blendingMode == null ||
+    values.greyscale == null ||
+    values.disable == null
+  ) {
+    return false
+  }
+
+  if (typeof material.fragmentShader !== 'string') return false
+  const compact = material.fragmentShader.replace(/\s+/g, '')
+  return compact.includes('uniformfloatradius;') &&
+    compact.includes('uniformfloatrotateR;') &&
+    compact.includes('uniformintshape;') &&
+    compact.includes('structCell{') &&
+    compact.includes('vec4getSample(vec2point)') &&
+    compact.includes('CellgetReferenceCell(vec2p,vec2origin,floatgrid_angle,floatstep)') &&
+    compact.includes('gl_FragColor=vec4(r,g,b,1.0);')
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {

@@ -17,7 +17,11 @@ import { Refractor } from 'three/examples/jsm/objects/Refractor.js'
 import { AfterimagePass } from 'three/examples/jsm/postprocessing/AfterimagePass.js'
 import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'
 import { ClearPass } from 'three/examples/jsm/postprocessing/ClearPass.js'
+import { DotScreenPass } from 'three/examples/jsm/postprocessing/DotScreenPass.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js'
+import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass.js'
+import { HalftonePass } from 'three/examples/jsm/postprocessing/HalftonePass.js'
 import { ClearMaskPass, MaskPass } from 'three/examples/jsm/postprocessing/MaskPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -2860,6 +2864,48 @@ test('EffectComposer BloomPass internal convolution shader pass fails clearly', 
     )
   } finally {
     pass.dispose()
+  }
+})
+
+test('EffectComposer lightweight shader passes fail clearly with helper guidance', () => {
+  const cases = [
+    [
+      'FilmPass',
+      () => new FilmPass(0.35, false),
+      /FilmPass internal FilmShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'DotScreenPass',
+      () => new DotScreenPass(undefined, 1.1, 1.2),
+      /DotScreenPass internal DotScreenShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'GlitchPass',
+      () => new GlitchPass(4),
+      /GlitchPass internal DigitalGlitch ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+    [
+      'HalftonePass',
+      () => new HalftonePass(16, 16, {}),
+      /HalftonePass internal HalftoneShader ShaderMaterial.*not translated.*postProcessing.*custom WGSL/i,
+    ],
+  ]
+
+  for (const [name, createPass, pattern] of cases) {
+    const renderer = new Renderer()
+    const writeBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const readBuffer = new THREE.WebGLRenderTarget(16, 16)
+    const pass = createPass()
+
+    try {
+      assert.throws(
+        () => pass.render(renderer, writeBuffer, readBuffer, 0.016, false),
+        pattern,
+        `${name} should fail with helper-specific guidance`,
+      )
+    } finally {
+      pass.dispose()
+    }
   }
 })
 
