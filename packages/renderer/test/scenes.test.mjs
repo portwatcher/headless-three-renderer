@@ -144,6 +144,18 @@ function extractCommonRendererMethodNames() {
   return names
 }
 
+function extractCommonBackendMethodNames() {
+  const names = new Set()
+  const source = extractJsClassBody(threeRendererSource('src/renderers/common/Backend.js'), 'Backend')
+  for (const match of source.matchAll(/^\t(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    if (!JS_METHOD_DECLARATION_IGNORE.has(match[1])) names.add(match[1])
+  }
+  for (const match of source.matchAll(/^\tget\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    names.add(match[1])
+  }
+  return names
+}
+
 function extractWebGlStateMethodNames() {
   const names = new Set()
   const source = threeRendererSource('src/renderers/webgl/WebGLState.js')
@@ -35012,6 +35024,21 @@ test('Renderer domElement is an inert output-size mirror', () => {
   assert.equal(rgba.length, 40 * 20 * 4)
   const mean = meanRegion(rgba, 40, 20, 12, 6, 28, 14)
   assert.ok(mean.r > mean.b + 80, `domElement size mirroring should preserve normal rendering (${mean.r} vs ${mean.b})`)
+})
+
+test('Renderer.backend tracks the installed CommonRenderer Backend method surface', () => {
+  const renderer = new Renderer()
+  const backendMethods = extractCommonBackendMethodNames()
+  assert.ok(backendMethods.size > 40, 'Expected to find installed Three.js CommonRenderer Backend methods.')
+
+  const missingBackendMethods = [...backendMethods]
+    .filter((methodName) => !objectSurfaceNames(renderer.backend).has(methodName))
+    .sort()
+  assert.deepEqual(
+    missingBackendMethods,
+    [],
+    `Renderer.backend is missing installed Three.js CommonRenderer Backend methods: ${missingBackendMethods.join(', ')}`,
+  )
 })
 
 test('Renderer.state tracks the installed WebGLState method surface', () => {
