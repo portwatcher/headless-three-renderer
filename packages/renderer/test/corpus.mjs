@@ -97,6 +97,7 @@ export function createSceneCorpus() {
     dashedLineMaterialTextureCorpus(),
     dashedLineMaterialUvChannelCorpus(),
     dashedLineMaterialWideLineCorpus(),
+    lineMaterialNoopCorpus(),
     pointsMaterialTextureCorpus(),
     pointsMaterialUvChannelCorpus(),
     instancedLinesPointsCorpus(),
@@ -5273,6 +5274,85 @@ function dashedLineMaterialWideLineCorpus() {
     validate() {
       if (!(thinPixels > 0 && widePixels > thinPixels * 3)) {
         throw new Error(`wide dashed-line corpus should expand linewidth coverage, thin=${thinPixels} wide=${widePixels}`)
+      }
+    },
+  }
+}
+
+function lineMaterialNoopCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = { capJoinDiffs: {}, receiveShadowDiffs: {} }
+
+  function makeLine(kind, configureMaterial = () => {}, receiveShadow = false) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0, 0),
+      new THREE.Vector3(0, 0.5, 0),
+      new THREE.Vector3(1.2, 0, 0),
+    ])
+    const material = kind === 'basic'
+      ? new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 8 })
+      : new THREE.LineDashedMaterial({
+        color: 0xffffff,
+        dashSize: 0.3,
+        gapSize: 0.15,
+        linewidth: 8,
+        scale: 1,
+      })
+    configureMaterial(material)
+
+    const line = new THREE.Line(geometry, material)
+    line.receiveShadow = receiveShadow
+    if (kind === 'dashed') line.computeLineDistances()
+    return line
+  }
+
+  function makeScene(kind, configureMaterial = () => {}, receiveShadow = false) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(makeLine(kind, configureMaterial, receiveShadow))
+    return scene
+  }
+
+  function renderLine(renderer, kind, configureMaterial = () => {}, receiveShadow = false) {
+    return renderer.render(makeScene(kind, configureMaterial, receiveShadow), camera, options)
+  }
+
+  return {
+    name: 'line-material-noop-state',
+    scene: makeScene('basic'),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.004,
+    browserReference: false,
+    render(renderer) {
+      let returned
+      for (const kind of ['basic', 'dashed']) {
+        const baseline = renderLine(renderer, kind)
+        if (kind === 'basic') returned = baseline
+        stats.capJoinDiffs[kind] = meanAbsDiff(baseline, renderLine(renderer, kind, (material) => {
+          material.linecap = 'butt'
+          material.linejoin = 'bevel'
+        }))
+        stats.receiveShadowDiffs[kind] = meanAbsDiff(baseline, renderLine(renderer, kind, () => {}, true))
+      }
+      return returned
+    },
+    validate(rgba, { width, height }) {
+      const whitePixels = countRegionPixels(rgba, width, 0, 0, width, height, (r, g, b) => r > 160 && g > 160 && b > 160)
+      if (!(whitePixels > 400)) {
+        throw new Error(`line no-op corpus should render a visible wide white line, whitePixels=${whitePixels}`)
+      }
+      for (const [kind, diff] of Object.entries(stats.capJoinDiffs)) {
+        if (!(diff < 0.1)) {
+          throw new Error(`${kind} linecap/linejoin should be accepted as no-op state, stats=${JSON.stringify(stats)}`)
+        }
+      }
+      for (const [kind, diff] of Object.entries(stats.receiveShadowDiffs)) {
+        if (!(diff < 0.1)) {
+          throw new Error(`${kind} receiveShadow should be accepted as an unlit line no-op, stats=${JSON.stringify(stats)}`)
+        }
       }
     },
   }
