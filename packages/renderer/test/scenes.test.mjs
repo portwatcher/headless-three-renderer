@@ -96,6 +96,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js'
 import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader.js'
 import { VTKLoader } from 'three/examples/jsm/loaders/VTKLoader.js'
+import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader.js'
 import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
 import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
 import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
@@ -6824,6 +6825,41 @@ test('examples MTLLoader parses material libraries for renderable mesh paths', (
   } finally {
     geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples VRMLLoader parses renderable scene mesh paths', () => {
+  const scene = new VRMLLoader().parse([
+    '#VRML V2.0 utf8',
+    'Shape {',
+    '  appearance Appearance { material Material { diffuseColor 0 1 0 } }',
+    '  geometry Box { size 1 1 1 }',
+    '}',
+  ].join('\n'), '')
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.AmbientLight(0xffffff, 1))
+
+  const mesh = scene.children.find((child) => child.isMesh)
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    assert.equal(scene.isScene, true)
+    assert.ok(mesh, 'VRMLLoader should create a mesh child')
+    assert.equal(mesh.geometry.type, 'BoxGeometry')
+    assert.equal(mesh.material.type, 'MeshPhongMaterial')
+    assert.equal(mesh.material.color.getHexString(), '00ff00')
+    assert.ok(
+      nonBackgroundRatio(renderRgba(scene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.12,
+      'VRMLLoader scene output should render visible mesh pixels',
+    )
+  } finally {
+    for (const child of scene.children) {
+      child.geometry?.dispose?.()
+      child.material?.dispose?.()
+    }
   }
 })
 
