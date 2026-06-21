@@ -15,6 +15,10 @@ import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffec
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
+import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
+import { ParametricGeometry } from 'three/examples/jsm/geometries/ParametricGeometry.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js'
 import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js'
 import { PositionalAudioHelper } from 'three/examples/jsm/helpers/PositionalAudioHelper.js'
@@ -3366,6 +3370,107 @@ test('MarchingCubes renders generated BufferGeometry with built-in materials', (
   } finally {
     cubes.geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples geometry generators render BufferGeometry with built-in materials', () => {
+  const sourceGeometry = new THREE.BoxGeometry(0.9, 0.9, 0.9)
+  const sourceMesh = new THREE.Mesh(sourceGeometry, new THREE.MeshBasicMaterial())
+  sourceMesh.updateMatrixWorld(true)
+
+  const entries = [
+    {
+      label: 'ConvexGeometry',
+      geometry: new ConvexGeometry([
+        new THREE.Vector3(-0.35, -0.35, -0.2),
+        new THREE.Vector3(0.35, -0.35, -0.2),
+        new THREE.Vector3(0.2, 0.35, -0.1),
+        new THREE.Vector3(-0.2, 0.2, 0.35),
+        new THREE.Vector3(0.3, 0.15, 0.25),
+      ]),
+      color: 0xff4455,
+      x: -1.35,
+      isColor: (r, g, b) => r > 140 && g < 110 && b < 130,
+    },
+    {
+      label: 'RoundedBoxGeometry',
+      geometry: new RoundedBoxGeometry(0.68, 0.68, 0.68, 4, 0.12),
+      color: 0x44ff66,
+      x: -0.45,
+      isColor: (r, g, b) => g > 140 && g > r + 20 && g > b + 20,
+    },
+    {
+      label: 'ParametricGeometry',
+      geometry: new ParametricGeometry((u, v, target) => {
+        const x = (u - 0.5) * 0.74
+        const y = (v - 0.5) * 0.74
+        const z = Math.sin(u * Math.PI) * Math.cos(v * Math.PI) * 0.22
+        target.set(x, y, z)
+      }, 10, 10),
+      color: 0x4488ff,
+      x: 0.45,
+      isColor: (r, g, b) => b > 140 && r < 120 && g < 170,
+    },
+    {
+      label: 'DecalGeometry',
+      geometry: new DecalGeometry(
+        sourceMesh,
+        new THREE.Vector3(0, 0, 0.46),
+        new THREE.Euler(0, 0, 0),
+        new THREE.Vector3(0.62, 0.62, 0.2),
+      ),
+      color: 0xffdd44,
+      x: 1.35,
+      isColor: (r, g, b) => r > 140 && g > 120 && b < 180,
+    },
+  ]
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  const materials = []
+  const meshes = []
+  for (const entry of entries) {
+    const material = new THREE.MeshBasicMaterial({ color: entry.color, side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(entry.geometry, material)
+    mesh.position.x = entry.x
+    scene.add(mesh)
+    materials.push(material)
+    meshes.push(mesh)
+  }
+
+  const camera = new THREE.OrthographicCamera(-2, 2, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 64
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04,
+      'examples generated geometries should render visible pixels',
+    )
+    for (const entry of entries) {
+      assert.equal(entry.geometry.isBufferGeometry, true, `${entry.label} should produce BufferGeometry`)
+      assert.ok(
+        entry.geometry.getAttribute('position')?.count > 0,
+        `${entry.label} should generate position vertices`,
+      )
+      assert.ok(entry.geometry.getAttribute('normal'), `${entry.label} should generate normals`)
+      const coloredPixels = countRegionPixels(rgba, width, height, 0, 0, width, height, entry.isColor)
+      assert.ok(coloredPixels > 20, `${entry.label} should render its material color (${coloredPixels})`)
+    }
+    assert.ok(
+      entries.some((entry) => entry.label === 'DecalGeometry' && entry.geometry.getAttribute('uv')),
+      'DecalGeometry should generate UVs for texture-compatible materials',
+    )
+  } finally {
+    for (const mesh of meshes) scene.remove(mesh)
+    for (const entry of entries) entry.geometry.dispose()
+    for (const material of materials) material.dispose()
+    sourceGeometry.dispose()
+    sourceMesh.material.dispose()
   }
 })
 

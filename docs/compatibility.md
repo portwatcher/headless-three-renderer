@@ -33,6 +33,7 @@ consistency test keeping that list synchronized with `gltf.test.mjs`.
 | `RectAreaLightHelper` | Supported | The helper renders its light outline and fill visualization through supported `LineBasicMaterial` and `MeshBasicMaterial` geometry when attached under a `RectAreaLight`. |
 | `PositionalAudioHelper` | Supported | The helper renders grouped cone visualization line geometry through supported `Line` material-array groups with `LineBasicMaterial`; it only requires panner cone-angle metadata for still rendering. |
 | `OctreeHelper` | Supported | The helper renders generated octree box edges through supported `LineSegments` plus `LineBasicMaterial` paths. |
+| Examples geometry generators | Supported | `ConvexGeometry`, `RoundedBoxGeometry`, `DecalGeometry`, and `ParametricGeometry` generate CPU-side `BufferGeometry` that renders through supported built-in mesh material paths, including generated normals and decal UVs. |
 | `GroundedSkybox` | Supported | The examples object generates projected sky geometry and renders through supported `SphereGeometry` plus `MeshBasicMaterial.map` texture paths. |
 | `ShadowMesh` | Supported | The examples helper projects source mesh geometry onto a plane and renders through supported `MeshBasicMaterial` transparent and stencil state after `update()`. |
 | `MarchingCubes` | Supported | The examples object generates metaball `BufferGeometry` on the CPU and renders through supported built-in material paths after `addBall()` and `update()`. |
