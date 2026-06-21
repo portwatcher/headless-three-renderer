@@ -97,9 +97,11 @@ export function createSceneCorpus() {
     avatarLikeCorpus(),
     physicalIblShadowCorpus(),
     physicalClearcoatMapCorpus(),
+    physicalSheenMapCorpus(),
     physicalSpecularMapCorpus(),
     physicalAnisotropyMapCorpus(),
     physicalIridescenceMapCorpus(),
+    physicalTransmissionMapCorpus(),
     physicalTransmissionDispersionCorpus(),
     transmissionResolutionScaleCorpus(),
     multipleDirectionalShadowCorpus(),
@@ -5387,6 +5389,88 @@ function physicalClearcoatMapCorpus() {
   }
 }
 
+function physicalSheenMapCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeMap(data, offsetX) {
+    const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, offsetX)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(material) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.environment = environmentTexture()
+    scene.environmentIntensity = 2
+    scene.add(new THREE.Mesh(constantUvPlane(0.25, 0.5), material))
+    return scene
+  }
+
+  function makeSheenColorScene(offsetX) {
+    return makeScene(new THREE.MeshPhysicalMaterial({
+      color: 0x000000,
+      roughness: 1,
+      metalness: 0,
+      sheen: 1,
+      sheenColor: new THREE.Color(1, 1, 1),
+      sheenRoughness: 0.35,
+      sheenColorMap: makeMap([
+        0, 0, 0, 255,
+        255, 0, 0, 255,
+      ], offsetX),
+    }))
+  }
+
+  function makeSheenRoughnessScene(offsetX) {
+    return makeScene(new THREE.MeshPhysicalMaterial({
+      color: 0x000000,
+      roughness: 1,
+      metalness: 0,
+      sheen: 1,
+      sheenColor: new THREE.Color(1, 0, 0),
+      sheenRoughness: 1,
+      sheenRoughnessMap: makeMap([
+        0, 0, 0, 0,
+        0, 0, 0, 255,
+      ], offsetX),
+    }))
+  }
+
+  return {
+    name: 'physical-sheen-map-slots',
+    scene: makeSheenColorScene(0.5),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    render(renderer) {
+      const colorPrimary = renderer.render(makeSheenColorScene(0), camera, options)
+      const colorShifted = renderer.render(makeSheenColorScene(0.5), camera, options)
+      const roughnessPrimary = renderer.render(makeSheenRoughnessScene(0), camera, options)
+      const roughnessShifted = renderer.render(makeSheenRoughnessScene(0.5), camera, options)
+      stats.colorPrimary = meanRegion(colorPrimary, options.width, 0, 0, options.width, options.height)
+      stats.colorShifted = meanRegion(colorShifted, options.width, 0, 0, options.width, options.height)
+      stats.roughnessDiff = meanAbsDiff(roughnessPrimary, roughnessShifted)
+      return colorShifted
+    },
+    validate() {
+      if (!(stats.colorShifted.r > stats.colorPrimary.r + 3 && stats.colorShifted.r > stats.colorShifted.g + 3)) {
+        throw new Error(`physical sheen corpus should tint sheenColorMap output red, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.roughnessDiff > 5)) {
+        throw new Error(`physical sheen corpus should sample shifted sheenRoughnessMap texel, stats=${JSON.stringify(stats)}`)
+      }
+    },
+  }
+}
+
 function physicalSpecularMapCorpus() {
   const camera = makeCamera([0, 0, 3])
   const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
@@ -5644,6 +5728,112 @@ function physicalIridescenceMapCorpus() {
       }
       if (!(factorCenter && factorCenter.r > 15 && thicknessCenter && Math.max(thicknessCenter.r, thicknessCenter.g, thicknessCenter.b) > 15)) {
         throw new Error(`iridescence texture corpus should render visible specular highlights, factor=${JSON.stringify(factorCenter)} thickness=${JSON.stringify(thicknessCenter)}`)
+      }
+    },
+  }
+}
+
+function physicalTransmissionMapCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function makeMap(data, offsetX) {
+    const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    setTextureMatrixOffset(texture, offsetX)
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeTransmissionScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0x0000ff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xff0000,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        transmissionMap: makeMap([
+          0, 0, 0, 255,
+          255, 0, 0, 255,
+        ], offsetX),
+        ior: 1.5,
+        thickness: 0,
+      }),
+    ))
+    return scene
+  }
+
+  function makeThicknessScene(offsetX) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    back.position.z = -0.2
+    scene.add(back)
+    scene.add(new THREE.Mesh(
+      constantUvPlane(0.25, 0.5),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        ior: 1.5,
+        thickness: 8,
+        thicknessMap: makeMap([
+          0, 0, 0, 255,
+          0, 255, 0, 255,
+        ], offsetX),
+        attenuationColor: new THREE.Color(0.02, 0.02, 1),
+        attenuationDistance: 1,
+      }),
+    ))
+    return scene
+  }
+
+  return {
+    name: 'physical-transmission-map-slots',
+    scene: makeTransmissionScene(0.5),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.2,
+    browserReference: false,
+    render(renderer) {
+      const transmissionPrimary = renderer.render(makeTransmissionScene(0), camera, options)
+      const transmissionShifted = renderer.render(makeTransmissionScene(0.5), camera, options)
+      const thicknessPrimary = renderer.render(makeThicknessScene(0), camera, options)
+      const thicknessShifted = renderer.render(makeThicknessScene(0.5), camera, options)
+      stats.transmissionPrimary = meanRegion(transmissionPrimary, options.width, 0, 0, options.width, options.height)
+      stats.transmissionShifted = meanRegion(transmissionShifted, options.width, 0, 0, options.width, options.height)
+      stats.thicknessPrimary = meanRegion(thicknessPrimary, options.width, 0, 0, options.width, options.height)
+      stats.thicknessShifted = meanRegion(thicknessShifted, options.width, 0, 0, options.width, options.height)
+      return transmissionShifted
+    },
+    validate() {
+      if (!(stats.transmissionPrimary.r > stats.transmissionPrimary.b + 30)) {
+        throw new Error(`physical transmission corpus should keep the primary transmissionMap texel opaque red, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.transmissionShifted.b > stats.transmissionShifted.r + 40)) {
+        throw new Error(`physical transmission corpus should sample the shifted transmissionMap texel, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.thicknessPrimary.r > stats.thicknessPrimary.b - 15)) {
+        throw new Error(`physical transmission corpus should keep the primary thicknessMap texel thin, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.thicknessShifted.b > stats.thicknessShifted.r + 40)) {
+        throw new Error(`physical transmission corpus should sample the shifted attenuating thicknessMap texel, stats=${JSON.stringify(stats)}`)
       }
     },
   }
