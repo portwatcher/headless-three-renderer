@@ -17,6 +17,7 @@ import { LightProbeHelper } from 'three/examples/jsm/helpers/LightProbeHelper.js
 import { OctreeHelper } from 'three/examples/jsm/helpers/OctreeHelper.js'
 import { PositionalAudioHelper } from 'three/examples/jsm/helpers/PositionalAudioHelper.js'
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js'
+import { TextureHelper } from 'three/examples/jsm/helpers/TextureHelper.js'
 import { VertexNormalsHelper } from 'three/examples/jsm/helpers/VertexNormalsHelper.js'
 import { VertexTangentsHelper } from 'three/examples/jsm/helpers/VertexTangentsHelper.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
@@ -2449,6 +2450,18 @@ test('LightProbeHelper shader fails clearly', () => {
   assert.throws(
     () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
     /LightProbeHelper internal LightProbeHelperMaterial ShaderMaterial.*not translated.*Native THREE\.LightProbe lighting.*LightProbeGenerator/i,
+  )
+})
+
+test('TextureHelper shader fails clearly', () => {
+  const scene = new THREE.Scene()
+  const texture = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255]), 1, 1)
+  texture.needsUpdate = true
+  scene.add(new TextureHelper(texture, 1, 1, 1))
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /TextureHelper internal TextureHelperMaterial ShaderMaterial.*not translated.*supported material, background, scene\.environment.*target pixels.*custom WGSL/i,
   )
 })
 
