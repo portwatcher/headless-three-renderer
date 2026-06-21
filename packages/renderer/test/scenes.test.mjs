@@ -83,7 +83,10 @@ import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLigh
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
 import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
 import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
@@ -5777,6 +5780,114 @@ test('examples XYZLoader GCodeLoader and PDBLoader parse renderable geometry pat
     pdb.geometryBonds.dispose()
     pdbAtomMaterial.dispose()
     pdbBondMaterial.dispose()
+  }
+})
+
+test('examples OBJLoader STLLoader and PLYLoader parse renderable mesh geometry paths', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  const objGroup = new OBJLoader().parse([
+    'o tri',
+    'v -0.6 -0.4 0 1 0 0',
+    'v 0.6 -0.4 0 0 1 0',
+    'v 0 0.6 0 0 0 1',
+    'vt 0 0',
+    'vt 1 0',
+    'vt 0.5 1',
+    'vn 0 0 1',
+    'usemtl none',
+    'f 1/1/1 2/2/1 3/3/1',
+  ].join('\n'))
+  const objScene = new THREE.Scene()
+  objScene.background = new THREE.Color(0x000000)
+  objScene.add(new THREE.AmbientLight(0xffffff, 1), objGroup)
+
+  const stlGeometry = new STLLoader().parse(new TextEncoder().encode([
+    'solid tri',
+    'facet normal 0 0 1',
+    'outer loop',
+    'vertex -0.6 -0.4 0',
+    'vertex 0.6 -0.4 0',
+    'vertex 0 0.6 0',
+    'endloop',
+    'endfacet',
+    'endsolid tri',
+  ].join('\n')).buffer)
+  const stlMaterial = new THREE.MeshBasicMaterial({ color: 0xff8844, side: THREE.DoubleSide })
+  const stlMesh = new THREE.Mesh(stlGeometry, stlMaterial)
+  const stlScene = new THREE.Scene()
+  stlScene.background = new THREE.Color(0x000000)
+  stlScene.add(stlMesh)
+
+  const plyGeometry = new PLYLoader().parse([
+    'ply',
+    'format ascii 1.0',
+    'element vertex 3',
+    'property float x',
+    'property float y',
+    'property float z',
+    'property uchar red',
+    'property uchar green',
+    'property uchar blue',
+    'element face 1',
+    'property list uchar int vertex_indices',
+    'end_header',
+    '-0.6 -0.4 0 255 0 0',
+    '0.6 -0.4 0 0 255 0',
+    '0 0.6 0 0 0 255',
+    '3 0 1 2',
+  ].join('\n'))
+  const plyMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, vertexColors: true })
+  const plyMesh = new THREE.Mesh(plyGeometry, plyMaterial)
+  const plyScene = new THREE.Scene()
+  plyScene.background = new THREE.Color(0x000000)
+  plyScene.add(plyMesh)
+
+  try {
+    const objMesh = objGroup.children[0]
+    assert.equal(objGroup.children.length, 1)
+    assert.equal(objMesh.isMesh, true)
+    assert.equal(objMesh.geometry.getAttribute('position').count, 3)
+    assert.equal(objMesh.geometry.getAttribute('normal').count, 3)
+    assert.equal(objMesh.geometry.getAttribute('uv').count, 3)
+    assert.equal(objMesh.geometry.getAttribute('color').count, 3)
+    assert.equal(objMesh.material.name, 'none')
+    assert.ok(
+      nonBackgroundRatio(renderRgba(objScene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.08,
+      'OBJLoader mesh output should render visible vertex-colored geometry',
+    )
+
+    assert.equal(stlGeometry.getAttribute('position').count, 3)
+    assert.equal(stlGeometry.getAttribute('normal').count, 3)
+    assert.equal(stlGeometry.groups.length, 1)
+    assert.ok(
+      nonBackgroundRatio(renderRgba(stlScene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.08,
+      'STLLoader mesh output should render visible triangle geometry',
+    )
+
+    assert.equal(plyGeometry.getAttribute('position').count, 3)
+    assert.equal(plyGeometry.getAttribute('color').count, 3)
+    assert.equal(plyGeometry.index.count, 3)
+    assert.ok(
+      nonBackgroundRatio(renderRgba(plyScene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.08,
+      'PLYLoader mesh output should render visible indexed vertex-colored geometry',
+    )
+  } finally {
+    for (const child of objGroup.children) {
+      child.geometry?.dispose?.()
+      if (Array.isArray(child.material)) {
+        for (const material of child.material) material.dispose()
+      } else {
+        child.material?.dispose?.()
+      }
+    }
+    stlGeometry.dispose()
+    stlMaterial.dispose()
+    plyGeometry.dispose()
+    plyMaterial.dispose()
   }
 })
 
