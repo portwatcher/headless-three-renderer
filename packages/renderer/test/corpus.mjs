@@ -83,6 +83,7 @@ export function createSceneCorpus() {
     transmissionResolutionScaleCorpus(),
     multipleDirectionalShadowCorpus(),
     shadowMapEnabledGatingCorpus(),
+    shadowMapTypeFilteringCorpus(),
     shadowMaterialReceiverCorpus(),
     shadowMaterialFogOptOutCorpus(),
     dashedLineMaterialCorpus(),
@@ -4193,6 +4194,88 @@ function shadowMapEnabledGatingCorpus() {
       const disabledLum = luminance(disabledOutput)
       if (!(enabledLum < disabledLum - 25)) {
         throw new Error(`shadowMap.enabled corpus should darken the receiver only when enabled, enabled=${enabledLum.toFixed(1)} disabled=${disabledLum.toFixed(1)}`)
+      }
+    },
+  }
+}
+
+function shadowMapTypeFilteringCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(1, 1, 1)
+
+  const receiver = new THREE.Mesh(
+    new THREE.PlaneGeometry(12, 12),
+    new THREE.ShadowMaterial({ opacity: 1 }),
+  )
+  receiver.rotation.x = -Math.PI / 2
+  receiver.receiveShadow = true
+  scene.add(receiver)
+
+  const caster = new THREE.Mesh(
+    new THREE.BoxGeometry(3, 3, 3),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  )
+  caster.position.y = 1.5
+  caster.castShadow = true
+  scene.add(caster)
+
+  const light = new THREE.DirectionalLight(0xffffff, 2)
+  light.position.set(8, 6, 0)
+  light.target.position.set(0, 0, 0)
+  light.castShadow = true
+  light.shadow.mapSize.set(128, 128)
+  light.shadow.camera.left = -7
+  light.shadow.camera.right = 7
+  light.shadow.camera.top = 7
+  light.shadow.camera.bottom = -7
+  light.shadow.camera.near = 0.1
+  light.shadow.camera.far = 16
+  scene.add(light)
+  scene.add(light.target)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 6, 8)
+  camera.lookAt(0, 0, 0)
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = {}
+
+  function luminance(rgba) {
+    const mean = meanRegion(rgba, options.width, 28, 42, 68, 82)
+    return mean.r + mean.g + mean.b
+  }
+
+  return {
+    name: 'shadow-map-type-filtering',
+    scene,
+    camera,
+    options,
+    background: [255, 255, 255],
+    minNonBackgroundRatio: 0.02,
+    browserReference: false,
+    render(renderer) {
+      const previousType = renderer.shadowMap.type
+      const previousRadius = light.shadow.radius
+      try {
+        renderer.shadowMap.type = THREE.BasicShadowMap
+        light.shadow.radius = 0
+        stats.basicSmallRadius = luminance(renderer.render(scene, camera, options))
+        light.shadow.radius = 4
+        const basicLarge = renderer.render(scene, camera, options)
+        stats.basicLargeRadius = luminance(basicLarge)
+        renderer.shadowMap.type = THREE.PCFShadowMap
+        stats.pcfLargeRadius = luminance(renderer.render(scene, camera, options))
+        return basicLarge
+      } finally {
+        renderer.shadowMap.type = previousType
+        light.shadow.radius = previousRadius
+      }
+    },
+    validate() {
+      if (!(Math.abs(stats.basicSmallRadius - stats.basicLargeRadius) < 1)) {
+        throw new Error(`BasicShadowMap should ignore PCF radius in corpus, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.pcfLargeRadius < stats.basicLargeRadius - 10)) {
+        throw new Error(`PCFShadowMap should use radius-based PCF sampling in corpus, stats=${JSON.stringify(stats)}`)
       }
     },
   }
