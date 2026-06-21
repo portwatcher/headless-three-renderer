@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import path from 'node:path'
 import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
@@ -79,6 +81,63 @@ const cjsRequire = createRequire(import.meta.url)
 const SIZE = 128
 const BG = [89, 89, 89] // sRGB output for linear 0.1
 const UnsignedInt101111Type = THREE.UnsignedInt101111Type ?? 35899
+
+const JS_METHOD_DECLARATION_IGNORE = new Set(['constructor', 'if', 'for', 'while', 'switch', 'catch', 'resolve', 'reject'])
+
+function threeRendererSource(relativePath) {
+  const threeRoot = path.resolve(path.dirname(cjsRequire.resolve('three')), '..')
+  return readFileSync(path.resolve(threeRoot, relativePath), 'utf8')
+}
+
+function extractJsClassBody(source, className) {
+  const match = new RegExp(`class\\s+${className}\\b`).exec(source)
+  if (!match) throw new Error(`Unable to locate Three.js class ${className}.`)
+
+  const open = source.indexOf('{', match.index)
+  let depth = 0
+  for (let index = open; index < source.length; index += 1) {
+    const character = source[index]
+    if (character === '{') depth += 1
+    if (character === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open + 1, index)
+    }
+  }
+  throw new Error(`Unable to locate the end of Three.js class ${className}.`)
+}
+
+function extractWebGlRendererMethodNames() {
+  const names = new Set()
+  const source = threeRendererSource('src/renderers/WebGLRenderer.js')
+  for (const match of source.matchAll(/this\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?function\b/g)) {
+    names.add(match[1])
+  }
+  return names
+}
+
+function extractCommonRendererMethodNames() {
+  const names = new Set()
+  const source = extractJsClassBody(threeRendererSource('src/renderers/common/Renderer.js'), 'Renderer')
+  for (const match of source.matchAll(/^\t(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    if (!JS_METHOD_DECLARATION_IGNORE.has(match[1])) names.add(match[1])
+  }
+  for (const match of source.matchAll(/^\tget\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
+    names.add(match[1])
+  }
+  return names
+}
+
+function rendererPrototypeSurfaceNames() {
+  const names = new Set()
+  for (const name of Object.getOwnPropertyNames(Renderer.prototype)) {
+    if (name === 'constructor') continue
+    const descriptor = Object.getOwnPropertyDescriptor(Renderer.prototype, name)
+    if (typeof descriptor?.value === 'function' || descriptor?.get || descriptor?.set) {
+      names.add(name)
+    }
+  }
+  return names
+}
 
 function makeCamera() {
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
@@ -35986,6 +36045,19 @@ test('Renderer setEffects is an inert validated compatibility hook', () => {
     () => renderer.setEffects('effects'),
     /Renderer\.setEffects effects must be an array or null/i,
   )
+})
+
+test('Renderer exposes the installed Three renderer method surface', () => {
+  const rendererSurface = rendererPrototypeSurfaceNames()
+
+  for (const [label, methodNames] of [
+    ['WebGLRenderer', extractWebGlRendererMethodNames()],
+    ['CommonRenderer', extractCommonRendererMethodNames()],
+  ]) {
+    assert.ok(methodNames.size > 20, `Expected to find installed Three.js ${label} methods.`)
+    const missing = [...methodNames].filter((methodName) => !rendererSurface.has(methodName)).sort()
+    assert.deepEqual(missing, [], `Renderer is missing installed Three.js ${label} methods: ${missing.join(', ')}`)
+  }
 })
 
 test('Renderer renderBufferDirect fails clearly as unsupported', () => {
