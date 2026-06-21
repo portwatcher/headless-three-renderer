@@ -93,6 +93,7 @@ import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
+import { TGALoader } from 'three/examples/jsm/loaders/TGALoader.js'
 import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader.js'
 import { VTKLoader } from 'three/examples/jsm/loaders/VTKLoader.js'
 import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
@@ -6869,6 +6870,62 @@ test('examples RGBELoader parses HDR buffers into renderable DataTexture payload
     assert.ok(
       nonBackgroundRatio(renderRgba(scene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.12,
       'RGBELoader-decoded DataTexture should render visible HDR texture pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
+    texture.dispose()
+  }
+})
+
+test('examples TGALoader parses TGA buffers into renderable DataTexture payloads', () => {
+  const header = new Uint8Array(18)
+  header[2] = 2
+  header[12] = 2
+  header[14] = 1
+  header[16] = 24
+  header[17] = 0x20
+
+  const buffer = new Uint8Array(18 + 6)
+  buffer.set(header)
+  buffer.set([
+    0, 0, 255,
+    0, 255, 0,
+  ], 18)
+
+  const texData = new TGALoader().parse(buffer.buffer)
+  const texture = new THREE.DataTexture(texData.data, texData.width, texData.height, THREE.RGBAFormat)
+  texture.flipY = texData.flipY
+  texture.generateMipmaps = texData.generateMipmaps
+  texture.minFilter = texData.minFilter
+  texture.needsUpdate = true
+
+  const geometry = new THREE.PlaneGeometry(1, 1)
+  const material = new THREE.MeshBasicMaterial({ map: texture })
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    assert.equal(texData.width, 2)
+    assert.equal(texData.height, 1)
+    assert.equal(texData.flipY, true)
+    assert.equal(texData.generateMipmaps, true)
+    assert.equal(texData.minFilter, THREE.LinearMipmapLinearFilter)
+    assert.deepEqual(Array.from(texData.data), [
+      255, 0, 0, 255,
+      0, 255, 0, 255,
+    ])
+    assert.ok(
+      nonBackgroundRatio(renderRgba(scene, camera, { width: 64, height: 64 }), [0, 0, 0], 3) > 0.12,
+      'TGALoader-decoded DataTexture should render visible TGA texture pixels',
     )
   } finally {
     geometry.dispose()
