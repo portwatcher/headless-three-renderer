@@ -2819,6 +2819,96 @@ test('OctreeHelper renders generated box line geometry', () => {
   }
 })
 
+test('core Three helpers render supported line and basic material geometry', () => {
+  const makeCameraForHelper = () => {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
+    camera.position.set(1.4, 1.2, 2.4)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+  const helperCases = [
+    ['AxesHelper', () => new THREE.AxesHelper(0.8)],
+    ['GridHelper', () => new THREE.GridHelper(1, 4)],
+    ['PolarGridHelper', () => new THREE.PolarGridHelper(0.55, 6, 2, 12)],
+    ['BoxHelper', () => {
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.45, 0.35),
+        new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      )
+      mesh.updateMatrixWorld(true)
+      return new THREE.BoxHelper(mesh, 0xff8800)
+    }],
+    ['Box3Helper', () => new THREE.Box3Helper(
+      new THREE.Box3(
+        new THREE.Vector3(-0.35, -0.25, -0.2),
+        new THREE.Vector3(0.35, 0.25, 0.2),
+      ),
+      0x00ffaa,
+    )],
+    ['PlaneHelper', () => new THREE.PlaneHelper(
+      new THREE.Plane(new THREE.Vector3(0, 0, 1), 0),
+      0.8,
+      0x4488ff,
+    )],
+    ['ArrowHelper', () => new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0.25, 0).normalize(),
+      new THREE.Vector3(-0.3, -0.1, 0),
+      0.8,
+      0xffff00,
+    )],
+    ['CameraHelper', () => {
+      const sourceCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1.2)
+      sourceCamera.position.set(0, 0, 0.55)
+      sourceCamera.lookAt(0, 0, -0.4)
+      sourceCamera.updateMatrixWorld(true)
+      return new THREE.CameraHelper(sourceCamera)
+    }],
+    ['DirectionalLightHelper', () => {
+      const light = new THREE.DirectionalLight(0xffffff, 1)
+      light.position.set(0, 0, 0.35)
+      light.target.position.set(0, 0, -0.4)
+      light.updateMatrixWorld(true)
+      light.target.updateMatrixWorld(true)
+      return new THREE.DirectionalLightHelper(light, 0.55)
+    }],
+    ['PointLightHelper', () => {
+      const light = new THREE.PointLight(0xffffff, 1)
+      return new THREE.PointLightHelper(light, 0.45)
+    }],
+    ['SpotLightHelper', () => {
+      const light = new THREE.SpotLight(0xffffff, 1)
+      light.position.set(0, 0, 0.5)
+      light.target.position.set(0, 0, -0.5)
+      light.updateMatrixWorld(true)
+      light.target.updateMatrixWorld(true)
+      return new THREE.SpotLightHelper(light, 0x00ffff)
+    }],
+    ['HemisphereLightHelper', () => {
+      const light = new THREE.HemisphereLight(0xffffaa, 0x3333ff, 1)
+      return new THREE.HemisphereLightHelper(light, 0.45)
+    }],
+  ]
+
+  for (const [label, makeHelper] of helperCases) {
+    const helper = makeHelper()
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0x000000)
+    scene.add(helper)
+    helper.update?.()
+    helper.updateMatrixWorld?.(true)
+
+    try {
+      const rgba = renderRgba(scene, makeCameraForHelper(), { width: 64, height: 64 })
+      assert.ok(
+        nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.0005,
+        `${label} should render visible supported helper geometry`,
+      )
+    } finally {
+      helper.dispose?.()
+    }
+  }
+})
+
 test('Reflector and Refractor prepasses use Renderer target state and restore flags', () => {
   for (const [label, Helper] of [
     ['Reflector', Reflector],
