@@ -31364,6 +31364,8 @@ test('shadow bias options are extracted for native shadow lights', () => {
     light.shadow.normalBias = 0.125
     light.shadow.radius = 3.5
     light.shadow.intensity = 0.4
+    light.shadow.map = { texture: {} }
+    light.shadow.mapPass = { texture: {} }
     light.shadow.camera.near = 0.2
     light.shadow.camera.far = 24
     if ('left' in light.shadow.camera) {
@@ -31911,6 +31913,18 @@ test('invalid shadow numeric values fail clearly', () => {
     ['blurSamples negative', (light) => {
       light.shadow.blurSamples = -1
     }, /light\.shadow\.blurSamples must be non-negative/i],
+    ['map cache', (light) => {
+      light.shadow.map = 'target'
+    }, /light\.shadow\.map must be an object/i],
+    ['mapPass cache', (light) => {
+      light.shadow.mapPass = ['target']
+    }, /light\.shadow\.mapPass must be an object/i],
+    ['matrix container', (light) => {
+      light.shadow.matrix = { elements: [1, 0, 0] }
+    }, /light\.shadow\.matrix must be a THREE\.Matrix4/i],
+    ['matrix element', (light) => {
+      light.shadow.matrix.elements[0] = Number.NaN
+    }, /light\.shadow\.matrix\.elements\[0\] must be a finite number/i],
     ['camera.left', (light) => {
       light.shadow.camera.left = 'left'
     }, /light\.shadow\.camera\.left must be a finite number/i],

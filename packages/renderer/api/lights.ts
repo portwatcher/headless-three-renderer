@@ -193,6 +193,9 @@ function applyShadowOptions(out: NativeSceneLight, light: ThreeObject3DLike): vo
   out.shadowMapHeight = mapSize.height
   optionalBoolean(shadow?.autoUpdate, 'light.shadow.autoUpdate')
   optionalBoolean(shadow?.needsUpdate, 'light.shadow.needsUpdate')
+  validateShadowObjectState(shadow?.map, 'light.shadow.map')
+  validateShadowObjectState(shadow?.mapPass, 'light.shadow.mapPass')
+  if (shadow?.matrix != null) matrixElements(shadow.matrix, 'light.shadow.matrix')
   const bias = optionalFiniteNumber(shadow?.bias, 'light.shadow.bias')
   const normalBias = optionalFiniteNumber(shadow?.normalBias, 'light.shadow.normalBias')
   const radius = optionalNonNegativeFiniteNumber(shadow?.radius, 'light.shadow.radius')
@@ -313,8 +316,13 @@ function assertShadowContainerLike(shadow: unknown): void {
   assertPlainObject(shadow, 'light.shadow')
 }
 
+function validateShadowObjectState(value: unknown, label: string): void {
+  if (value == null) return
+  assertPlainObject(value, label)
+}
+
 function assertPlainObject(value: unknown, label: string): void {
-  if (typeof value === 'object' && !Array.isArray(value)) return
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) return
   throw new TypeError(`${label} must be an object.`)
 }
 
