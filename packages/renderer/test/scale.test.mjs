@@ -343,6 +343,60 @@ test('mesh render budget handles 1,936 separate mesh objects', () => {
   assert.ok(mean.r > 25 && mean.g > 25 && mean.b > 25, `separate mesh colors should survive rendering (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
+test('transparent sorting budget renders 1,024 layered meshes', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0.02, 0.02, 0.02)
+
+  const columns = 32
+  const rows = 16
+  const geometry = new THREE.PlaneGeometry(0.07, 0.09)
+  const redMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff3344,
+    opacity: 0.48,
+    transparent: true,
+    depthWrite: false,
+  })
+  const blueMaterial = new THREE.MeshBasicMaterial({
+    color: 0x2266ff,
+    opacity: 0.48,
+    transparent: true,
+    depthWrite: false,
+  })
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      const x = (col / (columns - 1) - 0.5) * 2.0
+      const y = (row / (rows - 1) - 0.5) * 1.8
+      const z = ((row + col) % 7) * 0.001
+
+      const red = new THREE.Mesh(geometry, redMaterial)
+      red.position.set(x, y, z)
+      red.rotation.z = ((row * columns + col) % 11) * 0.03
+      red.renderOrder = 1
+      scene.add(red)
+
+      const blue = new THREE.Mesh(geometry, blueMaterial)
+      blue.position.set(x, y, z + 0.0005)
+      blue.rotation.z = red.rotation.z + 0.02
+      blue.renderOrder = 0
+      scene.add(blue)
+    }
+  }
+
+  assert.equal(scene.children.length, columns * rows * 2)
+
+  const camera = new THREE.OrthographicCamera(-1.08, 1.08, 1.08, -1.08, 0.01, 10)
+  camera.position.set(0, 0, 2)
+  camera.lookAt(0, 0, 0)
+
+  const rgba = renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba' })
+  assert.equal(rgba.length, SIZE * SIZE * 4)
+  const ratio = nonBackgroundRatio(rgba, BACKGROUND, 6)
+  assert.ok(ratio > 0.25, `transparent sorting budget should render broad visible coverage (${ratio})`)
+  const mean = meanRgba(rgba)
+  assert.ok(mean.r > mean.b + 8, `renderOrder should draw red transparent layers after blue at scale (${mean.r} vs ${mean.b})`)
+})
+
 test('nested scene graph budget renders 2,048 transform groups with 256 meshes', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.02)
