@@ -26108,7 +26108,7 @@ test('Renderer.setRenderTarget state populates FloatType depthTexture', () => {
   assert.equal(renderer.getRenderTarget(), null)
 })
 
-test('Renderer.setRenderTarget state populates half-float and packed depth textures', () => {
+test('Renderer.setRenderTarget state populates scalar, half-float, and packed depth textures', () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
 
@@ -26131,6 +26131,39 @@ test('Renderer.setRenderTarget state populates half-float and packed depth textu
 
   const renderer = new Renderer()
   const cases = [
+    {
+      label: 'UnsignedByteType',
+      depthTexture: { type: THREE.UnsignedByteType, source: { data: {} } },
+      assertData(depthTexture) {
+        assert.ok(depthTexture.image.data instanceof Uint8Array, 'UnsignedByteType depthTexture should receive Uint8Array data')
+        const leftDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
+        const rightDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
+        assert.ok(leftDepth > rightDepth + 80, `active target near byte depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+        assert.ok(leftDepth <= 0xff && rightDepth >= 0, `active target byte depth values should be normalized (${leftDepth}, ${rightDepth})`)
+      },
+    },
+    {
+      label: 'UnsignedShortType',
+      depthTexture: { type: THREE.UnsignedShortType, source: { data: {} } },
+      assertData(depthTexture) {
+        assert.ok(depthTexture.image.data instanceof Uint16Array, 'UnsignedShortType depthTexture should receive Uint16Array data')
+        const leftDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
+        const rightDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
+        assert.ok(leftDepth > rightDepth + 20000, `active target near ushort depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+        assert.ok(leftDepth <= 0xffff && rightDepth >= 0, `active target ushort depth values should be normalized (${leftDepth}, ${rightDepth})`)
+      },
+    },
+    {
+      label: 'UnsignedIntType',
+      depthTexture: { type: THREE.UnsignedIntType, source: { data: {} } },
+      assertData(depthTexture) {
+        assert.ok(depthTexture.image.data instanceof Uint32Array, 'UnsignedIntType depthTexture should receive Uint32Array data')
+        const leftDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 18, 26, 26, 38)
+        const rightDepth = meanScalarRegion(depthTexture.image.data, 64, 64, 38, 26, 46, 38)
+        assert.ok(leftDepth > rightDepth + 1_000_000_000, `active target near uint depth should be greater than far depth (${leftDepth} vs ${rightDepth})`)
+        assert.ok(leftDepth <= 0xffffffff && rightDepth >= 0, `active target uint depth values should be normalized (${leftDepth}, ${rightDepth})`)
+      },
+    },
     {
       label: 'HalfFloatType',
       depthTexture: { type: THREE.HalfFloatType, source: { data: {} } },
