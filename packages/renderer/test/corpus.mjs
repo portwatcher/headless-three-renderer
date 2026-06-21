@@ -11,6 +11,7 @@ export function createSceneCorpus() {
     stencilRenderStateCorpus(),
     customBlendingCorpus(),
     backgroundOverrideCorpus(),
+    rendererClearColorFallbackCorpus(),
     twoDimensionalBackgroundTextureCorpus(),
     signedRawTextureCorpus(),
     equirectangularBackgroundCorpus(),
@@ -649,6 +650,71 @@ function backgroundOverrideCorpus() {
       if (!(center.g > center.r + 80 && center.g > center.b + 40 && corner.r < 2 && corner.g < 2 && corner.b < 2)) {
         throw new Error(`background override corpus should render green mesh on black option background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
+    },
+  }
+}
+
+function rendererClearColorFallbackCorpus() {
+  const emptyScene = new THREE.Scene()
+  const backgroundScene = new THREE.Scene()
+  backgroundScene.background = new THREE.Color(1, 0, 0)
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const samples = {}
+
+  function sampleCenter(rgba) {
+    return pixelAt(rgba, options.width, 48, 48)
+  }
+
+  function assertPixel(pixel, expected, label) {
+    const close = Math.abs(pixel.r - expected[0]) <= 1
+      && Math.abs(pixel.g - expected[1]) <= 1
+      && Math.abs(pixel.b - expected[2]) <= 1
+      && Math.abs(pixel.a - expected[3]) <= 1
+    if (!close) {
+      throw new Error(`${label} expected rgba(${expected.join(', ')}), got ${JSON.stringify(pixel)}`)
+    }
+  }
+
+  return {
+    name: 'renderer-clear-color-fallback',
+    scene: emptyScene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.9,
+    minMeanAlpha: 180,
+    browserReference: false,
+    render(renderer) {
+      const previousColor = renderer.getClearColor(new THREE.Color())
+      const previousAlpha = renderer.getClearAlpha()
+      try {
+        renderer.setClearColor(0x204080, 0.5)
+        const clearFallback = renderer.render(emptyScene, camera, options)
+        samples.clearFallback = sampleCenter(clearFallback)
+
+        const sceneBackground = renderer.render(backgroundScene, camera, options)
+        samples.sceneBackground = sampleCenter(sceneBackground)
+
+        renderer.setClearAlpha(0.25)
+        const nullBackground = renderer.render(backgroundScene, camera, { ...options, background: null })
+        samples.nullBackground = sampleCenter(nullBackground)
+
+        const optionBackground = renderer.render(backgroundScene, camera, {
+          ...options,
+          background: [0, 1, 0, 0.75],
+        })
+        samples.optionBackground = sampleCenter(optionBackground)
+        return optionBackground
+      } finally {
+        renderer.setClearColor(previousColor, previousAlpha)
+      }
+    },
+    validate() {
+      assertPixel(samples.clearFallback, [0x20, 0x40, 0x80, 128], 'Renderer clear color fallback')
+      assertPixel(samples.sceneBackground, [255, 0, 0, 255], 'scene background precedence')
+      assertPixel(samples.nullBackground, [0x20, 0x40, 0x80, 64], 'options.background null clear fallback')
+      assertPixel(samples.optionBackground, [0, 255, 0, 191], 'options.background override')
     },
   }
 }
