@@ -147,6 +147,7 @@ import { SSAARenderPass } from 'three/examples/jsm/postprocessing/SSAARenderPass
 import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.js'
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { Projector, RenderableFace, RenderableLine, RenderableSprite } from 'three/examples/jsm/renderers/Projector.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import { FlakesTexture } from 'three/examples/jsm/textures/FlakesTexture.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -3211,6 +3212,75 @@ test('examples WebGL and WebGPU capability helpers expose browser-context bounda
     } else {
       delete globalThis.document
     }
+  }
+})
+
+test('Projector produces CPU render data for supported scene objects', () => {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+
+  const meshGeometry = new THREE.PlaneGeometry(0.8, 0.8)
+  const meshMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
+  const mesh = new THREE.Mesh(meshGeometry, meshMaterial)
+  mesh.position.x = -0.4
+
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-0.2, -0.6, 0),
+    new THREE.Vector3(0.6, -0.6, 0),
+  ])
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x33ff66 })
+  const line = new THREE.LineSegments(lineGeometry, lineMaterial)
+
+  const pointsGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0.45, 0.35, 0),
+  ])
+  const pointsMaterial = new THREE.PointsMaterial({ color: 0x4488ff, size: 0.25 })
+  const points = new THREE.Points(pointsGeometry, pointsMaterial)
+
+  const spriteMaterial = new THREE.SpriteMaterial({ color: 0xffff44 })
+  const sprite = new THREE.Sprite(spriteMaterial)
+  sprite.position.set(0.2, 0.15, 0)
+  sprite.scale.setScalar(0.35)
+
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  scene.add(mesh, line, points, sprite, light)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.z = 3
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const data = new Projector().projectScene(scene, camera, true, true)
+    const faces = data.elements.filter((element) => element instanceof RenderableFace)
+    const lines = data.elements.filter((element) => element instanceof RenderableLine)
+    const sprites = data.elements.filter((element) => element instanceof RenderableSprite)
+
+    assert.ok(data.objects.some((entry) => entry.object === mesh), 'Projector should include mesh objects')
+    assert.ok(data.objects.some((entry) => entry.object === line), 'Projector should include line objects')
+    assert.equal(data.lights[0], light)
+    assert.equal(faces.length, 2)
+    assert.equal(lines.length, 1)
+    assert.equal(sprites.length, 2)
+    assert.equal(faces[0].material, meshMaterial)
+    assert.equal(lines[0].material, lineMaterial)
+    assert.equal(sprites.some((entry) => entry.object === points), true)
+    assert.equal(sprites.some((entry) => entry.object === sprite), true)
+    assert.ok(data.elements.every((element) => Number.isFinite(element.z)), 'projected element z values should be finite')
+
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.04,
+      'Projector source scene objects should still render through the normal renderer path',
+    )
+  } finally {
+    meshGeometry.dispose()
+    meshMaterial.dispose()
+    lineGeometry.dispose()
+    lineMaterial.dispose()
+    pointsGeometry.dispose()
+    pointsMaterial.dispose()
+    spriteMaterial.dispose()
   }
 })
 
