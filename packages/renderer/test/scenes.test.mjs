@@ -84,6 +84,7 @@ import { BVHLoader } from 'three/examples/jsm/loaders/BVHLoader.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { GCodeLoader } from 'three/examples/jsm/loaders/GCodeLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
 import { PDBLoader } from 'three/examples/jsm/loaders/PDBLoader.js'
@@ -6725,6 +6726,48 @@ test('examples OBJLoader STLLoader and PLYLoader parse renderable mesh geometry 
     stlMaterial.dispose()
     plyGeometry.dispose()
     plyMaterial.dispose()
+  }
+})
+
+test('examples MTLLoader parses material libraries for renderable mesh paths', () => {
+  const materialCreator = new MTLLoader().setMaterialOptions({ normalizeRGB: true }).parse([
+    'newmtl panel',
+    'Kd 64 200 96',
+    'Ks 0 0 0',
+    'Ns 16',
+    'd 0.9',
+  ].join('\n'), '')
+  materialCreator.preload()
+  const materials = materialCreator.getAsArray()
+  const material = materialCreator.create('panel')
+  const geometry = new THREE.PlaneGeometry(1, 1)
+  const mesh = new THREE.Mesh(geometry, material)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(new THREE.AmbientLight(0xffffff, 1), mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    assert.equal(material.type, 'MeshPhongMaterial')
+    assert.equal(material.name, 'panel')
+    assert.equal(materialCreator.getIndex('panel'), 0)
+    assert.equal(materials[0], material)
+    assert.equal(material.transparent, true)
+    assert.equal(material.opacity, 0.9)
+    assert.ok(material.color.g > material.color.r)
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.12,
+      'MTLLoader-created MeshPhongMaterial should render visible mesh pixels',
+    )
+  } finally {
+    geometry.dispose()
+    material.dispose()
   }
 })
 
