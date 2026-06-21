@@ -7130,7 +7130,7 @@ function dashedLineMaterialLineLoopDistanceCorpus() {
     color: 0x66ddff,
     dashSize: 2,
     gapSize: 10,
-    linewidth: 4,
+    linewidth: 1,
     scale: 1,
   }))
   line.computeLineDistances()
@@ -7147,7 +7147,6 @@ function dashedLineMaterialLineLoopDistanceCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.002,
-    browserReference: false,
     validate(rgba, { width }) {
       const isCyan = (r, g, b) => b > 120 && g > 100 && b > r + 35 && g > r + 25
       const lowerClosingPixels = countRegionPixels(rgba, width, 12, 48, 22, 76, isCyan)

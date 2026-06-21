@@ -595,6 +595,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "line-dashed-material-lineloop-distance.png",
+      "name": "line-dashed-material-lineloop-distance",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "line-basic-material-uv-channel-selection.png",
       "name": "line-basic-material-uv-channel-selection",
       "width": 96,
