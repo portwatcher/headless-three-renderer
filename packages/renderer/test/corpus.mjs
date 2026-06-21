@@ -10,6 +10,7 @@ export function createSceneCorpus() {
     alphaToCoverageClippingCorpus(),
     stencilRenderStateCorpus(),
     customBlendingCorpus(),
+    materialRenderStateNoopCorpus(),
     backgroundOverrideCorpus(),
     rendererClearColorFallbackCorpus(),
     twoDimensionalBackgroundTextureCorpus(),
@@ -622,6 +623,113 @@ function customBlendingCorpus() {
       const center = meanRegion(rgba, width, 32, 32, 64, 64)
       if (!(center.r < 4 && center.g > 180 && center.b > 180)) {
         throw new Error(`reverse-subtract blending corpus should render cyan in the overlap, got ${JSON.stringify(center)}`)
+      }
+    },
+  }
+}
+
+function materialRenderStateNoopCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+    toneMapping: THREE.NoToneMapping,
+  }
+  const stats = { precisionDiffs: {} }
+
+  function planeScene(configure = () => {}) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const material = new THREE.MeshBasicMaterial({ color: 0x40a0ff })
+    configure(material)
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+    return scene
+  }
+
+  function wireframeScene(hints = {}) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        ...hints,
+      }),
+    ))
+    return scene
+  }
+
+  function renderPlane(renderer, configure) {
+    return renderer.render(planeScene(configure), camera, options)
+  }
+
+  function renderWireframe(renderer, hints) {
+    return renderer.render(wireframeScene(hints), makeCamera([0, 0, 4]), options)
+  }
+
+  return {
+    name: 'material-render-state-noops',
+    scene: planeScene(),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.1,
+    browserReference: false,
+    render(renderer) {
+      const baseline = renderPlane(renderer)
+      stats.center = meanRegion(baseline, options.width, 32, 32, 64, 64)
+      stats.ditheringDiff = meanAbsDiff(baseline, renderPlane(renderer, (material) => {
+        material.dithering = true
+      }))
+      for (const precision of ['highp', 'mediump', 'lowp']) {
+        stats.precisionDiffs[precision] = meanAbsDiff(baseline, renderPlane(renderer, (material) => {
+          material.precision = precision
+        }))
+      }
+
+      const transparentBase = renderPlane(renderer, (material) => {
+        material.opacity = 0.5
+        material.side = THREE.DoubleSide
+        material.transparent = true
+      })
+      const forceSinglePass = renderPlane(renderer, (material) => {
+        material.forceSinglePass = true
+        material.opacity = 0.5
+        material.side = THREE.DoubleSide
+        material.transparent = true
+      })
+      stats.forceSinglePassDiff = meanAbsDiff(transparentBase, forceSinglePass)
+
+      const wireframeBase = renderWireframe(renderer, {})
+      const wireframeHints = renderWireframe(renderer, {
+        wireframeLinewidth: 4,
+        wireframeLinecap: 'butt',
+        wireframeLinejoin: 'bevel',
+      })
+      stats.wireframeHintDiff = meanAbsDiff(wireframeBase, wireframeHints)
+
+      return baseline
+    },
+    validate() {
+      if (!(stats.center.b > 240 && stats.center.g > 80 && stats.center.g < 105 && stats.center.r > 8 && stats.center.r < 25)) {
+        throw new Error(`render-state no-op baseline should render the blue plane, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.ditheringDiff < 0.1)) {
+        throw new Error(`material.dithering should not alter native output, stats=${JSON.stringify(stats)}`)
+      }
+      for (const [precision, diff] of Object.entries(stats.precisionDiffs)) {
+        if (!(diff < 0.1)) {
+          throw new Error(`material.precision=${precision} should not alter native output, stats=${JSON.stringify(stats)}`)
+        }
+      }
+      if (!(stats.forceSinglePassDiff < 0.1)) {
+        throw new Error(`material.forceSinglePass should not alter native output, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.wireframeHintDiff < 0.1)) {
+        throw new Error(`mesh wireframe line hints should not alter native output, stats=${JSON.stringify(stats)}`)
       }
     },
   }
