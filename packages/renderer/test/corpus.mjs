@@ -3436,7 +3436,6 @@ function customTransparentSortGroupCorpus() {
       transparentSort: (a, b) => b.group.materialIndex - a.group.materialIndex,
     },
     background: [0, 0, 0],
-    browserReference: false,
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
