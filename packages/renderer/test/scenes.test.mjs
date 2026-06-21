@@ -57,6 +57,8 @@ import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.j
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { Gyroscope } from 'three/examples/jsm/misc/Gyroscope.js'
+import { MorphAnimMesh } from 'three/examples/jsm/misc/MorphAnimMesh.js'
+import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
@@ -4576,6 +4578,75 @@ test('examples Gyroscope preserves child orientation while rendering normal mesh
     geometry.dispose()
     redMaterial.dispose()
     greenMaterial.dispose()
+  }
+})
+
+test('examples morph animation helpers drive renderable CPU morph target state', () => {
+  const createMorphPlaneGeometry = (targetNames, offsetX) => {
+    const geometry = new THREE.PlaneGeometry(0.34, 0.34)
+    const position = geometry.getAttribute('position')
+    geometry.morphTargetsRelative = true
+    geometry.morphAttributes.position = targetNames.map((name) => {
+      const values = new Float32Array(position.count * 3)
+      for (let i = 0; i < position.count; i += 1) values[i * 3] = offsetX
+      const attribute = new THREE.Float32BufferAttribute(values, 3)
+      attribute.name = name
+      return attribute
+    })
+    return geometry
+  }
+
+  const animGeometry = createMorphPlaneGeometry(['enter'], 2.6)
+  animGeometry.animations = [
+    new THREE.AnimationClip('enter', 1, [
+      new THREE.NumberKeyframeTrack('.morphTargetInfluences[0]', [0, 1], [0, 1]),
+    ]),
+  ]
+  const animMaterial = new THREE.MeshBasicMaterial({ color: 0x44ff66, side: THREE.DoubleSide })
+  const animMesh = new MorphAnimMesh(animGeometry, animMaterial)
+  animMesh.position.x = -1.8
+  animMesh.frustumCulled = false
+  animMesh.playAnimation('enter', 1)
+  animMesh.updateAnimation(0.5)
+
+  const blendGeometry = createMorphPlaneGeometry(['pulse_0', 'pulse_1'], -1.3)
+  const blendMaterial = new THREE.MeshBasicMaterial({ color: 0xff4455, side: THREE.DoubleSide })
+  const blendMesh = new MorphBlendMesh(blendGeometry, blendMaterial)
+  blendMesh.position.x = 1.8
+  blendMesh.frustumCulled = false
+  blendMesh.autoCreateAnimations(2)
+  blendMesh.playAnimation('pulse')
+  blendMesh.update(0.2)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(animMesh, blendMesh)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(animMesh.morphTargetInfluences[0] > 0.45 && animMesh.morphTargetInfluences[0] < 0.55)
+    assert.ok(blendMesh.morphTargetInfluences[0] > 0.9)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 150 && g > r + 20 && g > b + 20) > 100,
+      'MorphAnimMesh helper-updated morph target should render green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 140 && b < 140) > 100,
+      'MorphBlendMesh helper-updated morph target should render red pixels',
+    )
+  } finally {
+    animGeometry.dispose()
+    animMaterial.dispose()
+    blendGeometry.dispose()
+    blendMaterial.dispose()
   }
 })
 
