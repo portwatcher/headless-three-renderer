@@ -30,6 +30,7 @@ import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerat
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
+import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js'
 import { ReflectorForSSRPass } from 'three/examples/jsm/objects/ReflectorForSSRPass.js'
@@ -3287,6 +3288,47 @@ test('ShadowMesh renders projected helper geometry with built-in material state'
     shadow.material.dispose()
     sourceGeometry.dispose()
     sourceMaterial.dispose()
+  }
+})
+
+test('GroundedSkybox renders generated textured sky geometry', () => {
+  const texture = new THREE.DataTexture(new Uint8Array([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 0, 255, 255,
+    255, 255, 0, 255,
+  ]), 2, 2, THREE.RGBAFormat)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+
+  const skybox = new GroundedSkybox(texture, 1, 8, 8)
+  skybox.position.y = 1
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(skybox)
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 50)
+  camera.position.set(0, 1, 0.1)
+  camera.lookAt(0, 1, -1)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+    const mean = meanRgba(rgba)
+    assert.equal(skybox.material.map, texture)
+    assert.ok(
+      nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.9,
+      'GroundedSkybox should fill the view with generated textured geometry',
+    )
+    assert.ok(
+      mean.r > 40 && mean.b > 40,
+      `GroundedSkybox should sample visible texture colors (${mean.r}, ${mean.g}, ${mean.b})`,
+    )
+  } finally {
+    skybox.geometry.dispose()
+    skybox.material.dispose()
+    texture.dispose()
   }
 })
 

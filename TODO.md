@@ -44,6 +44,7 @@ Already supported in the current implementation:
 - Three.js `RectAreaLightHelper` renders its light outline and fill visualization through supported `LineBasicMaterial` and `MeshBasicMaterial` geometry.
 - Three.js `PositionalAudioHelper` renders grouped cone line geometry through supported `Line` material-array groups with `LineBasicMaterial`.
 - Three.js `OctreeHelper` renders generated box edges through supported `LineSegments` plus `LineBasicMaterial` paths.
+- Three.js examples `GroundedSkybox` renders generated textured sky geometry through supported `SphereGeometry` plus `MeshBasicMaterial` map paths.
 - Three.js examples `ShadowMesh` renders projected helper geometry through supported source geometry plus `MeshBasicMaterial` transparent/stencil state.
 - Three.js `LightProbeHelper` fails clearly on its internal `LightProbeHelperMaterial` shader path with guidance to use native `THREE.LightProbe` lighting, `LightProbeGenerator` readback, or a custom WGSL visualizer.
 - Three.js `TextureHelper` fails clearly on its internal `TextureHelperMaterial` shader path with guidance to render supported texture inputs directly or provide a custom WGSL visualizer.
