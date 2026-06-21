@@ -65,6 +65,7 @@ export function createSceneCorpus() {
     fogExp2MixedObjectCorpus(),
     textureMatrixColorSpaceCorpus(),
     linearOutputColorSpaceCorpus(),
+    toneMappingStateCorpus(),
     customWgslPremultipliedCorpus(),
     sceneOverrideMaterialCorpus(),
     maskRenderModeCorpus(),
@@ -971,6 +972,109 @@ function linearOutputColorSpaceCorpus() {
       const corner = pixelAt(rgba, width, 4, 4)
       if (!(center.r > 130 && center.r < 160 && center.g > 60 && center.g < 85 && center.b > 15 && center.b < 35 && corner.r > 40 && corner.r < 55 && corner.g > 40 && corner.g < 55 && corner.b > 40 && corner.b < 55)) {
         throw new Error(`linear output corpus should preserve linear RGB values, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
+      }
+    },
+  }
+}
+
+function toneMappingStateCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 4),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1) }),
+  ))
+
+  const camera = makeCamera([0, 0, 3])
+  const options = {
+    width: CORPUS_RENDER_SIZE,
+    height: CORPUS_RENDER_SIZE,
+    format: 'rgba',
+    outputColorSpace: THREE.LinearSRGBColorSpace,
+  }
+  const stats = {}
+
+  function luminance(rgba) {
+    const mean = meanRegion(rgba, options.width, 32, 32, 64, 64)
+    return mean.r
+  }
+
+  return {
+    name: 'renderer-tone-mapping-state',
+    scene,
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.4,
+    browserReference: false,
+    render(renderer) {
+      const previousToneMapping = renderer.toneMapping
+      const previousToneMappingExposure = renderer.toneMappingExposure
+      try {
+        stats.mapped = luminance(renderer.render(scene, camera, options))
+
+        renderer.toneMapping = THREE.NoToneMapping
+        const unmapped = renderer.render(scene, camera, options)
+        stats.unmapped = luminance(unmapped)
+        stats.optionMapped = luminance(renderer.render(scene, camera, {
+          ...options,
+          toneMapping: THREE.ACESFilmicToneMapping,
+        }))
+
+        renderer.toneMapping = THREE.ACESFilmicToneMapping
+        renderer.toneMappingExposure = 0.25
+        stats.dimmed = luminance(renderer.render(scene, camera, options))
+        stats.optionBrightened = luminance(renderer.render(scene, camera, {
+          ...options,
+          toneMappingExposure: 2,
+        }))
+        renderer.toneMappingExposure = 2
+        stats.brightened = luminance(renderer.render(scene, camera, options))
+
+        renderer.toneMappingExposure = 1
+        renderer.toneMapping = THREE.LinearToneMapping
+        stats.linear = luminance(renderer.render(scene, camera, options))
+        renderer.toneMapping = THREE.ReinhardToneMapping
+        stats.reinhard = luminance(renderer.render(scene, camera, options))
+        renderer.toneMapping = THREE.CineonToneMapping
+        stats.cineon = luminance(renderer.render(scene, camera, options))
+        renderer.toneMapping = THREE.CustomToneMapping
+        stats.custom = luminance(renderer.render(scene, camera, options))
+        renderer.toneMapping = THREE.AgXToneMapping
+        stats.agx = luminance(renderer.render(scene, camera, options))
+        renderer.toneMapping = THREE.NeutralToneMapping
+        stats.neutral = luminance(renderer.render(scene, camera, options))
+
+        return unmapped
+      } finally {
+        renderer.toneMapping = previousToneMapping
+        renderer.toneMappingExposure = previousToneMappingExposure
+      }
+    },
+    validate() {
+      if (!(stats.unmapped > stats.mapped + 35 && stats.unmapped > 245)) {
+        throw new Error(`NoToneMapping should preserve bright linear output, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.unmapped > stats.optionMapped + 35)) {
+        throw new Error(`options.toneMapping should override renderer state, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.brightened > stats.dimmed + 60 && stats.optionBrightened > stats.dimmed + 60)) {
+        throw new Error(`toneMappingExposure state/options should scale output, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.linear > 245)) {
+        throw new Error(`LinearToneMapping should preserve white output, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.reinhard < stats.linear - 70)) {
+        throw new Error(`ReinhardToneMapping should compress white, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.cineon > stats.reinhard + 20 && stats.cineon < stats.linear - 20)) {
+        throw new Error(`CineonToneMapping should land between Reinhard and Linear, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(Math.abs(stats.custom - stats.linear) < 2)) {
+        throw new Error(`CustomToneMapping should use the default identity mapping, stats=${JSON.stringify(stats)}`)
+      }
+      if (!(stats.agx > 0 && stats.agx < stats.linear - 20 && stats.neutral > 0 && stats.neutral < stats.linear - 5)) {
+        throw new Error(`AgX and Neutral tone mapping should produce finite compressed output, stats=${JSON.stringify(stats)}`)
       }
     },
   }
