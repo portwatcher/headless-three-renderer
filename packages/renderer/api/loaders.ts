@@ -52,6 +52,7 @@ export type ThreeLoadingManagerLike = {
 export type ThreeGltfLoaderLike = {
   parse(data: ArrayBuffer | string, path: string, onLoad: (gltf: unknown) => void, onError?: (error: unknown) => void): void
   register?(callback: unknown): unknown
+  setPath?(path: string): ThreeGltfLoaderLike
 }
 type GltfLoaderCtor = new (manager?: ThreeLoadingManagerLike) => ThreeGltfLoaderLike
 type GltfLoaderModule = {
@@ -261,6 +262,7 @@ export async function createNodeGltfLoader(
 
   const { GLTFLoader } = await importGltfLoader()
   const loader = new GLTFLoader(loadingManager)
+  loader.setPath?.(pathToFileURL(`${root}${path.sep}`).href)
   await configureLoader?.(loader)
   installAnimationPointerExtension(loader)
   installNodeVisibilityExtension(loader)

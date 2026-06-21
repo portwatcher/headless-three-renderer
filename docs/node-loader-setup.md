@@ -71,10 +71,12 @@ avatar manually.
 For fully custom loading flows, `createNodeGltfLoader(rootDir)` returns the
 configured `{ loader, manager, encodedImages }` bundle so callers can add more
 handlers or reuse the loader directly. Loader `rootDir` values accept relative
-paths, absolute paths, and `file://` directory URLs. The helper also installs
-the narrow WebP `Image` support probe that Three.js `GLTFLoader` uses for
-`EXT_texture_webp` capability detection; image bytes are still loaded through
-the encoded-buffer handlers rather than a DOM image decoder.
+paths, absolute paths, and `file://` directory URLs, and the returned
+`GLTFLoader` has its path set to that root so `loader.load('model.gltf')`
+resolves local relative assets without additional caller setup. The helper also
+installs the narrow WebP `Image` support probe that Three.js `GLTFLoader` uses
+for `EXT_texture_webp` capability detection; image bytes are still loaded
+through the encoded-buffer handlers rather than a DOM image decoder.
 
 Local helper paths are normalized through `resolveLocalAssetPath(url, rootDir)`.
 Relative paths resolve under relative, absolute, or `file://` `rootDir`
