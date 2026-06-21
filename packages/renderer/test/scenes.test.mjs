@@ -5776,6 +5776,53 @@ test('MeshNormalMaterial bumpMap perturbs output normals', () => {
   assert.ok(diff > 2, `bumpMap should perturb MeshNormalMaterial output normals (diff=${diff.toFixed(2)})`)
 })
 
+test('MeshNormalMaterial bumpMap honors nearest and linear filters', () => {
+  function shiftedUvPlane(offsetU) {
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    const uv = geometry.getAttribute('uv')
+    for (let i = 0; i < uv.count; i += 1) {
+      uv.setXY(i, uv.getX(i) + offsetU, uv.getY(i))
+    }
+    uv.needsUpdate = true
+    return geometry
+  }
+
+  function renderWithFilter(filter) {
+    const bumpMap = rgbaTexture([
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+    ], 2, 1)
+    bumpMap.magFilter = filter
+    bumpMap.minFilter = filter
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    scene.add(new THREE.Mesh(
+      shiftedUvPlane(-0.05),
+      new THREE.MeshNormalMaterial({ bumpMap, bumpScale: 8 }),
+    ))
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+
+    return renderRgba(scene, camera, {
+      width: 64,
+      height: 64,
+      outputColorSpace: THREE.LinearSRGBColorSpace,
+    })
+  }
+
+  const nearest = renderWithFilter(THREE.NearestFilter)
+  const linear = renderWithFilter(THREE.LinearFilter)
+  const diff = meanAbsDiff(nearest, linear)
+  const nearestCenter = meanRegion(nearest, 64, 64, 28, 28, 36, 36)
+  const linearCenter = meanRegion(linear, 64, 64, 28, 28, 36, 36)
+  assert.ok(diff > 3, `NearestFilter and LinearFilter should perturb bump normals differently (diff=${diff.toFixed(2)})`)
+  assert.ok(nearestCenter.r > linearCenter.r + 15, `NearestFilter should preserve a stronger stepped bump perturbation (${nearestCenter.r} vs ${linearCenter.r})`)
+  assert.ok(linearCenter.b > nearestCenter.b + 5, `LinearFilter should keep the blended bump normal more front-facing (${linearCenter.b} vs ${nearestCenter.b})`)
+})
+
 test('BackSide normalMap and bumpMap scales match Three.js sign inversion', () => {
   function renderNormal(side, cameraZ) {
     const scene = new THREE.Scene()
