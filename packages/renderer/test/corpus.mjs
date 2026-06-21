@@ -112,6 +112,8 @@ export function createSceneCorpus() {
     renderableFrustumCullingCorpus(),
     batchedMeshCorpus(),
     batchedMeshInactiveGeometryCorpus(),
+    batchedMeshNonIndexedGroupsCorpus(),
+    batchedMeshPartialGroupRangeCorpus(),
     batchedMeshSparseMaterialGroupsCorpus(),
     batchedMeshCullingCorpus(),
     batchedMeshCustomSortCorpus(),
@@ -6371,6 +6373,134 @@ function batchedMeshInactiveGeometryCorpus() {
       }
       if (rightR > 8 || rightG > 8 || rightB > 8) {
         throw new Error(`deleted BatchedMesh geometry should remain black, got rgb(${rightR}, ${rightG}, ${rightB})`)
+      }
+    },
+  }
+}
+
+function batchedMeshNonIndexedGroupsCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+
+  const batch = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    0,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batch.addGeometry(source)
+  batch.addInstance(geometryId)
+  batch.perObjectFrustumCulled = false
+
+  const range = batch.getGeometryRangeAt(geometryId, {})
+  batch.geometry.clearGroups()
+  batch.geometry.addGroup(range.start, 6, 0)
+  batch.geometry.addGroup(range.start + 6, 6, 1)
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-non-indexed-groups',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.08,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const left = meanRegion(rgba, width, 20, 42, 30, 54)
+      const right = meanRegion(rgba, width, 66, 42, 76, 54)
+      if (!(left.r > left.g + 80 && left.r > left.b + 80 && right.g > right.r + 70 && right.g > right.b + 80)) {
+        throw new Error(`BatchedMesh non-indexed material groups should render left red and right green, got left=${JSON.stringify(left)} right=${JSON.stringify(right)}`)
+      }
+    },
+  }
+}
+
+function batchedMeshPartialGroupRangeCorpus() {
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+
+  const source = new THREE.BufferGeometry()
+  source.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.9, -0.45, 0,
+    -0.25, -0.45, 0,
+    -0.25, 0.45, 0,
+    -0.9, 0.45, 0,
+    0.25, -0.45, 0,
+    0.9, -0.45, 0,
+    0.9, 0.45, 0,
+    0.25, 0.45, 0,
+  ]), 3))
+  source.setIndex([
+    0, 1, 2,
+    0, 2, 3,
+    4, 5, 6,
+    4, 6, 7,
+  ])
+
+  const batch = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    [
+      new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    ],
+  )
+  const geometryId = batch.addGeometry(source)
+  batch.addInstance(geometryId)
+  batch.perObjectFrustumCulled = false
+
+  const range = batch.getGeometryRangeAt(geometryId, {})
+  batch.geometry.clearGroups()
+  batch.geometry.addGroup(range.start, 6, 0)
+  batch.geometry.addGroup(range.start + 6, 6, 1)
+  batch._geometryInfo[geometryId].start = range.start + 3
+  batch._geometryInfo[geometryId].count = 6
+  scene.add(batch)
+
+  const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  return {
+    name: 'batched-mesh-partial-group-range',
+    scene,
+    camera,
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.015,
+    browserReference: false,
+    validate(rgba, { width }) {
+      const redPixels = countRegionPixels(rgba, width, 12, 21, 42, 51, (r, g, b) => r > 120 && r > g + 50 && r > b + 50)
+      const greenPixels = countRegionPixels(rgba, width, 62, 45, 90, 78, (r, g, b) => g > 120 && g > r + 50 && g > b + 50)
+      const clippedLeft = meanRegion(rgba, width, 30, 54, 40, 69)
+      const clippedRight = meanRegion(rgba, width, 56, 27, 66, 42)
+      if (!(redPixels > 150 && greenPixels > 150 && clippedLeft.r < 5 && clippedLeft.g < 5 && clippedLeft.b < 5 && clippedRight.r < 5 && clippedRight.g < 5 && clippedRight.b < 5)) {
+        throw new Error(`BatchedMesh partial group range should clip source groups while preserving material colors, red=${redPixels} green=${greenPixels} clippedLeft=${JSON.stringify(clippedLeft)} clippedRight=${JSON.stringify(clippedRight)}`)
       }
     },
   }
