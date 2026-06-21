@@ -196,6 +196,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "mesh-standard-displacement-map.png",
+      "name": "mesh-standard-displacement-map",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "mesh-normal-material-flat.png",
       "name": "mesh-normal-material-flat",
       "width": 96,

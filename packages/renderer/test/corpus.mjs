@@ -3713,7 +3713,6 @@ function meshStandardMaterialDisplacementCorpus() {
     options,
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.2,
-    browserReference: false,
     render(renderer) {
       const flat = renderer.render(makeScene(0), camera, options).slice()
       const displaced = renderer.render(makeScene(0.8), camera, options).slice()
