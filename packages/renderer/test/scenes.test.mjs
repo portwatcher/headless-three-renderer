@@ -103,6 +103,7 @@ import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { frameCorners } from 'three/examples/jsm/utils/CameraUtils.js'
 import { hilbert2D } from 'three/examples/jsm/utils/GeometryUtils.js'
+import { LDrawUtils } from 'three/examples/jsm/utils/LDrawUtils.js'
 import * as SceneUtils from 'three/examples/jsm/utils/SceneUtils.js'
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
@@ -4055,6 +4056,64 @@ test('examples geometry modifiers and BufferGeometryUtils render CPU-transformed
     mergeRightGeometry.dispose()
     mergedGeometry.dispose()
     mergedMaterial.dispose()
+  }
+})
+
+test('examples LDrawUtils merges mesh and line objects into renderable geometry', () => {
+  const meshMaterial = new THREE.MeshBasicMaterial({ color: 0xff4455, side: THREE.DoubleSide })
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x44ffff, linewidth: 8 })
+  const root = new THREE.Group()
+  const meshGeometries = []
+  for (const x of [-0.35, 0.15]) {
+    const geometry = new THREE.BoxGeometry(0.25, 0.25, 0.25).toNonIndexed()
+    meshGeometries.push(geometry)
+    const mesh = new THREE.Mesh(geometry, meshMaterial)
+    mesh.position.x = x
+    root.add(mesh)
+  }
+  const lineGeometry = new THREE.BufferGeometry()
+  lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    -0.6, -0.35, 0,
+    0.45, 0.35, 0,
+  ]), 3))
+  root.add(new THREE.LineSegments(lineGeometry, lineMaterial))
+
+  const merged = LDrawUtils.mergeObject(root)
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(merged)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.7, -0.7, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 96
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    const mergedMesh = merged.children.find((child) => child.isMesh)
+    const mergedLine = merged.children.find((child) => child.isLineSegments)
+
+    assert.equal(merged.userData.constructionStep, 0)
+    assert.equal(merged.userData.numConstructionSteps, 1)
+    assert.equal(merged.children.length, 2, 'LDrawUtils.mergeObject should merge by mesh and line material')
+    assert.equal(mergedMesh?.geometry.getAttribute('position').count, 72)
+    assert.equal(mergedLine?.geometry.getAttribute('position').count, 2)
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 140) > 250,
+      'LDrawUtils merged mesh geometry should render red pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 180 && b > 180 && g > r + 40) > 300,
+      'LDrawUtils merged line geometry should render cyan pixels',
+    )
+  } finally {
+    for (const geometry of meshGeometries) geometry.dispose()
+    lineGeometry.dispose()
+    for (const child of merged.children) child.geometry?.dispose()
+    meshMaterial.dispose()
+    lineMaterial.dispose()
   }
 })
 
