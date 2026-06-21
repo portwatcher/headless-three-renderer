@@ -744,6 +744,8 @@ export interface NativeSceneLight {
   shadowNormalBias?: number
   /** PCF shadow radius multiplier. Defaults to 1. */
   shadowRadius?: number
+  /** VSM blur sample count. Defaults to Three.js' LightShadow default of 8. */
+  shadowBlurSamples?: number
   /** Orthographic shadow-camera frustum bounds. */
   shadowCameraLeft?: number
   shadowCameraRight?: number

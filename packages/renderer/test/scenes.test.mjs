@@ -24958,6 +24958,226 @@ test('physical extension maps honor nearest texture filters', () => {
   assert.ok(thicknessDiff > 0.5, `LinearFilter should blend iridescence thickness differently than NearestFilter, diff=${thicknessDiff.toFixed(2)}`)
 })
 
+test('physical extension maps honor horizontal and vertical repeat wrapping', () => {
+  function wrappedTexture(active, inactive = [0, 0, 0, 255]) {
+    const texture = rgbaTexture([
+      ...active,
+      ...inactive,
+      ...inactive,
+      ...inactive,
+    ], 2, 2)
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    return texture
+  }
+
+  function frontCamera() {
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 0, 3)
+    camera.lookAt(0, 0, 0)
+    return camera
+  }
+
+  function renderPhysicalWrap(config, { wrapS = THREE.ClampToEdgeWrapping, wrapT = THREE.ClampToEdgeWrapping, uv }) {
+    const texture = wrappedTexture(config.active, config.inactive)
+    texture.wrapS = wrapS
+    texture.wrapT = wrapT
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    if (config.environment) {
+      scene.environment = makeEnvironmentTexture()
+      scene.environmentIntensity = 2
+    }
+
+    if (config.backdrop != null) {
+      const back = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshBasicMaterial({ color: config.backdrop }),
+      )
+      back.position.z = -0.2
+      scene.add(back)
+    }
+
+    scene.add(new THREE.Mesh(
+      constantUvPlane(...uv),
+      new THREE.MeshPhysicalMaterial({
+        ...config.material,
+        [config.slot]: texture,
+      }),
+    ))
+
+    if (config.light) {
+      const light = new THREE.PointLight(0xffffff, config.light.intensity)
+      light.position.set(...config.light.position)
+      scene.add(light)
+    }
+
+    return renderRgba(scene, frontCamera(), { width: 64, height: 64 })
+  }
+
+  const physicalWrapCases = [
+    {
+      label: 'clearcoatMap',
+      slot: 'clearcoatMap',
+      active: [255, 0, 0, 255],
+      material: { color: 0x000000, roughness: 1, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.04 },
+      environment: true,
+    },
+    {
+      label: 'clearcoatRoughnessMap',
+      slot: 'clearcoatRoughnessMap',
+      active: [0, 255, 0, 255],
+      material: { color: 0x000000, roughness: 1, metalness: 0, clearcoat: 1, clearcoatRoughness: 1 },
+      environment: true,
+    },
+    {
+      label: 'clearcoatNormalMap',
+      slot: 'clearcoatNormalMap',
+      active: [255, 128, 128, 255],
+      inactive: [128, 128, 255, 255],
+      material: {
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        clearcoatNormalScale: new THREE.Vector2(1, 1),
+      },
+      environment: true,
+    },
+    {
+      label: 'sheenColorMap',
+      slot: 'sheenColorMap',
+      active: [255, 0, 0, 255],
+      material: {
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        sheen: 1,
+        sheenColor: new THREE.Color(1, 1, 1),
+        sheenRoughness: 0.35,
+      },
+      environment: true,
+    },
+    {
+      label: 'sheenRoughnessMap',
+      slot: 'sheenRoughnessMap',
+      active: [0, 0, 0, 255],
+      inactive: [0, 0, 0, 0],
+      material: {
+        color: 0x000000,
+        roughness: 1,
+        metalness: 0,
+        sheen: 1,
+        sheenColor: new THREE.Color(1, 0, 0),
+        sheenRoughness: 1,
+      },
+      environment: true,
+    },
+    {
+      label: 'specularColorMap',
+      slot: 'specularColorMap',
+      active: [255, 0, 0, 255],
+      material: {
+        color: 0x000000,
+        roughness: 0.05,
+        metalness: 0,
+        specularIntensity: 1,
+        specularColor: new THREE.Color(1, 1, 1),
+      },
+      light: { intensity: 450, position: [0, 0, 2] },
+    },
+    {
+      label: 'specularIntensityMap',
+      slot: 'specularIntensityMap',
+      active: [0, 0, 0, 255],
+      inactive: [0, 0, 0, 0],
+      material: { color: 0x000000, roughness: 0.05, metalness: 0, specularIntensity: 1 },
+      light: { intensity: 450, position: [0, 0, 2] },
+    },
+    {
+      label: 'anisotropyMap',
+      slot: 'anisotropyMap',
+      active: [255, 128, 255, 255],
+      inactive: [128, 128, 0, 255],
+      material: { color: 0x111111, roughness: 0.2, metalness: 0, anisotropy: 1, anisotropyRotation: Math.PI / 4 },
+      light: { intensity: 250, position: [0.8, 0.8, 2] },
+    },
+    {
+      label: 'iridescenceMap',
+      slot: 'iridescenceMap',
+      active: [255, 0, 0, 255],
+      material: {
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [250, 650],
+      },
+      light: { intensity: 300, position: [0, 0, 2] },
+    },
+    {
+      label: 'iridescenceThicknessMap',
+      slot: 'iridescenceThicknessMap',
+      active: [0, 255, 0, 255],
+      material: {
+        color: 0x000000,
+        roughness: 0.08,
+        metalness: 0,
+        specularIntensity: 1,
+        iridescence: 1,
+        iridescenceIOR: 1.8,
+        iridescenceThicknessRange: [120, 760],
+      },
+      light: { intensity: 300, position: [0, 0, 2] },
+    },
+    {
+      label: 'transmissionMap',
+      slot: 'transmissionMap',
+      active: [255, 0, 0, 255],
+      material: { color: 0xff0000, roughness: 0.1, metalness: 0, transmission: 1, ior: 1.5, thickness: 0 },
+      backdrop: 0x0000ff,
+    },
+    {
+      label: 'thicknessMap',
+      slot: 'thicknessMap',
+      active: [0, 255, 0, 255],
+      material: {
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0,
+        transmission: 1,
+        ior: 1.5,
+        thickness: 8,
+        attenuationColor: new THREE.Color(0.02, 0.02, 1),
+        attenuationDistance: 1,
+      },
+      backdrop: 0xffffff,
+    },
+  ]
+
+  for (const config of physicalWrapCases) {
+    const clampedU = renderPhysicalWrap(config, { wrapS: THREE.ClampToEdgeWrapping, uv: [1.25, 0.25] })
+    const repeatedU = renderPhysicalWrap(config, { wrapS: THREE.RepeatWrapping, uv: [1.25, 0.25] })
+    const mirroredU = renderPhysicalWrap(config, { wrapS: THREE.MirroredRepeatWrapping, uv: [1.25, 0.25] })
+    const repeatDiffU = meanAbsDiff(clampedU, repeatedU)
+    const mirroredDiffU = meanAbsDiff(repeatedU, mirroredU)
+    assert.ok(repeatDiffU > 0.25, `${config.label} RepeatWrapping should wrap U coordinates before sampling, diff=${repeatDiffU.toFixed(2)}`)
+    assert.ok(mirroredDiffU > 0.25, `${config.label} MirroredRepeatWrapping should reflect U coordinates differently than RepeatWrapping, diff=${mirroredDiffU.toFixed(2)}`)
+
+    const clampedV = renderPhysicalWrap(config, { wrapT: THREE.ClampToEdgeWrapping, uv: [0.25, 1.25] })
+    const repeatedV = renderPhysicalWrap(config, { wrapT: THREE.RepeatWrapping, uv: [0.25, 1.25] })
+    const mirroredV = renderPhysicalWrap(config, { wrapT: THREE.MirroredRepeatWrapping, uv: [0.25, 1.25] })
+    const repeatDiffV = meanAbsDiff(clampedV, repeatedV)
+    const mirroredDiffV = meanAbsDiff(repeatedV, mirroredV)
+    assert.ok(repeatDiffV > 0.25, `${config.label} RepeatWrapping should wrap V coordinates before sampling, diff=${repeatDiffV.toFixed(2)}`)
+    assert.ok(mirroredDiffV > 0.25, `${config.label} MirroredRepeatWrapping should reflect V coordinates differently than RepeatWrapping, diff=${mirroredDiffV.toFixed(2)}`)
+  }
+})
+
 test('conflicting packed physical texture samplers fail clearly', () => {
   const clearcoatMap = solidTexture(255, 0, 0)
   clearcoatMap.magFilter = THREE.NearestFilter
@@ -30893,6 +31113,62 @@ test('Renderer shadowMap type controls Basic versus filtered sampling', () => {
   assert.ok(
     vsmLargeRadius < basicLargeRadius - 10,
     `VSMShadowMap should use the current filtered shadow path (${vsmLargeRadius} vs ${basicLargeRadius})`,
+  )
+})
+
+test('VSMShadowMap blurSamples adjusts filtered shadow softness', () => {
+  function renderVsmBlurSamples(blurSamples) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(1, 1, 1)
+
+    const receiver = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 12),
+      new THREE.ShadowMaterial({ opacity: 1 }),
+    )
+    receiver.rotation.x = -Math.PI / 2
+    receiver.receiveShadow = true
+    scene.add(receiver)
+
+    const caster = new THREE.Mesh(
+      new THREE.BoxGeometry(3, 3, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    )
+    caster.position.y = 1.5
+    caster.castShadow = true
+    scene.add(caster)
+
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(8, 6, 0)
+    light.target.position.set(0, 0, 0)
+    light.castShadow = true
+    light.shadow.radius = 4
+    light.shadow.blurSamples = blurSamples
+    light.shadow.mapSize.set(128, 128)
+    light.shadow.camera.left = -7
+    light.shadow.camera.right = 7
+    light.shadow.camera.top = 7
+    light.shadow.camera.bottom = -7
+    light.shadow.camera.near = 0.1
+    light.shadow.camera.far = 16
+    scene.add(light)
+    scene.add(light.target)
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+    camera.position.set(0, 6, 8)
+    camera.lookAt(0, 0, 0)
+
+    const renderer = new Renderer()
+    renderer.shadowMap.type = THREE.VSMShadowMap
+    const rgba = renderer.render(scene, camera, { width: 96, height: 96, format: 'rgba' })
+    const mean = meanRegion(rgba, 96, 96, 28, 42, 68, 82)
+    return mean.r + mean.g + mean.b
+  }
+
+  const oneSample = renderVsmBlurSamples(1)
+  const denseSamples = renderVsmBlurSamples(16)
+  assert.ok(
+    denseSamples < oneSample - 10,
+    `VSM blurSamples should widen the approximate filtered shadow (${denseSamples} vs ${oneSample})`,
   )
 })
 

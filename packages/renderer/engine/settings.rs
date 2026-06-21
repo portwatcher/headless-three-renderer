@@ -44,7 +44,7 @@ pub struct ShadowCaster {
     pub bias: f32,
     /// World-space normal offset applied at the receiver.
     pub normal_bias: f32,
-    /// PCF radius multiplier.
+    /// Effective shadow filter radius multiplier.
     pub radius: f32,
 }
 
@@ -267,7 +267,7 @@ impl RenderSettings {
             )?;
 
             let fog = FogSettings::from_scene(scene, background)?;
-            let shadow = resolve_shadow_maps(scene)?;
+            let shadow = resolve_shadow_maps(scene, shadow_map_type)?;
             let post_processing = PostProcessingSettings::from_scene(scene)?;
 
             Ok(Self {
@@ -755,7 +755,7 @@ fn parse_light_probe(values: Option<&[f64]>) -> Result<([[f32; 3]; 9], bool)> {
 }
 
 /// Resolve optional shadow casters from the scene into a shared depth array.
-fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
+fn resolve_shadow_maps(scene: &RenderScene, shadow_map_type: f32) -> Result<Option<ShadowMapSet>> {
     let Some(lights) = scene.lights.as_deref() else {
         return Ok(None);
     };
@@ -933,7 +933,7 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
             light.shadow_normal_bias.unwrap_or(0.0),
             &format!("{prefix}.shadow.normalBias"),
         )?;
-        let radius = shadow_radius(light, &prefix)?;
+        let radius = shadow_radius(light, &prefix, shadow_map_type)?;
 
         let requested_layers = total_layers + layer_count;
         if requested_layers > MAX_SHADOW_LAYERS as u32 {
@@ -969,12 +969,29 @@ fn resolve_shadow_maps(scene: &RenderScene) -> Result<Option<ShadowMapSet>> {
     }
 }
 
-fn shadow_radius(light: &crate::types::SceneLight, prefix: &str) -> Result<f32> {
-    Ok(finite_f32(
+fn shadow_radius(
+    light: &crate::types::SceneLight,
+    prefix: &str,
+    shadow_map_type: f32,
+) -> Result<f32> {
+    let radius = finite_f32(
         light.shadow_radius.unwrap_or(1.0),
         &format!("{prefix}.shadow.radius"),
     )?
-    .max(0.0))
+    .max(0.0);
+    if (shadow_map_type - 3.0).abs() > f32::EPSILON {
+        return Ok(radius);
+    }
+
+    let blur_samples = finite_f32(
+        light.shadow_blur_samples.unwrap_or(8.0),
+        &format!("{prefix}.shadow.blurSamples"),
+    )?
+    .max(0.0);
+    if blur_samples <= 1.0 || radius <= 0.0 {
+        return Ok(0.0);
+    }
+    Ok(radius * (blur_samples / 8.0).sqrt())
 }
 
 fn shadow_camera_bounds(

@@ -143,6 +143,8 @@ pub struct SceneLight {
     pub shadow_normal_bias: Option<f64>,
     /// PCF shadow radius multiplier. Defaults to 1.
     pub shadow_radius: Option<f64>,
+    /// VSM blur sample count. Defaults to Three.js' LightShadow default of 8.
+    pub shadow_blur_samples: Option<f64>,
     /// Orthographic shadow-camera frustum bounds.
     pub shadow_camera_left: Option<f64>,
     pub shadow_camera_right: Option<f64>,
