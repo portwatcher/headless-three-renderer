@@ -56,6 +56,7 @@ export function createSceneCorpus() {
     meshToonMaterialCorpus(),
     meshToonMaterialNormalMapCorpus(),
     meshToonMaterialBumpMapCorpus(),
+    meshToonTextureSlotsCorpus(),
     meshToonAlphaMapCorpus(),
     globalClippingPlaneCorpus(),
     materialLocalClippingCorpus(),
@@ -1234,6 +1235,7 @@ function phongSpecularMapMatrixCorpus() {
     options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.08,
+    browserReference: false,
     validate(rgba, { width }) {
       const center = meanRegion(rgba, width, 31, 31, 65, 65)
       if (!(center.r > 80 && center.g > 80 && center.b > 80)) {
@@ -4210,6 +4212,110 @@ function meshToonMaterialBumpMapCorpus() {
     validate() {
       if (!(flatCenter.r > bumpedCenter.r + 8)) {
         throw new Error(`toon bump-map corpus should perturb the ramp lookup, flat=${JSON.stringify(flatCenter)} bumped=${JSON.stringify(bumpedCenter)}`)
+      }
+    },
+  }
+}
+
+function meshToonTextureSlotsCorpus() {
+  const camera = makeCamera([0, 0, 3])
+  const options = { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' }
+  const stats = new Map()
+
+  function secondaryUvPlane() {
+    const geometry = constantUvPlane(0.25, 0.5)
+    const uv1 = new Float32Array(geometry.getAttribute('position').count * 2)
+    for (let i = 0; i < geometry.getAttribute('position').count; i += 1) {
+      uv1[i * 2] = 0.75
+      uv1[i * 2 + 1] = 0.5
+    }
+    geometry.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2))
+    return geometry
+  }
+
+  function channelTexture(data) {
+    const texture = new THREE.DataTexture(new Uint8Array(data), 2, 1, THREE.RGBAFormat)
+    texture.channel = 1
+    texture.magFilter = THREE.NearestFilter
+    texture.minFilter = THREE.NearestFilter
+    texture.needsUpdate = true
+    return texture
+  }
+
+  function makeScene(kind) {
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, 0)
+    const geometry = secondaryUvPlane()
+    let material
+
+    if (kind === 'map') {
+      material = new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        map: channelTexture([
+          0, 255, 0, 255,
+          255, 0, 0, 255,
+        ]),
+      })
+      const light = new THREE.DirectionalLight(0xffffff, 3)
+      light.position.set(0, 0, 3)
+      scene.add(light)
+    } else if (kind === 'emissive') {
+      material = new THREE.MeshToonMaterial({
+        color: 0x000000,
+        emissive: 0xffffff,
+        emissiveMap: channelTexture([
+          0, 255, 0, 255,
+          255, 0, 0, 255,
+        ]),
+      })
+    } else {
+      material = new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        lightMap: channelTexture([
+          0, 0, 0, 255,
+          255, 255, 255, 255,
+        ]),
+        lightMapIntensity: 4,
+      })
+    }
+
+    scene.add(new THREE.Mesh(geometry, material))
+    return scene
+  }
+
+  function centerMean(rgba) {
+    return meanRegion(rgba, options.width, 28, 28, 68, 68)
+  }
+
+  return {
+    name: 'mesh-toon-texture-slot-uv-channel',
+    scene: makeScene('map'),
+    camera,
+    options,
+    background: [0, 0, 0],
+    minNonBackgroundRatio: 0.35,
+    browserReference: false,
+    render(renderer) {
+      const map = renderer.render(makeScene('map'), camera, options).slice()
+      const emissive = renderer.render(makeScene('emissive'), camera, options).slice()
+      const lightMap = renderer.render(makeScene('lightMap'), camera, options).slice()
+      stats.set('map', centerMean(map))
+      stats.set('emissive', centerMean(emissive))
+      stats.set('lightMap', centerMean(lightMap))
+      return map
+    },
+    validate() {
+      const map = stats.get('map')
+      const emissive = stats.get('emissive')
+      const lightMap = stats.get('lightMap')
+      if (!(map && map.r > map.g + 40 && map.r > map.b + 40)) {
+        throw new Error(`toon map should sample the secondary-UV red texel, got ${JSON.stringify(map)}`)
+      }
+      if (!(emissive && emissive.r > emissive.g + 40 && emissive.r > emissive.b + 40)) {
+        throw new Error(`toon emissiveMap should sample the secondary-UV red texel, got ${JSON.stringify(emissive)}`)
+      }
+      if (!(lightMap && lightMap.r > 100 && lightMap.g > 100 && lightMap.b > 100)) {
+        throw new Error(`toon lightMap should sample the secondary-UV bright texel, got ${JSON.stringify(lightMap)}`)
       }
     },
   }
