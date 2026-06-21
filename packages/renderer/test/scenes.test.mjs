@@ -50,8 +50,11 @@ import { WireframeGeometry2 } from 'three/examples/jsm/lines/WireframeGeometry2.
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
+import { ColorConverter } from 'three/examples/jsm/math/ColorConverter.js'
+import { ImprovedNoise } from 'three/examples/jsm/math/ImprovedNoise.js'
 import { Lut } from 'three/examples/jsm/math/Lut.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
+import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
@@ -1710,6 +1713,34 @@ test('BatchedMesh per-object frustum culling honors geometry bounds', () => {
   const uncullable = renderCulling(false)
   assert.ok(culled.r < 5 && culled.g < 5 && culled.b < 5, `cached out-of-frustum BatchedMesh bounds should cull the draw (${culled.r}, ${culled.g}, ${culled.b})`)
   assert.ok(uncullable.r > 200, `perObjectFrustumCulled=false should render the oversized batch draw (${uncullable.r})`)
+})
+
+test('BatchedMesh per-object frustum culling combines object and instance transforms', () => {
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const source = new THREE.PlaneGeometry(0.5, 0.5)
+  const batched = new THREE.BatchedMesh(
+    1,
+    source.getAttribute('position').count,
+    source.index.count,
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  )
+  const geometryId = batched.addGeometry(source)
+  const instanceId = batched.addInstance(geometryId)
+  batched.setMatrixAt(instanceId, new THREE.Matrix4().makeTranslation(-3, 0, 0))
+  batched.position.set(3, 0, 0)
+  batched.frustumCulled = false
+  batched.perObjectFrustumCulled = true
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0, 0, 0)
+  scene.add(batched)
+
+  const rgba = renderRgba(scene, camera, { width: 64, height: 64 })
+  const mean = meanRegion(rgba, 64, 64, 28, 28, 36, 36)
+  assert.ok(mean.r > mean.g + 150 && mean.r > mean.b + 150, `combined BatchedMesh object and instance transform should keep the draw visible (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 
 test('BatchedMesh object frustum culling computes aggregate bounds with per-object culling disabled', () => {
@@ -4407,6 +4438,87 @@ test('examples Lut maps scalar values into renderable vertex colors', () => {
   } finally {
     geometry.dispose()
     material.dispose()
+  }
+})
+
+test('examples color and noise math utilities produce renderable scene inputs', () => {
+  let seed = 17
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0
+    return seed / 0x100000000
+  }
+
+  const hues = [0, 1 / 3, 2 / 3]
+  const planeGeometry = new THREE.PlaneGeometry(0.36, 0.34)
+  const colorMeshes = []
+  const colorMaterials = []
+
+  for (let i = 0; i < hues.length; i += 1) {
+    const color = ColorConverter.setHSV(new THREE.Color(), hues[i], 1, 1)
+    const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })
+    const mesh = new THREE.Mesh(planeGeometry, material)
+    mesh.position.set(-0.62 + i * 0.62, 0.24, 0)
+    colorMeshes.push(mesh)
+    colorMaterials.push(material)
+  }
+
+  const hsv = ColorConverter.getHSV(colorMaterials[1].color, {})
+  assert.ok(Math.abs(hsv.h - 1 / 3) < 1e-6)
+  assert.ok(Math.abs(hsv.s - 1) < 1e-6)
+  assert.ok(Math.abs(hsv.v - 1) < 1e-6)
+
+  const improvedNoise = new ImprovedNoise()
+  const simplexNoise = new SimplexNoise({ random })
+  const points = []
+  const yValues = []
+  for (let i = 0; i < 32; i += 1) {
+    const x = -0.9 + (i / 31) * 1.8
+    const noiseValue = improvedNoise.noise(i * 0.21, 0.4, 0.9) + simplexNoise.noise(i * 0.16, 0.3)
+    const y = -0.42 + noiseValue * 0.08
+    points.push(new THREE.Vector3(x, y, 0))
+    yValues.push(y)
+  }
+  assert.ok(Math.max(...yValues) - Math.min(...yValues) > 0.02, 'noise helpers should perturb the generated path')
+
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints(points)
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffff44, linewidth: 4 })
+  const line = new THREE.Line(lineGeometry, lineMaterial)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(...colorMeshes, line)
+
+  const camera = new THREE.OrthographicCamera(-1, 1, 0.75, -0.75, 0.01, 10)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g < 120 && b < 120) > 150,
+      'ColorConverter HSV red should render visible red pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && g > r + 20 && g > b + 20) > 150,
+      'ColorConverter HSV green should render visible green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 150 && r < 120 && g < 170) > 150,
+      'ColorConverter HSV blue should render visible blue pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 140 && b < 140) > 20,
+      'noise-generated line path should render visible yellow pixels',
+    )
+  } finally {
+    planeGeometry.dispose()
+    for (const material of colorMaterials) material.dispose()
+    lineGeometry.dispose()
+    lineMaterial.dispose()
   }
 })
 
