@@ -50,6 +50,9 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
+import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
+import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
+import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
 import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js'
 import InstancedPoints from 'three/examples/jsm/objects/InstancedPoints.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
@@ -93,6 +96,7 @@ import { TAARenderPass } from 'three/examples/jsm/postprocessing/TAARenderPass.j
 import { TexturePass } from 'three/examples/jsm/postprocessing/TexturePass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { CopyShader } from 'three/examples/jsm/shaders/CopyShader.js'
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { ShadowMapViewer } from 'three/examples/jsm/utils/ShadowMapViewer.js'
 import CommonCubeRenderTarget from 'three/src/renderers/common/CubeRenderTarget.js'
 import pkg from '../dist/index.js'
@@ -3947,6 +3951,102 @@ test('examples CurveExtras and NURBS helpers render generated geometry paths', (
     surfaceMaterial.dispose()
     volumeGeometry.dispose()
     volumeMaterial.dispose()
+  }
+})
+
+test('examples geometry modifiers and BufferGeometryUtils render CPU-transformed geometry paths', () => {
+  const edgeSourceGeometry = new THREE.BoxGeometry(0.48, 0.48, 0.48)
+  const edgeGeometry = new EdgeSplitModifier().modify(edgeSourceGeometry, Math.PI / 6)
+  const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0xff4466, side: THREE.DoubleSide })
+  const edgeMesh = new THREE.Mesh(edgeGeometry, edgeMaterial)
+  edgeMesh.position.x = -1.25
+  edgeMesh.rotation.set(0.45, 0.45, 0.1)
+
+  const simplifySourceGeometry = new THREE.IcosahedronGeometry(0.48, 2)
+  const simplifyGeometry = new SimplifyModifier().modify(simplifySourceGeometry, 24)
+  simplifyGeometry.computeVertexNormals()
+  const simplifyMaterial = new THREE.MeshBasicMaterial({ color: 0x55ff66, side: THREE.DoubleSide })
+  const simplifyMesh = new THREE.Mesh(simplifyGeometry, simplifyMaterial)
+  simplifyMesh.position.x = -0.42
+  simplifyMesh.rotation.set(0.2, -0.5, 0.1)
+
+  const tessellateSourceGeometry = new THREE.PlaneGeometry(0.72, 0.72, 1, 1).toNonIndexed()
+  const tessellateGeometry = new TessellateModifier(0.28, 3).modify(tessellateSourceGeometry)
+  tessellateGeometry.computeVertexNormals()
+  const tessellateMaterial = new THREE.MeshBasicMaterial({ color: 0x6688ff, side: THREE.DoubleSide })
+  const tessellateMesh = new THREE.Mesh(tessellateGeometry, tessellateMaterial)
+  tessellateMesh.position.x = 0.42
+  tessellateMesh.rotation.z = 0.2
+
+  const mergeLeftGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
+  mergeLeftGeometry.translate(-0.16, 0, 0)
+  const mergeRightGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2)
+  mergeRightGeometry.translate(0.16, 0, 0)
+  const mergedGeometry = BufferGeometryUtils.mergeGeometries([mergeLeftGeometry, mergeRightGeometry], true)
+  assert.ok(mergedGeometry, 'BufferGeometryUtils.mergeGeometries should produce merged geometry')
+  const mergedMaterial = new THREE.MeshBasicMaterial({ color: 0xffdd44, side: THREE.DoubleSide })
+  const mergedMesh = new THREE.Mesh(mergedGeometry, mergedMaterial)
+  mergedMesh.position.x = 1.25
+  mergedMesh.rotation.set(0.3, -0.35, 0.1)
+
+  const scene = new THREE.Scene()
+  scene.background = new THREE.Color(0x000000)
+  scene.add(edgeMesh, simplifyMesh, tessellateMesh, mergedMesh)
+
+  const camera = new THREE.OrthographicCamera(-1.8, 1.8, 0.9, -0.9, 0.01, 10)
+  camera.position.set(0, 0, 4)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld(true)
+
+  try {
+    const width = 128
+    const height = 72
+    const rgba = renderRgba(scene, camera, { width, height })
+    assert.ok(
+      edgeGeometry.getAttribute('position').count > edgeSourceGeometry.getAttribute('position').count,
+      'EdgeSplitModifier should split vertices around sharp edges',
+    )
+    assert.ok(
+      simplifyGeometry.getAttribute('position').count < simplifySourceGeometry.getAttribute('position').count,
+      'SimplifyModifier should reduce source vertices',
+    )
+    assert.ok(
+      tessellateGeometry.getAttribute('position').count > tessellateSourceGeometry.getAttribute('position').count,
+      'TessellateModifier should add vertices for long edges',
+    )
+    assert.equal(mergedGeometry.isBufferGeometry, true, 'mergeGeometries should return BufferGeometry')
+    assert.ok(mergedGeometry.getAttribute('position').count > mergeLeftGeometry.getAttribute('position').count)
+    assert.ok(mergedGeometry.groups.length >= 2, 'mergeGeometries(useGroups=true) should keep source geometry groups')
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 160 && g < 120 && b < 140) > 120,
+      'EdgeSplitModifier output should render red pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 170 && g > r + 40 && g > b + 40) > 120,
+      'SimplifyModifier output should render green pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => b > 180 && r < 150 && g < 180) > 120,
+      'TessellateModifier output should render blue pixels',
+    )
+    assert.ok(
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 150 && g > 120 && b < 180) > 40,
+      'BufferGeometryUtils.mergeGeometries output should render yellow pixels',
+    )
+  } finally {
+    edgeSourceGeometry.dispose()
+    edgeGeometry.dispose()
+    edgeMaterial.dispose()
+    simplifySourceGeometry.dispose()
+    simplifyGeometry.dispose()
+    simplifyMaterial.dispose()
+    tessellateSourceGeometry.dispose()
+    tessellateGeometry.dispose()
+    tessellateMaterial.dispose()
+    mergeLeftGeometry.dispose()
+    mergeRightGeometry.dispose()
+    mergedGeometry.dispose()
+    mergedMaterial.dispose()
   }
 })
 
