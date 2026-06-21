@@ -2879,7 +2879,6 @@ function rendererClippingStateCorpus() {
     options,
     background: [0, 0, 255],
     minNonBackgroundRatio: 0.2,
-    browserReference: false,
     render(renderer) {
       const previousClippingPlanes = renderer.clippingPlanes
       const previousLocalClippingEnabled = renderer.localClippingEnabled

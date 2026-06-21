@@ -336,6 +336,13 @@
       "outputColorSpace": "srgb"
     },
     {
+      "file": "renderer-clipping-state-options.png",
+      "name": "renderer-clipping-state-options",
+      "width": 96,
+      "height": 96,
+      "outputColorSpace": "srgb"
+    },
+    {
       "file": "light-probe-diffuse.png",
       "name": "light-probe-diffuse",
       "width": 96,
