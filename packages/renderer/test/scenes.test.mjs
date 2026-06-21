@@ -33529,6 +33529,81 @@ test('LineDashedMaterial alphaMap honors horizontal and vertical repeat wrapping
   assert.ok(mirroredVerticalGreen < 20, `mirrored dashed-line alphaMap V coordinates should reflect to the transparent texel (${mirroredVerticalGreen})`)
 })
 
+test('LineBasicMaterial and LineDashedMaterial maps honor nearest and linear filters', () => {
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  function renderLine(kind, slot, filter) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.5, 0, 0),
+      new THREE.Vector3(1.5, 0, 0),
+    ])
+    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      0.45, 0.5,
+      0.45, 0.5,
+    ]), 2))
+
+    const materialProps = {
+      alphaTest: slot === 'alphaMap' ? 0.3 : 0,
+      color: slot === 'alphaMap' ? 0x00ff00 : 0xffffff,
+      linewidth: 8,
+      transparent: false,
+    }
+
+    if (slot === 'map') {
+      const map = rgbaTexture([
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+      ], 2, 1)
+      map.magFilter = filter
+      map.minFilter = filter
+      materialProps.map = map
+    }
+
+    const material = kind === 'basic'
+      ? new THREE.LineBasicMaterial(materialProps)
+      : new THREE.LineDashedMaterial({
+        ...materialProps,
+        dashSize: 10,
+        gapSize: 0,
+        scale: 1,
+      })
+
+    if (slot === 'alphaMap') {
+      const alphaMap = rgbaTexture([
+        255, 0, 255, 255,
+        255, 255, 255, 255,
+      ], 2, 1)
+      alphaMap.magFilter = filter
+      alphaMap.minFilter = filter
+      material.alphaMap = alphaMap
+    }
+
+    const line = new THREE.Line(geometry, material)
+    if (kind === 'dashed') line.computeLineDistances()
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color(0, 0, slot === 'alphaMap' ? 1 : 0)
+    scene.add(line)
+    return meanRegion(renderRgba(scene, camera, { width: 96, height: 96 }), 96, 96, 0, 44, 96, 52)
+  }
+
+  for (const kind of ['basic', 'dashed']) {
+    const nearestMap = renderLine(kind, 'map', THREE.NearestFilter)
+    const linearMap = renderLine(kind, 'map', THREE.LinearFilter)
+    assert.ok(nearestMap.r > nearestMap.g + 60, `${kind} NearestFilter color map should choose the red texel (${nearestMap.r} vs ${nearestMap.g})`)
+    assert.ok(linearMap.g > nearestMap.g + 30, `${kind} LinearFilter color map should blend in the green texel (${linearMap.g} vs ${nearestMap.g})`)
+    assert.ok(nearestMap.r > linearMap.r + 15, `${kind} NearestFilter color map should preserve a stronger red texel (${nearestMap.r} vs ${linearMap.r})`)
+
+    const nearestAlpha = renderLine(kind, 'alphaMap', THREE.NearestFilter)
+    const linearAlpha = renderLine(kind, 'alphaMap', THREE.LinearFilter)
+    assert.ok(nearestAlpha.b > nearestAlpha.g + 80, `${kind} NearestFilter alphaMap should choose the transparent texel (${nearestAlpha.b} vs ${nearestAlpha.g})`)
+    assert.ok(linearAlpha.g > linearAlpha.b + 30, `${kind} LinearFilter alphaMap should blend in enough opacity to pass alphaTest (${linearAlpha.g} vs ${linearAlpha.b})`)
+    assert.ok(linearAlpha.g > nearestAlpha.g + 50, `${kind} LinearFilter alphaMap should keep the line visible (${linearAlpha.g} vs ${nearestAlpha.g})`)
+  }
+})
+
 test('LineDashedMaterial map samples selected uv1-uv3 texture channels', () => {
   const map = rgbaTexture([
     255, 0, 0, 255,
