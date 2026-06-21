@@ -13,6 +13,9 @@ import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
 import { KTX2Exporter } from 'three/examples/jsm/exporters/KTX2Exporter.js'
 import { ViewHelper } from 'three/examples/jsm/helpers/ViewHelper.js'
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js'
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
 import { GPUComputationRenderer } from 'three/examples/jsm/misc/GPUComputationRenderer.js'
@@ -2484,6 +2487,20 @@ test('CSM material shader injection fails clearly', () => {
     csm.dispose()
     csm.remove()
   }
+})
+
+test('LineSegments2 LineMaterial shader fails clearly', () => {
+  const geometry = new LineSegmentsGeometry()
+  geometry.setPositions([-0.5, 0, 0, 0.5, 0, 0])
+  const material = new LineMaterial({ color: 0xff0000, linewidth: 2 })
+  const line = new LineSegments2(geometry, material)
+  const scene = new THREE.Scene()
+  scene.add(line)
+
+  assert.throws(
+    () => renderRgba(scene, makeCamera(), { width: 32, height: 32 }),
+    /LineMaterial ShaderMaterial.*not translated.*LineBasicMaterial.*LineDashedMaterial/i,
+  )
 })
 
 test('ProgressiveLightMap internal shader rewrite fails clearly', () => {

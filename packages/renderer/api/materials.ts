@@ -2229,6 +2229,12 @@ function assertSupportedShaderMaterial(
     )
   }
 
+  if (isThreeLineMaterialShaderMaterial(material)) {
+    throw new Error(
+      'THREE.LineMaterial ShaderMaterial used by Line2, LineSegments2, and Wireframe is not translated by @headless-three/renderer yet. Use THREE.Line, THREE.LineSegments, or THREE.LineLoop with LineBasicMaterial or LineDashedMaterial for covered CPU-expanded line rendering, or provide a custom WGSL fragment for an equivalent line material.',
+    )
+  }
+
   const label = namedShaderMaterialLabel(kind, material)
   throw new Error(
     `${label} is not supported directly by @headless-three/renderer. Use a built-in Three.js material, or provide material.userData.headlessThreeRenderer.fragmentWgsl with a WGSL fragment body for the renderer's custom material path.`,
@@ -2944,6 +2950,11 @@ function isThreeShadowMapViewerShaderMaterial(material: ThreeMaterialLike): bool
     compact.includes('uniformsampler2DtDiffuse;') &&
     compact.includes('floatdepth=1.0-unpackRGBAToDepth(texture2D(tDiffuse,vUv));') &&
     compact.includes('gl_FragColor=vec4(vec3(depth),opacity);')
+}
+
+function isThreeLineMaterialShaderMaterial(material: ThreeMaterialLike): boolean {
+  return (material as { isLineMaterial?: unknown }).isLineMaterial === true ||
+    material.type === 'LineMaterial'
 }
 
 function namedShaderMaterialLabel(kind: string, material: ThreeMaterialLike): string {
