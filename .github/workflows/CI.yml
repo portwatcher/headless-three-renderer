@@ -147,7 +147,7 @@ jobs:
 
       - name: Conformance tests
         working-directory: packages/renderer
-        run: pnpm run test:conformance
+        run: pnpm run test:conformance:ci
 
       - name: Release artifact verification
         working-directory: packages/renderer

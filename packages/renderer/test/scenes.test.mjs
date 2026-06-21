@@ -1,4 +1,4 @@
-import test, { afterEach } from 'node:test'
+import nodeTest, { afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -220,6 +220,43 @@ const BG = [89, 89, 89] // sRGB output for linear 0.1
 const UnsignedInt101111Type = THREE.UnsignedInt101111Type ?? 35899
 
 const JS_METHOD_DECLARATION_IGNORE = new Set(['constructor', 'if', 'for', 'while', 'switch', 'catch', 'resolve', 'reject'])
+const CONFORMANCE_SHARD = parseConformanceShard(process.env.HEADLESS_THREE_CONFORMANCE_SHARD)
+
+let conformanceTestOrdinal = 0
+
+function parseConformanceShard(value) {
+  if (!value) return null
+
+  const match = /^(\d+)\/(\d+)$/.exec(value)
+  if (!match) {
+    throw new Error('HEADLESS_THREE_CONFORMANCE_SHARD must use the form "index/total".')
+  }
+
+  const index = Number(match[1])
+  const total = Number(match[2])
+  if (
+    !Number.isSafeInteger(index) ||
+    !Number.isSafeInteger(total) ||
+    index < 1 ||
+    total < 1 ||
+    index > total
+  ) {
+    throw new Error('HEADLESS_THREE_CONFORMANCE_SHARD must contain a 1-based index no greater than total.')
+  }
+
+  return { index: index - 1, total }
+}
+
+function test(name, ...args) {
+  const ordinal = conformanceTestOrdinal
+  conformanceTestOrdinal += 1
+
+  if (CONFORMANCE_SHARD && ordinal % CONFORMANCE_SHARD.total !== CONFORMANCE_SHARD.index) {
+    return undefined
+  }
+
+  return nodeTest(name, ...args)
+}
 
 function threeRendererFile(relativePath) {
   const threeRoot = path.resolve(path.dirname(cjsRequire.resolve('three')), '..')
