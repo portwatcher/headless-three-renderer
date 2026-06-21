@@ -68,6 +68,7 @@ import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap
 import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry, SkyGeometry, TreesGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
 import { FixedTimer, Timer } from 'three/examples/jsm/misc/Timer.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
+import { Flow, InstancedFlow } from 'three/examples/jsm/modifiers/CurveModifier.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
 import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
@@ -3101,6 +3102,49 @@ test('CSM material shader injection fails clearly', () => {
     csm.remove()
     THREE.ShaderChunk.lights_fragment_begin = previousLightsFragmentBegin
     THREE.ShaderChunk.lights_pars_begin = previousLightsParsBegin
+  }
+})
+
+test('CurveModifier Flow shader injection fails clearly', () => {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.8, 0, 0),
+    new THREE.Vector3(0, 0.4, 0),
+    new THREE.Vector3(0.8, 0, 0),
+  ])
+  const geometry = new THREE.BoxGeometry(0.5, 0.18, 0.18)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff5533 })
+  const flow = new Flow(new THREE.Mesh(geometry, material))
+  flow.updateCurve(0, curve)
+  const instancedFlow = new InstancedFlow(2, 1, geometry, material)
+  instancedFlow.updateCurve(0, curve)
+  instancedFlow.moveIndividualAlongCurve(1, 0.3)
+
+  const camera = makeCamera()
+  try {
+    for (const [label, object3D] of [
+      ['Flow', flow.object3D],
+      ['InstancedFlow', instancedFlow.object3D],
+    ]) {
+      const scene = new THREE.Scene()
+      scene.add(object3D)
+      assert.throws(
+        () => renderRgba(scene, camera, { width: 16, height: 16 }),
+        /material\.onBeforeCompile customizations.*fragmentWgsl/i,
+        `${label} should fail clearly on its shader-injection path`,
+      )
+    }
+  } finally {
+    geometry.dispose()
+    material.dispose()
+    for (const object3D of [flow.object3D, instancedFlow.object3D]) {
+      object3D.traverse((child) => {
+        if (Array.isArray(child.material)) {
+          for (const childMaterial of child.material) childMaterial.dispose()
+        } else {
+          child.material?.dispose?.()
+        }
+      })
+    }
   }
 })
 
