@@ -1,6 +1,6 @@
 {
   "name": "@headless-three/renderer-win32-x64-msvc",
-  "version": "0.1.9",
+  "version": "0.1.0",
   "cpu": [
     "x64"
   ],
