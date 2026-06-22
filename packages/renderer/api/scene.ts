@@ -136,6 +136,7 @@ export interface SceneExtractionCache {
   instancedNormalExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedNormalExpansion>>
   instancedUvExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedUvExpansion>>
   instancedColorExpansions: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedColorExpansion>>
+  indexRanges: WeakMap<ThreeBufferGeometryLike, Map<string, CachedIndexRangeExpansion>>
   batchedGeometryViews: WeakMap<ThreeBufferGeometryLike, Map<string, CachedBatchedGeometryView>>
   dashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedDashedLineExpansion>>
   instancedDashedLines: WeakMap<ThreeBufferGeometryLike, Map<string, CachedInstancedDashedLineExpansion>>
@@ -146,6 +147,22 @@ export interface SceneExtractionCache {
   materialScalarFeatures: MaterialScalarFeatureExtractionCache
   pointBillboards: WeakMap<ThreeObject3DLike, Map<string, CachedPointBillboardExpansion>>
   spriteBillboards: WeakMap<ThreeObject3DLike, CachedSpriteBillboardExpansion>
+  nativeMeshPayloads: NativeMeshPayloadCache
+}
+
+interface NativeMeshPayloadCache {
+  objectIds: WeakMap<object, number>
+  payloads: Map<string, CachedNativeMeshPayload>
+  pending: Set<string>
+  nextObjectId: number
+  nextPayloadId: number
+}
+
+interface CachedNativeMeshPayload {
+  key: number
+  vertexCount: number
+  indexCount?: number
+  ready: boolean
 }
 
 interface CachedMeshGeometryExtraction {
@@ -176,6 +193,11 @@ interface CachedInstancedUvExpansion {
 interface CachedInstancedColorExpansion {
   signature: InstancedColorExpansionSignature
   colors: number[]
+}
+
+interface CachedIndexRangeExpansion {
+  signature: IndexRangeExpansionSignature
+  indices: number[]
 }
 
 interface CachedBatchedGeometryView {
@@ -405,6 +427,15 @@ interface InstancedColorExpansionSignature {
   label: string
 }
 
+interface IndexRangeExpansionSignature {
+  cacheable: boolean
+  geometryVersion?: number
+  sourceIndices: number[]
+  start: number
+  count: number
+  index: AttributeSignature
+}
+
 interface AttributeSignature {
   ref?: ThreeBufferAttributeLike
   version?: number
@@ -469,6 +500,7 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     instancedNormalExpansions: new WeakMap(),
     instancedUvExpansions: new WeakMap(),
     instancedColorExpansions: new WeakMap(),
+    indexRanges: new WeakMap(),
     batchedGeometryViews: new WeakMap(),
     dashedLines: new WeakMap(),
     instancedDashedLines: new WeakMap(),
@@ -479,6 +511,13 @@ export function createSceneExtractionCache(): SceneExtractionCache {
     materialScalarFeatures: new WeakMap(),
     pointBillboards: new WeakMap(),
     spriteBillboards: new WeakMap(),
+    nativeMeshPayloads: {
+      objectIds: new WeakMap(),
+      payloads: new Map(),
+      pending: new Set(),
+      nextObjectId: 1,
+      nextPayloadId: 1,
+    },
   }
 }
 
@@ -502,7 +541,20 @@ export function flattenScene(
     clipShadows: false,
   }
   visitObject(scene, camera, meshes, 0, viewportHeight, clippingContext, localClippingEnabled, shadowMaterialMode, materialContext, overrideMaterial, cache, callbackContext)
-  return nativeMeshesFromSortedFlattened(sortFlattenedMeshes(meshes, sortOptions))
+  const nativeMeshes = nativeMeshesFromSortedFlattened(sortFlattenedMeshes(meshes, sortOptions))
+  if (cache) {
+    applyNativeMeshPayloadCache(nativeMeshes, cache.nativeMeshPayloads)
+  }
+  return nativeMeshes
+}
+
+export function commitNativeMeshPayloadCache(cache: SceneExtractionCache): void {
+  const payloads = cache.nativeMeshPayloads
+  for (const signature of payloads.pending) {
+    const cached = payloads.payloads.get(signature)
+    if (cached) cached.ready = true
+  }
+  payloads.pending.clear()
 }
 
 function visitObject(
@@ -697,7 +749,7 @@ function appendMesh(
     const wireframe = isMeshWireframeMaterial(material)
 
     if (index) {
-      const indices = index.slice(group.start, group.start + group.count)
+      const indices = indexRangeWithCache(cache, geometry, index, group.start, group.count)
       if (indices.length % 3 !== 0) {
         throw new Error(`THREE.Mesh "${object.name || object.uuid || '<unnamed>'}" has a non-triangle index range`)
       }
@@ -1132,7 +1184,7 @@ function appendShadowOnlyMeshGroup(
   const hiddenMainPass = shadowOnlyMainPassState()
 
   if (index) {
-    const indices = index.slice(group.start, group.start + group.count)
+    const indices = indexRangeWithCache(cache, object.geometry!, index, group.start, group.count)
     if (indices.length % 3 !== 0) {
       throw new Error(`THREE.Mesh "${object.name || object.uuid || '<unnamed>'}" has a non-triangle index range`)
     }
@@ -2732,6 +2784,87 @@ function nativeMeshesFromSortedFlattened(meshes: FlattenedMesh[]): NativeSceneMe
   return nativeMeshes
 }
 
+const NativeMeshPayloadCacheLimit = 2048
+
+function applyNativeMeshPayloadCache(meshes: NativeSceneMesh[], cache: NativeMeshPayloadCache): void {
+  for (const mesh of meshes) {
+    const signature = nativeMeshPayloadSignature(mesh, cache)
+    if (!signature) continue
+
+    let cached = cache.payloads.get(signature)
+    if (!cached) {
+      const positions = mesh.positions!
+      cached = {
+        key: cache.nextPayloadId++,
+        vertexCount: positions.length / 3,
+        indexCount: mesh.indices?.length,
+        ready: false,
+      }
+      evictNativeMeshPayloads(cache)
+      cache.payloads.set(signature, cached)
+    }
+
+    mesh.nativeMeshKey = cached.key
+    mesh.nativeVertexCount = cached.vertexCount
+    mesh.nativeIndexCount = cached.indexCount
+
+    if (cached.ready) {
+      mesh.positions = []
+      delete mesh.indices
+      delete mesh.normals
+      delete mesh.colors
+      delete mesh.uvs
+      delete mesh.uvs2
+    } else {
+      cache.pending.add(signature)
+    }
+  }
+}
+
+function nativeMeshPayloadSignature(mesh: NativeSceneMesh, cache: NativeMeshPayloadCache): string | null {
+  if (!mesh.positions || mesh.positions.length === 0) return null
+  if (mesh.positions.length % 3 !== 0) return null
+  if (!nativeMeshPayloadCacheable(mesh)) return null
+
+  return [
+    'p', nativeMeshPayloadObjectId(cache, mesh.positions),
+    'i', nativeMeshPayloadObjectId(cache, mesh.indices),
+    'n', nativeMeshPayloadObjectId(cache, mesh.normals),
+    'c', nativeMeshPayloadObjectId(cache, mesh.colors),
+    'u', nativeMeshPayloadObjectId(cache, mesh.uvs),
+    'v', nativeMeshPayloadObjectId(cache, mesh.uvs2),
+    'flat', mesh.flatShading === true ? 1 : 0,
+    'topology', mesh.topology ?? 'triangles',
+  ].join(':')
+}
+
+function nativeMeshPayloadCacheable(mesh: NativeSceneMesh): boolean {
+  return mesh.displacementMap == null
+    && mesh.normalMap == null
+    && mesh.bumpMap == null
+    && mesh.clearcoatNormalMap == null
+    && (mesh.anisotropy == null || mesh.anisotropy <= 0)
+}
+
+function nativeMeshPayloadObjectId(cache: NativeMeshPayloadCache, value: object | null | undefined): string {
+  if (value == null) return 'none'
+  let id = cache.objectIds.get(value)
+  if (id === undefined) {
+    id = cache.nextObjectId++
+    cache.objectIds.set(value, id)
+  }
+  return String(id)
+}
+
+function evictNativeMeshPayloads(cache: NativeMeshPayloadCache): void {
+  while (cache.payloads.size >= NativeMeshPayloadCacheLimit) {
+    const first = cache.payloads.keys().next()
+    if (first.done) return
+    cache.payloads.delete(first.value)
+    cache.pending.delete(first.value)
+  }
+}
+
 function sortInfoForObject(
   object: ThreeObject3DLike,
   material: ThreeMaterialLike | undefined,
@@ -3524,7 +3657,7 @@ function expandVec3ValuesForInstancesWithCache(
   offsetAttribute?: InstancedAttributeRef | null,
   scaleAttribute?: InstancedAttributeRef | null,
 ): number[] {
-  if (instanceCount <= 1 && !offsetAttribute && !scaleAttribute) {
+  if (!cache) {
     return expandVec3ValuesForInstances(values, start, count, instanceCount, offsetAttribute, scaleAttribute)
   }
 
@@ -3538,7 +3671,7 @@ function expandVec3ValuesForInstancesWithCache(
     offsetAttribute,
     scaleAttribute,
   )
-  if (!cache || !signature.cacheable) {
+  if (!signature.cacheable) {
     return expandVec3ValuesForInstances(values, start, count, instanceCount, offsetAttribute, scaleAttribute)
   }
 
@@ -3668,7 +3801,7 @@ function expandNormalValuesForInstancesWithCache(
   instanceCount: number,
   label = 'geometry.attributes.normal',
 ): number[] {
-  if (instanceCount <= 1 && !isInstancedAttribute(attribute)) {
+  if (!cache) {
     return expandNormalValuesForInstances(attribute, values, start, count, instanceCount, label)
   }
 
@@ -3681,7 +3814,7 @@ function expandNormalValuesForInstancesWithCache(
     instanceCount,
     label,
   )
-  if (!cache || !signature.cacheable) {
+  if (!signature.cacheable) {
     return expandNormalValuesForInstances(attribute, values, start, count, instanceCount, label)
   }
 
@@ -3765,12 +3898,12 @@ function expandUvChannelForInstancesWithCache(
   count: number,
   instanceCount: number,
 ): number[] {
-  if (instanceCount <= 1 && !isInstancedAttribute(channel.attribute)) {
+  if (!cache) {
     return expandUvChannelForInstances(channel, start, count, instanceCount)
   }
 
   const signature = instancedUvExpansionSignature(geometry, channel, start, count, instanceCount)
-  if (!cache || !signature.cacheable) {
+  if (!signature.cacheable) {
     return expandUvChannelForInstances(channel, start, count, instanceCount)
   }
 
@@ -3909,7 +4042,7 @@ function expandColorAttributeForInstancesWithCache(
   instanceCount: number,
   label = 'geometry.attributes.color',
 ): number[] {
-  if (instanceCount <= 1 && !isInstancedAttribute(attribute)) {
+  if (!cache) {
     return expandColorAttributeForInstances(attribute, materialColor, start, count, instanceCount, label)
   }
 
@@ -3922,7 +4055,7 @@ function expandColorAttributeForInstancesWithCache(
     instanceCount,
     label,
   )
-  if (!cache || !signature.cacheable) {
+  if (!signature.cacheable) {
     return expandColorAttributeForInstances(attribute, materialColor, start, count, instanceCount, label)
   }
 
@@ -3977,6 +4110,64 @@ function sameInstancedColorExpansionSignature(
     && a.instanceCount === b.instanceCount
     && sameAttributeSignature(a.color, b.color)
     && a.label === b.label
+}
+
+function indexRangeWithCache(
+  cache: SceneExtractionCache | undefined,
+  geometry: ThreeBufferGeometryLike,
+  indices: number[],
+  start: number,
+  count: number,
+): number[] {
+  if (!cache) return indices.slice(start, start + count)
+
+  const signature = indexRangeExpansionSignature(geometry, indices, start, count)
+  if (!signature.cacheable) return indices.slice(start, start + count)
+
+  const key = `${start}:${count}`
+  let geometryCache = cache.indexRanges.get(geometry)
+  const cached = geometryCache?.get(key)
+  if (cached && sameIndexRangeExpansionSignature(cached.signature, signature)) {
+    return cached.indices
+  }
+
+  const range = indices.slice(start, start + count)
+  if (!geometryCache) {
+    geometryCache = new Map()
+    cache.indexRanges.set(geometry, geometryCache)
+  }
+  geometryCache.set(key, { signature, indices: range })
+  return range
+}
+
+function indexRangeExpansionSignature(
+  geometry: ThreeBufferGeometryLike,
+  indices: number[],
+  start: number,
+  count: number,
+): IndexRangeExpansionSignature {
+  const signature: IndexRangeExpansionSignature = {
+    cacheable: true,
+    geometryVersion: geometry.version,
+    sourceIndices: indices,
+    start,
+    count,
+    index: attributeSignature(geometry.index),
+  }
+  signature.cacheable = attributeSignatureCacheable(signature.index)
+  return signature
+}
+
+function sameIndexRangeExpansionSignature(
+  a: IndexRangeExpansionSignature,
+  b: IndexRangeExpansionSignature,
+): boolean {
+  return a.cacheable === b.cacheable
+    && a.geometryVersion === b.geometryVersion
+    && a.sourceIndices === b.sourceIndices
+    && a.start === b.start
+    && a.count === b.count
+    && sameAttributeSignature(a.index, b.index)
 }
 
 function expandIndicesForInstances(indices: number[], vertexCount: number, instanceCount: number): number[] {

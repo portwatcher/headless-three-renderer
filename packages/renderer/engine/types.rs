@@ -163,6 +163,12 @@ pub struct SceneLight {
 #[napi(object)]
 #[derive(Default)]
 pub struct SceneMesh {
+    /// Stable renderer-local key for reusing cached native mesh buffers.
+    pub native_mesh_key: Option<u32>,
+    /// Vertex count for cached native mesh-buffer references.
+    pub native_vertex_count: Option<u32>,
+    /// Index count for cached native mesh-buffer references.
+    pub native_index_count: Option<u32>,
     /// Flat xyz positions: `[x0, y0, z0, x1, y1, z1, ...]`.
     pub positions: Vec<f64>,
     /// Optional uint32 triangle-list indices.

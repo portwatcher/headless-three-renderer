@@ -197,6 +197,12 @@ export interface SceneLight {
 }
 
 export interface SceneMesh {
+  /** Stable renderer-local key for reusing cached native mesh buffers. */
+  nativeMeshKey?: number
+  /** Vertex count for cached native mesh-buffer references. */
+  nativeVertexCount?: number
+  /** Index count for cached native mesh-buffer references. */
+  nativeIndexCount?: number
   /** Flat xyz positions: `[x0, y0, z0, x1, y1, z1, ...]`. */
   positions: Array<number>
   /** Optional uint32 triangle-list indices. */

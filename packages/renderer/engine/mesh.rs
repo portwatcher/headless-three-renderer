@@ -41,6 +41,7 @@ impl Vertex {
 }
 
 pub struct PreparedMesh {
+    pub native_mesh_key: Option<u32>,
     pub vertices: Vec<Vertex>,
     pub indices: Option<Vec<u32>>,
     pub transform: Mat4,
@@ -669,34 +670,53 @@ pub fn texture_anisotropy(value: Option<f64>, field: &str) -> Result<u16> {
 
 fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh> {
     let topology = Topology::from_str_opt(mesh.topology.as_deref());
+    let cached_native_mesh = mesh.positions.is_empty() && mesh.native_mesh_key.is_some();
 
     let min_positions = match topology {
         Topology::Triangles => 9, // at least 3 xyz
         Topology::Lines => 6,     // at least 2 xyz
         Topology::Points => 3,    // at least 1 xyz
     };
-    if mesh.positions.len() < min_positions || mesh.positions.len() % 3 != 0 {
+    if cached_native_mesh {
+        if mesh.native_vertex_count.unwrap_or(0) == 0 {
+            bail!(
+                "scene.meshes[{mesh_index}].nativeVertexCount must be positive when using nativeMeshKey without positions"
+            );
+        }
+    } else if mesh.positions.len() < min_positions || mesh.positions.len() % 3 != 0 {
         bail!(
             "scene.meshes[{mesh_index}].positions must contain at least {} xyz vertices",
             min_positions / 3
         );
     }
 
-    let vertex_count = mesh.positions.len() / 3;
+    let vertex_count = if cached_native_mesh {
+        mesh.native_vertex_count.unwrap() as usize
+    } else {
+        mesh.positions.len() / 3
+    };
     let material_color = parse_color(
         mesh.color.as_deref(),
         [0.82, 0.82, 0.82, 1.0],
         &format!("scene.meshes[{mesh_index}].color"),
     )?;
 
-    let color_mode = ColorMode::new(
-        mesh.colors.as_deref(),
-        vertex_count,
-        material_color,
-        mesh_index,
-    )?;
+    let color_mode = if cached_native_mesh {
+        ColorMode::new(None, vertex_count, material_color, mesh_index)?
+    } else {
+        ColorMode::new(
+            mesh.colors.as_deref(),
+            vertex_count,
+            material_color,
+            mesh_index,
+        )?
+    };
 
-    let uvs = mesh.uvs.as_deref();
+    let uvs = if cached_native_mesh {
+        None
+    } else {
+        mesh.uvs.as_deref()
+    };
     let has_uvs = uvs.map_or(false, |u| u.len() == vertex_count * 2);
     if let Some(u) = uvs {
         if u.len() != vertex_count * 2 {
@@ -708,7 +728,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         }
     }
 
-    let uvs2 = mesh.uvs2.as_deref();
+    let uvs2 = if cached_native_mesh {
+        None
+    } else {
+        mesh.uvs2.as_deref()
+    };
     let has_uvs2 = uvs2.map_or(false, |u| u.len() == vertex_count * 2);
     if let Some(u) = uvs2 {
         if u.len() != vertex_count * 2 {
@@ -720,7 +744,11 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         }
     }
 
-    let normals = mesh.normals.as_deref();
+    let normals = if cached_native_mesh {
+        None
+    } else {
+        mesh.normals.as_deref()
+    };
     let has_normals = normals.map_or(false, |n| n.len() == vertex_count * 3);
     if let Some(n) = normals {
         if n.len() != vertex_count * 3 {
@@ -736,52 +764,54 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     let normals_field = format!("scene.meshes[{mesh_index}].normals");
     let uvs_field = format!("scene.meshes[{mesh_index}].uvs");
     let uvs2_field = format!("scene.meshes[{mesh_index}].uvs2");
-    for vertex_index in 0..vertex_count {
-        let base = vertex_index * 3;
-        let uv_base = vertex_index * 2;
-        vertices.push(Vertex {
-            position: [
-                finite_f32(mesh.positions[base], "mesh position")?,
-                finite_f32(mesh.positions[base + 1], "mesh position")?,
-                finite_f32(mesh.positions[base + 2], "mesh position")?,
-            ],
-            normal: if has_normals {
-                let n = normals.unwrap();
-                [
-                    finite_f32(n[base], &normals_field)?,
-                    finite_f32(n[base + 1], &normals_field)?,
-                    finite_f32(n[base + 2], &normals_field)?,
-                ]
-            } else {
-                [0.0, 0.0, 0.0]
-            },
-            tangent: [0.0, 0.0, 0.0, 0.0],
-            color: color_mode.color(vertex_index),
-            uv: if has_uvs {
-                let u = uvs.unwrap();
-                [
-                    finite_f32(u[uv_base], &uvs_field)?,
-                    finite_f32(u[uv_base + 1], &uvs_field)?,
-                ]
-            } else {
-                [0.0, 0.0]
-            },
-            uv2: if has_uvs2 {
-                let u = uvs2.unwrap();
-                [
-                    finite_f32(u[uv_base], &uvs2_field)?,
-                    finite_f32(u[uv_base + 1], &uvs2_field)?,
-                ]
-            } else if has_uvs {
-                let u = uvs.unwrap();
-                [
-                    finite_f32(u[uv_base], &uvs_field)?,
-                    finite_f32(u[uv_base + 1], &uvs_field)?,
-                ]
-            } else {
-                [0.0, 0.0]
-            },
-        });
+    if !cached_native_mesh {
+        for vertex_index in 0..vertex_count {
+            let base = vertex_index * 3;
+            let uv_base = vertex_index * 2;
+            vertices.push(Vertex {
+                position: [
+                    finite_f32(mesh.positions[base], "mesh position")?,
+                    finite_f32(mesh.positions[base + 1], "mesh position")?,
+                    finite_f32(mesh.positions[base + 2], "mesh position")?,
+                ],
+                normal: if has_normals {
+                    let n = normals.unwrap();
+                    [
+                        finite_f32(n[base], &normals_field)?,
+                        finite_f32(n[base + 1], &normals_field)?,
+                        finite_f32(n[base + 2], &normals_field)?,
+                    ]
+                } else {
+                    [0.0, 0.0, 0.0]
+                },
+                tangent: [0.0, 0.0, 0.0, 0.0],
+                color: color_mode.color(vertex_index),
+                uv: if has_uvs {
+                    let u = uvs.unwrap();
+                    [
+                        finite_f32(u[uv_base], &uvs_field)?,
+                        finite_f32(u[uv_base + 1], &uvs_field)?,
+                    ]
+                } else {
+                    [0.0, 0.0]
+                },
+                uv2: if has_uvs2 {
+                    let u = uvs2.unwrap();
+                    [
+                        finite_f32(u[uv_base], &uvs2_field)?,
+                        finite_f32(u[uv_base + 1], &uvs2_field)?,
+                    ]
+                } else if has_uvs {
+                    let u = uvs.unwrap();
+                    [
+                        finite_f32(u[uv_base], &uvs_field)?,
+                        finite_f32(u[uv_base + 1], &uvs_field)?,
+                    ]
+                } else {
+                    [0.0, 0.0]
+                },
+            });
+        }
     }
 
     let mut indices = match &mesh.indices {
@@ -804,6 +834,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             }
             Some(indices.clone())
         }
+        None if cached_native_mesh => None,
         None => {
             let stride = match topology {
                 Topology::Triangles => 3,
@@ -824,6 +855,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
         .as_ref()
         .is_some_and(|data| !data.is_empty());
     let use_flat_normals = mesh.flat_shading.unwrap_or(false)
+        && !cached_native_mesh
         && !has_normal_map_slot
         && topology == Topology::Triangles;
 
@@ -839,7 +871,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
             vertices = expanded;
         }
         compute_flat_normals(&mut vertices, None);
-    } else if !has_normals && topology == Topology::Triangles {
+    } else if !cached_native_mesh && !has_normals && topology == Topology::Triangles {
         compute_flat_normals(&mut vertices, indices.as_deref());
     }
 
@@ -1063,7 +1095,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     )?;
     let shininess = finite_f32(mesh.shininess.unwrap_or(30.0), "mesh shininess")?.max(0.0001);
 
-    if let Some(displacement_map) = displacement_map.as_ref() {
+    if !cached_native_mesh && let Some(displacement_map) = displacement_map.as_ref() {
         if has_uvs && topology == Topology::Triangles {
             apply_displacement_map(
                 &mut vertices,
@@ -1078,7 +1110,8 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     }
 
     // Compute tangents when normal/bump mapping or anisotropic shading needs a frame.
-    if (normal_map.is_some()
+    if !cached_native_mesh
+        && (normal_map.is_some()
         || bump_map.is_some()
         || clearcoat_normal_map.is_some()
         || anisotropy > 0.0)
@@ -1183,6 +1216,7 @@ fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<PreparedMesh>
     };
 
     Ok(PreparedMesh {
+        native_mesh_key: mesh.native_mesh_key,
         vertices,
         indices,
         transform: parse_transform(mesh.transform.as_deref(), mesh_index)?,

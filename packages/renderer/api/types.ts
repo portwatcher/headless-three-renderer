@@ -769,6 +769,9 @@ export interface NativeSceneLight {
 }
 
 export interface NativeSceneMesh {
+  nativeMeshKey?: number
+  nativeVertexCount?: number
+  nativeIndexCount?: number
   positions: number[]
   indices?: number[]
   normals?: number[]

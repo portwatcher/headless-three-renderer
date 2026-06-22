@@ -140,6 +140,7 @@ const MAX_CUSTOM_PIPELINE_CACHE_ENTRIES: usize = 128;
 const MAX_SCRATCH_TEXTURE_CACHE_ENTRIES: usize = 32;
 const MAX_POST_BIND_GROUP_CACHE_ENTRIES: usize = 32;
 const MAX_READBACK_BUFFER_CACHE_ENTRIES: usize = 32;
+const MAX_NATIVE_MESH_BUFFER_CACHE_ENTRIES: usize = 2048;
 
 pub struct GpuRenderer {
     device: wgpu::Device,
@@ -189,6 +190,7 @@ pub struct GpuRenderer {
     post_texture_cache: Mutex<HashMap<ScratchTextureKey, wgpu::Texture>>,
     readback_buffer_cache: Mutex<HashMap<ReadbackBufferKey, wgpu::Buffer>>,
     mesh_buffer_cache: Mutex<HashMap<MeshBufferCacheKey, CachedMeshBuffers>>,
+    native_mesh_buffer_cache: Mutex<HashMap<u32, CachedMeshBuffers>>,
     state_pipeline_cache: Mutex<HashMap<StatePipelineKey, wgpu::RenderPipeline>>,
     custom_pipeline_cache: Mutex<HashMap<CustomPipelineKey, wgpu::RenderPipeline>>,
     shadow_sampler: wgpu::Sampler,
@@ -310,6 +312,8 @@ struct AoPhysicalBindGroupResources {
 struct CachedMeshBuffers {
     vertex_buffer: wgpu::Buffer,
     index_buffer: Option<wgpu::Buffer>,
+    vertex_count: u32,
+    index_count: u32,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -2114,6 +2118,7 @@ impl GpuRenderer {
             post_texture_cache: Mutex::new(HashMap::new()),
             readback_buffer_cache: Mutex::new(HashMap::new()),
             mesh_buffer_cache: Mutex::new(HashMap::new()),
+            native_mesh_buffer_cache: Mutex::new(HashMap::new()),
             state_pipeline_cache: Mutex::new(HashMap::new()),
             custom_pipeline_cache: Mutex::new(HashMap::new()),
             shadow_sampler,
@@ -3801,7 +3806,33 @@ impl GpuRenderer {
             })
     }
 
-    fn mesh_buffers_for(&self, mesh: &PreparedMesh) -> CachedMeshBuffers {
+    fn mesh_buffers_for(&self, mesh: &PreparedMesh) -> Result<CachedMeshBuffers> {
+        if let Some(key) = mesh.native_mesh_key {
+            if mesh.vertices.is_empty() {
+                return self
+                    .native_mesh_buffer_cache
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .get(&key)
+                    .cloned()
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "native mesh buffer cache key {key} was referenced before a full mesh payload seeded it"
+                        )
+                    });
+            }
+
+            if let Some(buffers) = self
+                .native_mesh_buffer_cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .get(&key)
+                .cloned()
+            {
+                return Ok(buffers);
+            }
+        }
+
         let key = MeshBufferCacheKey::from_mesh(mesh);
         if let Some(buffers) = self
             .mesh_buffer_cache
@@ -3810,7 +3841,18 @@ impl GpuRenderer {
             .get(&key)
             .cloned()
         {
-            return buffers;
+            if let Some(native_key) = mesh.native_mesh_key {
+                insert_bounded_cache(
+                    &mut self
+                        .native_mesh_buffer_cache
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()),
+                    native_key,
+                    buffers.clone(),
+                    MAX_NATIVE_MESH_BUFFER_CACHE_ENTRIES,
+                );
+            }
+            return Ok(buffers);
         }
 
         let buffers = CachedMeshBuffers {
@@ -3829,6 +3871,12 @@ impl GpuRenderer {
                         usage: wgpu::BufferUsages::INDEX,
                     })
             }),
+            vertex_count: mesh.vertices.len() as u32,
+            index_count: mesh
+                .indices
+                .as_ref()
+                .map(|indices| indices.len() as u32)
+                .unwrap_or(0),
         };
 
         insert_bounded_cache(
@@ -3837,9 +3885,23 @@ impl GpuRenderer {
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner()),
             key,
-            buffers,
+            buffers.clone(),
             MAX_MESH_BUFFER_CACHE_ENTRIES,
-        )
+        );
+
+        if let Some(native_key) = mesh.native_mesh_key {
+            insert_bounded_cache(
+                &mut self
+                    .native_mesh_buffer_cache
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()),
+                native_key,
+                buffers.clone(),
+                MAX_NATIVE_MESH_BUFFER_CACHE_ENTRIES,
+            );
+        }
+
+        Ok(buffers)
     }
 
     fn dynamic_uniform_bind_group_for(
@@ -3997,7 +4059,9 @@ impl GpuRenderer {
         let CachedMeshBuffers {
             vertex_buffer,
             index_buffer,
-        } = self.mesh_buffers_for(mesh);
+            vertex_count,
+            index_count,
+        } = self.mesh_buffers_for(mesh)?;
 
         let model = mesh.transform;
         let mvp = settings.view_projection * model;
@@ -4407,11 +4471,8 @@ impl GpuRenderer {
             emissive_map_bind_group,
             ao_map_bind_group,
             pipeline_override,
-            index_count: mesh
-                .indices
-                .as_ref()
-                .map_or(0, |indices| indices.len() as u32),
-            vertex_count: mesh.vertices.len() as u32,
+            index_count,
+            vertex_count,
             side: mesh.side,
             topology: mesh.topology,
             blend_constant: blend_constant(mesh.custom_blend),

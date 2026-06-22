@@ -35,7 +35,7 @@ const native = require('../native.js')
 
 import { resolveSize, cameraViewProjection, cameraViewMatrix, cameraWorldPosition } from './camera'
 import { DEFAULT_BACKGROUND_COLOR, cssColorStringToArray, resolveBackground, validatedColorLikeToArray } from './color'
-import { createSceneExtractionCache, flattenScene, type SceneExtractionCache, type ShadowMaterialMode } from './scene'
+import { commitNativeMeshPayloadCache, createSceneExtractionCache, flattenScene, type SceneExtractionCache, type ShadowMaterialMode } from './scene'
 import { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } from './lights'
 import { canvasLikeImageToRgba, extractBackgroundTexture, extractTextureData, isCompressedTextureFormat, resolveEnvironmentMap, resolveSceneOverrideMaterial, type MaterialExtractionContext } from './materials'
 import { extractClippingPlanes } from './clipping'
@@ -3802,7 +3802,9 @@ export class Renderer {
     options: RenderOptions,
   ): { buffer: Buffer; nativeScene: NativeRenderScene; nativeCamera: NativeCamera; objectIdEntries?: RenderObjectIdEntry[] } {
     const { nativeScene, nativeCamera, objectIdEntries } = toNativeInput(scene, camera, options, this.sceneExtractionCache)
-    return { buffer: this.native.render(nativeScene, nativeCamera), nativeScene, nativeCamera, objectIdEntries }
+    const buffer = this.native.render(nativeScene, nativeCamera)
+    commitNativeMeshPayloadCache(this.sceneExtractionCache)
+    return { buffer, nativeScene, nativeCamera, objectIdEntries }
   }
 
   private resolveRenderOptions(options: RenderOptions, fallbackTarget: RenderTargetLike | null | undefined = options.target): InternalRenderOptions {
@@ -4201,6 +4203,9 @@ function renderModeMesh(mesh: NativeSceneMesh, mode: Exclude<RenderMode, 'color'
       ? objectIdColor(mesh, index)
       : [1, 1, 1, materialAlpha(mesh)] as Color4
   return {
+    nativeMeshKey: mesh.nativeMeshKey,
+    nativeVertexCount: mesh.nativeVertexCount,
+    nativeIndexCount: mesh.nativeIndexCount,
     positions: mesh.positions,
     indices: mesh.indices,
     normals: mesh.normals,

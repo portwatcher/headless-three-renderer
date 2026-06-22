@@ -910,6 +910,49 @@ test('renderer is reusable across multiple calls', () => {
   }
 })
 
+test('reusable renderer omits repeated native mesh arrays after cache seed render', () => {
+  const scene = new THREE.Scene()
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshBasicMaterial({ color: 0xff3355 }),
+  )
+  scene.add(mesh)
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
+  camera.position.set(0, 0, 3)
+  camera.lookAt(0, 0, 0)
+
+  const r = new Renderer()
+  const capturedMeshes = []
+  const originalRender = r.native.render.bind(r.native)
+  r.native.render = (nativeScene, nativeCamera) => {
+    capturedMeshes.push(nativeScene.meshes.map((nativeMesh) => ({
+      nativeMeshKey: nativeMesh.nativeMeshKey,
+      nativeVertexCount: nativeMesh.nativeVertexCount,
+      nativeIndexCount: nativeMesh.nativeIndexCount,
+      positionsLength: nativeMesh.positions?.length ?? 0,
+      indicesLength: nativeMesh.indices?.length ?? 0,
+    })))
+    return originalRender(nativeScene, nativeCamera)
+  }
+
+  const first = r.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+  mesh.position.x = 0.15
+  const second = r.render(scene, camera, { width: 64, height: 64, format: 'rgba' })
+
+  assert.equal(first.length, 64 * 64 * 4)
+  assert.equal(second.length, 64 * 64 * 4)
+  assert.equal(capturedMeshes.length, 2)
+  assert.ok(capturedMeshes[0][0].nativeMeshKey > 0)
+  assert.ok(capturedMeshes[0][0].positionsLength > 0)
+  assert.ok(capturedMeshes[0][0].indicesLength > 0)
+  assert.equal(capturedMeshes[1][0].nativeMeshKey, capturedMeshes[0][0].nativeMeshKey)
+  assert.equal(capturedMeshes[1][0].nativeVertexCount, capturedMeshes[0][0].nativeVertexCount)
+  assert.equal(capturedMeshes[1][0].nativeIndexCount, capturedMeshes[0][0].nativeIndexCount)
+  assert.equal(capturedMeshes[1][0].positionsLength, 0)
+  assert.equal(capturedMeshes[1][0].indicesLength, 0)
+})
+
 test('top-level render() function works without a Renderer instance', () => {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial({ color: 0x0000ff })))
