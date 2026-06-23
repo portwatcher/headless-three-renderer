@@ -665,6 +665,7 @@ class RendererBackendState {
   readonly coordinateSystem = WEBGL_COORDINATE_SYSTEM
   readonly parameters: Record<string, never> = Object.freeze({})
   private data = new WeakMap<object, Record<string, unknown>>()
+  private timestampUid = 0
 
   constructor(readonly renderer: Renderer) {}
 
@@ -792,6 +793,10 @@ class RendererBackendState {
     throw unsupportedBackendOperationError('Renderer.backend.createSampler', 'backend sampler creation')
   }
 
+  updateSampler(_texture?: unknown): string {
+    return ''
+  }
+
   destroySampler(): void {}
 
   createDefaultTexture(): never {
@@ -881,6 +886,49 @@ class RendererBackendState {
     return this.hasFeature(name)
   }
 
+  hasCompatibility(name: unknown): boolean {
+    assertRendererProbeName(name, 'Renderer.backend.hasCompatibility name')
+    return false
+  }
+
+  updateTimeStampUID(abstractRenderContext: unknown): void {
+    assertWeakMapKey(abstractRenderContext, 'Renderer.backend.updateTimeStampUID abstractRenderContext')
+    this.get(abstractRenderContext).timestampUID = `r:${this.timestampUid += 1}`
+  }
+
+  getTimestampUID(abstractRenderContext: unknown): string {
+    assertWeakMapKey(abstractRenderContext, 'Renderer.backend.getTimestampUID abstractRenderContext')
+    const data = this.get(abstractRenderContext)
+    if (typeof data.timestampUID !== 'string') {
+      data.timestampUID = `r:${this.timestampUid += 1}`
+    }
+    return data.timestampUID as string
+  }
+
+  getTimestampFrames(type: unknown): number[] {
+    assertTimestampQueryType(type, 'Renderer.backend.getTimestampFrames type')
+    return []
+  }
+
+  _getQueryPool(uid: unknown): null {
+    assertTimestampUid(uid, 'Renderer.backend._getQueryPool uid')
+    return null
+  }
+
+  getTimestamp(uid: unknown): number {
+    assertTimestampUid(uid, 'Renderer.backend.getTimestamp uid')
+    return 0
+  }
+
+  hasTimestamp(uid: unknown): boolean {
+    assertTimestampUid(uid, 'Renderer.backend.hasTimestamp uid')
+    return false
+  }
+
+  async resolveTimestampsAsync(type: unknown = 'render'): Promise<void> {
+    assertTimestampQueryType(type, 'Renderer.backend.resolveTimestampsAsync type')
+  }
+
   getMaxAnisotropy(): number {
     return 0
   }
@@ -933,6 +981,10 @@ class RendererBackendState {
       'Renderer.backend.resolveTimestampAsync() is not supported by @headless-three/renderer because timestamp queries require backend GPU query pools that are outside the scene-oriented API.',
     )
   }
+
+  initRenderTarget(_renderContext?: unknown): void {}
+
+  deleteBindGroupData(_bindGroup?: unknown): void {}
 
   async waitForGPU(): Promise<void> {
     throw new Error(
@@ -2459,6 +2511,7 @@ export class Renderer {
   }
   private onDeviceLostValue: (info?: unknown) => void = this.defaultOnDeviceLost
   private readonly contextAttributes: RendererContextAttributesLike
+  private readonly domElementValue = new RendererDomElementState()
 
   readonly isRenderer = true
   readonly isWebGLRenderer = true
@@ -2471,7 +2524,6 @@ export class Renderer {
   readonly capabilities = new RendererCapabilitiesState()
   clippingPlanes: ThreePlaneLike[] = []
   readonly debug = new RendererDebugState()
-  readonly domElement = new RendererDomElementState()
   readonly extensions = new RendererExtensionsState()
   readonly info = new RendererInfoState()
   readonly library = new RendererNodeLibraryState()
@@ -2495,6 +2547,10 @@ export class Renderer {
     this.nodes = new RendererNodesState(this, this.backend)
     this.native = new native.NativeRenderer()
     this.inspectorValue.setRenderer(this)
+  }
+
+  get domElement(): RendererDomElementState {
+    return this.domElementValue
   }
 
   async init(): Promise<this> {
@@ -2827,8 +2883,27 @@ export class Renderer {
     throw unsupportedInternalRenderDispatchError('Renderer._renderObjectDirect')
   }
 
+  _renderOutput(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._renderOutput')
+  }
+
   _createObjectPipeline(): never {
     throw unsupportedInternalRenderDispatchError('Renderer._createObjectPipeline')
+  }
+
+  _getShadowNodes(): never {
+    throw unsupportedInternalRenderDispatchError('Renderer._getShadowNodes')
+  }
+
+  _onCanvasTargetResize(): void {}
+
+  _setXRLayerSize(width: unknown, height: unknown): void {
+    const size = rendererStateSize(width, height, 'Renderer._setXRLayerSize')
+    this.setViewport(0, 0, size.width, size.height)
+  }
+
+  _resetXRState(): void {
+    this.setRenderTarget(null)
   }
 
   compute(computeNodes: unknown, dispatchSize: unknown = null): never {
@@ -6182,6 +6257,12 @@ function assertTimestampQueryType(value: unknown, label: string): void {
   }
   if (!SupportedTimestampQueryTypes.has(value)) {
     throw new TypeError(`${label} must be "render" or "compute"; received "${value}".`)
+  }
+}
+
+function assertTimestampUid(value: unknown, label: string): void {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError(`${label} must be a non-empty string.`)
   }
 }
 
