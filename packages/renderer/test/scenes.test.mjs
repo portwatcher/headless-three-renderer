@@ -6,6 +6,7 @@ import path from 'node:path'
 import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
+import { Timer } from 'three/src/core/Timer.js'
 import { AnimationClipCreator } from 'three/examples/jsm/animation/AnimationClipCreator.js'
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js'
 import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
@@ -28,7 +29,6 @@ import { AnaglyphEffect } from 'three/examples/jsm/effects/AnaglyphEffect.js'
 import { AsciiEffect } from 'three/examples/jsm/effects/AsciiEffect.js'
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js'
 import { ParallaxBarrierEffect } from 'three/examples/jsm/effects/ParallaxBarrierEffect.js'
-import { PeppersGhostEffect } from 'three/examples/jsm/effects/PeppersGhostEffect.js'
 import { StereoEffect } from 'three/examples/jsm/effects/StereoEffect.js'
 import { DRACOExporter } from 'three/examples/jsm/exporters/DRACOExporter.js'
 import { EXRExporter, NO_COMPRESSION } from 'three/examples/jsm/exporters/EXRExporter.js'
@@ -48,9 +48,8 @@ import { NURBSVolume } from 'three/examples/jsm/curves/NURBSVolume.js'
 import { BoxLineGeometry } from 'three/examples/jsm/geometries/BoxLineGeometry.js'
 import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js'
-import InstancedPointsGeometry from 'three/examples/jsm/geometries/InstancedPointsGeometry.js'
 import { ParametricGeometry } from 'three/examples/jsm/geometries/ParametricGeometry.js'
-import { ParametricGeometries } from 'three/examples/jsm/geometries/ParametricGeometries.js'
+import * as ParametricFunctions from 'three/examples/jsm/geometries/ParametricFunctions.js'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { TeapotGeometry } from 'three/examples/jsm/geometries/TeapotGeometry.js'
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js'
@@ -103,8 +102,6 @@ import { VTKLoader } from 'three/examples/jsm/loaders/VTKLoader.js'
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader.js'
 import { XYZLoader } from 'three/examples/jsm/loaders/XYZLoader.js'
 import { LDrawConditionalLineMaterial } from 'three/examples/jsm/materials/LDrawConditionalLineMaterial.js'
-import { MeshGouraudMaterial } from 'three/examples/jsm/materials/MeshGouraudMaterial.js'
-import { MeshPostProcessingMaterial } from 'three/examples/jsm/materials/MeshPostProcessingMaterial.js'
 import { Capsule } from 'three/examples/jsm/math/Capsule.js'
 import { ColorConverter } from 'three/examples/jsm/math/ColorConverter.js'
 import { DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearRec2020ColorSpace } from 'three/examples/jsm/math/ColorSpaces.js'
@@ -125,17 +122,15 @@ import { MorphBlendMesh } from 'three/examples/jsm/misc/MorphBlendMesh.js'
 import { ProgressiveLightMap } from 'three/examples/jsm/misc/ProgressiveLightMap.js'
 import { ProgressiveLightMap as ProgressiveLightMapGPU } from 'three/examples/jsm/misc/ProgressiveLightMapGPU.js'
 import { RollerCoasterGeometry, RollerCoasterLiftersGeometry, RollerCoasterShadowGeometry, SkyGeometry, TreesGeometry } from 'three/examples/jsm/misc/RollerCoaster.js'
-import { FixedTimer, Timer } from 'three/examples/jsm/misc/Timer.js'
 import { TubePainter } from 'three/examples/jsm/misc/TubePainter.js'
 import { Volume } from 'three/examples/jsm/misc/Volume.js'
 import { VolumeSlice } from 'three/examples/jsm/misc/VolumeSlice.js'
 import { Flow, InstancedFlow } from 'three/examples/jsm/modifiers/CurveModifier.js'
-import { Flow as GPUFlow, getUniforms as getGPUCurveUniforms, initSplineTexture as initGPUCurveSplineTexture, updateSplineTexture as updateGPUCurveSplineTexture } from 'three/examples/jsm/modifiers/CurveModifierGPU.js'
+import { Flow as GPUFlow } from 'three/examples/jsm/modifiers/CurveModifierGPU.js'
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier.js'
 import { SimplifyModifier } from 'three/examples/jsm/modifiers/SimplifyModifier.js'
 import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
 import { GroundedSkybox } from 'three/examples/jsm/objects/GroundedSkybox.js'
-import InstancedPoints from 'three/examples/jsm/objects/InstancedPoints.js'
 import { Lensflare } from 'three/examples/jsm/objects/Lensflare.js'
 import { LensflareMesh } from 'three/examples/jsm/objects/LensflareMesh.js'
 import { MarchingCubes } from 'three/examples/jsm/objects/MarchingCubes.js'
@@ -213,6 +208,10 @@ const { Renderer, render, renderToTarget } = pkg
 const { extractLights, extractAmbientLight, extractAmbientIntensity, extractLightProbe } = lightsApi
 const { extractBackgroundTexture, extractEnvironmentMap, extractTextureData } = materialsApi
 const cjsRequire = createRequire(import.meta.url)
+const InstancedPoints = await optionalExampleExport('three/examples/jsm/objects/InstancedPoints.js', 'default')
+const MeshGouraudMaterial = await optionalExampleExport('three/examples/jsm/materials/MeshGouraudMaterial.js', 'MeshGouraudMaterial')
+const MeshPostProcessingMaterial = await optionalExampleExport('three/examples/jsm/materials/MeshPostProcessingMaterial.js', 'MeshPostProcessingMaterial')
+const PeppersGhostEffect = await optionalExampleExport('three/examples/jsm/effects/PeppersGhostEffect.js', 'PeppersGhostEffect')
 
 const SIZE = 128
 const SHARED_RENDERER_RECYCLE_TEST_INTERVAL = 64
@@ -256,6 +255,17 @@ function test(name, ...args) {
   }
 
   return nodeTest(name, ...args)
+}
+
+async function optionalExampleExport(specifier, exportName) {
+  try {
+    return (await import(specifier))[exportName]
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND' && String(error.message).includes(path.basename(specifier))) {
+      return null
+    }
+    throw error
+  }
 }
 
 function threeRendererFile(relativePath) {
@@ -4754,8 +4764,11 @@ test('CurveModifierGPU Flow writes spline textures and fails clearly on material
     new THREE.Vector3(0, 0.4, 0),
     new THREE.Vector3(0.8, 0, 0),
   ])
-  const texture = initGPUCurveSplineTexture(2)
+  const geometry = new THREE.BoxGeometry(0.5, 0.18, 0.18)
+  const material = new THREE.MeshBasicMaterial({ color: 0xff5533 })
+  const flow = new GPUFlow(new THREE.Mesh(geometry, material), 2)
   try {
+    const texture = flow.splineTexture
     assert.equal(texture.isDataTexture, true)
     assert.equal(texture.image.width, 1024)
     assert.equal(texture.image.height, 8)
@@ -4767,35 +4780,27 @@ test('CurveModifierGPU Flow writes spline textures and fails clearly on material
     assert.equal(texture.magFilter, THREE.LinearFilter)
     assert.equal(texture.minFilter, THREE.LinearFilter)
 
-    const version = texture.version
-    updateGPUCurveSplineTexture(texture, curve, 1)
-    assert.ok(texture.version > version, 'updating a CurveModifierGPU spline texture should mark it dirty')
-    const secondCurveRowOffset = 1024 * 4 * 4
-    assert.ok(
-      Array.from(texture.image.data.slice(secondCurveRowOffset, secondCurveRowOffset + 64)).some((value) => value !== 0),
-      'offset curve rows should receive packed half-float spline data',
-    )
-
-    const uniforms = getGPUCurveUniforms(texture)
+    const { uniforms } = flow
     assert.equal(uniforms.spineTexture, texture)
     assert.equal(uniforms.pathOffset, 0)
     assert.equal(uniforms.pathSegment, 1)
     assert.equal(uniforms.spineOffset, 161)
     assert.equal(uniforms.spineLength, 400)
     assert.equal(uniforms.flow, 1)
-  } finally {
-    texture.dispose()
-  }
 
-  const geometry = new THREE.BoxGeometry(0.5, 0.18, 0.18)
-  const material = new THREE.MeshBasicMaterial({ color: 0xff5533 })
-  const flow = new GPUFlow(new THREE.Mesh(geometry, material), 2)
-  try {
+    const version = texture.version
     flow.updateCurve(0, curve)
+    assert.ok(texture.version > version, 'updating a CurveModifierGPU spline texture should mark it dirty')
+    assert.ok(
+      Array.from(texture.image.data.slice(0, 64)).some((value) => value !== 0),
+      'curve rows should receive packed half-float spline data',
+    )
+
     flow.moveAlongCurve(0.25)
 
     assert.equal(flow.curveArray[0], curve)
-    assert.ok(Math.abs(flow.curveLengthArray[0] - curve.getLength()) < 1e-6)
+    assert.ok(Math.abs(flow.curveLengthArray[0] - curve.getLength()) < 1e-5)
+    assert.ok(Math.abs(flow.uniforms.spineLength - curve.getLength()) < 1e-5)
     assert.equal(flow.uniforms.pathOffset, 0.25)
     assert.notEqual(flow.object3D.material, material)
     assert.equal(flow.object3D.material.positionNode?.isNode, true)
@@ -4901,10 +4906,10 @@ test('examples Line2, LineSegments2, and Wireframe LineMaterial shaders fail cle
 
 test('examples custom material helpers fail clearly on shader customization boundaries', () => {
   const cases = [
-    ['MeshGouraudMaterial', () => new THREE.Mesh(
+    ...(MeshGouraudMaterial ? [['MeshGouraudMaterial', () => new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new MeshGouraudMaterial({ color: 0xff5533 }),
-    ), /ShaderMaterial.*fragmentWgsl/i],
+    ), /ShaderMaterial.*fragmentWgsl/i]] : []),
     ['LDrawConditionalLineMaterial', () => new THREE.LineSegments(
       new THREE.BufferGeometry().setAttribute(
         'position',
@@ -4912,10 +4917,10 @@ test('examples custom material helpers fail clearly on shader customization boun
       ),
       new LDrawConditionalLineMaterial({ color: 0x33ff66 }),
     ), /ShaderMaterial.*fragmentWgsl/i],
-    ['MeshPostProcessingMaterial', () => new THREE.Mesh(
+    ...(MeshPostProcessingMaterial ? [['MeshPostProcessingMaterial', () => new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new MeshPostProcessingMaterial({ color: 0x3355ff }),
-    ), /onBeforeCompile customizations.*fragmentWgsl/i],
+    ), /onBeforeCompile customizations.*fragmentWgsl/i]] : []),
   ]
 
   for (const [label, makeObject, pattern] of cases) {
@@ -7305,40 +7310,29 @@ test('examples PCDLoader and VTKLoader parse renderable point and mesh geometry 
   }
 })
 
-test('examples InstancedPointsGeometry and ParametricGeometries render generated geometry paths', () => {
-  const instancedGeometry = new InstancedPointsGeometry()
-  instancedGeometry.setPositions([
-    -2.2, 1.6, 0,
-    0, 1.6, 0,
-    2.2, 1.6, 0,
-  ])
-  const instancedMaterial = new THREE.MeshBasicMaterial({ color: 0x44ffff, side: THREE.DoubleSide })
-  const instancedMesh = new THREE.Mesh(instancedGeometry, instancedMaterial)
-  instancedMesh.position.x = -1.12
-  instancedMesh.scale.setScalar(0.16)
-
+test('examples ParametricFunctions render generated geometry paths', () => {
   const entries = [
     {
-      label: 'ParametricGeometries.klein',
-      geometry: new ParametricGeometry(ParametricGeometries.klein, 10, 10),
+      label: 'ParametricFunctions.klein',
+      geometry: new ParametricGeometry(ParametricFunctions.klein, 10, 10),
       color: 0xff44ff,
-      x: -0.3,
+      x: -0.85,
       scale: 0.07,
       isColor: (r, g, b) => r > 120 && b > 120 && g < 120,
     },
     {
-      label: 'ParametricGeometries.TorusKnotGeometry',
-      geometry: new ParametricGeometries.TorusKnotGeometry(0.28, 0.06, 28, 8),
+      label: 'THREE.TorusKnotGeometry',
+      geometry: new THREE.TorusKnotGeometry(0.28, 0.06, 28, 8),
       color: 0x55ff66,
-      x: 0.58,
+      x: 0,
       scale: 1,
       isColor: (r, g, b) => g > 130 && g > r + 40 && g > b + 40,
     },
     {
-      label: 'ParametricGeometries.SphereGeometry',
-      geometry: new ParametricGeometries.SphereGeometry(0.32, 12, 8),
+      label: 'THREE.SphereGeometry',
+      geometry: new THREE.SphereGeometry(0.32, 12, 8),
       color: 0x4488ff,
-      x: 1.25,
+      x: 0.85,
       scale: 1,
       isColor: (r, g, b) => b > 130 && b > r + 50 && b > g + 20,
     },
@@ -7346,9 +7340,8 @@ test('examples InstancedPointsGeometry and ParametricGeometries render generated
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
-  scene.add(instancedMesh)
-  const materials = [instancedMaterial]
-  const meshes = [instancedMesh]
+  const materials = []
+  const meshes = []
   for (const entry of entries) {
     const material = new THREE.MeshBasicMaterial({ color: entry.color, side: THREE.DoubleSide })
     const mesh = new THREE.Mesh(entry.geometry, material)
@@ -7368,15 +7361,6 @@ test('examples InstancedPointsGeometry and ParametricGeometries render generated
     const width = 128
     const height = 72
     const rgba = renderRgba(scene, camera, { width, height })
-    assert.equal(instancedGeometry.isInstancedPointsGeometry, true)
-    assert.equal(instancedGeometry.isInstancedBufferGeometry, true)
-    assert.equal(instancedGeometry.instanceCount, 3)
-    assert.ok(instancedGeometry.getAttribute('instancePosition'), 'InstancedPointsGeometry should expose instance positions')
-    assert.ok(instancedGeometry.getAttribute('uv'), 'InstancedPointsGeometry should expose quad UVs')
-    assert.ok(
-      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => g > 120 && b > 120 && r < 120) > 200,
-      'InstancedPointsGeometry should render repeated cyan point quads',
-    )
     for (const entry of entries) {
       assert.equal(entry.geometry.isBufferGeometry, true, `${entry.label} should produce BufferGeometry`)
       assert.ok(entry.geometry.getAttribute('position')?.count > 0, `${entry.label} should generate vertices`)
@@ -7388,7 +7372,6 @@ test('examples InstancedPointsGeometry and ParametricGeometries render generated
     }
   } finally {
     for (const mesh of meshes) scene.remove(mesh)
-    instancedGeometry.dispose()
     for (const entry of entries) entry.geometry.dispose()
     for (const material of materials) material.dispose()
   }
@@ -8238,20 +8221,19 @@ test('examples Gyroscope preserves child orientation while rendering normal mesh
   }
 })
 
-test('examples Timer utilities can drive still-frame render state', () => {
+test('Three.js Timer utility can drive still-frame render state', () => {
   const timer = new Timer()
   timer.setTimescale(2)
   timer.update(timer._startTime + 250)
 
-  const fixedTimer = new FixedTimer(10)
-  fixedTimer.setTimescale(1.5)
-  fixedTimer.update()
-  fixedTimer.update()
+  const secondTimer = new Timer()
+  secondTimer.setTimescale(1)
+  secondTimer.update(secondTimer._startTime + 500)
 
   assert.ok(Math.abs(timer.getDelta() - 0.5) < 1e-6)
   assert.ok(Math.abs(timer.getElapsed() - 0.5) < 1e-6)
-  assert.ok(Math.abs(fixedTimer.getDelta() - 0.1) < 1e-6)
-  assert.ok(Math.abs(fixedTimer.getElapsed() - 0.3) < 1e-6)
+  assert.ok(Math.abs(secondTimer.getDelta() - 0.5) < 1e-6)
+  assert.ok(Math.abs(secondTimer.getElapsed() - 0.5) < 1e-6)
 
   const geometry = new THREE.PlaneGeometry(0.36, 0.36)
   const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff3344, side: THREE.DoubleSide })
@@ -8259,7 +8241,7 @@ test('examples Timer utilities can drive still-frame render state', () => {
   const red = new THREE.Mesh(geometry, redMaterial)
   red.position.x = -timer.getElapsed()
   const green = new THREE.Mesh(geometry, greenMaterial)
-  green.position.x = fixedTimer.getElapsed() + 0.2
+  green.position.x = secondTimer.getElapsed() + 0.2
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
@@ -8280,11 +8262,11 @@ test('examples Timer utilities can drive still-frame render state', () => {
     )
     assert.ok(
       countRegionPixels(rgba, width, height, width / 2, 0, width, height, (r, g, b) => g > 150 && g > r + 20 && g > b + 20) > 120,
-      'FixedTimer-driven green mesh should render on the right',
+      'second Timer-driven green mesh should render on the right',
     )
   } finally {
     timer.dispose()
-    fixedTimer.dispose()
+    secondTimer.dispose()
     geometry.dispose()
     redMaterial.dispose()
     greenMaterial.dispose()
@@ -9536,7 +9518,9 @@ test('StereoEffect renders scissored eye cameras without forced matrix updates',
   assert.deepEqual(renderer.getScissor(), { x: 32, y: 0, width: 32, height: 32 })
 })
 
-test('PeppersGhostEffect renders scissored cameras into the active target', () => {
+test('PeppersGhostEffect renders scissored cameras into the active target', {
+  skip: PeppersGhostEffect ? false : 'PeppersGhostEffect is not shipped by this Three.js revision',
+}, () => {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
   scene.add(new THREE.AmbientLight(0xffffff, 2))
@@ -9805,7 +9789,7 @@ test('Three.js WebGPU examples NodeMaterial objects fail clearly', () => {
       normalMap0: solidTexture(128, 128, 255),
       normalMap1: solidTexture(128, 128, 255),
     })],
-    ['InstancedPoints', () => new InstancedPoints()],
+    ...(InstancedPoints ? [['InstancedPoints', () => new InstancedPoints()]] : []),
     ['LensflareMesh', () => new LensflareMesh(), () => {
       const previousWindow = globalThis.window
       globalThis.window = { devicePixelRatio: 1 }

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generator": "@headless-three/renderer/test/browser-reference",
   "renderer": "THREE.WebGLRenderer",
-  "threeRevision": "172",
+  "threeRevision": "183",
   "toneMapping": 0,
   "toneMappingExposure": 1,
   "fixtures": [
