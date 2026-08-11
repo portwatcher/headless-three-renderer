@@ -113,6 +113,10 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run build:ts
 
+      - name: Enforce source LOC limit
+        working-directory: packages/renderer
+        run: pnpm run check:loc
+
       - name: Download native binary
         uses: actions/download-artifact@v4
         with:
@@ -126,6 +130,10 @@ jobs:
       - name: Smoke tests
         working-directory: packages/renderer
         run: pnpm run test:smoke
+
+      - name: GPU-native output tests
+        working-directory: packages/renderer
+        run: pnpm run test:gpu-output
 
       - name: glTF fixture tests
         # Windows hosted runners make the asset-heavy glTF suite too slow for

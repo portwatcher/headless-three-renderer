@@ -1,5 +1,10 @@
 use super::*;
 
+enum RenderedFrame {
+    Rgba(Vec<u8>),
+    Texture(wgpu::Texture),
+}
+
 impl GpuRenderer {
     pub fn render(&self, scene: &RenderScene, camera: &Camera) -> Result<Vec<u8>> {
         let settings = RenderSettings::from_scene(scene, camera, self.device.limits())?;
@@ -17,6 +22,40 @@ impl GpuRenderer {
         settings: &RenderSettings,
         meshes: &[PreparedMesh],
     ) -> Result<Vec<u8>> {
+        match self.render_frame(settings, meshes, false)? {
+            RenderedFrame::Rgba(rgba) => Ok(rgba),
+            RenderedFrame::Texture(_) => unreachable!("CPU render returned a GPU texture"),
+        }
+    }
+
+    pub fn render_gpu_frame(&self, scene: &RenderScene, camera: &Camera) -> Result<GpuFrame> {
+        let capabilities = self.gpu_output_capabilities();
+        if !capabilities.texture_supported {
+            bail!(
+                "native GPU texture output is unsupported: {}",
+                capabilities.texture_reason.unwrap_or("unknown reason")
+            );
+        }
+        let settings = RenderSettings::from_scene(scene, camera, self.device.limits())?;
+        let meshes = prepare_meshes(scene)?;
+        let texture = match self.render_frame(&settings, &meshes, true)? {
+            RenderedFrame::Texture(texture) => texture,
+            RenderedFrame::Rgba(_) => unreachable!("GPU render returned CPU pixels"),
+        };
+        Ok(GpuFrame::new(
+            texture,
+            self.backend,
+            settings.width,
+            settings.height,
+        ))
+    }
+
+    fn render_frame(
+        &self,
+        settings: &RenderSettings,
+        meshes: &[PreparedMesh],
+        native_output: bool,
+    ) -> Result<RenderedFrame> {
         let texture_size = wgpu::Extent3d {
             width: settings.width,
             height: settings.height,
@@ -107,8 +146,28 @@ impl GpuRenderer {
             );
         }
 
-        let (output_buffer, readback_buffer_guard) =
-            self.cached_readback_buffer(output_buffer_size);
+        let mut readback_buffer_guard = None;
+        let output_buffer = if native_output {
+            None
+        } else {
+            let (buffer, guard) = self.cached_readback_buffer(output_buffer_size);
+            readback_buffer_guard = Some(guard);
+            Some(buffer)
+        };
+        let native_texture = native_output.then(|| {
+            self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("headless-three-renderer leased output texture"),
+                size: texture_size,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: COLOR_FORMAT,
+                usage: wgpu::TextureUsages::COPY_DST
+                    | wgpu::TextureUsages::COPY_SRC
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+        });
 
         let mut encoder = self
             .device
@@ -372,20 +431,22 @@ impl GpuRenderer {
             pass.draw(0..3, 0..1);
             drop(pass);
 
-            copy_texture_to_output(
+            copy_texture_to_render_output(
                 &mut encoder,
                 &post_texture,
-                &output_buffer,
+                output_buffer.as_ref(),
+                native_texture.as_ref(),
                 padded_bytes_per_row,
                 settings.height,
                 texture_size,
             );
             post_uniform_buffer_guard = Some(guard);
         } else {
-            copy_texture_to_output(
+            copy_texture_to_render_output(
                 &mut encoder,
                 &color_texture,
-                &output_buffer,
+                output_buffer.as_ref(),
+                native_texture.as_ref(),
                 padded_bytes_per_row,
                 settings.height,
                 texture_size,
@@ -394,34 +455,39 @@ impl GpuRenderer {
 
         self.queue.submit([encoder.finish()]);
 
-        let buffer_slice = output_buffer.slice(..);
-        let (sender, receiver) = std::sync::mpsc::channel();
-        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
-            let _ = sender.send(result);
+        let mapped = output_buffer.as_ref().map(|output_buffer| {
+            let buffer_slice = output_buffer.slice(..);
+            let (sender, receiver) = std::sync::mpsc::channel();
+            buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+                let _ = sender.send(result);
+            });
+            (buffer_slice, receiver)
         });
         self.device
             .poll(wgpu::PollType::wait_indefinitely())
-            .context("failed while waiting for GPU readback")?;
+            .context("failed while waiting for GPU frame completion")?;
 
-        receiver
-            .recv()
-            .context("GPU readback callback was not delivered")?
-            .context("failed to map GPU readback buffer")?;
-
-        let padded_data = buffer_slice.get_mapped_range();
-        let mut rgba = vec![0; (settings.width * settings.height * 4) as usize];
-        let unpadded = unpadded_bytes_per_row as usize;
-        let padded = padded_bytes_per_row as usize;
-
-        for row in 0..settings.height as usize {
-            let src_start = row * padded;
-            let dst_start = row * unpadded;
-            rgba[dst_start..dst_start + unpadded]
-                .copy_from_slice(&padded_data[src_start..src_start + unpadded]);
-        }
-
-        drop(padded_data);
-        output_buffer.unmap();
+        let rgba = if let Some((buffer_slice, receiver)) = mapped {
+            receiver
+                .recv()
+                .context("GPU readback callback was not delivered")?
+                .context("failed to map GPU readback buffer")?;
+            let padded_data = buffer_slice.get_mapped_range();
+            let mut rgba = vec![0; (settings.width * settings.height * 4) as usize];
+            let unpadded = unpadded_bytes_per_row as usize;
+            let padded = padded_bytes_per_row as usize;
+            for row in 0..settings.height as usize {
+                let src_start = row * padded;
+                let dst_start = row * unpadded;
+                rgba[dst_start..dst_start + unpadded]
+                    .copy_from_slice(&padded_data[src_start..src_start + unpadded]);
+            }
+            drop(padded_data);
+            output_buffer.as_ref().unwrap().unmap();
+            Some(rgba)
+        } else {
+            None
+        };
         drop(post_uniform_buffer_guard);
         drop(post_texture_guard);
         drop(scene_color_texture_guard);
@@ -430,7 +496,13 @@ impl GpuRenderer {
         dynamic_uniform_guard.truncate(meshes.len());
         drop(dynamic_uniform_guard);
 
-        Ok(rgba)
+        if let Some(rgba) = rgba {
+            Ok(RenderedFrame::Rgba(rgba))
+        } else {
+            Ok(RenderedFrame::Texture(
+                native_texture.context("native output texture was not created")?,
+            ))
+        }
     }
 
     pub(super) fn cached_scratch_texture<'a>(

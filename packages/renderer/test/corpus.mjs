@@ -1,4 +1,4 @@
-import './corpus.part-001.mjs'
+export { CORPUS_RENDER_SIZE, createSceneCorpus } from './corpus.part-001.mjs'
 import './corpus.part-002.mjs'
 import './corpus.part-003.mjs'
 import './corpus.part-004.mjs'

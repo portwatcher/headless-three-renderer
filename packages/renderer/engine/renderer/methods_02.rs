@@ -29,6 +29,7 @@ impl GpuRenderer {
 };
 
         let required_limits = wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
+        let backend = adapter.get_info().backend;
         // Raise the bind group count: we use 8 (uniforms + 5 texture slots +
         // IBL + shadow map), which is the WebGPU spec default.
         let required_limits = wgpu::Limits {
@@ -119,6 +120,7 @@ impl GpuRenderer {
         Ok(Self {
             device,
             queue,
+            backend,
             shader,
             pipelines,
             pipelines_msaa4,

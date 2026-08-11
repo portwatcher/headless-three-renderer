@@ -456,6 +456,7 @@ name = "headless_three_renderer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ash",
  "bytemuck",
  "glam",
  "image",
@@ -464,6 +465,7 @@ dependencies = [
  "napi-derive",
  "pollster",
  "wgpu",
+ "windows-core",
 ]
 
 [[package]]

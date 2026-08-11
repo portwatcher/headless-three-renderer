@@ -68,6 +68,8 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 `Renderer.renderAsync(scene, camera, options)` is a Promise-returning compatibility wrapper around the same scene-output contract.
 
+`Renderer.renderGpuFrame(scene, camera, options)` returns a same-device GPU texture lease without RGBA readback when `Renderer.getGpuOutputCapabilities().texture.supported` is true. Native handles are borrowed `bigint` values and must be released deterministically. See the [GPU-native output contract](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/gpu-native-output.md).
+
 `Renderer.sortObjects`, `Renderer.opaque`, `Renderer.transparent`, `Renderer.setOpaqueSort(fn)`, `Renderer.setTransparentSort(fn)`, and the matching `render()` options (`sortObjects`, `opaque`, `transparent`, `opaqueSort`, `transparentSort`) control native draw-list sorting and bucket inclusion.
 
 It also exports Node loader helpers:
@@ -122,6 +124,7 @@ Install the main package, not the platform package directly.
 - [Compatibility matrix](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/compatibility.md)
 - [Node loader setup](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/node-loader-setup.md)
 - [Scale budgets](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/scale-budgets.md)
+- [GPU-native output](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/gpu-native-output.md)
 - [Release notes](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/release-notes.md)
 - [glTF example](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-gltf.mjs)
 - [VRM/VRMA example](https://github.com/portwatcher/headless-three-renderer/blob/main/examples/render-vrm.mjs)

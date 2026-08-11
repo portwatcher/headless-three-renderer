@@ -20,6 +20,15 @@ import './index.part-019'
 import './index.part-020'
 import './index.part-021'
 export { Renderer } from './index.part-008'
+export { GpuFrameLease } from './gpu-output'
+export type {
+  DmaBufFrameLease,
+  DmaBufOutputCapability,
+  DmaBufPlane,
+  GpuOutputCapabilities,
+  GpuTextureHandleType,
+  GpuTextureOutputCapability,
+} from './gpu-output'
 export { render } from './index.part-011'
 export { renderToTarget } from './index.part-011'
 export {

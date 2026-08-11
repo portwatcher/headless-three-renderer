@@ -42,6 +42,7 @@ const MAX_NATIVE_MESH_BUFFER_CACHE_ENTRIES: usize = 2048;
 pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
+    backend: wgpu::Backend,
     shader: wgpu::ShaderModule,
     /// Opaque pipelines keyed by `MeshSide` (Front, Back, Double).
     pipelines: [wgpu::RenderPipeline; 3],
@@ -754,7 +755,10 @@ mod methods_04;
 mod methods_05;
 mod methods_06;
 mod methods_07;
+mod native_output;
 mod uniforms;
+
+pub use native_output::{GpuFrame, GpuOutputCapabilities};
 
 use helpers_01::*;
 use helpers_02::*;

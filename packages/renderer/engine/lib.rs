@@ -1,6 +1,7 @@
 mod ibl;
 mod lights;
 mod mesh;
+mod native_output;
 mod renderer;
 mod settings;
 mod shader;
@@ -12,6 +13,7 @@ use std::sync::OnceLock;
 use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 
+use native_output::{NativeGpuFrameLease, NativeGpuOutputCapabilities};
 use renderer::GpuRenderer;
 use types::{Camera, RenderScene};
 use util::encode_png;
@@ -43,6 +45,23 @@ impl NativeRenderer {
         self.inner
             .render(&scene, &camera)
             .map(Buffer::from)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub fn get_gpu_output_capabilities(&self) -> NativeGpuOutputCapabilities {
+        self.inner.gpu_output_capabilities().into()
+    }
+
+    #[napi]
+    pub fn render_gpu_frame(
+        &self,
+        scene: RenderScene,
+        camera: Camera,
+    ) -> napi::Result<NativeGpuFrameLease> {
+        self.inner
+            .render_gpu_frame(&scene, &camera)
+            .map(NativeGpuFrameLease::new)
             .map_err(to_napi_error)
     }
 }

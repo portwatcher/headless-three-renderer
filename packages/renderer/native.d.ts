@@ -1,7 +1,25 @@
 /// <reference types="node" />
+export declare class NativeGpuFrameLease {
+  get width(): number
+  get height(): number
+  get format(): string
+  get backend(): string
+  get handleType(): string
+  get released(): boolean
+  get completed(): boolean
+  get scope(): string
+  get usage(): string
+  get layout(): string
+  nativeHandle(): bigint
+  exportDmaBuf(): void
+  release(): void
+}
+
 export declare class NativeRenderer {
   constructor()
   render(scene: RenderScene, camera: Camera): Buffer
+  getGpuOutputCapabilities(): NativeGpuOutputCapabilities
+  renderGpuFrame(scene: RenderScene, camera: Camera): NativeGpuFrameLease
 }
 
 export interface Camera {
@@ -38,6 +56,28 @@ export interface DecodedImage {
 export declare function decodeImage(data: Buffer): DecodedImage
 
 export declare function encodePng(data: Buffer, width: number, height: number): Buffer
+
+export interface NativeDmaBufCapability {
+  supported: boolean
+  reason?: string
+}
+
+export interface NativeGpuOutputCapabilities {
+  backend: string
+  texture: NativeGpuTextureCapability
+  dmaBuf: NativeDmaBufCapability
+}
+
+export interface NativeGpuTextureCapability {
+  supported: boolean
+  handleType?: string
+  synchronization: string
+  scope: string
+  format: string
+  usage: string
+  layout: string
+  reason?: string
+}
 
 export declare function renderNative(scene: RenderScene, camera: Camera): Buffer
 

@@ -47,6 +47,7 @@ import { assertNonCubeCameraRenderTargetTextures, compositeActiveTargetColorBuff
 import { clearRenderTargetColor, clearRenderTargetDepth, clearRenderTargetStencil } from './index.part-019'
 import { copyRenderTargetReadbackPixels, createRenderTargetReadbackBuffer, readbackRect, renderTargetReadbackSource } from './index.part-020'
 import { cloneTargetData, depthTextureData, isArrayCamera, isCubeCamera, validateThreeSceneRoot, validateTopLevelRenderCamera } from './index.part-021'
+import { GpuFrameLease, type GpuOutputCapabilities, wrapGpuOutputCapabilities } from './gpu-output'
 export function renderer_clear_43(this: any, color = true, depth = true, stencil = true): void {
     assertOptionalBoolean(color, 'Renderer.clear color')
     assertOptionalBoolean(depth, 'Renderer.clear depth')
@@ -444,6 +445,24 @@ export function renderer_renderNative_52(this: any, scene: ThreeSceneRootLike, c
     commitNativeMeshPayloadCache(this.sceneExtractionCache)
     return { buffer, nativeScene, nativeCamera, objectIdEntries }
   }
+
+export function renderer_getGpuOutputCapabilities_55(this: any): GpuOutputCapabilities {
+  return wrapGpuOutputCapabilities(this.native.getGpuOutputCapabilities())
+}
+
+export function renderer_renderGpuFrame_56(this: any, scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): GpuFrameLease {
+  validateThreeSceneRoot(scene)
+  validateTopLevelRenderCamera(camera)
+  assertRenderOptionsLike(options, 'options')
+  const renderOptions = this.resolveRenderOptions(options, undefined)
+  if (renderOptions.target) {
+    throw new Error('Renderer.renderGpuFrame does not support CPU-backed render targets')
+  }
+  const { nativeScene, nativeCamera } = toNativeInput(scene, camera, { ...renderOptions, format: 'rgba' }, this.sceneExtractionCache)
+  const lease = this.native.renderGpuFrame(nativeScene, nativeCamera)
+  commitNativeMeshPayloadCache(this.sceneExtractionCache)
+  return new GpuFrameLease(lease)
+}
 
 export function renderer_resolveRenderOptions_53(this: any, options: RenderOptions, fallbackTarget: RenderTargetLike | null | undefined = options.target): InternalRenderOptions {
     const sizeOptions = this.optionsWithRendererSizeFallback(options, fallbackTarget)

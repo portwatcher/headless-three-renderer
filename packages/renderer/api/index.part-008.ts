@@ -46,6 +46,8 @@ import { RendererCapabilitiesState, RendererExtensionsState, RendererPropertiesS
 import { RendererRenderListsState, RendererRenderStatesState } from './index.part-007'
 import { renderer__onDeviceLost_1, renderer_compile_7, renderer_computeAsync_13, renderer_compute_12, renderer_copyFramebufferToTexture_27, renderer_copyTextureToTexture3D_29, renderer_copyTextureToTexture_28, renderer_currentSamples_6, renderer_getArrayBufferAsync_14, renderer_getClearColor_37, renderer_getContext_31, renderer_getCurrentViewport_40, renderer_getDrawingBufferSize_36, renderer_getScissor_41, renderer_getSize_34, renderer_getViewport_39, renderer_highPrecision_5, renderer_inspector_2, renderer_isOccluded_3, renderer_onDeviceLost_0, renderer_renderBufferDirect_9, renderer_renderBufferImmediate_10, renderer_renderObject_11, renderer_resolveTimestampsAsync_15, renderer_setAnimationLoop_30, renderer_setCanvasTarget_19, renderer_setClearAlpha_38, renderer_setDrawingBufferSize_35, renderer_setMRT_17, renderer_setOutputRenderTarget_18, renderer_setRenderObjectFunction_8, renderer_setRenderTargetFramebuffer_26, renderer_setRenderTargetTextures_25, renderer_setRenderTarget_32, renderer_setScissorTest_42, renderer_setSize_33, renderer_setTexture2DArray_24, renderer_setTexture2D_20, renderer_setTexture3D_23, renderer_setTextureCubeDynamic_22, renderer_setTextureCube_21, renderer_sortObjects_4, renderer_waitForGPU_16 } from './index.part-009'
 import { renderer_clearTarget_44, renderer_clear_43, renderer_dispose_45, renderer_optionsWithRendererSizeFallback_54, renderer_readRenderTargetPixelsAsync_49, renderer_readRenderTargetPixels_48, renderer_renderCurrentCubeFace_51, renderer_renderCurrentRenderTarget_50, renderer_renderNative_52, renderer_renderToTarget_47, renderer_render_46, renderer_resolveRenderOptions_53 } from './index.part-010'
+import { renderer_getGpuOutputCapabilities_55, renderer_renderGpuFrame_56 } from './index.part-010'
+import type { GpuFrameLease, GpuOutputCapabilities } from './gpu-output'
 import { InternalRenderOptions, PixelRect, PixelSize, UnsignedByteType } from './index.part-012'
 import { assertDefaultViewportDepthRange, assertRendererParametersLike, rendererStateBoolean, rendererStateClearColor, rendererStateClearDepth, rendererStateClearStencil, rendererStatePixelRatio, rendererStatePixelRect, rendererStatePositiveFiniteNumber, rendererStateSize } from './index.part-014'
 import { assertEffectsArrayOrNull, finiteNonNegativeNumber, rendererContextAttributes, rendererStateToneMapping } from './index.part-015'
@@ -688,6 +690,12 @@ export class Renderer {
   }
 
   render(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Buffer { return renderer_render_46.call(this, scene, camera, options) }
+
+  getGpuOutputCapabilities(): GpuOutputCapabilities { return renderer_getGpuOutputCapabilities_55.call(this) }
+
+  renderGpuFrame(scene: ThreeSceneRootLike, camera: ThreeCameraLike, options: RenderOptions = {}): GpuFrameLease {
+    return renderer_renderGpuFrame_56.call(this, scene, camera, options)
+  }
 
   async renderAsync(scene: ThreeSceneRootLike, camera: ThreeRenderCameraLike, options: RenderOptions = {}): Promise<Buffer> {
     return this.render(scene, camera, options)

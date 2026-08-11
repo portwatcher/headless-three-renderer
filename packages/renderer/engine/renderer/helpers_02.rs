@@ -272,31 +272,51 @@ pub(super) fn transmission_scene_color_size(settings: &RenderSettings) -> wgpu::
     }
 }
 
-pub(super) fn copy_texture_to_output(
+pub(super) fn copy_texture_to_render_output(
     encoder: &mut wgpu::CommandEncoder,
     texture: &wgpu::Texture,
-    output_buffer: &wgpu::Buffer,
+    output_buffer: Option<&wgpu::Buffer>,
+    native_texture: Option<&wgpu::Texture>,
     padded_bytes_per_row: u32,
     height: u32,
     texture_size: wgpu::Extent3d,
 ) {
-    encoder.copy_texture_to_buffer(
-        wgpu::TexelCopyTextureInfo {
-            texture,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        wgpu::TexelCopyBufferInfo {
-            buffer: output_buffer,
-            layout: wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(padded_bytes_per_row),
-                rows_per_image: Some(height),
+    if let Some(output_buffer) = output_buffer {
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
-        },
-        texture_size,
-    );
+            wgpu::TexelCopyBufferInfo {
+                buffer: output_buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            texture_size,
+        );
+    }
+    if let Some(native_texture) = native_texture {
+        encoder.copy_texture_to_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture: native_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            texture_size,
+        );
+    }
 }
 
 pub(super) fn create_default_ibl_bind_group(
