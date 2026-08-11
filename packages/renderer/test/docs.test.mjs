@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { access, readFile } from 'node:fs/promises'
+import { access, readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -42,10 +42,14 @@ test('public documentation links point at committed files', async () => {
 })
 
 test('compatibility matrix links to synchronized Khronos glTF Sample Assets coverage', async () => {
+  const gltfTestParts = (await readdir(path.dirname(GLTF_TEST)))
+    .filter((name) => /^gltf\.test\.part-\d+\.mjs$/.test(name))
+    .sort()
   const [compatibility, sampleAssetsDoc, gltfTest] = await Promise.all([
     readFile(COMPATIBILITY_DOC, 'utf8'),
     readFile(GLTF_SAMPLE_ASSETS_DOC, 'utf8'),
-    readFile(GLTF_TEST, 'utf8'),
+    Promise.all(gltfTestParts.map((name) => readFile(path.join(path.dirname(GLTF_TEST), name), 'utf8')))
+      .then((parts) => parts.join('\n')),
   ])
 
   assert.match(

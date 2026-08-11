@@ -62,6 +62,7 @@
     ]
   },
   "scripts": {
+    "check:loc": "node scripts/check-source-loc.mjs",
     "artifacts": "napi artifacts",
     "build": "tsc && napi build --platform --js native.js --dts native.d.ts --release",
     "build:debug": "tsc && napi build --platform --js native.js --dts native.d.ts",
