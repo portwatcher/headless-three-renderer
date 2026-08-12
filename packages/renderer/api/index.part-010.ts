@@ -47,7 +47,7 @@ import { assertNonCubeCameraRenderTargetTextures, compositeActiveTargetColorBuff
 import { clearRenderTargetColor, clearRenderTargetDepth, clearRenderTargetStencil } from './index.part-019'
 import { copyRenderTargetReadbackPixels, createRenderTargetReadbackBuffer, readbackRect, renderTargetReadbackSource } from './index.part-020'
 import { cloneTargetData, depthTextureData, isArrayCamera, isCubeCamera, validateThreeSceneRoot, validateTopLevelRenderCamera } from './index.part-021'
-import { GpuFrameLease, type GpuOutputCapabilities, wrapGpuOutputCapabilities } from './gpu-output'
+import { GpuFrameLease, GpuFramePool, type GpuFramePoolOptions, type GpuOutputCapabilities, wrapGpuOutputCapabilities } from './gpu-output'
 export function renderer_clear_43(this: any, color = true, depth = true, stencil = true): void {
     assertOptionalBoolean(color, 'Renderer.clear color')
     assertOptionalBoolean(depth, 'Renderer.clear depth')
@@ -462,6 +462,36 @@ export function renderer_renderGpuFrame_56(this: any, scene: ThreeSceneRootLike,
   const lease = this.native.renderGpuFrame(nativeScene, nativeCamera)
   commitNativeMeshPayloadCache(this.sceneExtractionCache)
   return new GpuFrameLease(lease)
+}
+
+export function renderer_createGpuFramePool_57(this: any, options: GpuFramePoolOptions): GpuFramePool {
+  if (!options || typeof options !== 'object') throw new TypeError('GPU frame pool options must be an object')
+  const normalized: Required<GpuFramePoolOptions> = {
+    width: options.width,
+    height: options.height,
+    capacity: options.capacity ?? 3,
+    format: options.format ?? 'rgba8unorm',
+    overflow: options.overflow ?? 'error',
+  }
+  const nativePool = this.native.createGpuFramePool(normalized)
+  let pool: GpuFramePool
+  pool = new GpuFramePool(nativePool, async (scene, camera, renderOptions) => {
+    validateThreeSceneRoot(scene as ThreeSceneRootLike)
+    validateTopLevelRenderCamera(camera as ThreeCameraLike)
+    assertRenderOptionsLike(renderOptions, 'options')
+    const resolved = this.resolveRenderOptions({
+      ...(renderOptions as RenderOptions),
+      width: normalized.width,
+      height: normalized.height,
+      format: 'rgba',
+    }, undefined)
+    if (resolved.target) throw new Error('GpuFramePool.render does not support CPU-backed render targets')
+    const input = toNativeInput(scene as ThreeSceneRootLike, camera as ThreeCameraLike, resolved, this.sceneExtractionCache)
+    const result = pool.renderNative(input.nativeScene, input.nativeCamera)
+    commitNativeMeshPayloadCache(this.sceneExtractionCache)
+    return result
+  }, normalized)
+  return pool
 }
 
 export function renderer_resolveRenderOptions_53(this: any, options: RenderOptions, fallbackTarget: RenderTargetLike | null | undefined = options.target): InternalRenderOptions {

@@ -22,6 +22,7 @@ test('public documentation links point at committed files', async () => {
     path.join(REPO_ROOT, 'docs', 'gltf-sample-assets.md'),
     path.join(REPO_ROOT, 'docs', 'node-loader-setup.md'),
     path.join(REPO_ROOT, 'docs', 'release-checklist.md'),
+    path.join(REPO_ROOT, 'docs', 'gpu-native-output.md'),
     path.join(REPO_ROOT, 'packages', 'renderer', 'test', 'README.md'),
   ]
 

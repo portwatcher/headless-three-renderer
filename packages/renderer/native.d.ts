@@ -15,11 +15,40 @@ export declare class NativeGpuFrameLease {
   release(): void
 }
 
+export declare class NativeGpuFramePool {
+  reserve(): NativeGpuFrameReservation | null
+  renderAsync(reservation: NativeGpuFrameReservation, scene: RenderScene, camera: Camera): Promise<unknown>
+  stats(): NativeGpuFramePoolStats
+  close(): void
+}
+
+export declare class NativeGpuFrameReservation {
+
+}
+
+export declare class NativeGpuMediaFrameLease {
+  get width(): number
+  get height(): number
+  get format(): string
+  get backend(): string
+  get handleType(): string
+  get sequence(): number
+  get released(): boolean
+  get ready(): boolean
+  planeInfo(index: number): NativeGpuPlaneInfo
+  planeHandle(index: number): bigint
+  readPlanes(): Promise<unknown>
+  exportDmaBuf(): void
+  completeExternalUse(): void
+  release(): void
+}
+
 export declare class NativeRenderer {
   constructor()
   render(scene: RenderScene, camera: Camera): Buffer
   getGpuOutputCapabilities(): NativeGpuOutputCapabilities
   renderGpuFrame(scene: RenderScene, camera: Camera): NativeGpuFrameLease
+  createGpuFramePool(options: NativeGpuFramePoolOptions): NativeGpuFramePool
 }
 
 export interface Camera {
@@ -62,10 +91,71 @@ export interface NativeDmaBufCapability {
   reason?: string
 }
 
+export interface NativeEncoderSurfaceCapability {
+  supported: boolean
+  reason: string
+}
+
+export interface NativeGpuFramePoolOptions {
+  width: number
+  height: number
+  capacity?: number
+  format?: string
+  overflow?: string
+}
+
+export interface NativeGpuFramePoolStats {
+  capacity: number
+  available: number
+  inFlight: number
+  peakInFlight: number
+  submitted: number
+  completed: number
+  dropped: number
+  rejected: number
+  reused: number
+  allocations: number
+  retired: number
+  closed: boolean
+}
+
+export interface NativeGpuMediaFormatCapability {
+  format: string
+  supported: boolean
+  storage: string
+  planeFormats: Array<string>
+  reason?: string
+  colorMatrix?: string
+  colorRange?: string
+  chromaSiting?: string
+}
+
 export interface NativeGpuOutputCapabilities {
   backend: string
   texture: NativeGpuTextureCapability
   dmaBuf: NativeDmaBufCapability
+  encoderSurface: NativeEncoderSurfaceCapability
+  mediaFormats: Array<NativeGpuMediaFormatCapability>
+}
+
+export interface NativeGpuPlaneData {
+  index: number
+  format: string
+  width: number
+  height: number
+  bytesPerRow: number
+  data: Buffer
+}
+
+export interface NativeGpuPlaneInfo {
+  index: number
+  format: string
+  width: number
+  height: number
+  bytesPerRow: number
+  rowSemantics: string
+  expectedStateBeforeUse: string
+  requiredStateOnRelease: string
 }
 
 export interface NativeGpuTextureCapability {

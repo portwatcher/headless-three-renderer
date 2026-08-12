@@ -20,7 +20,7 @@ import './index.part-019'
 import './index.part-020'
 import './index.part-021'
 export { Renderer } from './index.part-008'
-export { GpuFrameLease } from './gpu-output'
+export { GpuFrameLease, GpuFramePool, GpuMediaFrameLease } from './gpu-output'
 export type {
   DmaBufFrameLease,
   DmaBufOutputCapability,
@@ -28,6 +28,13 @@ export type {
   GpuOutputCapabilities,
   GpuTextureHandleType,
   GpuTextureOutputCapability,
+  GpuFramePoolOptions,
+  GpuFramePoolOverflowPolicy,
+  GpuFramePoolStats,
+  GpuMediaFormatCapability,
+  GpuMediaOutputFormat,
+  GpuMediaPlaneData,
+  GpuMediaPlaneInfo,
 } from './gpu-output'
 export { render } from './index.part-011'
 export { renderToTarget } from './index.part-011'

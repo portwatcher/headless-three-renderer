@@ -70,6 +70,35 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 `Renderer.renderGpuFrame(scene, camera, options)` returns a same-device GPU texture lease without RGBA readback when `Renderer.getGpuOutputCapabilities().texture.supported` is true. Native handles are borrowed `bigint` values and must be released deterministically. See the [GPU-native output contract](https://github.com/portwatcher/headless-three-renderer/blob/main/docs/gpu-native-output.md).
 
+For real-time media, `Renderer.createGpuFramePool()` provides asynchronous,
+bounded, reusable `rgba8unorm`, `nv12-planes`, and capability-gated
+`p010-planes` output. The YUV forms are real GPU-converted separate plane
+textures, not directly importable encoder-native multi-planar surfaces. Consult
+capabilities and the linked contract before using borrowed plane handles.
+
+```js
+const pool = renderer.createGpuFramePool({
+  width: 1920,
+  height: 1080,
+  capacity: 3,
+  format: 'nv12-planes',
+  overflow: 'drop-newest',
+})
+const frame = await pool.render(scene, camera)
+if (frame) {
+  const yTexture = frame.planeHandle(0)
+  const uvTexture = frame.planeHandle(1)
+  await consumeOnRendererDevice({ yTexture, uvTexture, planes: frame.planes })
+  // The consumer must first restore every plane to requiredStateOnRelease.
+  frame.completeExternalUse()
+  frame.release()
+}
+```
+
+These two handles are separate textures, not an encoder-native NV12 surface.
+If a handle was requested, `release()` throws until external work is complete
+and `completeExternalUse()` has acknowledged the required state restoration.
+
 `Renderer.sortObjects`, `Renderer.opaque`, `Renderer.transparent`, `Renderer.setOpaqueSort(fn)`, `Renderer.setTransparentSort(fn)`, and the matching `render()` options (`sortObjects`, `opaque`, `transparent`, `opaqueSort`, `transparentSort`) control native draw-list sorting and bucket inclusion.
 
 It also exports Node loader helpers:

@@ -30,6 +30,21 @@ impl GpuRenderer {
 
         let required_limits = wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits());
         let backend = adapter.get_info().backend;
+        let adapter_specific_storage = adapter
+            .features()
+            .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
+        let media_nv12_planes_supported = adapter_specific_storage
+            && storage_format_supported(&adapter, wgpu::TextureFormat::R8Unorm)
+            && storage_format_supported(&adapter, wgpu::TextureFormat::Rg8Unorm);
+        let media_p010_planes_supported = adapter_specific_storage
+            && adapter
+                .features()
+                .contains(wgpu::Features::TEXTURE_FORMAT_16BIT_NORM)
+            && storage_format_supported(&adapter, wgpu::TextureFormat::R16Unorm)
+            && storage_format_supported(&adapter, wgpu::TextureFormat::Rg16Unorm);
+        let optional_media_features = adapter.features()
+            & (wgpu::Features::TEXTURE_FORMAT_16BIT_NORM
+                | wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
         // Raise the bind group count: we use 8 (uniforms + 5 texture slots +
         // IBL + shadow map), which is the WebGPU spec default.
         let required_limits = wgpu::Limits {
@@ -39,7 +54,7 @@ impl GpuRenderer {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("headless-three-renderer device"),
-                required_features: wgpu::Features::empty(),
+                required_features: optional_media_features,
                 required_limits,
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 memory_hints: wgpu::MemoryHints::Performance,
@@ -121,6 +136,8 @@ impl GpuRenderer {
             device,
             queue,
             backend,
+            media_nv12_planes_supported,
+            media_p010_planes_supported,
             shader,
             pipelines,
             pipelines_msaa4,
@@ -179,4 +196,11 @@ impl GpuRenderer {
             _default_shadow_texture: default_shadow_texture,
         })
     }
+}
+
+fn storage_format_supported(adapter: &wgpu::Adapter, format: wgpu::TextureFormat) -> bool {
+    adapter
+        .get_texture_format_features(format)
+        .allowed_usages
+        .contains(wgpu::TextureUsages::STORAGE_BINDING)
 }

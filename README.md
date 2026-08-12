@@ -138,11 +138,13 @@ Install the main package, not the platform package directly.
 - [Scale budgets](./docs/scale-budgets.md)
 - [Release notes](./docs/release-notes.md)
 - [Release checklist](./docs/release-checklist.md)
+- [GPU media output](./docs/gpu-native-output.md)
 
 ## Examples
 
 - [Render a local glTF/GLB asset](./examples/render-gltf.mjs)
 - [Render a VRM avatar, optionally with VRMA animation](./examples/render-vrm.mjs)
+- [Render through a bounded GPU media pool](./examples/render-gpu-media.mjs)
 
 ## Development
 

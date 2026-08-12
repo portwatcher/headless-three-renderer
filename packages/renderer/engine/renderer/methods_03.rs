@@ -22,7 +22,7 @@ impl GpuRenderer {
         settings: &RenderSettings,
         meshes: &[PreparedMesh],
     ) -> Result<Vec<u8>> {
-        match self.render_frame(settings, meshes, false)? {
+        match self.render_frame(settings, meshes, false, None)? {
             RenderedFrame::Rgba(rgba) => Ok(rgba),
             RenderedFrame::Texture(_) => unreachable!("CPU render returned a GPU texture"),
         }
@@ -38,7 +38,7 @@ impl GpuRenderer {
         }
         let settings = RenderSettings::from_scene(scene, camera, self.device.limits())?;
         let meshes = prepare_meshes(scene)?;
-        let texture = match self.render_frame(&settings, &meshes, true)? {
+        let texture = match self.render_frame(&settings, &meshes, true, None)? {
             RenderedFrame::Texture(texture) => texture,
             RenderedFrame::Rgba(_) => unreachable!("GPU render returned CPU pixels"),
         };
@@ -50,11 +50,26 @@ impl GpuRenderer {
         ))
     }
 
+    pub(super) fn render_gpu_frame_into(
+        &self,
+        scene: &RenderScene,
+        camera: &Camera,
+        target: &wgpu::Texture,
+    ) -> Result<()> {
+        let settings = RenderSettings::from_scene(scene, camera, self.device.limits())?;
+        let meshes = prepare_meshes(scene)?;
+        match self.render_frame(&settings, &meshes, true, Some(target))? {
+            RenderedFrame::Texture(_) => Ok(()),
+            RenderedFrame::Rgba(_) => unreachable!("GPU render returned CPU pixels"),
+        }
+    }
+
     fn render_frame(
         &self,
         settings: &RenderSettings,
         meshes: &[PreparedMesh],
         native_output: bool,
+        native_target: Option<&wgpu::Texture>,
     ) -> Result<RenderedFrame> {
         let texture_size = wgpu::Extent3d {
             width: settings.width,
@@ -155,17 +170,19 @@ impl GpuRenderer {
             Some(buffer)
         };
         let native_texture = native_output.then(|| {
-            self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("headless-three-renderer leased output texture"),
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: COLOR_FORMAT,
-                usage: wgpu::TextureUsages::COPY_DST
-                    | wgpu::TextureUsages::COPY_SRC
-                    | wgpu::TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
+            native_target.cloned().unwrap_or_else(|| {
+                self.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("headless-three-renderer leased output texture"),
+                    size: texture_size,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: COLOR_FORMAT,
+                    usage: wgpu::TextureUsages::COPY_DST
+                        | wgpu::TextureUsages::COPY_SRC
+                        | wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                })
             })
         });
 

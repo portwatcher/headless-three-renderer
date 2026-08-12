@@ -22,10 +22,30 @@ pub struct NativeDmaBufCapability {
 }
 
 #[napi(object)]
+pub struct NativeGpuMediaFormatCapability {
+    pub format: String,
+    pub supported: bool,
+    pub storage: String,
+    pub plane_formats: Vec<String>,
+    pub reason: Option<String>,
+    pub color_matrix: Option<String>,
+    pub color_range: Option<String>,
+    pub chroma_siting: Option<String>,
+}
+
+#[napi(object)]
+pub struct NativeEncoderSurfaceCapability {
+    pub supported: bool,
+    pub reason: String,
+}
+
+#[napi(object)]
 pub struct NativeGpuOutputCapabilities {
     pub backend: String,
     pub texture: NativeGpuTextureCapability,
     pub dma_buf: NativeDmaBufCapability,
+    pub encoder_surface: NativeEncoderSurfaceCapability,
+    pub media_formats: Vec<NativeGpuMediaFormatCapability>,
 }
 
 impl From<GpuOutputCapabilities> for NativeGpuOutputCapabilities {
@@ -46,7 +66,68 @@ impl From<GpuOutputCapabilities> for NativeGpuOutputCapabilities {
                 supported: value.dmabuf_supported,
                 reason: value.dmabuf_reason.map(str::to_owned),
             },
+            encoder_surface: NativeEncoderSurfaceCapability {
+                supported: false,
+                reason: encoder_surface_reason(value.backend).to_owned(),
+            },
+            media_formats: vec![
+                media_format("rgba8unorm", true, "single-texture", &["rgba8unorm"], None),
+                media_format(
+                    "nv12-planes",
+                    value.nv12_planes_supported,
+                    "separate-textures",
+                    &["r8unorm-y", "rg8unorm-uv"],
+                    (!value.nv12_planes_supported)
+                        .then_some("adapter lacks writable R8/RG8 storage texture support"),
+                ),
+                media_format(
+                    "p010-planes",
+                    value.p010_planes_supported,
+                    "separate-textures",
+                    &["r16unorm-y10-msb", "rg16unorm-uv10-msb"],
+                    (!value.p010_planes_supported)
+                        .then_some("adapter lacks wgpu TEXTURE_FORMAT_16BIT_NORM storage support"),
+                ),
+            ],
         }
+    }
+}
+
+fn media_format(
+    format: &str,
+    supported: bool,
+    storage: &str,
+    plane_formats: &[&str],
+    reason: Option<&str>,
+) -> NativeGpuMediaFormatCapability {
+    let yuv = format != "rgba8unorm";
+    NativeGpuMediaFormatCapability {
+        format: format.to_owned(),
+        supported,
+        storage: storage.to_owned(),
+        plane_formats: plane_formats
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect(),
+        reason: reason.map(str::to_owned),
+        color_matrix: yuv.then(|| "bt709".to_owned()),
+        color_range: yuv.then(|| "limited".to_owned()),
+        chroma_siting: yuv.then(|| "centered-2x2-box".to_owned()),
+    }
+}
+
+fn encoder_surface_reason(backend: &str) -> &'static str {
+    match backend {
+        "vulkan" => {
+            "wgpu 29 cannot safely create and track writable DRM-modifier multi-planar images with exportable memory and external synchronization"
+        }
+        "metal" => {
+            "wgpu-managed Metal textures are not IOSurface/CVPixelBuffer-backed encoder surfaces"
+        }
+        "dx12" => {
+            "wgpu-managed D3D12 textures are not allocated as shared encoder resources with shared fences"
+        }
+        _ => "the active backend has no encoder-native surface export implementation",
     }
 }
 

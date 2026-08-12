@@ -8,6 +8,8 @@ pub struct GpuOutputCapabilities {
     pub texture_reason: Option<&'static str>,
     pub dmabuf_supported: bool,
     pub dmabuf_reason: Option<&'static str>,
+    pub nv12_planes_supported: bool,
+    pub p010_planes_supported: bool,
 }
 
 pub struct GpuFrame {
@@ -35,6 +37,8 @@ impl GpuRenderer {
             texture_reason,
             dmabuf_supported: false,
             dmabuf_reason: Some(dmabuf_reason),
+            nv12_planes_supported: self.media_nv12_planes_supported,
+            p010_planes_supported: self.media_p010_planes_supported,
         }
     }
 }
@@ -74,7 +78,7 @@ impl GpuFrame {
     }
 }
 
-fn backend_name(backend: wgpu::Backend) -> &'static str {
+pub(super) fn backend_name(backend: wgpu::Backend) -> &'static str {
     match backend {
         wgpu::Backend::Vulkan => "vulkan",
         wgpu::Backend::Metal => "metal",
@@ -85,7 +89,7 @@ fn backend_name(backend: wgpu::Backend) -> &'static str {
     }
 }
 
-fn native_handle_type(backend: wgpu::Backend) -> Option<&'static str> {
+pub(super) fn native_handle_type(backend: wgpu::Backend) -> Option<&'static str> {
     match backend {
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         wgpu::Backend::Metal => Some("metal-texture"),
@@ -97,7 +101,7 @@ fn native_handle_type(backend: wgpu::Backend) -> Option<&'static str> {
     }
 }
 
-fn native_handle(texture: &wgpu::Texture, backend: wgpu::Backend) -> Option<u64> {
+pub(super) fn native_handle(texture: &wgpu::Texture, backend: wgpu::Backend) -> Option<u64> {
     match backend {
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         wgpu::Backend::Metal => {

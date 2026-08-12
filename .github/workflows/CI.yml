@@ -135,6 +135,10 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:gpu-output
 
+      - name: GPU media output tests
+        working-directory: packages/renderer
+        run: pnpm run test:gpu-media-output
+
       - name: glTF fixture tests
         # Windows hosted runners make the asset-heavy glTF suite too slow for
         # release CI; keep Windows coverage in smoke/golden/pack verification.

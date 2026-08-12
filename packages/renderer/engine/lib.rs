@@ -1,5 +1,6 @@
 mod ibl;
 mod lights;
+mod media_output;
 mod mesh;
 mod native_output;
 mod renderer;
@@ -8,13 +9,14 @@ mod shader;
 mod types;
 mod util;
 
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 
+use media_output::{NativeGpuFramePool, NativeGpuFramePoolOptions, parse_pool_options};
 use native_output::{NativeGpuFrameLease, NativeGpuOutputCapabilities};
-use renderer::GpuRenderer;
+use renderer::{GpuFramePool, GpuRenderer};
 use types::{Camera, RenderScene};
 use util::encode_png;
 
@@ -28,7 +30,7 @@ static SHARED_RENDERER: OnceLock<std::result::Result<GpuRenderer, String>> = Onc
 
 #[napi]
 pub struct NativeRenderer {
-    inner: GpuRenderer,
+    inner: Arc<GpuRenderer>,
 }
 
 #[napi]
@@ -36,7 +38,7 @@ impl NativeRenderer {
     #[napi(constructor)]
     pub fn new() -> napi::Result<Self> {
         Ok(Self {
-            inner: GpuRenderer::new().map_err(to_napi_error)?,
+            inner: Arc::new(GpuRenderer::new().map_err(to_napi_error)?),
         })
     }
 
@@ -62,6 +64,17 @@ impl NativeRenderer {
         self.inner
             .render_gpu_frame(&scene, &camera)
             .map(NativeGpuFrameLease::new)
+            .map_err(to_napi_error)
+    }
+
+    #[napi]
+    pub fn create_gpu_frame_pool(
+        &self,
+        options: NativeGpuFramePoolOptions,
+    ) -> napi::Result<NativeGpuFramePool> {
+        let options = parse_pool_options(options)?;
+        GpuFramePool::new(Arc::clone(&self.inner), options)
+            .map(NativeGpuFramePool::new)
             .map_err(to_napi_error)
     }
 }

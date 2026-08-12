@@ -1,5 +1,22 @@
 # Release Notes
 
+## 0.3.0
+
+- Added a genuinely asynchronous, fixed-capacity `GpuFramePool` with default
+  triple buffering, synchronous pre-libuv reservation, `error`/`drop-newest`
+  overflow behavior, reuse statistics, deterministic close, and no per-frame
+  output surface allocation after warm-up.
+- Added real GPU compute conversion to truthful `nv12-planes` and optional
+  `p010-planes` outputs. Both expose separate Y and interleaved UV textures,
+  BT.709 limited-range/centered-chroma metadata, and validated plane content;
+  P010 uses upper-10-bit word placement.
+- Added explicit per-plane native handle, dimensions, logical row semantics,
+  backend state restoration, external-use acknowledgement, and unsafe-slot
+  retirement contracts.
+- Kept DMA-BUF, IOSurface/CVPixelBuffer, shared D3D12, and encoder-native
+  multi-planar surface capabilities false with wgpu 29-specific blockers rather
+  than presenting separate textures as portable encoder surfaces.
+
 ## 0.2.0
 
 - Added capability-gated `Renderer.renderGpuFrame()` output for a leased,

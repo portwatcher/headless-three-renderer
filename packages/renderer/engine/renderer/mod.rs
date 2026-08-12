@@ -24,6 +24,19 @@ use crate::types::{Camera, RenderScene};
 use crate::util::{align_to, encode_png};
 use crate::{COLOR_FORMAT, DEPTH_FORMAT};
 
+mod media_conversion;
+mod media_pool;
+#[cfg(test)]
+mod media_pool_tests;
+mod media_readback;
+
+pub(super) use media_pool::MediaFrameResources;
+pub use media_pool::{
+    FrameReservation, GpuFramePool, GpuFramePoolOptions, GpuFramePoolStats, MediaFrame,
+    MediaOutputFormat, OverflowPolicy, PlaneReadback,
+};
+pub use media_readback::PlaneReadbackJob;
+
 const MAX_SAMPLER_CACHE_ENTRIES: usize = 64;
 const MAX_TEXTURE_CACHE_ENTRIES: usize = 512;
 const MAX_PHYSICAL_LAYERS_TEXTURE_CACHE_ENTRIES: usize = 256;
@@ -43,6 +56,8 @@ pub struct GpuRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     backend: wgpu::Backend,
+    media_nv12_planes_supported: bool,
+    media_p010_planes_supported: bool,
     shader: wgpu::ShaderModule,
     /// Opaque pipelines keyed by `MeshSide` (Front, Back, Double).
     pipelines: [wgpu::RenderPipeline; 3],
