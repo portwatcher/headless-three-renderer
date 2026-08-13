@@ -11,10 +11,11 @@
 - Added capability-gated `i420-planes` and `GpuFramePool.renderI420()`: GPU
   BT.601 limited-range conversion, tight Y/U/V packing, only 1.5 B/pixel CPU
   readback, preallocated per-slot GPU/readback resources, and reusable exact
-  caller buffers. Added a real optional `@roamhq/wrtc` source/sink test across
-  every packaged platform. That consumer gate runs on the production Node 20
-  runtime supported by `@roamhq/wrtc`; the rest of renderer CI remains on Node
-  24.
+  caller buffers. Added a real optional `@roamhq/wrtc` source/sink test on
+  Linux and macOS, running on the production Node 20 runtime. Windows keeps the
+  renderer I420 coverage but skips that consumer round trip because
+  `@roamhq/wrtc` 0.10.0 returns corrupt sink dimensions on both Node 20 and 24
+  there; the rest of renderer CI remains on Node 24.
 - On Apple M4/Metal/Node 24 with `UV_THREADPOOL_SIZE=1`, the released 0.3.0
   1080p NV12 pool averaged 3.169 ms; 0.4.0 averaged 1.598 ms after removing the
   second completion bubble. An unrelated PBKDF2 probe changed from 0.535 ms
