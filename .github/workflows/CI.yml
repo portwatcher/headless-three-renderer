@@ -140,11 +140,8 @@ jobs:
         run: pnpm run test:gpu-media-output
 
       # @roamhq/wrtc 0.10.0 publishes and validates Node 20/22 binaries. Keep
-      # this consumer contract on the production model-streamer runtime. Its
-      # Windows RTCVideoSink binding corrupts dimensions on both Node 20 and 24,
-      # so Windows retains renderer I420 coverage but skips that upstream sink.
+      # this consumer contract on the production model-streamer runtime.
       - name: Use production Node runtime for wrtc consumer
-        if: matrix.settings.target != 'x86_64-pc-windows-msvc'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -154,7 +151,6 @@ jobs:
         run: pnpm run test:wrtc
 
       - name: Restore renderer CI Node runtime
-        if: matrix.settings.target != 'x86_64-pc-windows-msvc'
         uses: actions/setup-node@v4
         with:
           node-version: 24
