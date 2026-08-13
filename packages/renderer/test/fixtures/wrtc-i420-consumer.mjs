@@ -18,7 +18,15 @@ assert.ok(output)
 assert.strictEqual(output.data, target)
 assert.equal(output.data.byteOffset, 0)
 assert.equal(output.data.buffer.byteLength, output.data.byteLength)
-const expected = Buffer.from(output.data)
+// Cross the native-addon boundary through wrtc's documented plain frame
+// shape. Perohub also constructs this object instead of passing renderer-only
+// metadata into a second addon.
+const consumerFrame = {
+  width: output.width,
+  height: output.height,
+  data: output.data,
+}
+const expected = Buffer.from(consumerFrame.data)
 
 const source = new wrtc.nonstandard.RTCVideoSource()
 const track = source.createTrack()
@@ -30,8 +38,8 @@ const received = new Promise((resolve, reject) => {
     resolve(frame)
   }
 })
-source.onFrame(output)
-output.data.fill(0)
+source.onFrame(consumerFrame)
+consumerFrame.data.fill(0)
 const frame = await received
 assert.equal(frame.width, width)
 assert.equal(frame.height, height)
