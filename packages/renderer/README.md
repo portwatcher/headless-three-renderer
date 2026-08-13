@@ -72,9 +72,11 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 For real-time media, `Renderer.createGpuFramePool()` provides asynchronous,
 bounded, reusable `rgba8unorm`, `nv12-planes`, and capability-gated
-`p010-planes` output. The YUV forms are real GPU-converted separate plane
-textures, not directly importable encoder-native multi-planar surfaces. Consult
-capabilities and the linked contract before using borrowed plane handles.
+`p010-planes` output. Accepted work and blocking GPU completion run on a
+renderer-owned thread rather than libuv's shared pool. The YUV forms are real
+GPU-converted separate plane textures, not directly importable encoder-native
+multi-planar surfaces. Consult capabilities and the linked contract before
+using borrowed plane handles.
 
 ```js
 const pool = renderer.createGpuFramePool({
@@ -98,6 +100,28 @@ if (frame) {
 These two handles are separate textures, not an encoder-native NV12 surface.
 If a handle was requested, `release()` throws until external work is complete
 and `completeExternalUse()` has acknowledged the required state restoration.
+
+For CPU-only WebRTC sources, `i420-planes` plus `renderI420()` converts and
+packs BT.601 limited-range I420 on the GPU and reads back only 1.5 bytes/pixel:
+
+```js
+const target = Buffer.allocUnsafeSlow(width * height * 1.5)
+const pool = renderer.createGpuFramePool({
+  width,
+  height,
+  capacity: 3,
+  format: 'i420-planes',
+  overflow: 'drop-newest',
+})
+const frame = await pool.renderI420(scene, camera, {}, target)
+if (frame) rtcVideoSource.onFrame(frame)
+```
+
+The optional target is reused without renderer allocation and must have byte
+offset zero, an exact backing store, and the exact packed I420 length. This is
+a production CPU fallback for APIs such as `@roamhq/wrtc`; that consumer still
+copies into its internal WebRTC frame. Encoder-native DMA-BUF remains
+capability-gated unsupported.
 
 `Renderer.sortObjects`, `Renderer.opaque`, `Renderer.transparent`, `Renderer.setOpaqueSort(fn)`, `Renderer.setTransparentSort(fn)`, and the matching `render()` options (`sortObjects`, `opaque`, `transparent`, `opaqueSort`, `transparentSort`) control native draw-list sorting and bucket inclusion.
 

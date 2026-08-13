@@ -1,72 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
 use anyhow::{Result, anyhow, bail};
 
 use super::media_conversion::MediaConverter;
+pub use super::media_format::{GpuFramePoolOptions, MediaOutputFormat, OverflowPolicy};
+use super::media_resources::{
+    I420Layout, MediaFrameResources, create_resources, i420_layout, validate_options,
+};
 use super::native_output::{backend_name, native_handle, native_handle_type};
-use super::{Camera, GpuRenderer, RenderScene};
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MediaOutputFormat {
-    Rgba8,
-    Nv12,
-    P010,
-}
-
-impl MediaOutputFormat {
-    pub fn parse(value: &str) -> Result<Self> {
-        match value {
-            "rgba8" | "rgba8unorm" => Ok(Self::Rgba8),
-            "nv12-planes" => Ok(Self::Nv12),
-            "p010-planes" => Ok(Self::P010),
-            _ => bail!("unsupported GPU media output format '{value}'"),
-        }
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Rgba8 => "rgba8unorm",
-            Self::Nv12 => "nv12-planes",
-            Self::P010 => "p010-planes",
-        }
-    }
-
-    fn plane_formats(self) -> &'static [wgpu::TextureFormat] {
-        match self {
-            Self::Rgba8 => &[wgpu::TextureFormat::Rgba8Unorm],
-            Self::Nv12 => &[wgpu::TextureFormat::R8Unorm, wgpu::TextureFormat::Rg8Unorm],
-            Self::P010 => &[
-                wgpu::TextureFormat::R16Unorm,
-                wgpu::TextureFormat::Rg16Unorm,
-            ],
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum OverflowPolicy {
-    Error,
-    DropNewest,
-}
-
-impl OverflowPolicy {
-    pub fn parse(value: &str) -> Result<Self> {
-        match value {
-            "error" => Ok(Self::Error),
-            "drop-newest" => Ok(Self::DropNewest),
-            _ => bail!("overflow must be 'error' or 'drop-newest'"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct GpuFramePoolOptions {
-    pub width: u32,
-    pub height: u32,
-    pub capacity: u32,
-    pub format: MediaOutputFormat,
-    pub overflow: OverflowPolicy,
-}
+use super::{Camera, GpuRenderer, MediaWorker, RenderScene};
 
 #[derive(Clone, Debug, Default)]
 pub struct GpuFramePoolStats {
@@ -84,17 +26,8 @@ pub struct GpuFramePoolStats {
     pub closed: bool,
 }
 
-#[derive(Clone)]
-pub(crate) struct MediaFrameResources {
-    pub(super) rgba: wgpu::Texture,
-    pub(super) y: Option<wgpu::Texture>,
-    pub(super) uv: Option<wgpu::Texture>,
-    pub(super) width: u32,
-    pub(super) height: u32,
-}
-
 struct PoolSlot {
-    resources: MediaFrameResources,
+    pub(super) resources: MediaFrameResources,
     leased: bool,
     uses: u64,
     retired: bool,
@@ -108,6 +41,7 @@ struct PoolInner {
 struct PoolState {
     options: GpuFramePoolOptions,
     inner: Mutex<PoolInner>,
+    worker: Arc<MediaWorker>,
 }
 
 pub struct GpuFramePool {
@@ -120,7 +54,7 @@ pub struct MediaFrame {
     pub(super) renderer: Arc<GpuRenderer>,
     state: Arc<PoolState>,
     slot: Option<usize>,
-    resources: MediaFrameResources,
+    pub(super) resources: MediaFrameResources,
     backend: wgpu::Backend,
     format: MediaOutputFormat,
     sequence: u64,
@@ -162,11 +96,13 @@ impl GpuFramePool {
             allocations: options.capacity as u64,
             ..Default::default()
         };
+        let worker = Arc::clone(&renderer.media_worker);
         Ok(Arc::new(Self {
             renderer,
             state: Arc::new(PoolState {
                 options,
                 inner: Mutex::new(PoolInner { slots, stats }),
+                worker,
             }),
             converter,
         }))
@@ -193,13 +129,19 @@ impl GpuFramePool {
         let mut camera = camera.clone();
         camera.width = Some(self.state.options.width);
         camera.height = Some(self.state.options.height);
-        let result = self
-            .renderer
-            .render_gpu_frame_into(scene, &camera, &resources.rgba)
-            .and_then(|()| {
+        let result = (|| {
+            let mut encode_conversion = |encoder: &mut wgpu::CommandEncoder| {
                 self.converter
-                    .convert(&self.renderer.device, &self.renderer.queue, &resources)
-            });
+                    .encode(&self.renderer.device, encoder, &resources, false)
+            };
+            let submission = self.renderer.render_gpu_frame_into(
+                scene,
+                &camera,
+                &resources.rgba,
+                &mut encode_conversion,
+            )?;
+            self.wait_for_media_completion(submission)
+        })();
         if let Err(error) = result {
             self.state.release(slot_index, false);
             return Err(error);
@@ -271,6 +213,100 @@ impl GpuFramePool {
 
     pub fn options(&self) -> GpuFramePoolOptions {
         self.state.options
+    }
+
+    pub(crate) fn worker(&self) -> &MediaWorker {
+        &self.state.worker
+    }
+
+    pub fn i420_layout(&self) -> Result<I420Layout> {
+        if self.state.options.format != MediaOutputFormat::I420 {
+            bail!("packed I420 output requires an i420-planes pool")
+        }
+        Ok(i420_layout(
+            self.state.options.width,
+            self.state.options.height,
+        ))
+    }
+
+    pub fn render_i420_reserved(
+        &self,
+        mut reservation: FrameReservation,
+        scene: &RenderScene,
+        camera: &Camera,
+        output: &mut [u8],
+    ) -> Result<I420Layout> {
+        if self.state.options.format != MediaOutputFormat::I420 {
+            bail!("packed I420 output requires an i420-planes pool")
+        }
+        if !Arc::ptr_eq(&reservation.state, &self.state) {
+            bail!("GPU frame reservation belongs to another pool")
+        }
+        let layout = self.i420_layout()?;
+        if output.len() != layout.byte_length {
+            bail!(
+                "packed I420 target must contain exactly {} bytes, received {}",
+                layout.byte_length,
+                output.len()
+            )
+        }
+        let slot_index = reservation.slot.take().expect("live frame reservation");
+        let resources = reservation.resources.clone();
+        let mut camera = camera.clone();
+        camera.width = Some(self.state.options.width);
+        camera.height = Some(self.state.options.height);
+
+        let result = (|| {
+            let mut encode_conversion = |encoder: &mut wgpu::CommandEncoder| {
+                self.converter
+                    .encode(&self.renderer.device, encoder, &resources, true)
+            };
+            let submission = self.renderer.render_gpu_frame_into(
+                scene,
+                &camera,
+                &resources.rgba,
+                &mut encode_conversion,
+            )?;
+            let readback = resources
+                .i420_readback
+                .as_ref()
+                .expect("I420 readback buffer");
+            let (sender, receiver) = mpsc::channel();
+            readback
+                .slice(..)
+                .map_async(wgpu::MapMode::Read, move |result| {
+                    let _ = sender.send(result);
+                });
+            self.wait_for_media_completion(submission)?;
+            receiver
+                .recv()
+                .map_err(|_| anyhow!("packed I420 readback callback was not delivered"))?
+                .map_err(|error| anyhow!("failed to map packed I420 readback: {error}"))?;
+            let mapped = readback.slice(..).get_mapped_range();
+            output.copy_from_slice(&mapped[..layout.byte_length]);
+            drop(mapped);
+            readback.unmap();
+            Ok(())
+        })();
+
+        if let Err(error) = result {
+            self.state.release(slot_index, false);
+            return Err(error);
+        }
+        self.state.completed();
+        self.state.release(slot_index, true);
+        Ok(layout)
+    }
+
+    fn wait_for_media_completion(&self, submission: wgpu::SubmissionIndex) -> Result<()> {
+        self.renderer
+            .device
+            .poll(wgpu::PollType::Wait {
+                submission_index: Some(submission),
+                timeout: None,
+            })
+            .map(|_| ())
+            .map_err(|error| anyhow!("failed while waiting for GPU media completion: {error}"))
     }
 }
 
@@ -357,6 +393,9 @@ impl MediaFrame {
             (MediaOutputFormat::Nv12, 1) => Ok("rg8unorm-uv"),
             (MediaOutputFormat::P010, 0) => Ok("r16unorm-y10-msb"),
             (MediaOutputFormat::P010, 1) => Ok("rg16unorm-uv10-msb"),
+            (MediaOutputFormat::I420, 0) => Ok("r8unorm-y"),
+            (MediaOutputFormat::I420, 1) => Ok("r8unorm-u"),
+            (MediaOutputFormat::I420, 2) => Ok("r8unorm-v"),
             _ => bail!("media plane index {index} is out of range"),
         }
     }
@@ -380,6 +419,7 @@ impl MediaFrame {
             (MediaOutputFormat::Nv12, 1) => 2,
             (MediaOutputFormat::P010, 0) => 2,
             (MediaOutputFormat::P010, 1) => 4,
+            (MediaOutputFormat::I420, _) => 1,
             _ => unreachable!(),
         };
         Ok(width * bytes)
@@ -402,6 +442,21 @@ impl MediaFrame {
         self.ensure_live()?;
         match (self.format, index) {
             (MediaOutputFormat::Rgba8, 0) => Ok(&self.resources.rgba),
+            (MediaOutputFormat::I420, 0) => self
+                .resources
+                .y
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing Y plane")),
+            (MediaOutputFormat::I420, 1) => self
+                .resources
+                .u
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing U plane")),
+            (MediaOutputFormat::I420, 2) => self
+                .resources
+                .v
+                .as_ref()
+                .ok_or_else(|| anyhow!("missing V plane")),
             (_, 0) => self
                 .resources
                 .y
@@ -448,6 +503,10 @@ impl MediaFrame {
         Ok(())
     }
 
+    pub(crate) fn worker(&self) -> &MediaWorker {
+        &self.state.worker
+    }
+
     pub fn release(&mut self) -> Result<()> {
         if self.external_use_pending {
             bail!(
@@ -478,115 +537,4 @@ impl Drop for MediaFrame {
             }
         }
     }
-}
-
-fn validate_options(renderer: &GpuRenderer, options: GpuFramePoolOptions) -> Result<()> {
-    if options.width == 0 || options.height == 0 {
-        bail!("pool width and height must be positive")
-    }
-    if options.width > 8192 || options.height > 8192 {
-        bail!("pool dimensions must not exceed 8192")
-    }
-    if options.capacity == 0 || options.capacity > 64 {
-        bail!("pool capacity must be between 1 and 64")
-    }
-    if options.format != MediaOutputFormat::Rgba8
-        && (!options.width.is_multiple_of(2) || !options.height.is_multiple_of(2))
-    {
-        bail!("{} requires even width and height", options.format.name())
-    }
-    if options.format == MediaOutputFormat::Nv12 && !renderer.media_nv12_planes_supported {
-        bail!("nv12-planes is unsupported: adapter lacks writable R8/RG8 storage textures")
-    }
-    if options.format == MediaOutputFormat::P010 && !renderer.media_p010_planes_supported {
-        bail!("p010-planes is unsupported: adapter lacks 16-bit normalized storage textures")
-    }
-    Ok(())
-}
-
-fn create_resources(device: &wgpu::Device, options: GpuFramePoolOptions) -> MediaFrameResources {
-    let rgba = create_texture(
-        device,
-        options.width,
-        options.height,
-        wgpu::TextureFormat::Rgba8Unorm,
-        "RGBA output",
-        false,
-    );
-    let (y, uv) = match options.format {
-        MediaOutputFormat::Rgba8 => (None, None),
-        MediaOutputFormat::Nv12 => (
-            Some(create_texture(
-                device,
-                options.width,
-                options.height,
-                wgpu::TextureFormat::R8Unorm,
-                "NV12 Y plane",
-                true,
-            )),
-            Some(create_texture(
-                device,
-                options.width / 2,
-                options.height / 2,
-                wgpu::TextureFormat::Rg8Unorm,
-                "NV12 UV plane",
-                true,
-            )),
-        ),
-        MediaOutputFormat::P010 => (
-            Some(create_texture(
-                device,
-                options.width,
-                options.height,
-                wgpu::TextureFormat::R16Unorm,
-                "P010 Y plane",
-                true,
-            )),
-            Some(create_texture(
-                device,
-                options.width / 2,
-                options.height / 2,
-                wgpu::TextureFormat::Rg16Unorm,
-                "P010 UV plane",
-                true,
-            )),
-        ),
-    };
-    MediaFrameResources {
-        rgba,
-        y,
-        uv,
-        width: options.width,
-        height: options.height,
-    }
-}
-
-fn create_texture(
-    device: &wgpu::Device,
-    width: u32,
-    height: u32,
-    format: wgpu::TextureFormat,
-    label: &'static str,
-    storage: bool,
-) -> wgpu::Texture {
-    let mut usage = wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::TEXTURE_BINDING;
-    if storage {
-        usage |= wgpu::TextureUsages::STORAGE_BINDING;
-    } else {
-        usage |= wgpu::TextureUsages::COPY_DST;
-    }
-    device.create_texture(&wgpu::TextureDescriptor {
-        label: Some(label),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format,
-        usage,
-        view_formats: &[],
-    })
 }

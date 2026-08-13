@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use napi::bindgen_prelude::{AsyncTask, BigInt, Buffer};
-use napi::{Env, Task};
+use napi::Env;
+use napi::bindgen_prelude::{BigInt, Buffer, JsValue, Object};
 use napi_derive::napi;
 
 use crate::renderer::{
     FrameReservation, GpuFramePool, GpuFramePoolOptions, GpuFramePoolStats, MediaFrame,
-    MediaOutputFormat, OverflowPolicy, PlaneReadback, PlaneReadbackJob,
+    MediaOutputFormat, OverflowPolicy, PlaneReadback,
 };
 use crate::types::{Camera, RenderScene};
 
@@ -75,6 +75,21 @@ pub struct NativeGpuPlaneData {
     pub height: u32,
     pub bytes_per_row: u32,
     pub data: Buffer,
+}
+
+#[napi(object)]
+pub struct NativeCpuI420Frame {
+    pub width: u32,
+    pub height: u32,
+    pub data: Buffer,
+    pub format: String,
+    pub color_matrix: String,
+    pub color_range: String,
+    pub chroma_siting: String,
+    pub strides: Vec<u32>,
+    pub offsets: Vec<u32>,
+    pub byte_length: u32,
+    pub gpu_readback_bytes: u32,
 }
 
 #[napi]
@@ -184,13 +199,24 @@ impl NativeGpuMediaFrameLease {
         })
     }
 
-    #[napi]
-    pub fn read_planes(&mut self) -> napi::Result<AsyncTask<ReadbackTask>> {
+    #[napi(ts_return_type = "Promise<NativeGpuPlaneData[]>")]
+    pub fn read_planes(&mut self, env: Env) -> napi::Result<Object<'static>> {
         let frame = self.frame.as_mut().ok_or_else(|| {
             napi::Error::from_reason("GPU media frame lease has been released".to_owned())
         })?;
         let job = frame.begin_plane_readback().map_err(to_napi_error)?;
-        Ok(AsyncTask::new(ReadbackTask { job: Some(job) }))
+        let (deferred, promise) = env.create_deferred()?;
+        frame
+            .worker()
+            .schedule(move || {
+                let result = job
+                    .complete()
+                    .map(convert_plane_readbacks)
+                    .map_err(to_napi_error);
+                deferred.resolve(move |_env| result);
+            })
+            .map_err(to_napi_error)?;
+        Ok(Object::from_raw(env.raw(), promise.raw()))
     }
 
     #[napi]
@@ -227,6 +253,14 @@ pub struct NativeGpuFrameReservation {
 }
 
 #[napi]
+impl NativeGpuFrameReservation {
+    #[napi]
+    pub fn cancel(&mut self) {
+        self.reservation.take();
+    }
+}
+
+#[napi]
 pub struct NativeGpuFramePool {
     pool: Arc<GpuFramePool>,
 }
@@ -251,22 +285,80 @@ impl NativeGpuFramePool {
             .map_err(to_napi_error)
     }
 
-    #[napi]
+    #[napi(ts_return_type = "Promise<NativeGpuMediaFrameLease>")]
     pub fn render_async(
         &self,
+        env: Env,
         reservation: &mut NativeGpuFrameReservation,
         scene: RenderScene,
         camera: Camera,
-    ) -> napi::Result<AsyncTask<RenderMediaTask>> {
+    ) -> napi::Result<Object<'static>> {
         let reservation = reservation.reservation.take().ok_or_else(|| {
             napi::Error::from_reason("GPU frame reservation has already been consumed".to_owned())
         })?;
-        Ok(AsyncTask::new(RenderMediaTask {
-            pool: Arc::clone(&self.pool),
-            reservation: Some(reservation),
-            scene: Some(scene),
-            camera: Some(camera),
-        }))
+        let (deferred, promise) = env.create_deferred()?;
+        let pool = Arc::clone(&self.pool);
+        self.pool
+            .worker()
+            .schedule(move || {
+                let result = pool
+                    .render_reserved(reservation, &scene, &camera)
+                    .map_err(to_napi_error)
+                    .and_then(NativeGpuMediaFrameLease::new);
+                deferred.resolve(move |_env| result);
+            })
+            .map_err(to_napi_error)?;
+        Ok(Object::from_raw(env.raw(), promise.raw()))
+    }
+
+    #[napi(ts_return_type = "Promise<NativeCpuI420Frame>")]
+    pub fn render_i420_async(
+        &self,
+        env: Env,
+        reservation: &mut NativeGpuFrameReservation,
+        scene: RenderScene,
+        camera: Camera,
+        target: Option<Buffer>,
+    ) -> napi::Result<Object<'static>> {
+        let reservation = reservation.reservation.take().ok_or_else(|| {
+            napi::Error::from_reason("GPU frame reservation has already been consumed".to_owned())
+        })?;
+        let layout = self.pool.i420_layout().map_err(to_napi_error)?;
+        let mut data = target.unwrap_or_else(|| Buffer::from(vec![0; layout.byte_length]));
+        if data.len() != layout.byte_length {
+            return Err(napi::Error::from_reason(format!(
+                "packed I420 target must contain exactly {} bytes, received {}",
+                layout.byte_length,
+                data.len()
+            )));
+        }
+        let width = self.pool.options().width;
+        let height = self.pool.options().height;
+        let (deferred, promise) = env.create_deferred()?;
+        let pool = Arc::clone(&self.pool);
+        self.pool
+            .worker()
+            .schedule(move || {
+                let result = pool
+                    .render_i420_reserved(reservation, &scene, &camera, &mut data)
+                    .map(|layout| NativeCpuI420Frame {
+                        width,
+                        height,
+                        data,
+                        format: "I420".to_owned(),
+                        color_matrix: "bt601".to_owned(),
+                        color_range: "limited".to_owned(),
+                        chroma_siting: "centered-2x2-box".to_owned(),
+                        strides: layout.strides.to_vec(),
+                        offsets: layout.offsets.to_vec(),
+                        byte_length: layout.byte_length as u32,
+                        gpu_readback_bytes: layout.gpu_readback_bytes as u32,
+                    })
+                    .map_err(to_napi_error);
+                deferred.resolve(move |_env| result);
+            })
+            .map_err(to_napi_error)?;
+        Ok(Object::from_raw(env.raw(), promise.raw()))
     }
 
     #[napi]
@@ -280,62 +372,19 @@ impl NativeGpuFramePool {
     }
 }
 
-pub struct RenderMediaTask {
-    pool: Arc<GpuFramePool>,
-    reservation: Option<FrameReservation>,
-    scene: Option<RenderScene>,
-    camera: Option<Camera>,
-}
-
-impl Task for RenderMediaTask {
-    type Output = MediaFrame;
-    type JsValue = NativeGpuMediaFrameLease;
-
-    fn compute(&mut self) -> napi::Result<Self::Output> {
-        self.pool
-            .render_reserved(
-                self.reservation.take().expect("frame reservation"),
-                self.scene.as_ref().expect("render scene"),
-                self.camera.as_ref().expect("render camera"),
-            )
-            .map_err(to_napi_error)
-    }
-
-    fn resolve(&mut self, _env: Env, output: Self::Output) -> napi::Result<Self::JsValue> {
-        NativeGpuMediaFrameLease::new(output)
-    }
-}
-
-pub struct ReadbackTask {
-    job: Option<PlaneReadbackJob>,
-}
-
-impl Task for ReadbackTask {
-    type Output = Vec<PlaneReadback>;
-    type JsValue = Vec<NativeGpuPlaneData>;
-
-    fn compute(&mut self) -> napi::Result<Self::Output> {
-        self.job
-            .take()
-            .expect("readback job")
-            .complete()
-            .map_err(to_napi_error)
-    }
-
-    fn resolve(&mut self, _env: Env, output: Self::Output) -> napi::Result<Self::JsValue> {
-        Ok(output
-            .into_iter()
-            .enumerate()
-            .map(|(index, plane)| NativeGpuPlaneData {
-                index: index as u32,
-                format: plane.format.to_owned(),
-                width: plane.width,
-                height: plane.height,
-                bytes_per_row: plane.bytes_per_row,
-                data: Buffer::from(plane.data),
-            })
-            .collect())
-    }
+fn convert_plane_readbacks(output: Vec<PlaneReadback>) -> Vec<NativeGpuPlaneData> {
+    output
+        .into_iter()
+        .enumerate()
+        .map(|(index, plane)| NativeGpuPlaneData {
+            index: index as u32,
+            format: plane.format.to_owned(),
+            width: plane.width,
+            height: plane.height,
+            bytes_per_row: plane.bytes_per_row,
+            data: Buffer::from(plane.data),
+        })
+        .collect()
 }
 
 pub fn parse_pool_options(value: NativeGpuFramePoolOptions) -> napi::Result<GpuFramePoolOptions> {

@@ -20,20 +20,27 @@ export interface GpuOutputCapabilities {
   backend: 'metal' | 'vulkan' | 'dx12' | 'gles' | 'browser-webgpu' | 'noop'
   texture: GpuTextureOutputCapability
   dmaBuf: DmaBufOutputCapability
-  encoderSurface: { supported: boolean; reason: string }
+  encoderSurface: EncoderSurfaceOutputCapability
   mediaFormats: GpuMediaFormatCapability[]
 }
 
-export type GpuMediaOutputFormat = 'rgba8unorm' | 'nv12-planes' | 'p010-planes'
+export interface EncoderSurfaceOutputCapability {
+  supported: boolean
+  reason: string
+  prerequisitesReady: boolean
+  prerequisites: string
+}
+
+export type GpuMediaOutputFormat = 'rgba8unorm' | 'nv12-planes' | 'p010-planes' | 'i420-planes'
 export type GpuFramePoolOverflowPolicy = 'error' | 'drop-newest'
 
 export interface GpuMediaFormatCapability {
   format: GpuMediaOutputFormat
   supported: boolean
-  storage: 'single-texture' | 'separate-textures'
+  storage: 'single-texture' | 'separate-textures' | 'separate-textures+packed-cpu-fallback'
   planeFormats: string[]
   reason?: string
-  colorMatrix?: 'bt709'
+  colorMatrix?: 'bt601' | 'bt709'
   colorRange?: 'limited'
   chromaSiting?: 'centered-2x2-box'
 }
@@ -74,6 +81,21 @@ export interface GpuMediaPlaneInfo {
 
 export interface GpuMediaPlaneData extends Omit<GpuMediaPlaneInfo, 'rowSemantics' | 'expectedStateBeforeUse' | 'requiredStateOnRelease'> {
   data: Buffer
+}
+
+/** Packed CPU I420 frame for APIs such as wrtc RTCVideoSource.onFrame(). */
+export interface CpuI420Frame {
+  width: number
+  height: number
+  data: Buffer
+  format: 'I420'
+  colorMatrix: 'bt601'
+  colorRange: 'limited'
+  chromaSiting: 'centered-2x2-box'
+  strides: [number, number, number]
+  offsets: [number, number, number]
+  byteLength: number
+  gpuReadbackBytes: number
 }
 
 export interface DmaBufPlane {
@@ -126,10 +148,15 @@ interface NativeGpuMediaFrameLeaseLike {
 }
 
 interface NativeGpuFramePoolLike {
-  reserve(): object | null
-  renderAsync(reservation: object, scene: unknown, camera: unknown): Promise<NativeGpuMediaFrameLeaseLike>
+  reserve(): NativeGpuFrameReservationLike | null
+  renderAsync(reservation: NativeGpuFrameReservationLike, scene: unknown, camera: unknown): Promise<NativeGpuMediaFrameLeaseLike>
+  renderI420Async(reservation: NativeGpuFrameReservationLike, scene: unknown, camera: unknown, target?: Buffer): Promise<CpuI420Frame>
   stats(): GpuFramePoolStats
   close(): void
+}
+
+interface NativeGpuFrameReservationLike {
+  cancel(): void
 }
 
 /**
@@ -201,7 +228,7 @@ export class GpuMediaFrameLease {
   get ready(): boolean { return this.nativeLease.ready }
 
   get planes(): GpuMediaPlaneInfo[] {
-    const count = this.format === 'rgba8unorm' ? 1 : 2
+    const count = this.format === 'rgba8unorm' ? 1 : this.format === 'i420-planes' ? 3 : 2
     return Array.from({ length: count }, (_, index) => this.nativeLease.planeInfo(index))
   }
 
@@ -228,16 +255,35 @@ export class GpuMediaFrameLease {
 }
 
 type PoolRender = (
+  reservation: NativeGpuFrameReservationLike,
   scene: ThreeSceneRootLike,
   camera: ThreeCameraLike,
   options: RenderOptions,
 ) => Promise<GpuMediaFrameLease | null>
 
+type PoolInputPrepare = (
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  options: RenderOptions,
+) => RenderOptions
+
+type PoolI420Render = (
+  reservation: NativeGpuFrameReservationLike,
+  scene: ThreeSceneRootLike,
+  camera: ThreeCameraLike,
+  options: RenderOptions,
+  target?: Buffer,
+) => Promise<CpuI420Frame | null>
+
 /** Fixed-size reusable GPU output pool with explicit overflow and lease semantics. */
 export class GpuFramePool {
+  private readonly i420TargetsInFlight = new Set<Buffer>()
+
   constructor(
     private readonly nativePool: NativeGpuFramePoolLike,
+    private readonly prepareInput: PoolInputPrepare,
     private readonly renderFrame: PoolRender,
+    private readonly renderI420Frame: PoolI420Render,
     readonly options: Required<GpuFramePoolOptions>,
   ) {}
 
@@ -246,19 +292,102 @@ export class GpuFramePool {
     camera: ThreeCameraLike,
     options: RenderOptions = {},
   ): Promise<GpuMediaFrameLease | null> {
-    return this.renderFrame(scene, camera, options)
+    let preparedOptions: RenderOptions
+    try {
+      preparedOptions = this.prepareInput(scene, camera, options)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    let reservation: NativeGpuFrameReservationLike | null
+    try {
+      reservation = this.nativePool.reserve()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (!reservation) return Promise.resolve(null)
+    return this.withReservation(
+      reservation,
+      () => this.renderFrame(reservation, scene, camera, preparedOptions),
+    )
+  }
+
+  /**
+   * CPU fallback for wrtc-compatible packed I420. The GPU performs BT.601
+   * conversion and reads back one contiguous 1.5 B/pixel payload.
+   */
+  renderI420(
+    scene: ThreeSceneRootLike,
+    camera: ThreeCameraLike,
+    options: RenderOptions = {},
+    target?: Buffer,
+  ): Promise<CpuI420Frame | null> {
+    if (this.options.format !== 'i420-planes') {
+      return Promise.reject(new Error('GpuFramePool.renderI420 requires format "i420-planes"'))
+    }
+    if (target && (
+      !Buffer.isBuffer(target)
+      || target.byteOffset !== 0
+      || target.buffer.byteLength !== target.byteLength
+      || target.byteLength !== this.options.width * this.options.height * 1.5
+    )) {
+      return Promise.reject(new Error(
+        'GpuFramePool.renderI420 target must be an exact standalone Buffer with byteOffset 0 and no larger backing store',
+      ))
+    }
+    if (target && this.i420TargetsInFlight.has(target)) {
+      return Promise.reject(new Error('GpuFramePool.renderI420 target is already in use'))
+    }
+    let preparedOptions: RenderOptions
+    try {
+      preparedOptions = this.prepareInput(scene, camera, options)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    let reservation: NativeGpuFrameReservationLike | null
+    try {
+      reservation = this.nativePool.reserve()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    if (!reservation) return Promise.resolve(null)
+    if (target) this.i420TargetsInFlight.add(target)
+    const pending = this.withReservation(
+      reservation,
+      () => this.renderI420Frame(reservation, scene, camera, preparedOptions, target),
+    )
+    return target ? pending.finally(() => this.i420TargetsInFlight.delete(target)) : pending
   }
 
   /** @internal */
-  async renderNative(scene: unknown, camera: unknown): Promise<GpuMediaFrameLease | null> {
-    const reservation = this.nativePool.reserve()
-    if (!reservation) return null
+  async renderNative(reservation: NativeGpuFrameReservationLike, scene: unknown, camera: unknown): Promise<GpuMediaFrameLease> {
     const lease = await this.nativePool.renderAsync(reservation, scene, camera)
     return new GpuMediaFrameLease(lease)
   }
 
+  /** @internal */
+  renderI420Native(
+    reservation: NativeGpuFrameReservationLike,
+    scene: unknown,
+    camera: unknown,
+    target?: Buffer,
+  ): Promise<CpuI420Frame> {
+    return this.nativePool.renderI420Async(reservation, scene, camera, target)
+  }
+
   stats(): GpuFramePoolStats { return this.nativePool.stats() }
   close(): void { this.nativePool.close() }
+
+  private async withReservation<T>(
+    reservation: NativeGpuFrameReservationLike,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await run()
+    } catch (error) {
+      reservation.cancel()
+      throw error
+    }
+  }
 }
 
 export function wrapGpuOutputCapabilities(value: unknown): GpuOutputCapabilities {

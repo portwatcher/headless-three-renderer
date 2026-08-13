@@ -17,13 +17,14 @@ export declare class NativeGpuFrameLease {
 
 export declare class NativeGpuFramePool {
   reserve(): NativeGpuFrameReservation | null
-  renderAsync(reservation: NativeGpuFrameReservation, scene: RenderScene, camera: Camera): Promise<unknown>
+  renderAsync(reservation: NativeGpuFrameReservation, scene: RenderScene, camera: Camera): Promise<NativeGpuMediaFrameLease>
+  renderI420Async(reservation: NativeGpuFrameReservation, scene: RenderScene, camera: Camera, target?: Buffer | undefined | null): Promise<NativeCpuI420Frame>
   stats(): NativeGpuFramePoolStats
   close(): void
 }
 
 export declare class NativeGpuFrameReservation {
-
+  cancel(): void
 }
 
 export declare class NativeGpuMediaFrameLease {
@@ -37,7 +38,7 @@ export declare class NativeGpuMediaFrameLease {
   get ready(): boolean
   planeInfo(index: number): NativeGpuPlaneInfo
   planeHandle(index: number): bigint
-  readPlanes(): Promise<unknown>
+  readPlanes(): Promise<NativeGpuPlaneData[]>
   exportDmaBuf(): void
   completeExternalUse(): void
   release(): void
@@ -86,6 +87,20 @@ export declare function decodeImage(data: Buffer): DecodedImage
 
 export declare function encodePng(data: Buffer, width: number, height: number): Buffer
 
+export interface NativeCpuI420Frame {
+  width: number
+  height: number
+  data: Buffer
+  format: string
+  colorMatrix: string
+  colorRange: string
+  chromaSiting: string
+  strides: Array<number>
+  offsets: Array<number>
+  byteLength: number
+  gpuReadbackBytes: number
+}
+
 export interface NativeDmaBufCapability {
   supported: boolean
   reason?: string
@@ -94,6 +109,8 @@ export interface NativeDmaBufCapability {
 export interface NativeEncoderSurfaceCapability {
   supported: boolean
   reason: string
+  prerequisitesReady: boolean
+  prerequisites: string
 }
 
 export interface NativeGpuFramePoolOptions {

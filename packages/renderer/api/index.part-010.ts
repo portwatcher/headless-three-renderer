@@ -475,7 +475,7 @@ export function renderer_createGpuFramePool_57(this: any, options: GpuFramePoolO
   }
   const nativePool = this.native.createGpuFramePool(normalized)
   let pool: GpuFramePool
-  pool = new GpuFramePool(nativePool, async (scene, camera, renderOptions) => {
+  const preparePoolOptions = (scene: unknown, camera: unknown, renderOptions: RenderOptions) => {
     validateThreeSceneRoot(scene as ThreeSceneRootLike)
     validateTopLevelRenderCamera(camera as ThreeCameraLike)
     assertRenderOptionsLike(renderOptions, 'options')
@@ -486,11 +486,26 @@ export function renderer_createGpuFramePool_57(this: any, options: GpuFramePoolO
       format: 'rgba',
     }, undefined)
     if (resolved.target) throw new Error('GpuFramePool.render does not support CPU-backed render targets')
-    const input = toNativeInput(scene as ThreeSceneRootLike, camera as ThreeCameraLike, resolved, this.sceneExtractionCache)
-    const result = pool.renderNative(input.nativeScene, input.nativeCamera)
+    return resolved
+  }
+  const extractPoolInput = (scene: unknown, camera: unknown, renderOptions: RenderOptions) => {
+    const input = toNativeInput(scene as ThreeSceneRootLike, camera as ThreeCameraLike, renderOptions, this.sceneExtractionCache)
     commitNativeMeshPayloadCache(this.sceneExtractionCache)
-    return result
-  }, normalized)
+    return input
+  }
+  pool = new GpuFramePool(
+    nativePool,
+    preparePoolOptions,
+    async (reservation, scene, camera, renderOptions) => {
+      const input = extractPoolInput(scene, camera, renderOptions)
+      return pool.renderNative(reservation, input.nativeScene, input.nativeCamera)
+    },
+    async (reservation, scene, camera, renderOptions, target) => {
+      const input = extractPoolInput(scene, camera, renderOptions)
+      return pool.renderI420Native(reservation, input.nativeScene, input.nativeCamera, target)
+    },
+    normalized,
+  )
   return pool
 }
 

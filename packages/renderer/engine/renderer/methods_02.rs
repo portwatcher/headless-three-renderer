@@ -33,8 +33,9 @@ impl GpuRenderer {
         let adapter_specific_storage = adapter
             .features()
             .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES);
-        let media_nv12_planes_supported = adapter_specific_storage
-            && storage_format_supported(&adapter, wgpu::TextureFormat::R8Unorm)
+        let media_i420_planes_supported = adapter_specific_storage
+            && storage_format_supported(&adapter, wgpu::TextureFormat::R8Unorm);
+        let media_nv12_planes_supported = media_i420_planes_supported
             && storage_format_supported(&adapter, wgpu::TextureFormat::Rg8Unorm);
         let media_p010_planes_supported = adapter_specific_storage
             && adapter
@@ -51,17 +52,18 @@ impl GpuRenderer {
             max_bind_groups: 8,
             ..required_limits
         };
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                label: Some("headless-three-renderer device"),
-                required_features: optional_media_features,
-                required_limits,
-                experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                memory_hints: wgpu::MemoryHints::Performance,
-                trace: wgpu::Trace::Off,
-            })
-            .await
-            .context("failed to create wgpu device")?;
+        let device_descriptor = wgpu::DeviceDescriptor {
+            label: Some("headless-three-renderer device"),
+            required_features: optional_media_features,
+            required_limits,
+            experimental_features: wgpu::ExperimentalFeatures::disabled(),
+            memory_hints: wgpu::MemoryHints::Performance,
+            trace: wgpu::Trace::Off,
+        };
+        let (device, queue, encoder_prerequisites) =
+            linux_encoder::open_renderer_device(&adapter, &device_descriptor)
+                .await
+                .context("failed to create renderer device")?;
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("headless-three-renderer shader"),
@@ -138,6 +140,9 @@ impl GpuRenderer {
             backend,
             media_nv12_planes_supported,
             media_p010_planes_supported,
+            media_i420_planes_supported,
+            encoder_prerequisites,
+            media_worker: std::sync::Arc::new(MediaWorker::new()?),
             shader,
             pipelines,
             pipelines_msaa4,

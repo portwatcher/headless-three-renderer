@@ -37,6 +37,8 @@ pub struct NativeGpuMediaFormatCapability {
 pub struct NativeEncoderSurfaceCapability {
     pub supported: bool,
     pub reason: String,
+    pub prerequisites_ready: bool,
+    pub prerequisites: String,
 }
 
 #[napi(object)]
@@ -69,6 +71,8 @@ impl From<GpuOutputCapabilities> for NativeGpuOutputCapabilities {
             encoder_surface: NativeEncoderSurfaceCapability {
                 supported: false,
                 reason: encoder_surface_reason(value.backend).to_owned(),
+                prerequisites_ready: value.encoder_prerequisites_ready,
+                prerequisites: value.encoder_prerequisites_detail,
             },
             media_formats: vec![
                 media_format("rgba8unorm", true, "single-texture", &["rgba8unorm"], None),
@@ -88,6 +92,15 @@ impl From<GpuOutputCapabilities> for NativeGpuOutputCapabilities {
                     (!value.p010_planes_supported)
                         .then_some("adapter lacks wgpu TEXTURE_FORMAT_16BIT_NORM storage support"),
                 ),
+                media_format_with_matrix(
+                    "i420-planes",
+                    value.i420_planes_supported,
+                    "separate-textures+packed-cpu-fallback",
+                    &["r8unorm-y", "r8unorm-u", "r8unorm-v"],
+                    (!value.i420_planes_supported)
+                        .then_some("adapter lacks writable R8 storage texture support"),
+                    "bt601",
+                ),
             ],
         }
     }
@@ -100,6 +113,17 @@ fn media_format(
     plane_formats: &[&str],
     reason: Option<&str>,
 ) -> NativeGpuMediaFormatCapability {
+    media_format_with_matrix(format, supported, storage, plane_formats, reason, "bt709")
+}
+
+fn media_format_with_matrix(
+    format: &str,
+    supported: bool,
+    storage: &str,
+    plane_formats: &[&str],
+    reason: Option<&str>,
+    matrix: &str,
+) -> NativeGpuMediaFormatCapability {
     let yuv = format != "rgba8unorm";
     NativeGpuMediaFormatCapability {
         format: format.to_owned(),
@@ -110,7 +134,7 @@ fn media_format(
             .map(|value| (*value).to_owned())
             .collect(),
         reason: reason.map(str::to_owned),
-        color_matrix: yuv.then(|| "bt709".to_owned()),
+        color_matrix: yuv.then(|| matrix.to_owned()),
         color_range: yuv.then(|| "limited".to_owned()),
         chroma_siting: yuv.then(|| "centered-2x2-box".to_owned()),
     }
@@ -119,7 +143,7 @@ fn media_format(
 fn encoder_surface_reason(backend: &str) -> &'static str {
     match backend {
         "vulkan" => {
-            "wgpu 29 cannot safely create and track writable DRM-modifier multi-planar images with exportable memory and external synchronization"
+            "requires a VA-created surface imported modifier/plane-exactly, foreign queue ownership, explicit/implicit sync bridging, and a real VAAPI/VCN encode validation on matched Linux AMD hardware"
         }
         "metal" => {
             "wgpu-managed Metal textures are not IOSurface/CVPixelBuffer-backed encoder surfaces"

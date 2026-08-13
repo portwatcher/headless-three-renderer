@@ -8,8 +8,11 @@ pub struct GpuOutputCapabilities {
     pub texture_reason: Option<&'static str>,
     pub dmabuf_supported: bool,
     pub dmabuf_reason: Option<&'static str>,
+    pub encoder_prerequisites_ready: bool,
+    pub encoder_prerequisites_detail: String,
     pub nv12_planes_supported: bool,
     pub p010_planes_supported: bool,
+    pub i420_planes_supported: bool,
 }
 
 pub struct GpuFrame {
@@ -37,8 +40,11 @@ impl GpuRenderer {
             texture_reason,
             dmabuf_supported: false,
             dmabuf_reason: Some(dmabuf_reason),
+            encoder_prerequisites_ready: self.encoder_prerequisites.ready,
+            encoder_prerequisites_detail: self.encoder_prerequisites.detail.clone(),
             nv12_planes_supported: self.media_nv12_planes_supported,
             p010_planes_supported: self.media_p010_planes_supported,
+            i420_planes_supported: self.media_i420_planes_supported,
         }
     }
 }

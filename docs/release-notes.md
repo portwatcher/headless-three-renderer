@@ -1,5 +1,39 @@
 # Release Notes
 
+## 0.4.0
+
+- Moved pooled render, conversion completion, and diagnostic readback waits off
+  N-API/libuv async work onto one renderer-owned media thread. Pooled render and
+  conversion now wait once for the exact final submission instead of creating
+  two global completion bubbles. Synchronous reservation also occurs before
+  JS scene extraction, preserving fixed-capacity `error`/`drop-newest`
+  scheduling under overload.
+- Added capability-gated `i420-planes` and `GpuFramePool.renderI420()`: GPU
+  BT.601 limited-range conversion, tight Y/U/V packing, only 1.5 B/pixel CPU
+  readback, preallocated per-slot GPU/readback resources, and reusable exact
+  caller buffers. Added a real optional `@roamhq/wrtc` source/sink test.
+- On Apple M4/Metal/Node 24 with `UV_THREADPOOL_SIZE=1`, the released 0.3.0
+  1080p NV12 pool averaged 3.169 ms; 0.4.0 averaged 1.598 ms after removing the
+  second completion bubble. An unrelated PBKDF2 probe changed from 0.535 ms
+  idle / 5.212 ms during a 4K pooled frame to 0.409 ms / 0.038 ms. The new
+  1080p packed-I420 benchmark read 3,110,400 bytes instead of 8,294,400 bytes.
+- In the same environment, a 100-frame `@roamhq/wrtc` run averaged 2.986 ms for
+  legacy RGBA readback + libyuv conversion + `onFrame`, versus 1.772 ms for GPU
+  packed I420 + `onFrame` (1.69x throughput, with renderer caller-buffer reuse).
+- Added a Linux Vulkan single-device prerequisite bootstrap that safely enables
+  the external-memory, DMA-BUF, DRM-modifier, foreign-queue, and semaphore-fd
+  extensions when available, and reports that state separately from support.
+  DMA-BUF/encoder surfaces remain unavailable until a VA-created surface can be
+  imported, synchronized, encoded, lifetime-tested, and fd-leak-tested on
+  matched AMD amdgpu/VCN hardware; no unusable VkImage or fd is exposed.
+- In a production-equivalent container on the matched AMD amdgpu/VCN host,
+  Vulkan reported `encoderSurface.prerequisitesReady=true` while correctly
+  keeping encoder-surface/DMA-BUF support false. All 10 GPU media tests passed.
+  A 720x720, 120-frame run (after 20 warm-up frames) reduced mean/p95 output
+  time from 1.702/2.302 ms for legacy RGBA to 0.996/1.034 ms for packed I420,
+  and reduced readback from 2,073,600 to 777,600 bytes per frame with one fixed
+  allocation reused for the remaining 139 submissions.
+
 ## 0.3.0
 
 - Added a genuinely asynchronous, fixed-capacity `GpuFramePool` with default

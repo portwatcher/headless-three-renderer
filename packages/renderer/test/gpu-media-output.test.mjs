@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import test from 'node:test'
+import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
 
 import { Renderer } from '../dist/index.js'
+
+const execFileAsync = promisify(execFile)
 
 function camera() {
   return new THREE.PerspectiveCamera(45, 1, 0.01, 100)
@@ -71,6 +76,33 @@ function convertReference(rgba, width, height, format) {
   return { y, uv }
 }
 
+function convertI420Reference(rgba, width, height) {
+  const y = new Uint8Array(width * height)
+  const u = new Uint8Array(width * height / 4)
+  const v = new Uint8Array(width * height / 4)
+  const rgbAt = (x, row) => {
+    const offset = (row * width + x) * 4
+    return [rgba[offset] / 255, rgba[offset + 1] / 255, rgba[offset + 2] / 255]
+  }
+  const luma = ([r, g, b]) => code8(16 + 219 * (0.299 * r + 0.587 * g + 0.114 * b))
+  const chroma = ([r, g, b]) => [
+    code8(128 + 224 * (-0.168736 * r - 0.331264 * g + 0.5 * b)),
+    code8(128 + 224 * (0.5 * r - 0.418688 * g - 0.081312 * b)),
+  ]
+  for (let row = 0; row < height; row += 1) {
+    for (let x = 0; x < width; x += 1) y[row * width + x] = luma(rgbAt(x, row))
+  }
+  for (let row = 0; row < height; row += 2) {
+    for (let x = 0; x < width; x += 2) {
+      const samples = [rgbAt(x, row), rgbAt(x + 1, row), rgbAt(x, row + 1), rgbAt(x + 1, row + 1)]
+      const average = [0, 1, 2].map((channel) => samples.reduce((sum, rgb) => sum + rgb[channel], 0) / 4)
+      const index = row / 2 * (width / 2) + x / 2
+      ;[u[index], v[index]] = chroma(average)
+    }
+  }
+  return Buffer.concat([y, u, v])
+}
+
 function unpackPlane(plane, tenBit) {
   if (!tenBit) return Uint16Array.from(plane.data)
   const view = new DataView(plane.data.buffer, plane.data.byteOffset, plane.data.byteLength)
@@ -99,12 +131,17 @@ test('media capabilities distinguish writable planes from encoder-native surface
   const rgba = capabilities.mediaFormats.find(({ format }) => format === 'rgba8unorm')
   const nv12 = capabilities.mediaFormats.find(({ format }) => format === 'nv12-planes')
   const p010 = capabilities.mediaFormats.find(({ format }) => format === 'p010-planes')
+  const i420 = capabilities.mediaFormats.find(({ format }) => format === 'i420-planes')
   assert.deepEqual(rgba?.planeFormats, ['rgba8unorm'])
   assert.equal(nv12?.storage, 'separate-textures')
   assert.deepEqual(nv12?.planeFormats, ['r8unorm-y', 'rg8unorm-uv'])
   assert.equal(typeof p010?.supported, 'boolean')
+  assert.equal(i420?.colorMatrix, 'bt601')
+  assert.equal(i420?.storage, 'separate-textures+packed-cpu-fallback')
   assert.equal(capabilities.encoderSurface.supported, false)
   assert.match(capabilities.encoderSurface.reason, /wgpu|encoder|surface|texture/i)
+  assert.equal(typeof capabilities.encoderSurface.prerequisitesReady, 'boolean')
+  assert.equal(typeof capabilities.encoderSurface.prerequisites, 'string')
   assert.equal(capabilities.dmaBuf.supported, false)
 })
 
@@ -119,6 +156,17 @@ test('pool rendering is asynchronous and lets the Node event loop advance', asyn
   assert.equal(frame?.ready, true)
   frame?.release()
   pool.close()
+})
+
+test('GPU completion waits do not occupy the shared libuv worker pool', async () => {
+  const fixture = fileURLToPath(new URL('./fixtures/media-worker-probe.mjs', import.meta.url))
+  const { stdout } = await execFileAsync(process.execPath, [fixture], {
+    env: { ...process.env, UV_THREADPOOL_SIZE: '1' },
+    timeout: 30_000,
+  })
+  const result = JSON.parse(stdout)
+  assert.equal(result.winner, 'pbkdf2')
+  assert.equal(result.completedFrames, 4)
 })
 
 test('pool reserves synchronously and bounds burst work before libuv', async () => {
@@ -232,5 +280,64 @@ test('hundreds of frames reuse a fixed allocation set', async () => {
   assert.equal(stats.reused, 399)
   assert.equal(stats.inFlight, 0)
   assert.equal(stats.available, 3)
+  pool.close()
+})
+
+test('packed I420 fallback is wrtc-shaped BT.601 data with 1.5 B/pixel readback', async (t) => {
+  const renderer = new Renderer()
+  const capability = renderer.getGpuOutputCapabilities().mediaFormats.find(({ format }) => format === 'i420-planes')
+  if (!capability?.supported) return t.skip(capability?.reason ?? 'i420-planes unsupported')
+  const width = 6
+  const height = 4
+  const scene = patternScene()
+  const options = { width, height, format: 'rgba', toneMapping: THREE.NoToneMapping }
+  const rgba = renderer.render(scene, camera(), options)
+  const reference = convertI420Reference(rgba, width, height)
+  const target = Buffer.alloc(width * height * 1.5)
+  const pool = renderer.createGpuFramePool({ width, height, capacity: 1, format: 'i420-planes' })
+  const frame = await pool.renderI420(scene, camera(), { toneMapping: THREE.NoToneMapping }, target)
+  assert.ok(frame)
+  assert.strictEqual(frame.data, target)
+  assert.equal(frame.data.length, reference.length)
+  assert.equal(frame.byteLength, reference.length)
+  assert.equal(frame.gpuReadbackBytes, Math.ceil(reference.length / 4) * 4)
+  assert.deepEqual(frame.strides, [width, width / 2, width / 2])
+  assert.deepEqual(frame.offsets, [0, width * height, width * height + width * height / 4])
+  assert.equal(frame.colorMatrix, 'bt601')
+  assert.equal(frame.colorRange, 'limited')
+  assertNear(frame.data, reference)
+  assert.equal(pool.stats().available, 1, 'CPU fallback releases its slot before resolving')
+
+  const oversized = Buffer.alloc(target.length + 1).subarray(1)
+  await assert.rejects(
+    () => pool.renderI420(scene, camera(), {}, oversized),
+    /exact standalone Buffer/,
+  )
+  pool.close()
+})
+
+test('I420 caller buffers can be reused without renderer allocations', async (t) => {
+  const renderer = new Renderer()
+  const capability = renderer.getGpuOutputCapabilities().mediaFormats.find(({ format }) => format === 'i420-planes')
+  if (!capability?.supported) return t.skip(capability?.reason ?? 'i420-planes unsupported')
+  const width = 8
+  const height = 8
+  const target = Buffer.alloc(width * height * 1.5)
+  const pool = renderer.createGpuFramePool({ width, height, capacity: 2, format: 'i420-planes' })
+  const pending = pool.renderI420(solidScene(0.1, 0.25, 0.5), camera(), {}, target)
+  await assert.rejects(
+    () => pool.renderI420(solidScene(0.2, 0.25, 0.5), camera(), {}, target),
+    /target is already in use/,
+  )
+  assert.strictEqual((await pending)?.data, target)
+  for (let index = 0; index < 120; index += 1) {
+    const frame = await pool.renderI420(solidScene(index / 120, 0.25, 0.5), camera(), {}, target)
+    assert.strictEqual(frame?.data, target)
+  }
+  const stats = pool.stats()
+  assert.equal(stats.submitted, 121)
+  assert.equal(stats.allocations, 2)
+  assert.equal(stats.reused, 120)
+  assert.equal(stats.inFlight, 0)
   pool.close()
 })

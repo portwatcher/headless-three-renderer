@@ -1,6 +1,6 @@
 {
   "name": "@headless-three/renderer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Headless wgpu renderer for Three.js scenes in Node.js. Produces PNG or raw RGBA from a THREE.Scene + THREE.Camera without a browser or WebGL.",
   "keywords": [
     "three",
@@ -70,10 +70,11 @@
     "create-npm-dirs": "napi create-npm-dirs",
     "prepublishOnly": "napi prepublish -t npm",
     "pretest": "pnpm run build:ts",
-    "test": "pnpm run test:docs && pnpm run test:smoke && pnpm run test:gpu-output && pnpm run test:gpu-media-output && pnpm run test:gltf && pnpm run test:corpus && pnpm run test:golden && pnpm run test:scale && pnpm run test:conformance",
+    "test": "pnpm run test:docs && pnpm run test:smoke && pnpm run test:gpu-output && pnpm run test:gpu-media-output && pnpm run test:wrtc && pnpm run test:gltf && pnpm run test:corpus && pnpm run test:golden && pnpm run test:scale && pnpm run test:conformance",
     "test:docs": "node --test --test-reporter=spec test/docs.test.mjs",
     "test:gpu-output": "node --test --test-reporter=spec test/gpu-output.test.mjs",
     "test:gpu-media-output": "node --test --test-reporter=spec test/gpu-media-output.test.mjs",
+    "test:wrtc": "node --test --test-reporter=spec test/wrtc-i420.test.mjs",
     "test:smoke": "node --test --test-reporter=spec test/smoke.test.mjs",
     "test:gltf": "node --test --test-reporter=spec test/gltf.test.mjs",
     "test:corpus": "node --test --test-reporter=spec test/corpus.test.mjs",
@@ -85,13 +86,16 @@
     "test:update": "UPDATE_SNAPSHOTS=1 node --test \"test/**/*.test.mjs\"",
     "test:rust": "cargo test",
     "verify:pack": "node scripts/verify-packed-install.mjs",
-    "profile:animated": "node scripts/profile-animated-scene.mjs"
+    "profile:animated": "node scripts/profile-animated-scene.mjs",
+    "benchmark:media": "node scripts/benchmark-media-output.mjs",
+    "benchmark:wrtc": "node scripts/benchmark-wrtc-i420.mjs"
   },
   "peerDependencies": {
     "three": ">=0.150.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.6.1",
+    "@roamhq/wrtc": "0.10.0",
     "@types/node": "25.6.0",
     "three": "^0.183.0",
     "typescript": "6.0.3"

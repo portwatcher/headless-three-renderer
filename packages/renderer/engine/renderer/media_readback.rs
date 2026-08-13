@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 
 use anyhow::{Context, Result};
@@ -7,7 +9,9 @@ use crate::util::align_to;
 
 pub struct PlaneReadbackJob {
     device: wgpu::Device,
+    submission: wgpu::SubmissionIndex,
     pending: Vec<PendingPlane>,
+    readback_in_flight: Arc<std::sync::atomic::AtomicBool>,
 }
 
 struct PendingPlane {
@@ -28,6 +32,24 @@ impl MediaFrame {
         if self.external_use_pending {
             anyhow::bail!("cannot read back planes while external GPU use is pending")
         }
+        let readback_in_flight = Arc::clone(&self.resources.readback_in_flight);
+        if readback_in_flight
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            anyhow::bail!("a plane readback is already in flight for this pool slot")
+        }
+        let result = self.enqueue_plane_readback(Arc::clone(&readback_in_flight));
+        if result.is_err() {
+            readback_in_flight.store(false, Ordering::Release);
+        }
+        result
+    }
+
+    fn enqueue_plane_readback(
+        &mut self,
+        readback_in_flight: Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<PlaneReadbackJob> {
         let device = self.renderer.device.clone();
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("headless-three media plane readback encoder"),
@@ -74,14 +96,19 @@ impl MediaFrame {
                 format: self.plane_format(index)?,
             });
         }
-        self.renderer.queue.submit([encoder.finish()]);
+        let submission = self.renderer.queue.submit([encoder.finish()]);
         self.readback_state = true;
-        Ok(PlaneReadbackJob { device, pending })
+        Ok(PlaneReadbackJob {
+            device,
+            submission,
+            pending,
+            readback_in_flight,
+        })
     }
 }
 
 impl PlaneReadbackJob {
-    pub fn complete(self) -> Result<Vec<PlaneReadback>> {
+    pub fn complete(mut self) -> Result<Vec<PlaneReadback>> {
         let mut receivers = Vec::with_capacity(self.pending.len());
         for plane in &self.pending {
             let (sender, receiver) = mpsc::channel();
@@ -94,10 +121,13 @@ impl PlaneReadbackJob {
             receivers.push(receiver);
         }
         self.device
-            .poll(wgpu::PollType::wait_indefinitely())
+            .poll(wgpu::PollType::Wait {
+                submission_index: Some(self.submission.clone()),
+                timeout: None,
+            })
             .context("failed while waiting for media plane readback")?;
         let mut output = Vec::with_capacity(self.pending.len());
-        for (plane, receiver) in self.pending.into_iter().zip(receivers) {
+        for (plane, receiver) in std::mem::take(&mut self.pending).into_iter().zip(receivers) {
             receiver
                 .recv()
                 .context("media plane readback callback was not delivered")?
@@ -121,5 +151,11 @@ impl PlaneReadbackJob {
             });
         }
         Ok(output)
+    }
+}
+
+impl Drop for PlaneReadbackJob {
+    fn drop(&mut self) {
+        self.readback_in_flight.store(false, Ordering::Release);
     }
 }

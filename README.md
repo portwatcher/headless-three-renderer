@@ -80,6 +80,12 @@ const imageBuffer = renderer.render(scene, camera, { width: 512, height: 512 })
 
 `Renderer.renderAsync(scene, camera, options)` is a Promise-returning compatibility wrapper around the same scene-output contract.
 
+For real-time media, `Renderer.createGpuFramePool()` provides bounded pooled
+GPU RGBA/NV12/P010 output and a packed CPU I420 fallback for
+`RTCVideoSource.onFrame()`-style consumers. See the [GPU media output
+contract](./docs/gpu-native-output.md) for scheduling, lifetime, and
+encoder-native capability boundaries.
+
 `Renderer.sortObjects`, `Renderer.opaque`, `Renderer.transparent`, `Renderer.setOpaqueSort(fn)`, `Renderer.setTransparentSort(fn)`, and the matching `render()` options (`sortObjects`, `opaque`, `transparent`, `opaqueSort`, `transparentSort`) control native draw-list sorting and bucket inclusion.
 
 It also exports Node loader helpers:

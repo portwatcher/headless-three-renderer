@@ -2,8 +2,10 @@ use super::*;
 
 enum RenderedFrame {
     Rgba(Vec<u8>),
-    Texture(wgpu::Texture),
+    Texture(wgpu::Texture, wgpu::SubmissionIndex),
 }
+
+type NativeFollowup<'a> = &'a mut dyn FnMut(&mut wgpu::CommandEncoder) -> Result<()>;
 
 impl GpuRenderer {
     pub fn render(&self, scene: &RenderScene, camera: &Camera) -> Result<Vec<u8>> {
@@ -22,9 +24,9 @@ impl GpuRenderer {
         settings: &RenderSettings,
         meshes: &[PreparedMesh],
     ) -> Result<Vec<u8>> {
-        match self.render_frame(settings, meshes, false, None)? {
+        match self.render_frame(settings, meshes, false, None, None)? {
             RenderedFrame::Rgba(rgba) => Ok(rgba),
-            RenderedFrame::Texture(_) => unreachable!("CPU render returned a GPU texture"),
+            RenderedFrame::Texture(_, _) => unreachable!("CPU render returned a GPU texture"),
         }
     }
 
@@ -38,8 +40,8 @@ impl GpuRenderer {
         }
         let settings = RenderSettings::from_scene(scene, camera, self.device.limits())?;
         let meshes = prepare_meshes(scene)?;
-        let texture = match self.render_frame(&settings, &meshes, true, None)? {
-            RenderedFrame::Texture(texture) => texture,
+        let texture = match self.render_frame(&settings, &meshes, true, None, None)? {
+            RenderedFrame::Texture(texture, _) => texture,
             RenderedFrame::Rgba(_) => unreachable!("GPU render returned CPU pixels"),
         };
         Ok(GpuFrame::new(
@@ -55,11 +57,12 @@ impl GpuRenderer {
         scene: &RenderScene,
         camera: &Camera,
         target: &wgpu::Texture,
-    ) -> Result<()> {
+        followup: &mut dyn FnMut(&mut wgpu::CommandEncoder) -> Result<()>,
+    ) -> Result<wgpu::SubmissionIndex> {
         let settings = RenderSettings::from_scene(scene, camera, self.device.limits())?;
         let meshes = prepare_meshes(scene)?;
-        match self.render_frame(&settings, &meshes, true, Some(target))? {
-            RenderedFrame::Texture(_) => Ok(()),
+        match self.render_frame(&settings, &meshes, true, Some(target), Some(followup))? {
+            RenderedFrame::Texture(_, submission) => Ok(submission),
             RenderedFrame::Rgba(_) => unreachable!("GPU render returned CPU pixels"),
         }
     }
@@ -70,6 +73,7 @@ impl GpuRenderer {
         meshes: &[PreparedMesh],
         native_output: bool,
         native_target: Option<&wgpu::Texture>,
+        native_followup: Option<NativeFollowup<'_>>,
     ) -> Result<RenderedFrame> {
         let texture_size = wgpu::Extent3d {
             width: settings.width,
@@ -470,7 +474,10 @@ impl GpuRenderer {
             );
         }
 
-        self.queue.submit([encoder.finish()]);
+        if let Some(followup) = native_followup {
+            followup(&mut encoder)?;
+        }
+        let submission = self.queue.submit([encoder.finish()]);
 
         let mapped = output_buffer.as_ref().map(|output_buffer| {
             let buffer_slice = output_buffer.slice(..);
@@ -480,9 +487,14 @@ impl GpuRenderer {
             });
             (buffer_slice, receiver)
         });
-        self.device
-            .poll(wgpu::PollType::wait_indefinitely())
-            .context("failed while waiting for GPU frame completion")?;
+        if mapped.is_some() || native_target.is_none() {
+            self.device
+                .poll(wgpu::PollType::Wait {
+                    submission_index: Some(submission.clone()),
+                    timeout: None,
+                })
+                .context("failed while waiting for GPU frame completion")?;
+        }
 
         let rgba = if let Some((buffer_slice, receiver)) = mapped {
             receiver
@@ -518,6 +530,7 @@ impl GpuRenderer {
         } else {
             Ok(RenderedFrame::Texture(
                 native_texture.context("native output texture was not created")?,
+                submission,
             ))
         }
     }

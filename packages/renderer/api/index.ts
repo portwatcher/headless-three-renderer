@@ -22,9 +22,11 @@ import './index.part-021'
 export { Renderer } from './index.part-008'
 export { GpuFrameLease, GpuFramePool, GpuMediaFrameLease } from './gpu-output'
 export type {
+  CpuI420Frame,
   DmaBufFrameLease,
   DmaBufOutputCapability,
   DmaBufPlane,
+  EncoderSurfaceOutputCapability,
   GpuOutputCapabilities,
   GpuTextureHandleType,
   GpuTextureOutputCapability,
