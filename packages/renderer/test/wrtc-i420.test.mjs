@@ -9,6 +9,12 @@ const execFileAsync = promisify(execFile)
 const require = createRequire(import.meta.url)
 
 test('packed I420 is consumed directly by @roamhq/wrtc RTCVideoSource', async (t) => {
+  if (process.platform === 'win32') {
+    t.skip(
+      '@roamhq/wrtc 0.10.0 RTCVideoSink returns corrupt frame dimensions on Node 24 Windows',
+    )
+    return
+  }
   let wrtcPath = process.env.WRTC_MODULE_PATH
   if (!wrtcPath) {
     try {
