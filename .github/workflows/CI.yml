@@ -139,9 +139,22 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:gpu-media-output
 
+      # @roamhq/wrtc 0.10.0 publishes and validates Node 20/22 binaries. Keep
+      # this consumer contract on the production model-streamer runtime instead
+      # of treating Node 24-only Windows ABI corruption as a platform failure.
+      - name: Use production Node runtime for wrtc consumer
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: wrtc packed-I420 consumer test
         working-directory: packages/renderer
         run: pnpm run test:wrtc
+
+      - name: Restore renderer CI Node runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
       - name: glTF fixture tests
         # Windows hosted runners make the asset-heavy glTF suite too slow for
