@@ -21,7 +21,11 @@ test('packed I420 is consumed directly by @roamhq/wrtc RTCVideoSource', async (t
   const fixture = fileURLToPath(new URL('./fixtures/wrtc-i420-consumer.mjs', import.meta.url))
   const { stdout } = await execFileAsync(process.execPath, [fixture], {
     env: { ...process.env, WRTC_MODULE_PATH: wrtcPath },
-    timeout: 5_000,
+    // Windows CI can spend tens of seconds creating its first native GPU
+    // device. The fixture keeps a separate two-second deadline after onFrame,
+    // so this watchdog covers process/device startup without weakening the
+    // actual RTCVideoSink delivery assertion.
+    timeout: 60_000,
   })
   assert.match(stdout, /wrtc-i420-consumer: ok/)
 })
