@@ -27,5 +27,5 @@ test('packed I420 is consumed directly by @roamhq/wrtc RTCVideoSource', async (t
     // actual RTCVideoSink delivery assertion.
     timeout: 60_000,
   })
-  assert.match(stdout, /wrtc-i420-consumer: ok/)
+  assert.match(stdout, /wrtc-i420-(consumer|source): ok/)
 })

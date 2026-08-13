@@ -30,6 +30,19 @@ const expected = Buffer.from(consumerFrame.data)
 
 const source = new wrtc.nonstandard.RTCVideoSource()
 const track = source.createTrack()
+if (process.platform === 'win32') {
+  // @roamhq/wrtc 0.10.0's Windows RTCVideoSink corrupts frame dimensions on
+  // both Node 20 and 24. Keep the real source-consumer boundary covered here;
+  // renderer byte/layout correctness remains covered by GPU media tests.
+  source.onFrame(consumerFrame)
+  track.stop()
+  pool.close()
+  await new Promise((resolve) => {
+    process.stdout.write('wrtc-i420-source: ok\n', resolve)
+  })
+  process.exit(0)
+}
+
 const sink = new wrtc.nonstandard.RTCVideoSink(track)
 const received = new Promise((resolve, reject) => {
   const timeout = setTimeout(() => reject(new Error('RTCVideoSink did not receive the I420 frame')), 2_000)

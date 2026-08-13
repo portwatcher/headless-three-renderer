@@ -11,8 +11,11 @@
 - Added capability-gated `i420-planes` and `GpuFramePool.renderI420()`: GPU
   BT.601 limited-range conversion, tight Y/U/V packing, only 1.5 B/pixel CPU
   readback, preallocated per-slot GPU/readback resources, and reusable exact
-  caller buffers. Added a real optional `@roamhq/wrtc` source/sink test across
-  every packaged platform, running on the production Node 20 runtime. The
+  caller buffers. Added a real optional `@roamhq/wrtc` source test across every
+  packaged platform, running on the production Node 20 runtime. Linux and
+  macOS additionally verify the sink dimensions and bytes. Windows cannot make
+  that second assertion because `@roamhq/wrtc` 0.10.0 corrupts RTCVideoSink
+  dimensions on Node 20 and 24, while accepting the same source frame. The
   consumer receives a documented plain `{ width, height, data }` frame rather
   than renderer-specific native metadata; the rest of renderer CI remains on
   Node 24.
