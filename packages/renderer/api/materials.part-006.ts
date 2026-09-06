@@ -9,7 +9,7 @@ export function assertSupportedShaderMaterial(
   customFragmentShader: string | undefined,
 ): void {
   const kind = shaderMaterialKind(material)
-  if (!kind || customFragmentShader || copyShaderMaterialInfo(material)) return
+  if (!kind || customFragmentShader || material.isMToonMaterial === true || copyShaderMaterialInfo(material)) return
 
   if (isThreePmremShaderMaterial(material)) {
     throw new Error(

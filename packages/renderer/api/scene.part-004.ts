@@ -1,3 +1,4 @@
+import { isMaterialSurfaceVisible, usesMaterialVertexColors } from './materials-mtoon'
 import type {
   ThreeObject3DLike,
   ThreeBufferAttributeLike,
@@ -125,7 +126,7 @@ export function appendSprite(
   optionalObjectBoolean(object.receiveShadow, 'object.receiveShadow')
 
   const material = materialForObjectGroup(object, 0, overrideMaterial)
-  if (material?.visible === false) return
+  if (!isMaterialSurfaceVisible(material)) return
 
   validateSpriteScale(object)
   const matrix = matrixElements(object.matrixWorld!, 'sprite.matrixWorld')
@@ -380,7 +381,7 @@ export function appendPoints(
 
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
-    if (material?.visible === false) continue
+    if (!isMaterialSurfaceVisible(material)) continue
     invokeObjectRenderCallback(object.onBeforeRender, 'onBeforeRender', callbackContext, object, camera, geometry, material, group)
     const pointUvStreams = material?.map || material?.alphaMap
       ? textureUvStreamsForMapAlphaMaterial(pointUvChannels, {
@@ -390,7 +391,7 @@ export function appendPoints(
       : null
 
     const baseColor = materialColor(material, materialContext)
-    const useVertexColors = vertexColors && material?.vertexColors !== false
+    const useVertexColors = vertexColors && usesMaterialVertexColors(material)
     const pointSize = positiveMaterialOrObjectNumber(material?.size, 'material.size', 1)
     const sizeAttenuation = optionalSceneBoolean(material?.sizeAttenuation, 'material.sizeAttenuation')
     const billboard = pointBillboardExpansion(

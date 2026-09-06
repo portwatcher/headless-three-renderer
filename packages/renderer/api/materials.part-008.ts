@@ -75,7 +75,8 @@ export function assertSupportedMaterialClass(
 }
 
 export function supportedMaterialClass(material: ThreeMaterialLike): boolean {
-  return material.isMeshBasicMaterial === true
+  return material.isMToonMaterial === true
+    || material.isMeshBasicMaterial === true
     || material.isMeshDepthMaterial === true
     || material.isMeshDistanceMaterial === true
     || material.isMeshLambertMaterial === true

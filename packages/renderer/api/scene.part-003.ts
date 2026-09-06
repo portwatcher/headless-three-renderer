@@ -1,3 +1,4 @@
+import { usesMaterialVertexColors } from './materials-mtoon'
 import type {
   ThreeObject3DLike,
   ThreeBufferAttributeLike,
@@ -317,7 +318,7 @@ export function appendShadowOnlyMeshGroup(
 ): void {
   const shadowMaterial = shadowMaterialWithSourceShadowState(material, sourceMaterial)
   const baseColor = materialColor(shadowMaterial, materialContext)
-  const useVertexColors = vertexColors && material.vertexColors !== false
+  const useVertexColors = vertexColors && usesMaterialVertexColors(material)
   const pbrProps = shadowPbrProperties(shadowMaterial, sourceMaterial, materialContext)
   assertSupportedCustomFragmentInstancedAttributes(object.geometry!, pbrProps)
   const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, shadowMaterial)

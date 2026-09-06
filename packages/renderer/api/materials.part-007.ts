@@ -469,7 +469,7 @@ export function assertSupportedOnBeforeCompile(
   material: ThreeMaterialLike,
   customFragmentShader: string | undefined,
 ): void {
-  if (customFragmentShader || !hasCustomOnBeforeCompile(material)) return
+  if (customFragmentShader || material.isMToonMaterial === true || !hasCustomOnBeforeCompile(material)) return
 
   if (isThreeCsmPatchedMaterial(material)) {
     throw new Error(

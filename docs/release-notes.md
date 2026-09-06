@@ -1,5 +1,20 @@
 # Release Notes
 
+## 0.4.1
+
+- Added a native toon surface adapter for Pixiv `MToonMaterial`, fixing real
+  VRM loads failing at the `ShaderMaterial` boundary. Base-color textures,
+  color/opacity expression bindings, alpha testing, normal/emissive maps,
+  sidedness, and vertex-color opt-out use the existing native material path.
+  The original material and its uniforms are retained, including live updates.
+- MToon parity remains partial: shading uses native Three.js toon lighting;
+  authored shade ramps, rim lighting, matcaps, UV animation, and extruded
+  outlines are not translated. Outline draw groups are omitted instead of
+  incorrectly painting their unextruded surfaces over the avatar.
+- Added tests using the real optional Pixiv loader and committed Seed-san
+  avatar, plus texture-alpha, live color/opacity, vertex-color, outline-group,
+  and unsupported generic shader regression coverage.
+
 ## 0.4.0
 
 - Moved pooled render, conversion completion, and diagnostic readback waits off

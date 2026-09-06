@@ -1,3 +1,4 @@
+import { isMaterialSurfaceVisible, usesMaterialVertexColors } from './materials-mtoon'
 import type {
   ThreeObject3DLike,
   ThreeBufferAttributeLike,
@@ -192,7 +193,7 @@ export function appendLineOrPoints(
 
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
-    if (material?.visible === false) continue
+    if (!isMaterialSurfaceVisible(material)) continue
 
     invokeObjectRenderCallback(object.onBeforeRender, 'onBeforeRender', callbackContext, object, camera, geometry, material, group)
 
@@ -206,7 +207,7 @@ export function appendLineOrPoints(
     let outputColors: number[] | undefined
     let thickCenter: [number, number, number] | undefined
     const color = materialColor(material, materialContext)
-    const useVertexColors = vertexColors && material?.vertexColors !== false
+    const useVertexColors = vertexColors && usesMaterialVertexColors(material)
     const pbrProps = extractPbrProperties(material, materialContext)
     assertSupportedCustomFragmentInstancedAttributes(geometry, pbrProps)
     if (topology === 'lines') {

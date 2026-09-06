@@ -339,6 +339,10 @@ export interface ThreeMaterialLike {
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
   isMeshToonMaterial?: boolean
+  /** Pixiv MToon surface adapter (native toon approximation). */
+  isMToonMaterial?: boolean
+  isOutline?: boolean
+  ignoreVertexColor?: boolean
   isShadowMaterial?: boolean
   isLineBasicMaterial?: boolean
   isPointsMaterial?: boolean

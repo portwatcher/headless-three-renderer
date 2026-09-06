@@ -1,3 +1,4 @@
+import { isMaterialSurfaceVisible, usesMaterialVertexColors } from './materials-mtoon'
 import type {
   ThreeObject3DLike,
   ThreeBufferAttributeLike,
@@ -318,14 +319,14 @@ export function appendMesh(
 
   for (const group of groups) {
     const material = materialForObjectGroup(object, group.materialIndex, overrideMaterial)
-    if (material?.visible === false) continue
+    if (!isMaterialSurfaceVisible(material)) continue
 
     invokeObjectRenderCallback(callbackObject.onBeforeRender, 'onBeforeRender', callbackContext, callbackObject, camera, geometry, material, group)
 
     const customShadowMaterial = customShadowMaterialForMode(object, shadowMaterialMode)
     const usesCustomShadowMaterial = objectCastsShadow && customShadowMaterial != null
     const baseColor = materialColor(material, materialContext)
-    const useVertexColors = vertexColors && material?.vertexColors !== false
+    const useVertexColors = vertexColors && usesMaterialVertexColors(material)
     const pbrProps = extractPbrProperties(material, materialContext)
     assertSupportedCustomFragmentInstancedAttributes(geometry, pbrProps)
     const uvStreams = textureUvStreamsForMeshMaterial(uvChannels, material)
