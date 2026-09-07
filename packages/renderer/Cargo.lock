@@ -453,7 +453,7 @@ checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
 
 [[package]]
 name = "headless_three_renderer"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "ash",
@@ -466,6 +466,7 @@ dependencies = [
  "pollster",
  "wgpu",
  "windows-core",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -1465,6 +1466,12 @@ name = "xml-rs"
 version = "0.8.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ae8337f8a065cfc972643663ea4279e04e7256de865aa66fe25cec5fb912d3f"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aee1b19627c7c60102ab80d3a9cbe18de90bfe03bfa6c3715447681f0e8c8af6"
 
 [[package]]
 name = "zerocopy"

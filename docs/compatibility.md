@@ -12,6 +12,11 @@ The committed Khronos fixture corpus is tracked separately in
 [Khronos glTF Sample Asset Coverage](./gltf-sample-assets.md), with a docs
 consistency test keeping that list synchronized with `gltf.test.mjs`.
 
+Per-frame native cache fingerprints use XXH3 while still checking every payload
+byte. Shader classification caches exact source strings with bounded retention;
+live shader replacement and in-place texture edits are regression-tested.
+These optimizations do not change the supported rendering semantics.
+
 ## Public API
 
 | Feature | Status | Notes |

@@ -144,22 +144,39 @@ export function uniformValue(uniform: unknown): unknown {
   return (uniform as { value?: unknown }).value
 }
 
-export function isCopyShaderFragment(fragmentShader: unknown): boolean {
-  if (typeof fragmentShader !== 'string') return false
+const shaderFragmentKinds = new Map<string, number>()
+
+const classifyShaderFragment = function (fragmentShader: string): number {
+  const cached = shaderFragmentKinds.get(fragmentShader)
+  if (cached !== undefined) return cached
   const compact = fragmentShader.replace(/\s+/g, '')
-  return compact.includes('uniformfloatopacity;') &&
+  const copy = compact.includes('uniformfloatopacity;') &&
     compact.includes('uniformsampler2DtDiffuse;') &&
     compact.includes('texture2D(tDiffuse,vUv)') &&
     compact.includes('gl_FragColor=opacity*texel;')
-}
-
-export function isOutputShaderFragment(fragmentShader: unknown): boolean {
-  if (typeof fragmentShader !== 'string') return false
-  const compact = fragmentShader.replace(/\s+/g, '')
-  return compact.includes('uniformsampler2DtDiffuse;') &&
+  const output = compact.includes('uniformsampler2DtDiffuse;') &&
     compact.includes('gl_FragColor=texture2D(tDiffuse,vUv);') &&
     compact.includes('tonemapping_pars_fragment') &&
     compact.includes('colorspace_pars_fragment')
+  const kind = (copy ? 1 : 0) | (output ? 2 : 0)
+  // Key by source rather than material identity so live shader replacements
+  // still invalidate detection. Bound retained source strings for long streams.
+  if (fragmentShader.length <= 128 * 1024) {
+    if (shaderFragmentKinds.size >= 32) {
+      const oldest = shaderFragmentKinds.keys().next().value
+      if (oldest !== undefined) shaderFragmentKinds.delete(oldest)
+    }
+    shaderFragmentKinds.set(fragmentShader, kind)
+  }
+  return kind
+}
+
+export function isCopyShaderFragment(fragmentShader: unknown): boolean {
+  return typeof fragmentShader === 'string' && (classifyShaderFragment(fragmentShader) & 1) !== 0
+}
+
+export function isOutputShaderFragment(fragmentShader: unknown): boolean {
+  return typeof fragmentShader === 'string' && (classifyShaderFragment(fragmentShader) & 2) !== 0
 }
 
 export function extractTextureData(

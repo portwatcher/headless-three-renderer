@@ -1,5 +1,18 @@
 # Release Notes
 
+## 0.4.3
+
+- Replaced native per-frame byte fingerprints with XXH3 for texture, mesh,
+  and uniform caches. Full payload validation is retained, including in-place
+  pixel edits with Three.js `needsUpdate`; this is a local cache key, not an asset
+  integrity or security hash.
+- Cache CopyShader/OutputShader classification by exact GLSL source in a bounded
+  map, avoiding repeated whitespace scans of unchanged MToon shaders. Replacing
+  the source still changes material support checks immediately.
+- Added a reused-renderer regression for live texture and shader replacement.
+  Output semantics and golden tolerances are unchanged; existing browser
+  references remain authoritative for this performance-only release.
+
 ## 0.4.2
 
 - Replaced the generic toon approximation for Pixiv MToon with its own native

@@ -1,6 +1,6 @@
 [package]
 name = "headless_three_renderer"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2024"
 license = "MIT"
 build = "build.rs"
@@ -19,6 +19,7 @@ napi = { version = "3.8.4", features = ["napi8"] }
 napi-derive = "3.5.3"
 pollster = "0.4.0"
 wgpu = { version = "29.0.1", default-features = false, features = ["std", "wgsl", "vulkan", "metal", "dx12", "gles"] }
+xxhash-rust = { version = "0.8.18", features = ["xxh3"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-core = "0.62.2"

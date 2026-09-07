@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -625,9 +624,9 @@ impl AoPhysicalBindGroupKey {
 }
 
 fn hash_bytes(bytes: &[u8]) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    bytes.hash(&mut hasher);
-    hasher.finish()
+    // Revalidate mutable Three.js payloads every frame without letting texture
+    // fingerprinting dominate media rendering. These are local cache keys.
+    xxhash_rust::xxh3::xxh3_64(bytes)
 }
 
 impl StatePipelineKey {
