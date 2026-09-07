@@ -456,6 +456,10 @@ function applyFixtureDistanceMaterials(fixture) {
       const fragmentShader = shader.fragmentShader.replace(
         'gl_FragColor = packDepthToRGBA( dist );',
         'gl_FragColor = vec4( dist, 0.0, 0.0, diffuseColor.a );',
+      ).replace(
+        // Three.js r183 already writes distance to red instead of packed RGBA.
+        'gl_FragColor = vec4( dist, 0.0, 0.0, 1.0 );',
+        'gl_FragColor = vec4( dist, 0.0, 0.0, diffuseColor.a );',
       )
       if (fragmentShader === shader.fragmentShader) {
         throw new Error('Browser reference MeshDistanceMaterial shader did not contain the expected packed-distance output.')
