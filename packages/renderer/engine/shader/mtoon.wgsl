@@ -2,9 +2,9 @@
 // https://github.com/pixiv/three-vrm/tree/v3.4.4/packages/three-vrm-materials-mtoon
 // Authored shade colors are a separate surface, not a multiplier on lit albedo.
 fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2<f32>, uv2: vec2<f32>) -> vec3<f32> {
-  let shade = uniforms.mtoon[0].rgb * input.color.rgb * textureSample(
-    t_physical_sheen, s_physical_sheen_map, transform_sheen_color_map_uv(uv, uv2)
-  ).rgb;
+  let shade = uniforms.mtoon[0].rgb * input.color.rgb * decode_matcap_map_sample(textureSample(
+    t_physical_sheen, s_physical_sheen_map, transform_matcap_color_map_uv(uv, uv2)
+  )).rgb;
   let shift_sample = decode_metallic_roughness_map_sample(textureSample(
     t_metallic_roughness, s_metallic_roughness, transform_metallic_roughness_map_uv(uv, uv2)
   )).r;
@@ -64,7 +64,10 @@ fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2
   let matcap = uniforms.mtoon[2].rgb * decode_light_map_sample(textureSample(
     t_light_map, s_light_map, transform_light_map_uv(matcap_uv, matcap_uv)
   )).rgb;
-  let rim_texture = textureSample(t_physical_specular, s_physical_specular_map, transform_specular_color_map_uv(uv, uv2)).rgb;
+  var rim_texture = textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv, uv2), 0).rgb;
+  if uniforms.map_transform_rows[10u].w > 0.5 {
+    rim_texture = srgb_to_linear(rim_texture);
+  }
   // Pixiv's current WebGL shader uses lighting mix 1 and divides irradiance by PI.
   color += (rim + matcap) * rim_texture * rim_irradiance / PI;
   color += uniforms.emissive.rgb * decode_emissive_map_sample(textureSample(

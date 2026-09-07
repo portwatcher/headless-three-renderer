@@ -38,11 +38,11 @@ export const extractMtoonProperties = function (
       : material.outlineWidthMode === 'screenCoordinates' ? 2
       : material.outlineWidthMode === 'worldCoordinates' ? 1 : 0,
   }
-  // MToon has no PBR sheen/specular/light/metallic maps. Reuse their independent
-  // texture bindings, UV transforms and samplers instead of adding GPU bindings.
+  // Reuse directly uploaded texture slots, preserving their UVs and samplers.
+  // PBR sheen/specular-color slots would repack large textures on the CPU each frame.
   const slots = [
-    ['shadeMultiplyTexture', 'sheenColorMap'],
-    ['rimMultiplyTexture', 'specularColorMap'],
+    ['shadeMultiplyTexture', 'matcapMap'],
+    ['rimMultiplyTexture', 'specularMap'],
     ['matcapTexture', 'lightMap'],
     ['shadingShiftTexture', 'metallicRoughnessTexture'],
     ['outlineWidthMultiplyTexture', 'aoMap'],

@@ -159,6 +159,9 @@ test('MToon shades with authored color and texture, and observes live shade and 
     colorNear(center(render(renderer, scene)), [0, 153, 0])
     material.shadeMultiplyTexture = shadeMap
     colorNear(center(render(renderer, scene)), [0, 111, 0])
+    shadeMap.colorSpace = THREE.SRGBColorSpace
+    colorNear(center(render(renderer, scene)), [0, 74, 0])
+    shadeMap.colorSpace = THREE.LinearSRGBColorSpace
     material.shadingShiftTexture = shiftMap
     material.shadingShiftTextureScale = 2
     colorNear(center(render(renderer, scene)), [153, 0, 0])
@@ -182,6 +185,9 @@ test('MToon preserves matcap, rim texture and live rim expression factors', () =
     colorNear(center(render(renderer, scene)), [0, 0, 153])
     material.rimMultiplyTexture = rimMap
     colorNear(center(render(renderer, scene)), [0, 0, 111])
+    rimMap.colorSpace = THREE.SRGBColorSpace
+    colorNear(center(render(renderer, scene)), [0, 0, 74])
+    rimMap.colorSpace = THREE.LinearSRGBColorSpace
     material.parametricRimColorFactor.setRGB(0, 0, 0)
     material.matcapTexture = matcap
     colorNear(center(render(renderer, scene)), [111, 0, 0])

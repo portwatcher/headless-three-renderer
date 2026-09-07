@@ -264,7 +264,7 @@ impl GpuRenderer {
                 mesh.clearcoat_normal_scale[0],
                 mesh.clearcoat_normal_scale[1],
                 mesh.light_map_intensity,
-                if mesh.shading_model == ShadingModel::Matcap {
+                if matches!(mesh.shading_model, ShadingModel::Matcap | ShadingModel::Mtoon) {
                     if mesh.matcap_map_is_srgb { 1.0 } else { 0.0 }
                 } else if mesh.shading_model == ShadingModel::Toon {
                     if mesh.gradient_map_is_srgb { 1.0 } else { 0.0 }
