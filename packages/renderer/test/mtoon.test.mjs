@@ -211,6 +211,13 @@ test('MToon world outlines extrude back faces and sample the authored width text
     const expanded = render(renderer, scene)
     assert.ok(visible(expanded) > visible(base) + 70)
     colorNear(center(expanded), [153, 0, 0])
+    let border = 0
+    while (!(expanded[border + 3] > 0 && base[border + 3] === 0)) border += 4
+    colorNear([...expanded.subarray(border, border + 4)], [0, 255, 0])
+    outline.outlineLightingMixFactor = 1
+    const litOutline = render(renderer, scene)
+    colorNear([...litOutline.subarray(border, border + 4)], [0, 153, 0])
+    outline.outlineLightingMixFactor = 0
     widthMap.image.data[1] = 0
     widthMap.needsUpdate = true
     assert.deepEqual(render(renderer, scene), base)
@@ -253,4 +260,32 @@ test('skinned meshes retain their world transform, matching Three.js deformed ve
     for (let i = 0; i < actual.length; i += 4) if (Math.abs(actual[i] - expected[i]) > 2) differing++
     assert.ok(differing <= 4, `world transform changed ${differing} pixels`)
   } finally { renderer.dispose(); material.dispose(); geometry.dispose(); baked.dispose(); mesh.skeleton.dispose() }
+})
+
+
+test('MToon shade textures preserve independent UV transforms and UV channels', () => {
+  const renderer = new Renderer()
+  const texture = new THREE.DataTexture(new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]), 2, 1)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.needsUpdate = true
+  texture.repeat.set(0, 0)
+  const material = new MToonMaterial({ shadeColorFactor: new THREE.Color(1, 1, 1), shadeMultiplyTexture: texture })
+  const geometry = new THREE.PlaneGeometry(1.5, 1.5)
+  geometry.setAttribute('uv1', new THREE.Float32BufferAttribute(new Float32Array(8), 2))
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(geometry, material))
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.position.z = -2
+  scene.add(light)
+  try {
+    colorNear(center(render(renderer, scene)), [153, 0, 0])
+    texture.offset.x = 1
+    colorNear(center(render(renderer, scene)), [0, 0, 153])
+    texture.offset.x = 0
+    texture.repeat.set(1, 1)
+    colorNear(center(render(renderer, scene)), [0, 0, 153])
+    texture.channel = 1
+    colorNear(center(render(renderer, scene)), [153, 0, 0])
+  } finally { renderer.dispose(); material.dispose(); texture.dispose(); geometry.dispose() }
 })

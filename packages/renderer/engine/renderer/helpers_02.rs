@@ -156,7 +156,7 @@ pub(super) fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 24]
         mesh.clearcoat_map_transform,
         mesh.clearcoat_roughness_map_transform,
         mesh.clearcoat_normal_map_transform,
-        if mesh.shading_model == ShadingModel::Matcap {
+        if matches!(mesh.shading_model, ShadingModel::Matcap | ShadingModel::Mtoon) {
             mesh.matcap_map_transform
         } else {
             mesh.sheen_color_map_transform
@@ -176,7 +176,7 @@ pub(super) fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 24]
         rows[row] = [transform[0], transform[1], transform[2], 0.0];
         rows[row + 1] = [transform[3], transform[4], transform[5], 0.0];
     }
-    if mesh.shading_model == ShadingModel::Matcap {
+    if matches!(mesh.shading_model, ShadingModel::Matcap | ShadingModel::Mtoon) {
         rows[7][3] = if mesh.matcap_map_uses_uv2 { 1.0 } else { 0.0 };
     } else {
         rows[7][3] = if mesh.sheen_color_map_uses_uv2 {

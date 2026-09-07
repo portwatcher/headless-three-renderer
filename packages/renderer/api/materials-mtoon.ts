@@ -5,6 +5,14 @@ import { assignPbrTextureSamplerState } from './materials.part-003'
 import { finiteNumberOrDefault } from './materials.part-005'
 import { extractTextureFromSlot } from './materials.part-009'
 
+export const MTOON_TEXTURE_SLOTS = [
+  ['shadeMultiplyTexture', 'matcapMap'],
+  ['rimMultiplyTexture', 'specularMap'],
+  ['matcapTexture', 'lightMap'],
+  ['shadingShiftTexture', 'metallicRoughnessTexture'],
+  ['outlineWidthMultiplyTexture', 'aoMap'],
+] as const
+
 /** Preserve Pixiv's live expression-bound factors without replacing its material. */
 export const extractMtoonProperties = function (
   material: ThreeMaterialLike,
@@ -40,15 +48,12 @@ export const extractMtoonProperties = function (
   }
   // Reuse directly uploaded texture slots, preserving their UVs and samplers.
   // PBR sheen/specular-color slots would repack large textures on the CPU each frame.
-  const slots = [
-    ['shadeMultiplyTexture', 'matcapMap'],
-    ['rimMultiplyTexture', 'specularMap'],
-    ['matcapTexture', 'lightMap'],
-    ['shadingShiftTexture', 'metallicRoughnessTexture'],
-    ['outlineWidthMultiplyTexture', 'aoMap'],
-  ] as const
   const target = props as Record<string, unknown>
-  for (const [source, destination] of slots) {
+  for (const [source, destination] of MTOON_TEXTURE_SLOTS) {
+    if (props.mtoon.outlineMode > 0 && props.mtoon.outlineLightingMix === 0
+      && source !== 'outlineWidthMultiplyTexture') {
+      continue
+    }
     const texture = material[source]
     const label = `material.${source}`
     const info = extractTextureFromSlot(texture, label, context.textureCache)

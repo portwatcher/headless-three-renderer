@@ -8,6 +8,9 @@
   irradiance now uses the same Lambert normalization as Pixiv WebGL, avoiding
   washed-out skin and clothing. World- and screen-coordinate outlines extrude
   back faces using the authored width texture and outline color/lighting mix.
+- Shade/rim maps use direct GPU texture uploads and color decoding instead
+  of repeated CPU PBR texture packing. Constant-color outlines skip lighting
+  textures. Independent texture transforms and UV channels have regressions.
 - Fixed transformed SkinnedMesh geometry and normals: CPU skinning returns
   mesh-local vertices, so the object world transform must still be applied.
 - Added targeted regressions for lighting, dynamic factors/textures, outlines,

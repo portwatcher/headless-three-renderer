@@ -2,6 +2,9 @@
 // https://github.com/pixiv/three-vrm/tree/v3.4.4/packages/three-vrm-materials-mtoon
 // Authored shade colors are a separate surface, not a multiplier on lit albedo.
 fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2<f32>, uv2: vec2<f32>) -> vec3<f32> {
+  if uniforms.mtoon[5].x > 0.5 && uniforms.mtoon[4].w == 0.0 {
+    return uniforms.mtoon[4].rgb;
+  }
   let shade = uniforms.mtoon[0].rgb * input.color.rgb * decode_matcap_map_sample(textureSample(
     t_physical_sheen, s_physical_sheen_map, transform_matcap_color_map_uv(uv, uv2)
   )).rgb;

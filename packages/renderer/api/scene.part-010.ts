@@ -1,3 +1,4 @@
+import { MTOON_TEXTURE_SLOTS } from './materials-mtoon'
 import type {
   ThreeObject3DLike,
   ThreeBufferAttributeLike,
@@ -400,6 +401,16 @@ export function meshTextureUvSlots(material: ThreeMaterialLike | undefined): Mat
     { texture: material.specularMap, pbrFlag: 'specularMapUsesUv2' },
     { texture: material.alphaMap, textureFlag: 'alphaMapUsesUv2' },
   )
+
+  if (material.isMToonMaterial === true) {
+    for (const [source, destination] of MTOON_TEXTURE_SLOTS) {
+      // Matcap coordinates come from the view normal, not a geometry UV stream.
+      if (source === 'matcapTexture') {
+        continue
+      }
+      slots.push({ texture: material[source], pbrFlag: `${destination}UsesUv2` })
+    }
+  }
 
   return slots
 }
