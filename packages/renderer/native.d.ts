@@ -87,6 +87,22 @@ export declare function decodeImage(data: Buffer): DecodedImage
 
 export declare function encodePng(data: Buffer, width: number, height: number): Buffer
 
+export interface MtoonParameters {
+  shadeColor: Array<number>
+  shadingShift: number
+  shadingToony: number
+  shadingShiftTextureScale: number
+  rimColor: Array<number>
+  rimFresnelPower: number
+  rimLift: number
+  matcapColor: Array<number>
+  v0CompatShade: boolean
+  outlineColor: Array<number>
+  outlineLightingMix: number
+  outlineWidth: number
+  outlineMode: number
+}
+
 export interface NativeCpuI420Frame {
   width: number
   height: number
@@ -1054,6 +1070,8 @@ export interface SceneMesh {
    * or `"lambert"` (diffuse-only / MeshLambertMaterial).
    */
   shadingModel?: string
+  /** Pixiv MToon lighting factors; texture slots are assigned by the adapter. */
+  mtoon?: MtoonParameters
   /** Whether this mesh samples the scene/material environment map when one exists. */
   useEnvironmentMap?: boolean
   /** Per-mesh environment intensity. Defaults to the scene environment intensity. */

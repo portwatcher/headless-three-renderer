@@ -2,6 +2,7 @@ pub const SHADER: &str = concat!(
     include_str!("shader/main_bindings.wgsl"),
     include_str!("shader/main_materials.wgsl"),
     include_str!("shader/main_output.wgsl"),
+    include_str!("shader/mtoon.wgsl"),
 );
 
 pub fn custom_shader_source(fragment_body: &str) -> String {

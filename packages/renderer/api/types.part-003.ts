@@ -351,6 +351,7 @@ export interface NativeSceneMesh {
   /** Optional shadow-pass face filter from material.shadowSide. Unset preserves the renderer's default no-cull caster behavior. */
   shadowSide?: string
   shadingModel?: string
+  mtoon?: import('./mtoon-parameters').MtoonParameters
   useEnvironmentMap?: boolean
   environmentMapIntensity?: number
   environmentMapCombine?: number

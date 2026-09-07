@@ -700,6 +700,7 @@ pub(super) fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<Pr
         side,
         shadow_side,
         shading_model,
+        mtoon: super::mtoon::prepare_mtoon(mesh.mtoon.as_ref())?,
         use_environment_map: mesh.use_environment_map,
         environment_map_intensity,
         environment_map_combine,

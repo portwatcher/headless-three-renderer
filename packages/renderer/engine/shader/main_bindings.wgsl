@@ -121,6 +121,7 @@ struct Uniforms {
   // x = iridescence, y = iridescence IOR, z/w = iridescence thickness range in nanometers.
   iridescence_params: vec4<f32>,
   lights: array<GpuLight, 64>,
+  mtoon: array<vec4<f32>, 6>,
 };
 
 @group(0) @binding(0)
@@ -221,6 +222,18 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
   let world_pos = uniforms.model * vec4<f32>(input.position, 1.0);
   output.position = uniforms.mvp * vec4<f32>(input.position, 1.0);
+  if uniforms.ibl_params.y == 10.0 && uniforms.mtoon[5].x > 0.5 {
+    let width_uv = transform_ao_map_uv(input.uv, input.uv2);
+    let width_texture = textureSampleLevel(t_ao, s_ao, width_uv, 0.0).g;
+    let transformed_normal = (uniforms.normal_matrix * vec4<f32>(normalize(input.normal), 0.0)).xyz;
+    var width = uniforms.mtoon[5].y * width_texture * length(transformed_normal);
+    if uniforms.mtoon[5].x > 1.5 {
+      let view_position = uniforms.view * world_pos;
+      width *= max(-view_position.z, 0.0) / max(uniforms.mtoon[5].z, 0.0001);
+    }
+    output.position = uniforms.mvp * vec4<f32>(input.position + normalize(input.normal) * width, 1.0);
+    output.position.z += 0.000001 * output.position.w;
+  }
   output.world_pos = world_pos.xyz;
   output.world_normal = normalize((uniforms.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz);
   output.world_tangent = normalize((uniforms.model * vec4<f32>(input.tangent.xyz, 0.0)).xyz);

@@ -339,8 +339,26 @@ export interface ThreeMaterialLike {
   isMeshStandardMaterial?: boolean
   isMeshPhysicalMaterial?: boolean
   isMeshToonMaterial?: boolean
-  /** Pixiv MToon surface adapter (native toon approximation). */
+  /** Pixiv MToon material adapter. */
   isMToonMaterial?: boolean
+  shadeColorFactor?: ThreeColorLike
+  shadeMultiplyTexture?: ThreeTextureLike | null
+  shadingShiftFactor?: number
+  shadingToonyFactor?: number
+  shadingShiftTexture?: ThreeTextureLike | null
+  shadingShiftTextureScale?: number
+  parametricRimColorFactor?: ThreeColorLike
+  parametricRimFresnelPowerFactor?: number
+  parametricRimLiftFactor?: number
+  rimMultiplyTexture?: ThreeTextureLike | null
+  matcapFactor?: ThreeColorLike
+  matcapTexture?: ThreeTextureLike | null
+  v0CompatShade?: boolean
+  outlineWidthMode?: string
+  outlineWidthFactor?: number
+  outlineWidthMultiplyTexture?: ThreeTextureLike | null
+  outlineColorFactor?: ThreeColorLike
+  outlineLightingMixFactor?: number
   isOutline?: boolean
   ignoreVertexColor?: boolean
   isShadowMaterial?: boolean

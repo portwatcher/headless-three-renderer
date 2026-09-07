@@ -121,7 +121,7 @@ pub(super) fn create_renderer_layouts(device: &wgpu::Device) -> RendererLayouts 
         entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
                     view_dimension: wgpu::TextureViewDimension::D2,
@@ -197,7 +197,7 @@ pub(super) fn create_renderer_layouts(device: &wgpu::Device) -> RendererLayouts 
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 8,
-                visibility: wgpu::ShaderStages::FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,
             },

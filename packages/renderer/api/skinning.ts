@@ -9,7 +9,7 @@ import { getAttribute, attributeComponent } from './attributes'
  * Three.js bone transform formula per vertex:
  *   boneMatrix[i] = skeleton.bones[i].matrixWorld * skeleton.boneInverses[i]
  *   skinMatrix = sum(weight[i] * boneMatrix[skinIndex[i]])
- *   worldPos = mesh.bindMatrixInverse * skinMatrix * mesh.bindMatrix * localPos
+ *   deformedLocalPos = mesh.bindMatrixInverse * skinMatrix * mesh.bindMatrix * localPos
  */
 export function applyCpuSkinning(
   mesh: ThreeObject3DLike,

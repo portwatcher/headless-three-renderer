@@ -290,6 +290,7 @@ export function extractPbrProperties(
   }
 
   Object.assign(props, materialRenderStateProperties(material, customFragmentShader, context))
+  extractMtoonProperties(material, props, context)
 
   return props
 }
@@ -494,3 +495,4 @@ export function materialScalarFeatureProperties(
   }
   return props
 }
+import { extractMtoonProperties } from './materials-mtoon'

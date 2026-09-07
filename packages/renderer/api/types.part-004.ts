@@ -1,4 +1,7 @@
+import type { MtoonParameters } from './mtoon-parameters'
+
 export interface PbrProperties {
+  mtoon?: MtoonParameters
   metallic?: number
   roughness?: number
   clearcoat?: number

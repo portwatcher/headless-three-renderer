@@ -82,6 +82,8 @@ pub struct Uniforms {
     /// x = iridescence, y = iridescence IOR, z/w = iridescence thickness range in nanometers.
     pub iridescence_params: [f32; 4],
     pub lights: [GpuLight; MAX_LIGHTS],
+    /// Shade + shift; rim + power; matcap + lift; toony + shift texture scale + VRM0 clamp.
+    pub mtoon: [[f32; 4]; 6],
 }
 
 #[repr(C)]

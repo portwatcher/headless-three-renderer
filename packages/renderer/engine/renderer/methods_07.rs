@@ -51,6 +51,10 @@ impl GpuRenderer {
             .environment_map_intensity
             .unwrap_or(settings.env_intensity);
 
+        let mut mtoon = mesh.mtoon;
+        mtoon[5][2] = (settings.view_projection * settings.view.inverse())
+            .y_axis
+            .y;
         let uniforms = Uniforms {
             mvp: mvp.to_cols_array_2d(),
             view: settings.view.to_cols_array_2d(),
@@ -298,6 +302,7 @@ impl GpuRenderer {
                 mesh.iridescence_thickness_max,
             ],
             lights,
+            mtoon,
         };
         let CachedUniformBindGroup {
             buffer: uniform_buffer,

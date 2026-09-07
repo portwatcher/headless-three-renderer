@@ -288,7 +288,9 @@ export function materialRenderStateProperties(
     props.shadingModel = 'matcap'
   } else if (material.isMeshPhongMaterial) {
     props.shadingModel = 'phong'
-  } else if (material.isMeshToonMaterial || material.isMToonMaterial) {
+  } else if (material.isMToonMaterial) {
+    props.shadingModel = 'mtoon'
+  } else if (material.isMeshToonMaterial) {
     props.shadingModel = 'toon'
   } else if (material.isShadowMaterial) {
     props.shadingModel = 'shadow'

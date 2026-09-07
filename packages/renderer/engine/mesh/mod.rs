@@ -123,6 +123,7 @@ pub struct PreparedMesh {
     pub side: MeshSide,
     pub shadow_side: MeshSide,
     pub shading_model: ShadingModel,
+    pub mtoon: [[f32; 4]; 6],
     pub use_environment_map: Option<bool>,
     pub environment_map_intensity: Option<f32>,
     pub environment_map_combine: u32,
@@ -294,6 +295,7 @@ pub enum ShadingModel {
     Toon,
     Distance,
     Shadow,
+    Mtoon,
 }
 
 impl ShadingModel {
@@ -308,6 +310,7 @@ impl ShadingModel {
             Some("toon") => Self::Toon,
             Some("distance") => Self::Distance,
             Some("shadow") => Self::Shadow,
+            Some("mtoon") => Self::Mtoon,
             _ => Self::Standard,
         }
     }
@@ -324,6 +327,7 @@ impl ShadingModel {
             Self::Toon => 7,
             Self::Distance => 8,
             Self::Shadow => 9,
+            Self::Mtoon => 10,
         }
     }
 }
@@ -599,6 +603,7 @@ impl MipmapFilter {
 }
 
 mod decode;
+mod mtoon;
 mod physical;
 mod prepare;
 mod sampling;

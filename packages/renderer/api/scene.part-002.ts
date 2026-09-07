@@ -304,13 +304,11 @@ export function appendMesh(
     normals = skinned.normals
   }
 
-  // For skinned meshes, positions are already in world space after CPU skinning.
-  const isSkinned = object.isSkinnedMesh === true && object.skeleton
+  // bindMatrixInverse returns skinned vertices to mesh-local space, just like
+  // Three.js' skinning vertex chunk. The object world transform still applies.
   const meshTransform = instanceOverride
     ? IDENTITY_4X4.slice()
-    : isSkinned
-      ? IDENTITY_4X4.slice()
-      : matrixElements(object.matrixWorld!, 'mesh.matrixWorld')
+    : matrixElements(object.matrixWorld!, 'mesh.matrixWorld')
   const instances = instanceOverride ?? meshInstances(object, meshTransform, cache)
   if (instances.length === 0) return
   const objectCastsShadow = optionalObjectBoolean(object.castShadow, 'object.castShadow') === true

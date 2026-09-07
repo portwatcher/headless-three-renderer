@@ -65,6 +65,7 @@ struct Uniforms {
   physical_specular: vec4<f32>,
   iridescence_params: vec4<f32>,
   lights: array<GpuLight, 64>,
+  mtoon: array<vec4<f32>, 6>,
 };
 
 @group(0) @binding(0)

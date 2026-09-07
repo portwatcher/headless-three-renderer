@@ -1,5 +1,26 @@
 # Release Notes
 
+## 0.4.2
+
+- Replaced the generic toon approximation for Pixiv MToon with its own native
+  lighting path: authored shade color/texture, shading shift and toony factors,
+  rim/matcap textures and expression factors, and VRM0 shade clamping. Ambient
+  irradiance now uses the same Lambert normalization as Pixiv WebGL, avoiding
+  washed-out skin and clothing. World- and screen-coordinate outlines extrude
+  back faces using the authored width texture and outline color/lighting mix.
+- Fixed transformed SkinnedMesh geometry and normals: CPU skinning returns
+  mesh-local vertices, so the object world transform must still be applied.
+- Added targeted regressions for lighting, dynamic factors/textures, outlines,
+  and transformed skinning. UV animation and debug modes remain unsupported.
+- A same-model, same-pose WebGL comparison at 600×720 reduced mean RGB error
+  from 44.04 to 1.65 out of 255 in the consuming NPCify application. Its private
+  model is not committed. Regenerated all 104 WebGL corpus images with Three.js
+  r183 and passed all 109 golden assertions without changing tolerances. The
+  generator now accepts r183's unpacked distance shader as well as the older
+  packed output. Existing committed Linux x64/macOS arm64 references also pass
+  and remain unchanged; other platforms retain the documented no-reference
+  skip path. Targeted MToon tests now run on every CI platform.
+
 ## 0.4.1
 
 - Added a native toon surface adapter for Pixiv `MToonMaterial`, fixing real

@@ -477,6 +477,12 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     tbn = tangent_basis(N, tbn[0], input.tangent_w);
   }
 
+  if shading_model == 10u {
+    let lit = mtoon_lighting(input, N, albedo, uv, uv2);
+    let mapped = apply_output_color_space(apply_material_tone_mapping(lit));
+    return output_color(apply_fog(mapped, fog_depth(input.world_pos)), alpha);
+  }
+
   // Ambient occlusion: sample red channel, blend toward 1.0 by intensity.
   // Matches three.js: ao = (texture.r - 1.0) * aoMapIntensity + 1.0
   var ao: f32 = 1.0;

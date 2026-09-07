@@ -37,6 +37,11 @@ test('committed Khronos glTF Sample Assets RiggedSimple fixture applies skinned 
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
+  // This side view is authored in the cylinder's local Z-up basis. Include
+  // the sample's world transform now that skinned draws correctly retain it.
+  camera.applyMatrix4(mesh.matrixWorld)
+  camera.updateMatrixWorld(true)
+
   const renderer = new Renderer()
   const renderBounds = () => nonBackgroundBounds(renderer.render(gltf.scene, camera, {
     width: 96,
@@ -378,6 +383,11 @@ test('committed Khronos glTF Sample Assets CesiumMan fixture loads textured skin
   camera.position.set(0, -3, 1.4)
   camera.lookAt(0, 0, 0.7)
   gltf.scene.updateMatrixWorld(true)
+  camera.updateMatrixWorld(true)
+
+  // The historical portrait camera was specified before the asset's axis
+  // conversion. Move it to the same world basis as the skinned character.
+  camera.applyMatrix4(mesh.matrixWorld)
   camera.updateMatrixWorld(true)
 
   const rgba = new Renderer().render(gltf.scene, camera, {

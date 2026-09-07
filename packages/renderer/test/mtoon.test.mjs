@@ -118,3 +118,133 @@ test('unrecognized ShaderMaterial still fails explicitly', () => {
     renderer.dispose()
   }
 })
+
+const colorNear = (actual, expected, tolerance = 2) => {
+  actual.slice(0, 3).forEach((value, i) => assert.ok(
+    Math.abs(value - expected[i]) <= tolerance,
+    `channel ${i}: expected ${expected}, got ${actual}`,
+  ))
+}
+const solidTexture = (rgba) => {
+  const texture = new THREE.DataTexture(new Uint8Array(rgba), 1, 1)
+  texture.needsUpdate = true
+  return texture
+}
+
+test('MToon uses the browser Lambert normalization for ambient light and stays dark without light', () => {
+  const renderer = new Renderer()
+  const material = new MToonMaterial({ color: new THREE.Color(1, 0, 0) })
+  const scene = surface(material)
+  try {
+    // Three.js WebGL: linear 1 / PI becomes sRGB 153, not full-strength ambient.
+    colorNear(center(render(renderer, scene)), [153, 0, 0])
+    scene.remove(scene.children[1])
+    colorNear(center(render(renderer, scene)), [0, 0, 0])
+  } finally { renderer.dispose(); material.dispose() }
+})
+
+test('MToon shades with authored color and texture, and observes live shade and shift changes', () => {
+  const renderer = new Renderer()
+  const material = new MToonMaterial({ color: new THREE.Color(1, 0, 0), shadeColorFactor: new THREE.Color(0, 0, 1) })
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), material))
+  const light = new THREE.DirectionalLight(0xffffff, 1)
+  light.position.z = -2
+  scene.add(light)
+  const shadeMap = solidTexture([255, 128, 255, 255])
+  const shiftMap = solidTexture([255, 0, 0, 255])
+  try {
+    colorNear(center(render(renderer, scene)), [0, 0, 153])
+    material.shadeColorFactor.setRGB(0, 1, 0)
+    colorNear(center(render(renderer, scene)), [0, 153, 0])
+    material.shadeMultiplyTexture = shadeMap
+    colorNear(center(render(renderer, scene)), [0, 111, 0])
+    material.shadingShiftTexture = shiftMap
+    material.shadingShiftTextureScale = 2
+    colorNear(center(render(renderer, scene)), [153, 0, 0])
+    material.shadingShiftTexture = null
+    light.position.z = 2
+    colorNear(center(render(renderer, scene)), [153, 0, 0])
+    material.shadingShiftFactor = -2
+    colorNear(center(render(renderer, scene)), [0, 111, 0])
+    material.shadingShiftFactor = Number.NaN
+    assert.throws(() => render(renderer, scene), /shadingShiftFactor.*finite/)
+  } finally { renderer.dispose(); material.dispose(); shadeMap.dispose(); shiftMap.dispose() }
+})
+
+test('MToon preserves matcap, rim texture and live rim expression factors', () => {
+  const renderer = new Renderer()
+  const material = new MToonMaterial({ color: new THREE.Color(0, 0, 0), parametricRimColorFactor: new THREE.Color(0, 0, 1), parametricRimFresnelPowerFactor: 0 })
+  const scene = surface(material)
+  const rimMap = solidTexture([255, 255, 128, 255])
+  const matcap = solidTexture([128, 0, 0, 255])
+  try {
+    colorNear(center(render(renderer, scene)), [0, 0, 153])
+    material.rimMultiplyTexture = rimMap
+    colorNear(center(render(renderer, scene)), [0, 0, 111])
+    material.parametricRimColorFactor.setRGB(0, 0, 0)
+    material.matcapTexture = matcap
+    colorNear(center(render(renderer, scene)), [111, 0, 0])
+    material.matcapFactor.setRGB(0, 0, 0)
+    colorNear(center(render(renderer, scene)), [0, 0, 0])
+  } finally { renderer.dispose(); material.dispose(); rimMap.dispose(); matcap.dispose() }
+})
+
+test('MToon world outlines extrude back faces and sample the authored width texture', () => {
+  const renderer = new Renderer()
+  const material = new MToonMaterial({ color: new THREE.Color(1, 0, 0) })
+  const widthMap = solidTexture([255, 255, 255, 255])
+  const outline = new MToonMaterial({ isOutline: true, side: THREE.BackSide, outlineWidthMode: 'worldCoordinates', outlineWidthFactor: 0.12, outlineColorFactor: new THREE.Color(0, 1, 0), outlineLightingMixFactor: 0, outlineWidthMultiplyTexture: widthMap })
+  const geometry = new THREE.SphereGeometry(0.6, 32, 24)
+  const scene = new THREE.Scene()
+  scene.add(new THREE.Mesh(geometry, material), new THREE.AmbientLight(0xffffff, 1))
+  const visible = (frame) => { let n = 0; for (let i = 3; i < frame.length; i += 4) if (frame[i] > 0) n++; return n }
+  try {
+    const base = render(renderer, scene)
+    scene.add(new THREE.Mesh(geometry, outline))
+    const expanded = render(renderer, scene)
+    assert.ok(visible(expanded) > visible(base) + 70)
+    colorNear(center(expanded), [153, 0, 0])
+    widthMap.image.data[1] = 0
+    widthMap.needsUpdate = true
+    assert.deepEqual(render(renderer, scene), base)
+  } finally { renderer.dispose(); material.dispose(); outline.dispose(); widthMap.dispose(); geometry.dispose() }
+})
+
+test('skinned meshes retain their world transform, matching Three.js deformed vertices', () => {
+  const renderer = new Renderer()
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  const geometry = new THREE.PlaneGeometry(0.6, 0.8)
+  const count = geometry.attributes.position.count
+  const weights = new Float32Array(count * 4)
+  for (let i = 0; i < count; i++) weights[i * 4] = 1
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(new Uint16Array(count * 4), 4))
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(weights, 4))
+  const bone = new THREE.Bone()
+  const mesh = new THREE.SkinnedMesh(geometry, material)
+  const parent = new THREE.Group()
+  parent.position.set(0.35, -0.15, 0)
+  parent.rotation.z = 0.4
+  parent.scale.setScalar(1.2)
+  parent.add(mesh)
+  mesh.add(bone)
+  parent.updateMatrixWorld(true)
+  mesh.bind(new THREE.Skeleton([bone]))
+  bone.rotation.z = -0.25
+  const scene = new THREE.Scene()
+  scene.add(parent)
+  scene.updateMatrixWorld(true)
+  const expectedPositions = []
+  for (let i = 0; i < count; i++) expectedPositions.push(...mesh.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).toArray())
+  const baked = geometry.clone()
+  baked.setAttribute('position', new THREE.Float32BufferAttribute(expectedPositions, 3))
+  const expectedScene = new THREE.Scene()
+  expectedScene.add(new THREE.Mesh(baked, material))
+  try {
+    const actual = render(renderer, scene)
+    const expected = render(renderer, expectedScene)
+    let differing = 0
+    for (let i = 0; i < actual.length; i += 4) if (Math.abs(actual[i] - expected[i]) > 2) differing++
+    assert.ok(differing <= 4, `world transform changed ${differing} pixels`)
+  } finally { renderer.dispose(); material.dispose(); geometry.dispose(); baked.dispose(); mesh.skeleton.dispose() }
+})

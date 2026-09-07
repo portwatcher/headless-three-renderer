@@ -700,6 +700,8 @@ pub struct SceneMesh {
     /// Shading model: `"standard"` (default PBR), `"basic"` (unlit / MeshBasicMaterial),
     /// or `"lambert"` (diffuse-only / MeshLambertMaterial).
     pub shading_model: Option<String>,
+    /// Pixiv MToon lighting factors; texture slots are assigned by the adapter.
+    pub mtoon: Option<super::MtoonParameters>,
     /// Whether this mesh samples the scene/material environment map when one exists.
     pub use_environment_map: Option<bool>,
     /// Per-mesh environment intensity. Defaults to the scene environment intensity.
