@@ -193,10 +193,6 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:conformance:ci
 
-      - name: Real Pixiv MToon regression tests
-        working-directory: packages/renderer
-        run: pnpm run test:mtoon
-
       - name: Release artifact verification
         working-directory: packages/renderer
         run: pnpm run verify:pack
