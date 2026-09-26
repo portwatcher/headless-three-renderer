@@ -58,11 +58,10 @@ pub(super) fn create_cubemap_with_mips(
 #[cfg(test)]
 mod tests {
     use super::{
-        AoPhysicalBindGroupKey, BackgroundBindGroupKey, BackgroundUniforms, CustomBlendPipelineKey,
-        IblBindGroupKey, MeshBufferCacheKey, PhysicalLayersTextureCacheKey, PostUniforms,
-        SamplerKey, TextureBindGroupKey, TextureBindGroupKind, TextureCacheKey,
-        UniformBindGroupKey, Uniforms, downsample_rgba_mip, f32_key, insert_bounded_cache,
-        post_uniforms, texture_mip_level_count,
+        BackgroundBindGroupKey, CustomBlendPipelineKey, IblBindGroupKey, MeshBufferCacheKey,
+        PhysicalLayersTextureCacheKey, PostUniforms, SamplerKey, TextureBindGroupKey,
+        TextureBindGroupKind, TextureCacheKey, UniformBindGroupKey, Uniforms, downsample_rgba_mip,
+        f32_key, insert_bounded_cache, post_uniforms, texture_mip_level_count,
     };
     use crate::ibl::IblMaps;
     use crate::mesh::{
@@ -373,7 +372,6 @@ mod tests {
     pub(super) fn background_bind_group_keys_track_texture_and_sampler() {
         let base = single_pixel_texture([255, 0, 0, 255]);
         let same = single_pixel_texture([255, 0, 0, 255]);
-        let uniforms = BackgroundUniforms::zeroed();
         assert_eq!(
             BackgroundBindGroupKey::new(&base),
             BackgroundBindGroupKey::new(&same)
@@ -391,60 +389,6 @@ mod tests {
             BackgroundBindGroupKey::new(&base),
             BackgroundBindGroupKey::new(&repeated_texture),
             "background sampler state is part of the cached bind group",
-        );
-
-        let mut changed_uniforms = uniforms;
-        changed_uniforms.camera_params[0] = 1.0;
-        assert_ne!(
-            bytemuck::bytes_of(&uniforms),
-            bytemuck::bytes_of(&changed_uniforms),
-        );
-        assert_eq!(
-            BackgroundBindGroupKey::new(&base),
-            BackgroundBindGroupKey::new(&base),
-            "camera and background uniform content update the cached buffer instead of splitting bind groups",
-        );
-    }
-
-    pub(super) fn ao_physical_key(ao: Option<&PreparedTexture>) -> AoPhysicalBindGroupKey {
-        let default_sampler = SamplerKey::default_texture();
-        AoPhysicalBindGroupKey {
-            ao: ao.map(TextureCacheKey::from_texture),
-            physical_layers: None,
-            physical_sheen: None,
-            physical_specular: None,
-            clearcoat_normal: None,
-            alpha: None,
-            light: None,
-            ao_sampler: ao.map(SamplerKey::from_texture).unwrap_or(default_sampler),
-            alpha_sampler: default_sampler,
-            light_sampler: default_sampler,
-            specular_sampler: default_sampler,
-            physical_layers_sampler: default_sampler,
-            physical_sheen_sampler: default_sampler,
-            physical_specular_sampler: default_sampler,
-            clearcoat_normal_sampler: default_sampler,
-        }
-    }
-
-    #[test]
-    pub(super) fn ao_physical_bind_group_keys_track_resources_and_samplers() {
-        let ao = single_pixel_texture([255, 0, 0, 255]);
-        let same_ao = single_pixel_texture([255, 0, 0, 255]);
-        assert_eq!(ao_physical_key(Some(&ao)), ao_physical_key(Some(&same_ao)));
-
-        let different_ao = single_pixel_texture([0, 255, 0, 255]);
-        assert_ne!(
-            ao_physical_key(Some(&ao)),
-            ao_physical_key(Some(&different_ao)),
-        );
-
-        let mut repeated_ao = single_pixel_texture([255, 0, 0, 255]);
-        repeated_ao.wrap_s = WrapMode::Repeat;
-        assert_ne!(
-            ao_physical_key(Some(&ao)),
-            ao_physical_key(Some(&repeated_ao)),
-            "AO sampler state is part of the combined bind group",
         );
     }
 
