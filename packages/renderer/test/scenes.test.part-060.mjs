@@ -281,9 +281,6 @@ test('invalid material render-state boolean values fail clearly', () => {
     ['toneMapped', (material) => {
       material.toneMapped = 'yes'
     }, /material\.toneMapped must be a boolean/i],
-    ['dithering', (material) => {
-      material.dithering = 'yes'
-    }, /material\.dithering must be a boolean/i],
     ['transparent', (material) => {
       material.transparent = 'yes'
     }, /material\.transparent must be a boolean/i],
@@ -471,9 +468,8 @@ test('material dithering is accepted as a compatibility no-op', () => {
     })
   }
 
-  assert.deepEqual(
-    renderDithering(true),
-    renderDithering(false),
-    'dithering should be accepted without altering native output',
-  )
+  const baseline = renderDithering(false)
+  for (const dithering of [true, 'yes']) {
+    assert.deepEqual(renderDithering(dithering), baseline, 'dithering should not alter native output')
+  }
 })

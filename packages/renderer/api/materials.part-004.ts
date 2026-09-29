@@ -5,7 +5,7 @@ import { objectChildren } from './objects'
 import { AddEquation, AdditiveBlending, AlwaysDepth, AlwaysStencilFunc, ConstantAlphaFactor, ConstantColorFactor, CustomBlending, DstAlphaFactor, DstColorFactor, EqualDepth, EqualStencilFunc, GreaterDepth, GreaterEqualDepth, GreaterEqualStencilFunc, GreaterStencilFunc, LessDepth, LessEqualDepth, LessEqualStencilFunc, LessStencilFunc, MaterialExtractionContext, MaxEquation, MinEquation, MultiplyBlending, NeverDepth, NeverStencilFunc, NoBlending, NormalBlending, NotEqualDepth, NotEqualStencilFunc, OneFactor, OneMinusConstantAlphaFactor, OneMinusConstantColorFactor, OneMinusDstAlphaFactor, OneMinusDstColorFactor, OneMinusSrcAlphaFactor, OneMinusSrcColorFactor, ReverseSubtractEquation, SrcAlphaFactor, SrcAlphaSaturateFactor, SrcColorFactor, SubtractEquation, SubtractiveBlending, ZeroFactor } from './materials.part-001'
 import { MaterialColorSignature, materialSlotColor, materialSlotColorSignature, sameMaterialColorSignature, sameUnknownArray } from './materials.part-002'
 import { MaterialScalarFeatureSignature } from './materials.part-003'
-import { materialShadowSide, materialSide, materialStencilOperation, optionalBoolean, optionalFiniteNumber, optionalMaterialPrecision } from './materials.part-005'
+import { materialShadowSide, materialSide, materialStencilOperation, optionalBoolean, optionalFiniteNumber } from './materials.part-005'
 import { copyShaderMaterialInfo, shaderMaterialKind } from './materials.part-008'
 export function materialScalarFeatureSignature(
   material: ThreeMaterialLike,
@@ -166,8 +166,6 @@ export function materialRenderStateProperties(
   if (optionalBoolean(material.toneMapped, 'material.toneMapped') === false) {
     props.toneMapped = false
   }
-  optionalBoolean(material.dithering, 'material.dithering')
-  optionalMaterialPrecision(material.precision)
   const transparent = optionalBoolean(material.transparent, 'material.transparent')
   if (transparent !== undefined) {
     props.transparent = transparent
@@ -321,8 +319,6 @@ export function materialRenderStateSignature(
       material.alphaToCoverage,
       material.premultipliedAlpha,
       material.toneMapped,
-      material.dithering,
-      material.precision,
       material.transparent,
       material.forceSinglePass,
       material.blending,

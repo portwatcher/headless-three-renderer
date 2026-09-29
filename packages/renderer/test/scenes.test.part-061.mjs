@@ -230,7 +230,7 @@ test('material precision values are accepted as compatibility no-ops', () => {
   }
 
   const defaultOutput = renderPrecision(null)
-  for (const precision of ['highp', 'mediump', 'lowp']) {
+  for (const precision of ['highp', 'mediump', 'lowp', 'ultrap', 1]) {
     assert.deepEqual(
       renderPrecision(precision),
       defaultOutput,
@@ -238,14 +238,6 @@ test('material precision values are accepted as compatibility no-ops', () => {
     )
   }
 
-  for (const [precision, pattern] of [
-    [1, /material\.precision must be "highp", "mediump", "lowp", null, or undefined/i],
-    ['ultrap', /material\.precision "ultrap" is not supported.*highp.*mediump.*lowp/i],
-  ]) {
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff })
-    material.precision = precision
-    assertMaterialRenderStateFails(material, pattern)
-  }
 })
 
 test('mesh wireframe line hints are accepted as compatibility no-ops', () => {
@@ -281,36 +273,15 @@ test('mesh wireframe line hints are accepted as compatibility no-ops', () => {
     renderWireframeHints({}),
     'wireframeLinewidth, wireframeLinecap, and wireframeLinejoin should not alter native output',
   )
-})
-
-test('invalid mesh wireframe line hints fail clearly', () => {
-  for (const [mutate, pattern] of [
-    [(material) => {
-      material.wireframeLinewidth = 'wide'
-    }, /material\.wireframeLinewidth must be a finite number/i],
-    [(material) => {
-      material.wireframeLinewidth = 0
-    }, /material\.wireframeLinewidth must be positive/i],
-    [(material) => {
-      material.wireframeLinecap = 1
-    }, /material\.wireframeLinecap must be a string/i],
-    [(material) => {
-      material.wireframeLinecap = 'triangle'
-    }, /material\.wireframeLinecap "triangle" is not supported.*butt.*round.*square/i],
-    [(material) => {
-      material.wireframeLinejoin = 1
-    }, /material\.wireframeLinejoin must be a string/i],
-    [(material) => {
-      material.wireframeLinejoin = 'triangle'
-    }, /material\.wireframeLinejoin "triangle" is not supported.*round.*bevel.*miter/i],
-  ]) {
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      wireframe: true,
-    })
-    mutate(material)
-    assertMaterialRenderStateFails(material, pattern)
-  }
+  assert.deepEqual(
+    renderWireframeHints({
+      wireframeLinewidth: 'wide',
+      wireframeLinecap: 'triangle',
+      wireframeLinejoin: 1,
+    }),
+    renderWireframeHints({}),
+    'ignored wireframe hints should not affect rendering',
+  )
 })
 
 test('NoBlending disables blending even for transparent materials', () => {

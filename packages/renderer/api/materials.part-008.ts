@@ -4,7 +4,7 @@ import { strictColorLikeToArray, validatedColorLikeToArray } from './color'
 import { objectChildren } from './objects'
 import { CubeReflectionMapping, CubeRefractionMapping, CubeUVReflectionMapping, DefaultOnBeforeCompileSource, EquirectangularReflectionMapping, EquirectangularRefractionMapping, MaterialExtractionContext, MaterialNodeHookProperties, TextureImageInput } from './materials.part-001'
 import { sameUnknownArray, supportsNativeMaterialEnvironmentMap } from './materials.part-002'
-import { optionalBoolean, optionalPositiveFiniteNumber, optionalWireframeLinecap, optionalWireframeLinejoin, textureUvChannel } from './materials.part-005'
+import { optionalBoolean, textureUvChannel } from './materials.part-005'
 import { cubeUvPackedImage, extractTextureFromSlot, filterModeToString, imageToRgbaTexture, minFilterModeToString, packedCubeUvTextureToFaceTextures, sampleCubeFace, textureLike, textureSourceData, wrapModeToString } from './materials.part-009'
 import { assertSupportedBackgroundTexture, assertSupportedTextureInput } from './materials.part-010'
 import { optionalTextureBoolean, textureAnisotropy, textureColorSpace, textureTransform, textureUnpackAlignment } from './materials.part-011'
@@ -46,9 +46,6 @@ export function assertSupportedMaterialState(
   context: MaterialExtractionContext,
 ): void {
   optionalBoolean(material.wireframe, 'material.wireframe')
-  optionalPositiveFiniteNumber(material.wireframeLinewidth, 'material.wireframeLinewidth')
-  optionalWireframeLinecap(material.wireframeLinecap)
-  optionalWireframeLinejoin(material.wireframeLinejoin)
   if (
     material.envMap != null &&
     supportsNativeMaterialEnvironmentMap(material) &&

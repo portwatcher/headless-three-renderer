@@ -124,52 +124,6 @@ export function optionalBoolean(value: unknown, label: string): boolean | undefi
   throw new TypeError(`${label} must be a boolean.`)
 }
 
-export function optionalPositiveFiniteNumber(value: unknown, label: string): void {
-  if (value == null) return
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new TypeError(`${label} must be a finite number.`)
-  }
-  if (value <= 0) {
-    throw new TypeError(`${label} must be positive.`)
-  }
-}
-
-export function optionalWireframeLinecap(value: unknown): void {
-  if (value == null) return
-  if (typeof value !== 'string') {
-    throw new TypeError('material.wireframeLinecap must be a string.')
-  }
-  if (value !== 'butt' && value !== 'round' && value !== 'square') {
-    throw new Error(
-      `material.wireframeLinecap ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "butt", "round", "square", null, or undefined.`,
-    )
-  }
-}
-
-export function optionalWireframeLinejoin(value: unknown): void {
-  if (value == null) return
-  if (typeof value !== 'string') {
-    throw new TypeError('material.wireframeLinejoin must be a string.')
-  }
-  if (value !== 'round' && value !== 'bevel' && value !== 'miter') {
-    throw new Error(
-      `material.wireframeLinejoin ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "round", "bevel", "miter", null, or undefined.`,
-    )
-  }
-}
-
-export function optionalMaterialPrecision(value: unknown): void {
-  if (value == null) return
-  if (typeof value !== 'string') {
-    throw new TypeError('material.precision must be "highp", "mediump", "lowp", null, or undefined.')
-  }
-  if (value !== 'highp' && value !== 'mediump' && value !== 'lowp') {
-    throw new Error(
-      `material.precision ${JSON.stringify(value)} is not supported by @headless-three/renderer. Use "highp", "mediump", "lowp", null, or undefined.`,
-    )
-  }
-}
-
 export function optionalFiniteNumberOrInfinityDefault(value: unknown, label: string): number | undefined {
   if (value === Number.POSITIVE_INFINITY) return undefined
   return optionalFiniteNumber(value, label)
