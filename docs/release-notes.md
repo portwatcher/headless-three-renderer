@@ -1,5 +1,50 @@
 # Release Notes
 
+## 0.4.4
+
+- Lit materials now use Three.js r155+ physical light units for indirect
+  diffuse light. AmbientLight, HemisphereLight, LightProbe, and light-map
+  irradiance reach Standard, Physical, Lambert, Phong, and Toon materials as
+  `irradiance * diffuse / PI`; Standard/Physical diffuse excludes metalness,
+  and `aoMap` applies to all of these terms. 0.4.3 used the full ambient color
+  without the `1 / PI` and also lit metals with it: a white
+  `MeshStandardMaterial` plane under AmbientLight 0.7 and DirectionalLight 1.2
+  rendered 241 instead of the 172 of Three.js r180 WebGL, and creator VRM
+  faces clipped to white under brighter lights. They now match the browser
+  within 2 levels.
+- Ambient lights are summed as color × intensity (0.4.3 clamped the summed
+  colors) and also apply with an environment map (0.4.3 dropped them). A
+  visible AmbientLight, also with zero intensity, turns off the renderer's
+  no-light preview fallback. The fallback stays for lit materials in scenes
+  without any light source; a light map now counts as a light source.
+- HemisphereLight takes its sky direction from the normalized light world
+  position, as Three.js does, instead of from its rotation. This also applies
+  to Pixiv MToon.
+- Standard/Physical direct diffuse no longer has a Fresnel weight, as in
+  Three.js `RE_Direct_Physical` (about 4 % brighter for dielectrics).
+- Added `test:lighting`, run on every CI platform, with expected values
+  checked against Three.js r180 and r183 WebGL output. `test:mtoon` adds
+  three-vrm 3.4.4 regressions for shading shift textures (sRGB decode of its
+  color-texture assignment, generated-face edge/inside values) and for lit and
+  shade factors changed after a `VRMC_materials_mtoon` load and before the
+  first frame; these MToon paths already matched in 0.4.3.
+- Browser references are unchanged because they are WebGL output. All 109
+  golden assertions pass against both committed reference sets; for example,
+  `skinned-morphed-plane` drops from a mean diff of 5.90 to 0.28 and
+  `mesh-standard-displacement-map` from 7.25 to 2.16. Tests that assumed the
+  old ambient scale now multiply ambient intensities by PI, light metallic
+  glTF samples with a neutral environment map, or render default-material
+  geometry checks as dielectrics.
+- `material.dithering`, `material.precision`, `wireframeLinewidth`,
+  `wireframeLinecap`, and `wireframeLinejoin` are no longer validated because
+  they have no native effect; invalid values are ignored instead of failing.
+- Known remaining differences: sRGB output uses a 2.2 gamma curve, so very
+  dark tones are up to about 8 levels lighter than WebGL; direct specular
+  keeps a Schlick-GGX geometry term, so off-normal metal highlights differ by
+  a few levels; and `scene.environment` image-based lighting renders brighter
+  than Three.js and also lights Lambert, Phong, and Toon materials, which
+  Three.js does not.
+
 ## 0.4.3
 
 - Replaced native per-frame byte fingerprints with XXH3 for texture, mesh,
