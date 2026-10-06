@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_CLEARCOAT_CAR_PAINT, SAMPLE_ASSET_CLEARCOAT_TEST, SAMPLE_ASSET_CLEARCOAT_WICKER, SAMPLE_ASSET_COMPARE_IOR, SAMPLE_ASSET_IRIDESCENCE_LAMP, SAMPLE_ASSET_POT_OF_COALS } from './gltf.test.part-001.mjs'
-import { findFirst, loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { findFirst, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_materials_clearcoat maps', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_CLEARCOAT_TEST)
   const meshes = []
@@ -47,7 +47,7 @@ test('committed Khronos glTF Sample Assets ClearCoatTest fixture loads KHR_mater
   const camera = new THREE.PerspectiveCamera(35, 4 / 3, 0.01, 40)
   camera.position.set(0, 1.2, 12)
   camera.lookAt(0, 0.6, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 4, 6)
   gltf.scene.add(light)
@@ -129,7 +129,7 @@ test('committed Khronos glTF Sample Assets ClearCoatCarPaint fixture loads clear
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0.5, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -228,7 +228,7 @@ test('committed Khronos glTF Sample Assets ClearcoatWicker fixture loads texture
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -349,7 +349,8 @@ test('committed Khronos glTF Sample Assets PotOfCoals fixture loads emissive coa
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.4))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.8)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -410,7 +411,8 @@ test('committed Khronos glTF Sample Assets IridescenceLamp fixture loads physica
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
   camera.position.set(0, 0.7, 2.4)
   camera.lookAt(0, 0.45, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -491,7 +493,7 @@ test('committed Khronos glTF Sample Assets CompareIor fixture loads transmission
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
   camera.position.set(0, 0.1, 4)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)

@@ -81,7 +81,7 @@ impl GpuRenderer {
                 settings.ambient_color[0],
                 settings.ambient_color[1],
                 settings.ambient_color[2],
-                0.0,
+                if settings.has_ambient_light { 1.0 } else { 0.0 },
             ],
             light_probe: light_probe_rows(settings),
             light_probe_params: [

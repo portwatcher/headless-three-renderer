@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_ANIMATED_COLORS_CUBE, SAMPLE_ASSET_ANIMATED_CUBE, SAMPLE_ASSET_ANIMATED_TRIANGLE, SAMPLE_ASSET_ANIMATION_POINTER_UVS, SAMPLE_ASSET_BOX_ANIMATED, SAMPLE_ASSET_INTERPOLATION_TEST, SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP } from './gltf.test.part-001.mjs'
-import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, nonBackgroundBounds, pngDimensions } from './gltf.test.part-028.mjs'
+import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, nonBackgroundBounds, pngDimensions, useDielectricMaterials } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets LightsPunctualLamp fixture loads textured point-light scene', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_LIGHTS_PUNCTUAL_LAMP, 'utf8'))
   assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission', 'KHR_lights_punctual'])
@@ -159,7 +159,7 @@ test('committed Khronos glTF Sample Assets InterpolationTest fixture applies ani
   const camera = new THREE.OrthographicCamera(-6, 6, 10, -2.5, 0.01, 20)
   camera.position.set(0, 3.6, 10)
   camera.lookAt(0, 3.6, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -211,7 +211,8 @@ test('committed Khronos glTF Sample Assets AnimatedTriangle fixture loads extern
   const camera = new THREE.OrthographicCamera(-0.2, 1.2, 1.2, -0.2, 0.01, 10)
   camera.position.set(0.5, 0.5, 2)
   camera.lookAt(0.5, 0.5, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -267,7 +268,7 @@ test('committed Khronos glTF Sample Assets AnimatedCube fixture loads textured q
   gltf.scene.updateMatrixWorld(true)
   assertVectorClose(mesh.quaternion.toArray(), [0, 1, 0, -4.371138828673793e-8], 'AnimatedCube half-turn pose')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const camera = new THREE.OrthographicCamera(-2.2, 2.2, 2.2, -2.2, 0.01, 20)
   camera.position.set(0, 0, 6)
   camera.lookAt(0, 0, 0)
@@ -317,7 +318,7 @@ test('committed Khronos glTF Sample Assets AnimatedColorsCube fixture applies ma
   assertVectorClose(animated.position.toArray(), [3, 3, 0], 'AnimatedColorsCube translation at t=1.5')
   assertVectorClose(animated.material.color.toArray(), [0.019999999552965164, 0.019999999552965164, 0.800000011920929], 'AnimatedColorsCube material color at t=1.5')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.1 * Math.PI))
   const camera = new THREE.OrthographicCamera(-5, 5, 4.8, -2, 0.01, 20)
   camera.position.set(0, 0, 10)
   camera.lookAt(0, 0, 0)
@@ -450,7 +451,7 @@ test('committed Khronos glTF Sample Assets AnimationPointerUVs fixture loads ani
   assert.ok(camera?.isPerspectiveCamera, 'AnimationPointerUVs should load the all-panels camera')
   camera.aspect = 1.5
   camera.updateProjectionMatrix()
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -477,7 +478,7 @@ test('committed Khronos glTF Sample Assets BoxAnimated fixture applies transform
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
   camera.position.set(1.7, 1.7, 4.4)
   camera.lookAt(0, 0.8, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.2)
   light.position.set(3, 4, 5)
   gltf.scene.add(light)

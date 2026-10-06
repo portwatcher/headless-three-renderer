@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_ALPHA_BLEND_MODE_TEST, SAMPLE_ASSET_COMPARE_ALPHA_COVERAGE, SAMPLE_ASSET_COMPARE_AMBIENT_OCCLUSION, SAMPLE_ASSET_COMPARE_ANISOTROPY, SAMPLE_ASSET_FLIGHT_HELMET } from './gltf.test.part-001.mjs'
-import { assertVectorClose, loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { assertVectorClose, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets FlightHelmet fixture loads transmission lens and PBR texture sets', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_FLIGHT_HELMET, 'utf8'))
   assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission'])
@@ -106,7 +106,7 @@ test('committed Khronos glTF Sample Assets FlightHelmet fixture loads transmissi
   const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.001, 10)
   renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.35, 1).normalize().multiplyScalar(1.0))
   renderCamera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.85))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.85 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.9)
   light.position.copy(center).add(new THREE.Vector3(0.5, 0.8, 1))
   gltf.scene.add(light)
@@ -155,7 +155,7 @@ test('committed Khronos glTF Sample Assets AlphaBlendModeTest fixture loads alph
   const camera = new THREE.PerspectiveCamera(35, 4 / 3, 0.01, 50)
   camera.position.set(0, 1.4, 8)
   camera.lookAt(0, 0.8, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -253,7 +253,7 @@ test('committed Khronos glTF Sample Assets CompareAlphaCoverage fixture loads al
   assert.equal(floor.normalMap.colorSpace, THREE.NoColorSpace)
   assert.equal(floor.normalMap.flipY, false)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -343,7 +343,7 @@ test('committed Khronos glTF Sample Assets CompareAmbientOcclusion fixture loads
   assert.equal(fruitWithAo.aoMap, fruitWithAo.roughnessMap, 'fruit AO should share the packed ORM texture when occlusion is enabled')
   assert.equal(fruitWithoutAo.aoMap ?? null, null)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(1.5, 3, 4)
   gltf.scene.add(light)
@@ -457,7 +457,8 @@ test('committed Khronos glTF Sample Assets CompareAnisotropy fixture loads aniso
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)

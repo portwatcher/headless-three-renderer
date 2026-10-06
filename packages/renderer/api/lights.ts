@@ -137,14 +137,14 @@ function extractLight(light: ThreeObject3DLike): NativeSceneLight | null {
 
   if (light.isHemisphereLight === true) {
     const groundColor = validatedColorLikeToArray(light.groundColor, 'HemisphereLight.groundColor') ?? [0.04, 0.02, 0.0, 1]
+    // Three.js WebGLLights uses the normalized world position as the sky direction, not the rotation.
     let direction = [0, 1, 0]
     const matrix = matrixElementsOrUndefined(light.matrixWorld, 'HemisphereLight.matrixWorld')
     if (matrix) {
-      const ux = matrix[4], uy = matrix[5], uz = matrix[6]
-      const ulen = Math.sqrt(ux * ux + uy * uy + uz * uz)
-      if (ulen > 0) {
-        direction = [ux / ulen, uy / ulen, uz / ulen]
-      }
+      const length = Math.hypot(matrix[12], matrix[13], matrix[14])
+      direction = length > 0
+        ? [matrix[12] / length, matrix[13] / length, matrix[14] / length]
+        : [0, 0, 0]
     }
     return {
       lightType: 'hemisphere',
@@ -512,27 +512,39 @@ function assertSupportedLightCount(lights: NativeSceneLight[]): void {
   }
 }
 
-export function extractAmbientLight(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {
-  let color: number[] | null = null
-  visitForAmbient(scene, camera, (light) => {
+type AmbientIrradiance = { color: number[]; intensity: number }
+
+/**
+ * Sums color x intensity of visible AmbientLights, as Three.js WebGLLights does. The native
+ * color channel is clamped to 0..1, so the sum is sent as a normalized color and a scale.
+ */
+function ambientIrradiance(scene: ThreeObject3DLike, camera?: ThreeCameraLike): AmbientIrradiance | null {
+  const lights: ThreeObject3DLike[] = []
+  visitForAmbient(scene, camera, (light) => lights.push(light))
+  if (lights.length === 0) return null
+  let r = 0
+  let g = 0
+  let b = 0
+  for (const light of lights) {
     const c = validatedColorLikeToArray(light.color, 'AmbientLight.color') ?? [1, 1, 1, 1]
-    if (!color) {
-      color = [c[0], c[1], c[2]]
-    } else {
-      color[0] = Math.min(1, color[0] + c[0])
-      color[1] = Math.min(1, color[1] + c[1])
-      color[2] = Math.min(1, color[2] + c[2])
-    }
-  })
-  return color
+    const intensity = finiteNumberOrDefault(light.intensity, 'AmbientLight.intensity', 1)
+    r += c[0] * intensity
+    g += c[1] * intensity
+    b += c[2] * intensity
+  }
+  const scale = Math.max(Math.abs(r), Math.abs(g), Math.abs(b))
+  if (scale === 0) return { color: [0, 0, 0], intensity: 0 }
+  const sign = r + g + b < 0 ? -1 : 1
+  return { color: [r * sign / scale, g * sign / scale, b * sign / scale], intensity: sign * scale }
 }
 
+export function extractAmbientLight(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {
+  return ambientIrradiance(scene, camera)?.color ?? null
+}
+
+/** Returns 0 for a visible zero-intensity AmbientLight, so the no-light fallback stays off. */
 export function extractAmbientIntensity(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number | undefined {
-  let intensity = 0
-  visitForAmbient(scene, camera, (light) => {
-    intensity += finiteNumberOrDefault(light.intensity, 'AmbientLight.intensity', 1)
-  })
-  return intensity > 0 ? intensity : undefined
+  return ambientIrradiance(scene, camera)?.intensity
 }
 
 export function extractLightProbe(scene: ThreeObject3DLike, camera?: ThreeCameraLike): number[] | null {

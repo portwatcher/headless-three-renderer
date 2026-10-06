@@ -51,7 +51,7 @@ test('committed Khronos glTF Sample Assets Sponza fixture loads large textured a
   assert.deepEqual(pngDimensions(second.material.map.image), [1024, 1024])
   assert.equal(second.material.normalMap?.name, '12501374198249454378.jpg')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -269,7 +269,7 @@ test('committed Khronos glTF Sample Assets XmpMetadataRoundedCube fixture preser
   assert.equal(mesh.material.metalness, 0)
   assert.equal(mesh.material.roughness, 0.503000020980835)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.7)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)

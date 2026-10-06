@@ -84,7 +84,7 @@ test('committed Khronos glTF Sample Assets DiffuseTransmissionTest fixture prese
   assert.equal(importedLight?.name, 'DirectLight')
   assert.equal(importedLight.intensity, 1)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35 * Math.PI))
   const camera = frameSceneCamera(gltf.scene, { distance: 2.1, yOffset: 0.3 })
   const rgba = new Renderer().render(gltf.scene, camera, {
     width: 128,
@@ -137,7 +137,7 @@ test('committed Khronos glTF Sample Assets MandarinOrange fixture loads real dif
     diffuseTransmissionTexture: { index: 1 },
   })
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -192,7 +192,7 @@ test('committed Khronos glTF Sample Assets USDShaderBallForGltf fixture loads tr
   assert.equal(bars?.material?.map?.name, 'sss_bars.png')
   assert.deepEqual(pngDimensions(bars.material.map.image), [64, 512])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -255,7 +255,7 @@ test('committed Khronos glTF Sample Assets ChronographWatch fixture loads varian
   assert.equal(watchFace?.material?.map?.name, 'watchface_basecolor.png')
   assert.deepEqual(pngDimensions(watchFace.material.map.image), [2048, 2048])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.7)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -323,7 +323,7 @@ test('committed Khronos glTF Sample Assets SheenWoodLeatherSofa fixture loads re
   assert.equal(paisley.material.roughnessMap, paisley.material.aoMap)
   assertWebpBuffer(paisley.material.map.image, 'Paisley base color')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.7)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -389,7 +389,7 @@ test('committed Khronos glTF Sample Assets DiffuseTransmissionPlant fixture load
   assert.equal(leaves.material.normalMap?.name, 'img1.jpg')
   assert.equal(Buffer.isBuffer(leaves.material.normalMap.image), true, 'leaf normal JPEG should load as an encoded Buffer')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.45))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.45 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -453,7 +453,7 @@ test('committed Khronos glTF Sample Assets DiffuseTransmissionTeacup fixture loa
   assert.equal(saucer.material.aoMap?.name, 'teasaucer_ormt.png')
   assert.deepEqual(pngDimensions(saucer.material.aoMap.image), [1024, 512])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.7)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)

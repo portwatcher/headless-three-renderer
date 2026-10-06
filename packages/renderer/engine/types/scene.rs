@@ -63,7 +63,8 @@ pub struct RenderScene {
     pub lights: Option<Vec<SceneLight>>,
     /// Ambient light color `[r, g, b]` in 0..1 range.
     pub ambient_light: Option<Vec<f64>>,
-    /// Ambient light intensity. Defaults to 0.
+    /// Ambient light intensity. Defaults to 0. Any value, also 0, marks a visible AmbientLight
+    /// and disables the lit-material fallback for scenes without light.
     pub ambient_intensity: Option<f64>,
     /// Flattened LightProbe spherical-harmonics coefficients: 9 RGB triplets.
     pub light_probe: Option<Vec<f64>>,

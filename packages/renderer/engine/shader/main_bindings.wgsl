@@ -11,7 +11,7 @@ struct GpuLight {
   color_intensity: vec4<f32>,
   // xyz = position (point/spot) or ground_color (hemisphere), w = distance
   position: vec4<f32>,
-  // xyz = direction, w = decay
+  // xyz = direction (hemisphere: light world position, normalized in the shader), w = decay
   direction: vec4<f32>,
   // spot: x = cos(outer_angle), y = cos(inner_angle); rect area: x = width, y = height
   params: vec4<f32>,
@@ -29,6 +29,7 @@ struct Uniforms {
   roughness: f32,
   ambient_intensity: f32,
   num_lights: u32,
+  // xyz = AmbientLight color, w = 1 when the scene has a visible AmbientLight.
   ambient_color: vec4<f32>,
   // xyz = LightProbe SH coefficient, w = reserved.
   light_probe: array<vec4<f32>, 9>,

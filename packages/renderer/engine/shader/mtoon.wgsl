@@ -13,7 +13,7 @@ fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2
   )).r;
   let shift = uniforms.mtoon[0].w + shift_sample * uniforms.mtoon[3].y;
   let edge = max(1.0 - uniforms.mtoon[3].x, 0.00001);
-  var indirect = uniforms.ambient_color.rgb * uniforms.ambient_intensity;
+  var indirect = scene_ambient_irradiance();
   if uniforms.light_probe_params.x > 0.5 {
     indirect += light_probe_irradiance(N);
   }
@@ -23,8 +23,7 @@ fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2
     let light = uniforms.lights[i];
     let radiance = light.color_intensity.rgb * light.color_intensity.w;
     if light.light_type == 3u {
-      let ground = light.position.xyz * light.color_intensity.w;
-      indirect += mix(ground, radiance, 0.5 + 0.5 * dot(N, normalize(light.direction.xyz)));
+      indirect += hemisphere_light_irradiance(light, N);
       continue;
     }
     // Pixiv MToon does not implement RectAreaLight.

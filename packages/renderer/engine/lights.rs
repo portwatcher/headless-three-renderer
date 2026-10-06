@@ -15,7 +15,7 @@ pub struct GpuLight {
     pub color_intensity: [f32; 4],
     /// xyz = position (point/spot) or ground_color (hemisphere), w = distance
     pub position: [f32; 4],
-    /// xyz = direction, w = decay
+    /// xyz = direction (hemisphere: light world position, normalized in the shader), w = decay
     pub direction: [f32; 4],
     /// spot: [cos_outer_angle, cos_inner_angle, 0, 0]; rect area: [width, height, 0, 0]
     pub params: [f32; 4],

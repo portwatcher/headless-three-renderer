@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_IOR_TEST_GRID, SAMPLE_ASSET_SHEEN_CHAIR, SAMPLE_ASSET_TRANSMISSION_ROUGHNESS_TEST, SAMPLE_ASSET_TRANSMISSION_THINWALL_TEST_GRID } from './gltf.test.part-001.mjs'
-import { loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { loadGltfFixture, meanRegion, pngDimensions, useDielectricMaterials } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets IORTestGrid fixture loads IOR, transmission, volume, and specular grids', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_IOR_TEST_GRID, 'utf8'))
   assert.deepEqual(source.extensionsUsed, [
@@ -131,7 +131,8 @@ test('committed Khronos glTF Sample Assets IORTestGrid fixture loads IOR, transm
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 1.6))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   const light = new THREE.DirectionalLight(0xffffff, 2.2)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
   gltf.scene.add(light)
@@ -237,7 +238,7 @@ test('committed Khronos glTF Sample Assets TransmissionRoughnessTest fixture loa
   const camera = new THREE.OrthographicCamera(-1.1, 1.1, 0.65, -0.65, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -365,7 +366,7 @@ test('committed Khronos glTF Sample Assets TransmissionThinwallTestGrid fixture 
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 1.6))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.2)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
   gltf.scene.add(light)
@@ -433,7 +434,7 @@ test('committed Khronos glTF Sample Assets SheenChair fixture loads KHR_material
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
   camera.position.set(0.6, 0.8, 2.2)
   camera.lookAt(0, 0.35, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.3)
   light.position.set(1.5, 3, 4)
   gltf.scene.add(light)

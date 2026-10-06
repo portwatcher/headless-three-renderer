@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_MESHOPT_CUBE_TEST, SAMPLE_ASSET_MESH_PRIMITIVE_MODES, SAMPLE_ASSET_METAL_ROUGH_SPHERES, SAMPLE_ASSET_METAL_ROUGH_SPHERES_NO_TEXTURES, SAMPLE_ASSET_MULTI_UV_TEST, SAMPLE_ASSET_TEXTURE_TRANSFORM_MULTI_TEST, SAMPLE_ASSET_TEXTURE_TRANSFORM_TEST } from './gltf.test.part-001.mjs'
-import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, pngDimensions, renderSingleObjectRatio } from './gltf.test.part-028.mjs'
+import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions, renderSingleObjectRatio, useDielectricMaterials } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets MultiUVTest fixture loads primary and secondary texture UVs', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_MULTI_UV_TEST)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
@@ -45,7 +45,8 @@ test('committed Khronos glTF Sample Assets MultiUVTest fixture loads primary and
   assert.ok(camera?.isPerspectiveCamera, 'MultiUVTest sample should load its camera')
   camera.aspect = 1
   camera.updateProjectionMatrix()
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -102,7 +103,7 @@ test('committed Khronos glTF Sample Assets TextureTransformTest fixture loads KH
   const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.2, -1.2, 0.01, 20)
   camera.position.set(0, 0, 10)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -191,7 +192,7 @@ test('committed Khronos glTF Sample Assets TextureTransformMultiTest fixture loa
   const camera = new THREE.OrthographicCamera(-0.05, 0.75, 0.95, -1.45, 0.01, 10)
   camera.position.set(0.35, -0.25, 2)
   camera.lookAt(0.35, -0.25, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(0.2, 1, 2)
   gltf.scene.add(light)
@@ -312,7 +313,7 @@ test('committed Khronos glTF Sample Assets MetalRoughSpheresNoTextures fixture l
 
   const neutralRatio = renderSingleObjectRatio(new Renderer(), materialGrid[0], 0.001)
   assert.ok(neutralRatio > 0.03, `MetalRoughSpheresNoTextures neutral representative mesh should render visible pixels (${neutralRatio})`)
-  const goldRatio = renderSingleObjectRatio(new Renderer(), materialGrid[97], 0.001)
+  const goldRatio = renderSingleObjectRatio(new Renderer(), materialGrid[97], 0.001, neutralEnvironment())
   assert.ok(goldRatio > 0.03, `MetalRoughSpheresNoTextures gold representative mesh should render visible pixels (${goldRatio})`)
 })
 
@@ -357,7 +358,8 @@ test('committed Khronos glTF Sample Assets MeshPrimitiveModes fixture loads and 
   const camera = new THREE.OrthographicCamera(-4, 4, 4, -4, 0.01, 10)
   camera.position.set(0, 0, 4)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -485,7 +487,7 @@ test('committed Khronos glTF Sample Assets MeshoptCubeTest fixture loads quantiz
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 1.9))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.2)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
   gltf.scene.add(light)

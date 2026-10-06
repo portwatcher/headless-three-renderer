@@ -111,7 +111,7 @@ test('committed Khronos glTF Sample Assets TransmissionOrderTest fixture loads a
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(3, 4, 6)
   gltf.scene.add(light)
@@ -205,7 +205,7 @@ test('committed Khronos glTF Sample Assets TransmissionTest fixture loads textur
 
   importedCamera.aspect = 4 / 3
   importedCamera.updateProjectionMatrix()
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.7)
   light.position.set(0, 2, 4)
   gltf.scene.add(light)
@@ -310,7 +310,7 @@ test('committed Khronos glTF Sample Assets CompareVolume fixture loads transmiss
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -416,7 +416,7 @@ test('committed Khronos glTF Sample Assets AttenuationTest fixture loads volume 
   assert.equal(backdrop.map.colorSpace, THREE.SRGBColorSpace)
   assert.equal(backdrop.map.flipY, false)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.85))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.85 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.3)
   light.position.set(2, 3, 8)
   gltf.scene.add(light)

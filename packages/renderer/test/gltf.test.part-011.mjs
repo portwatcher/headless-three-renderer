@@ -93,7 +93,7 @@ test('committed Khronos glTF Sample Assets Lantern fixture loads multi-mesh text
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
   const size = bounds.getSize(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(5, 8, 6)
   gltf.scene.add(light)
@@ -460,7 +460,7 @@ test('committed Khronos glTF Sample Assets CubeVisibility fixture applies KHR_no
   assert.equal(isEffectivelyVisible(meshes[3]), true)
   assert.equal(isEffectivelyVisible(meshes[4]), true)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2 * Math.PI))
   const camera = new THREE.OrthographicCamera(-2.4, 2.4, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 4)
   camera.lookAt(0, 0, 0)

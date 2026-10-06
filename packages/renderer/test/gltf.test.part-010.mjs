@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_CAMERAS, SAMPLE_ASSET_DAMAGED_HELMET, SAMPLE_ASSET_DIRECTIONAL_LIGHT, SAMPLE_ASSET_DUCK, SAMPLE_ASSET_VIRTUAL_CITY, SAMPLE_ASSET_WATER_BOTTLE } from './gltf.test.part-001.mjs'
-import { findFirst, loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { findFirst, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions, useDielectricMaterials } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imported cameras', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_CAMERAS)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
@@ -34,7 +34,8 @@ test('committed Khronos glTF Sample Assets Cameras fixture loads and renders imp
   assert.equal(orthographic.bottom, -1)
   assert.deepEqual(orthographic.position.toArray(), [0.5, 0.5, 3])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
 
   const renderer = new Renderer()
@@ -145,7 +146,7 @@ test('committed Khronos glTF Sample Assets VirtualCity fixture loads textured mu
   const camera = gltf.cameras[1]
   camera.aspect = 1.5
   camera.updateProjectionMatrix()
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(100, 300, 200)
   gltf.scene.add(light)
@@ -260,7 +261,7 @@ test('committed Khronos glTF Sample Assets Duck fixture loads textured external 
   camera.aspect = 1
   camera.updateProjectionMatrix()
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -350,7 +351,8 @@ test('committed Khronos glTF Sample Assets DamagedHelmet fixture loads canonical
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.1, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.5))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.5 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.5)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -449,7 +451,8 @@ test('committed Khronos glTF Sample Assets WaterBottle fixture loads textured PB
   camera.position.set(0, 0, 0.6)
   camera.lookAt(0, 0, 0)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
   light.position.set(0.2, 0.4, 0.7)
   gltf.scene.add(light)

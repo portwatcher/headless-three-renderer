@@ -49,7 +49,7 @@ test('committed Khronos glTF Sample Assets ScatteringSkull fixture loads volume-
   assert.equal(material.thicknessMap, material.aoMap)
   assert.deepEqual(pngDimensions(material.thicknessMap.image), [2048, 2048])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -111,7 +111,7 @@ test('committed Khronos glTF Sample Assets SpecGlossVsMetalRough fixture preserv
   assert.equal(label?.material?.map?.name, 'SpecGlossVsMetalRough.png')
   assert.deepEqual(pngDimensions(label.material.map.image), [512, 128])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.7)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -187,7 +187,7 @@ test('committed Khronos glTF Sample Assets CarConcept fixture loads variants, cl
   assert.equal(mechanical.roughnessMap?.name, 'Mechanical_ORM.png')
   assert.equal(mechanical.metalnessMap, mechanical.roughnessMap)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -246,7 +246,7 @@ test('committed Khronos glTF Sample Assets PotOfCoalsAnimationPointer fixture pr
   assert.equal(heatDome.material.thickness, 0.01999)
   assert.equal(heatDome.material.thicknessMap?.name, 'Heatdome_thickness.jpg')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -311,7 +311,7 @@ test('committed Khronos glTF Sample Assets StainedGlassLamp fixture loads glass 
   assert.equal(grill?.material?.map?.name, 'StainedGlassLamp_grill_basecolor-alpha.png')
   assert.deepEqual(pngDimensions(grill.material.map.image), [2048, 2048])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -390,7 +390,7 @@ test('committed Khronos glTF Sample Assets ABeautifulGame fixture loads chessboa
   assert.equal(pawnTop.material.roughnessMap?.name, 'Pawn_ORM')
   assert.equal(pawnTop.material.metalnessMap, pawnTop.material.roughnessMap)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -462,7 +462,7 @@ test('committed Khronos glTF Sample Assets MosquitoInAmber fixture loads amber t
   assert.equal(mosquito.material.map?.name, 'MosquitoInAmber3.jpg')
   assert.equal(mosquito.material.normalMap?.name, 'MosquitoInAmber4.jpg')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.6 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)

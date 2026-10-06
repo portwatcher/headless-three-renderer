@@ -79,6 +79,8 @@ pub struct RenderSettings {
     pub lights: Vec<GpuLight>,
     pub ambient_color: [f32; 3],
     pub ambient_intensity: f32,
+    /// A visible AmbientLight exists, also with zero intensity; disables the no-light fallback.
+    pub has_ambient_light: bool,
     pub light_probe: [[f32; 3]; 9],
     pub has_light_probe: bool,
     pub ibl: Option<IblMaps>,

@@ -268,6 +268,28 @@ fn light_probe_irradiance(normal: vec3<f32>) -> vec3<f32> {
   return max(result, vec3<f32>(0.0));
 }
 
+// Three.js r155+ physical light units: AmbientLight irradiance is color x intensity, without a PI scale.
+fn scene_ambient_irradiance() -> vec3<f32> {
+  return uniforms.ambient_color.rgb * uniforms.ambient_intensity;
+}
+
+// ambient_color.w marks a visible AmbientLight, also when its intensity is zero.
+fn has_scene_ambient_light() -> bool {
+  return uniforms.ambient_color.w > 0.5;
+}
+
+// Three.js getHemisphereLightIrradiance: the sky direction is the light's normalized world position.
+fn hemisphere_light_irradiance(light: GpuLight, normal: vec3<f32>) -> vec3<f32> {
+  let up_length = length(light.direction.xyz);
+  var sky_weight = 0.5;
+  if up_length > 0.0 {
+    sky_weight = 0.5 * dot(normal, light.direction.xyz / up_length) + 0.5;
+  }
+  let sky = light.color_intensity.rgb * light.color_intensity.w;
+  let ground = light.position.xyz * light.color_intensity.w;
+  return mix(ground, sky, sky_weight);
+}
+
 fn is_clipped_by_planes(world_pos: vec3<f32>) -> bool {
   let total_count = min(u32(uniforms.clipping_params.y), MAX_CLIPPING_PLANES);
   let union_count = min(u32(uniforms.clipping_params.x), total_count);

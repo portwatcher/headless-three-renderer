@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_AVOCADO, SAMPLE_ASSET_BARRAMUNDI_FISH, SAMPLE_ASSET_BOOM_BOX, SAMPLE_ASSET_BOOM_BOX_WITH_AXES, SAMPLE_ASSET_BOX_INTERLEAVED, SAMPLE_ASSET_COMPARE_NORMAL, SAMPLE_ASSET_DRAGON_ATTENUATION } from './gltf.test.part-001.mjs'
-import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, pngDimensions, vectorFromAttribute } from './gltf.test.part-028.mjs'
+import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, pngDimensions, useDielectricMaterials, vectorFromAttribute } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets DragonAttenuation fixture loads attenuation variants and thickness maps', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_DRAGON_ATTENUATION, 'utf8'))
   assert.deepEqual(source.extensionsUsed, [
@@ -102,7 +102,7 @@ test('committed Khronos glTF Sample Assets DragonAttenuation fixture loads atten
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.12, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -171,7 +171,7 @@ test('committed Khronos glTF Sample Assets CompareNormal fixture loads normal-ma
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -228,7 +228,7 @@ test('committed Khronos glTF Sample Assets Avocado fixture loads PBR texture map
   assert.equal(roughnessMap.flipY, false)
   assert.equal(normalMap.flipY, false)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -300,7 +300,7 @@ test('committed Khronos glTF Sample Assets BarramundiFish fixture loads organic 
   assert.equal(aoMap.colorSpace, THREE.NoColorSpace)
   assert.equal(normalMap.colorSpace, THREE.NoColorSpace)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -369,7 +369,7 @@ test('committed Khronos glTF Sample Assets BoomBox fixture loads emissive and pa
   assert.equal(normalMap.flipY, false)
   assert.equal(emissiveMap.flipY, false)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -446,7 +446,7 @@ test('committed Khronos glTF Sample Assets BoomBoxWithAxes fixture loads coordin
   assert.equal(coordinateMaterial.metalness, 0)
   assert.equal(coordinateMaterial.roughness, 0.735)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -491,7 +491,8 @@ test('committed Khronos glTF Sample Assets BoxInterleaved fixture loads byteStri
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
   camera.position.set(1.4, 1.1, 2.2)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)

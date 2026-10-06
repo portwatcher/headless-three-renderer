@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_COMPARE_TRANSMISSION, SAMPLE_ASSET_GLASS_BROKEN_WINDOW, SAMPLE_ASSET_GLASS_HURRICANE_CANDLE_HOLDER, SAMPLE_ASSET_GLASS_VASE_FLOWERS } from './gltf.test.part-001.mjs'
-import { assertVectorClose, loadGltfFixture, pngDimensions } from './gltf.test.part-028.mjs'
+import { assertVectorClose, loadGltfFixture, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets CompareTransmission fixture loads alpha versus transmission variants', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_TRANSMISSION, 'utf8'))
   assert.deepEqual(source.extensionsUsed, ['KHR_materials_transmission'])
@@ -93,7 +93,7 @@ test('committed Khronos glTF Sample Assets CompareTransmission fixture loads alp
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -204,7 +204,7 @@ test('committed Khronos glTF Sample Assets GlassBrokenWindow fixture loads trans
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -320,7 +320,8 @@ test('committed Khronos glTF Sample Assets GlassHurricaneCandleHolder fixture lo
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -444,7 +445,7 @@ test('committed Khronos glTF Sample Assets GlassVaseFlowers fixture loads alpha 
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.3))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.8)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)

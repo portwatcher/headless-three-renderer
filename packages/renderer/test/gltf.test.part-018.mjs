@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_SHEEN_TEST_GRID, SAMPLE_ASSET_SPECULAR_SILK_POUF, SAMPLE_ASSET_SPECULAR_TEST, SAMPLE_ASSET_SUZANNE } from './gltf.test.part-001.mjs'
-import { findFirst, loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { findFirst, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets SheenTestGrid fixture loads sheen color and roughness grid factors', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_SHEEN_TEST_GRID, 'utf8'))
   assert.deepEqual(source.extensionsUsed, ['KHR_materials_sheen'])
@@ -159,7 +159,7 @@ test('committed Khronos glTF Sample Assets SheenTestGrid fixture loads sheen col
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 1.6))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.2)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 5))
   gltf.scene.add(light)
@@ -243,7 +243,7 @@ test('committed Khronos glTF Sample Assets SpecularSilkPouf fixture loads real s
   const camera = new THREE.PerspectiveCamera(35, 1, 0.001, 20)
   camera.position.copy(center).add(new THREE.Vector3(0, 1, 0).multiplyScalar(2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.copy(center).add(new THREE.Vector3(0.5, 0.8, 1))
   gltf.scene.add(light)
@@ -322,7 +322,7 @@ test('committed Khronos glTF Sample Assets SpecularTest fixture loads KHR_materi
   const camera = new THREE.OrthographicCamera(-0.7, 0.7, 0.52, -0.52, 0.01, 20)
   camera.position.set(0, 0, 4)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.25))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.25 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 4)
   light.position.set(0.2, 0.5, 4)
   gltf.scene.add(light)
@@ -376,7 +376,8 @@ test('committed Khronos glTF Sample Assets Suzanne fixture loads dense textured 
   assert.equal(map.colorSpace, THREE.SRGBColorSpace)
   assert.equal(roughnessMap.colorSpace, THREE.NoColorSpace)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)

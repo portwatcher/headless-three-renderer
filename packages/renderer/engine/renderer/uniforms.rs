@@ -14,6 +14,7 @@ pub struct Uniforms {
     pub roughness: f32,
     pub ambient_intensity: f32,
     pub num_lights: u32,
+    /// xyz = AmbientLight color, w = 1 when the scene has a visible AmbientLight.
     pub ambient_color: [f32; 4],
     /// xyz = LightProbe SH coefficient, w = reserved.
     pub light_probe: [[f32; 4]; 9],

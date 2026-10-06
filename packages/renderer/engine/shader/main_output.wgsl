@@ -64,30 +64,27 @@
 
   let has_ibl = uniforms.normal_map_params.w > 0.5;
   let has_light_probe = uniforms.light_probe_params.x > 0.5;
-  var light_probe_diffuse = vec3<f32>(0.0);
+  // Three.js r155+ adds ambient, light-probe, hemisphere, and light-map irradiance and
+  // applies it as irradiance * BRDF_Lambert(diffuseColor), so it is divided by PI.
+  // Standard/Physical diffuse color excludes the metallic part.
+  let indirect_diffuse_color = select(albedo, albedo * (1.0 - metallic), use_specular);
+  var indirect_irradiance = scene_ambient_irradiance() + light_map_irradiance;
   if has_light_probe {
-    light_probe_diffuse = light_probe_irradiance(N);
+    indirect_irradiance += light_probe_irradiance(N);
   }
 
-  if uniforms.num_lights == 0u && !has_ibl && !has_light_probe {
-    // No lights or IBL: render with a basic hemispherical ambient
-    let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity;
+  if uniforms.num_lights == 0u && !has_ibl && !has_light_probe && !has_light_map && !has_scene_ambient_light() {
+    // No light source at all, not even baked light: render with a basic hemispherical fallback.
     let sky_factor = 0.5 + 0.5 * N.y;
     let fallback_ambient = mix(vec3<f32>(0.1, 0.1, 0.12), vec3<f32>(0.4, 0.45, 0.5), sky_factor);
-    let total_ambient = max(ambient, fallback_ambient);
-    lo = albedo * total_ambient * ao + light_map_diffuse;
+    lo = albedo * fallback_ambient * ao;
   } else {
     // Direct lighting from scene lights
     for (var i = 0u; i < uniforms.num_lights && i < MAX_LIGHTS; i = i + 1u) {
       let light = uniforms.lights[i];
 
       if light.light_type == 3u {
-        // Hemisphere light
-        let up = normalize(light.direction.xyz);
-        let sky_color = light.color_intensity.rgb * light.color_intensity.w;
-        let ground_color = light.position.xyz * light.color_intensity.w;
-        let hemi_factor = 0.5 + 0.5 * dot(N, up);
-        lo = lo + albedo * mix(ground_color, sky_color, hemi_factor);
+        indirect_irradiance += hemisphere_light_irradiance(light, N);
         continue;
       }
 
@@ -167,8 +164,8 @@
 
         let specular = (D * G * F) / (4.0 * n_dot_v * n_dot_l + 0.0001);
 
-        let k_s = F;
-        let k_d = (vec3<f32>(1.0) - k_s) * (1.0 - metallic);
+        // Three.js RE_Direct_Physical: BRDF_Lambert(diffuseColor) without a Fresnel weight.
+        let k_d = vec3<f32>(1.0 - metallic);
 
         var physical_specular = specular;
         if clearcoat > 0.0001 {
@@ -253,15 +250,8 @@
         // Lambert: diffuse IBL only
         lo = lo + irradiance * albedo * env_intensity * ao * legacy_env_reflectivity;
       }
-    } else {
-      // Ambient (non-IBL fallback when lights are present)
-      let ambient = uniforms.ambient_color.rgb * uniforms.ambient_intensity * albedo;
-      lo = lo + ambient * ao;
     }
-    if has_light_probe {
-      lo = lo + albedo * light_probe_diffuse * (1.0 / PI) * ao;
-    }
-    lo = lo + light_map_diffuse;
+    lo = lo + indirect_irradiance * indirect_diffuse_color * (1.0 / PI) * ao;
   }
 
   if use_specular && transmission > 0.0001 {

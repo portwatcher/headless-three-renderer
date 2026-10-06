@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_ANISOTROPY_BARN_LAMP, SAMPLE_ASSET_ANISOTROPY_DISC_TEST, SAMPLE_ASSET_ANISOTROPY_ROTATION_TEST, SAMPLE_ASSET_ANISOTROPY_STRENGTH_TEST, SAMPLE_ASSET_BOX_VERTEX_COLORS, SAMPLE_ASSET_VERTEX_COLOR_TEST } from './gltf.test.part-001.mjs'
-import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions, useDielectricMaterials } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets BoxVertexColors fixture renders COLOR_0 gradients', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_BOX_VERTEX_COLORS)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
@@ -22,7 +22,8 @@ test('committed Khronos glTF Sample Assets BoxVertexColors fixture renders COLOR
   camera.position.set(1.4, 1.1, 2.2)
   camera.lookAt(0, 0, 0)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   const light = new THREE.DirectionalLight(0xffffff, 1.0)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -129,7 +130,7 @@ test('committed Khronos glTF Sample Assets VertexColorTest fixture combines text
   const camera = new THREE.OrthographicCamera(-1.5, 1.5, 1.5, -1.5, 0.01, 20)
   camera.position.set(0, 0, 4)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -242,7 +243,8 @@ test('committed Khronos glTF Sample Assets AnisotropyBarnLamp fixture loads anis
   const box = new THREE.Box3().setFromObject(gltf.scene)
   const center = box.getCenter(new THREE.Vector3())
   const size = box.getSize(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.95))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.95 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.2)
   light.position.copy(center).add(new THREE.Vector3(0.5, 0.8, 1))
   gltf.scene.add(light)
@@ -322,7 +324,8 @@ test('committed Khronos glTF Sample Assets AnisotropyDiscTest fixture loads KHR_
   const camera = new THREE.OrthographicCamera(-4.2, 3.2, 3.0, -3.2, 0.01, 30)
   camera.position.set(-0.5, -0.1, 8)
   camera.lookAt(-0.5, -0.1, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.4))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.4 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(0, 2, 8)
   gltf.scene.add(light)
@@ -417,7 +420,8 @@ test('committed Khronos glTF Sample Assets AnisotropyRotationTest fixture loads 
   assert.equal(label?.material.map.name, 'AnisoDonutLabels')
   assert.deepEqual(pngDimensions(label.material.map.image), [512, 512])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(0, 2, 8)
   gltf.scene.add(light)
@@ -488,7 +492,8 @@ test('committed Khronos glTF Sample Assets AnisotropyStrengthTest fixture loads 
   assert.equal(label.material.map.flipY, false)
   assert.deepEqual(pngDimensions(label.material.map.image), [512, 512])
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(0, 2, 8)
   gltf.scene.add(light)

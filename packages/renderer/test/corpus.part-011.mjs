@@ -385,7 +385,8 @@ export function skinnedMorphCorpus() {
     validate(rgba, { width }) {
       const center = pixelAt(rgba, width, 48, 48)
       const corner = pixelAt(rgba, width, 4, 4)
-      if (!(center.b > center.g + 25 && center.g > center.r + 50 && center.b > center.r + 80 && corner.r === 63 && corner.g === 69 && corner.b === 80)) {
+      // Three.js-normalized ambient (irradiance / PI) keeps this mostly ambient-lit plane darker.
+      if (!(center.b > center.g + 15 && center.g > center.r + 30 && center.b > center.r + 50 && corner.r === 63 && corner.g === 69 && corner.b === 80)) {
         throw new Error(`skinned morph corpus should render the deformed cyan plane over background, got center=${JSON.stringify(center)} corner=${JSON.stringify(corner)}`)
       }
     },

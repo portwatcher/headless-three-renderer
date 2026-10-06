@@ -131,7 +131,7 @@ test('loadGltfFromFile resolves external glTF buffers from the model directory',
     assert.ok(camera, 'external-buffer fixture should load a camera')
     camera.aspect = 1
     camera.updateProjectionMatrix()
-    gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+    gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
     gltf.scene.updateMatrixWorld(true)
     camera.updateMatrixWorld(true)
 
@@ -247,15 +247,44 @@ export function worldDeterminant(object) {
   return object.matrixWorld.determinant()
 }
 
-export function renderSingleObjectRatio(renderer, object, padding = 0.2) {
+// As in Three.js r155+, AmbientLight does not light metals (glTF metallicFactor defaults to 1):
+// only specular light and an environment map do. Visibility checks of metallic assets use this
+// neutral sky-to-ground environment.
+export function neutralEnvironment() {
+  const width = 32
+  const height = 16
+  const data = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    const level = Math.round(255 * (0.75 - 0.4 * y / (height - 1)))
+    for (let x = 0; x < width; x += 1) data.set([level, level, level, 255], (y * width + x) * 4)
+  }
+  const texture = new THREE.DataTexture(data, width, height)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.colorSpace = THREE.LinearSRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+// Attribute, camera, and primitive checks are not about metalness: they render the glTF
+// default (metallic) materials as dielectrics, which AmbientLight lights as before.
+export function useDielectricMaterials(root) {
+  root.traverse((object) => {
+    for (const material of [object.material].flat()) {
+      if (material?.isMeshStandardMaterial === true) material.metalness = 0
+    }
+  })
+}
+
+export function renderSingleObjectRatio(renderer, object, padding = 0.2, environment = null) {
   object.updateWorldMatrix(true, true)
   const bounds = new THREE.Box3().setFromObject(object)
   const center = bounds.getCenter(new THREE.Vector3())
   const size = bounds.getSize(new THREE.Vector3())
 
   const scene = new THREE.Scene()
+  scene.environment = environment
   scene.add(object.clone(true))
-  scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
 
   const camera = new THREE.OrthographicCamera(
     -size.x / 2 - padding,

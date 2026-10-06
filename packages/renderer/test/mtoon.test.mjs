@@ -2,10 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three'
-import { MToonMaterial, VRMLoaderPlugin } from '@pixiv/three-vrm'
+import { MToonMaterial, MToonMaterialLoaderPlugin, VRMLoaderPlugin } from '@pixiv/three-vrm'
 import pkg from '../dist/index.js'
+import { mtoonFaceGltf } from './mtoon-face-gltf.mjs'
 
-const { Renderer, loadVrmFromFile } = pkg
+const { Renderer, createNodeGltfLoader, loadVrmFromFile } = pkg
 const camera = () => {
   const result = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
   result.position.z = 2
@@ -288,4 +289,116 @@ test('MToon shade textures preserve independent UV transforms and UV channels', 
     texture.channel = 1
     colorNear(center(render(renderer, scene)), [153, 0, 0])
   } finally { renderer.dispose(); material.dispose(); texture.dispose(); geometry.dispose() }
+})
+
+// three-vrm 3.4.4 parity helpers: sRGB output bytes, getShading(), and the left/right plane halves.
+const srgb8 = (linear) => Math.round(255 * (linear <= 0.0031308 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055))
+const shading = (dotNL, shift, toony = 0.9) => Math.min(1, Math.max(0, (dotNL + shift + 1 - toony) / (2 - 2 * toony)))
+const lightAtDot = (dotNL, intensity = 1) => {
+  const light = new THREE.DirectionalLight(0xffffff, intensity)
+  light.position.set(Math.sqrt(1 - dotNL * dotNL), 0, dotNL)
+  return light
+}
+const pixel = (frame, x) => [...frame.subarray((16 * 32 + x) * 4, (16 * 32 + x) * 4 + 4)]
+const shiftRow = (texels, colorSpace) => {
+  const texture = new THREE.DataTexture(new Uint8Array(texels), texels.length / 4, 1)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.colorSpace = colorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+test('MToon shading shift texture keeps the generated face inside lit, as three-vrm does', () => {
+  const renderer = new Renderer()
+  // Edge texels (left) are 0 and inside texels (right) 1; three-vrm assigns the texture as sRGB.
+  const shiftMap = shiftRow([0, 0, 0, 255, 255, 0, 0, 255], THREE.SRGBColorSpace)
+  const material = new MToonMaterial({ shadeColorFactor: new THREE.Color(0, 0, 0) })
+  material.shadingToonyFactor = 0.9
+  material.shadingShiftFactor = -0.05
+  material.shadingShiftTexture = shiftMap
+  material.shadingShiftTextureScale = 0.75
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), material)
+  try {
+    for (const dotNL of [-0.3, 0.02, 0.5]) {
+      const scene = new THREE.Scene()
+      scene.add(plane, lightAtDot(dotNL))
+      const frame = render(renderer, scene)
+      const expected = (shift) => srgb8(shading(dotNL, shift) / Math.PI)
+      colorNear(pixel(frame, 8), [0, 1, 2].map(() => expected(-0.05)))
+      colorNear(pixel(frame, 24), [0, 1, 2].map(() => expected(-0.05 + 0.75)))
+    }
+    // Without the texture the inside falls into the shade: the hard edge the texture removes.
+    material.shadingShiftTexture = null
+    const scene = new THREE.Scene()
+    scene.add(plane, lightAtDot(-0.3))
+    colorNear(pixel(render(renderer, scene), 24), [0, 0, 0])
+  } finally { renderer.dispose(); material.dispose(); shiftMap.dispose() }
+})
+
+test('MToon decodes sRGB shading shift texels before scaling, as WebGL samples them', () => {
+  const renderer = new Renderer()
+  try {
+    for (const [colorSpace, shift] of [[THREE.SRGBColorSpace, new THREE.Color().setRGB(128 / 255, 0, 0, THREE.SRGBColorSpace).r], [THREE.NoColorSpace, 128 / 255]]) {
+      const shiftMap = shiftRow([128, 0, 0, 255], colorSpace)
+      const material = new MToonMaterial({ shadeColorFactor: new THREE.Color(0, 0, 0) })
+      material.shadingToonyFactor = 0.9
+      material.shadingShiftTexture = shiftMap
+      material.shadingShiftTextureScale = 1
+      const scene = new THREE.Scene()
+      scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), material), lightAtDot(-0.15))
+      const value = srgb8(shading(-0.15, shift) / Math.PI)
+      colorNear(center(render(renderer, scene)), [value, value, value])
+      material.dispose()
+      shiftMap.dispose()
+    }
+  } finally { renderer.dispose() }
+})
+
+test('MToon hemisphere direction and summed ambient lights follow Three.js', () => {
+  const renderer = new Renderer()
+  const material = new MToonMaterial()
+  const scene = (...lights) => {
+    const result = new THREE.Scene()
+    result.add(new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), material), ...lights)
+    return result
+  }
+  try {
+    const front = new THREE.HemisphereLight(0xffffff, 0x000000, 1)
+    front.position.set(0, 0, 3)
+    colorNear(center(render(renderer, scene(front))), [153, 153, 153])
+    const rotated = new THREE.HemisphereLight(0xffffff, 0x000000, 1)
+    rotated.rotation.x = Math.PI / 2
+    colorNear(center(render(renderer, scene(rotated))), [111, 111, 111])
+    const summed = center(render(renderer, scene(new THREE.AmbientLight(0xff0000, 1), new THREE.AmbientLight(0xffffff, 0.5))))
+    colorNear(summed, [srgb8(1.5 / Math.PI), srgb8(0.5 / Math.PI), srgb8(0.5 / Math.PI)])
+  } finally { renderer.dispose(); material.dispose() }
+})
+
+test('loaded VRMC_materials_mtoon factors changed before the first frame are rendered', async () => {
+  const { loader } = await createNodeGltfLoader(fileURLToPath(new URL('.', import.meta.url)), {
+    configureLoader: (gltfLoader) => gltfLoader.register((parser) => new MToonMaterialLoaderPlugin(parser)),
+  })
+  const gltf = await new Promise((resolve, reject) => loader.parse(mtoonFaceGltf(), '', resolve, reject))
+  let material = null
+  gltf.scene.traverse((object) => {
+    if (object.material?.isMToonMaterial) material = object.material
+  })
+  assert.ok(material, 'the glTF face should load as MToonMaterial')
+  assert.equal(material.shadingShiftTexture?.colorSpace, THREE.SRGBColorSpace)
+  assert.equal(material.shadingShiftTextureScale, 0.75)
+  // A consumer normalizes older generated characters after load, before rendering.
+  const lit = [0.25, 0.5, 1]
+  const shade = [0.2, 0.4, 0.6]
+  material.color.setRGB(...lit)
+  material.shadeColorFactor.setRGB(...shade)
+  const scene = new THREE.Scene()
+  scene.add(gltf.scene, lightAtDot(-0.3), new THREE.AmbientLight(0xffffff, 0.2))
+  const renderer = new Renderer()
+  try {
+    const frame = render(renderer, scene)
+    // Edge shift -0.05 is in shade, inside shift +0.7 is lit; ambient adds 0.2 x lit / PI.
+    colorNear(pixel(frame, 8), shade.map((value, i) => srgb8((value + 0.2 * lit[i]) / Math.PI)))
+    colorNear(pixel(frame, 24), lit.map((value) => srgb8(1.2 * value / Math.PI)))
+  } finally { renderer.dispose(); material.dispose(); material.shadingShiftTexture?.dispose() }
 })

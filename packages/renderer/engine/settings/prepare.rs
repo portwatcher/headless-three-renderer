@@ -145,6 +145,7 @@ impl RenderSettings {
                     ambient_color[2] as f32,
                 ],
                 ambient_intensity,
+                has_ambient_light: scene.ambient_intensity.is_some(),
                 light_probe,
                 has_light_probe,
                 ibl,

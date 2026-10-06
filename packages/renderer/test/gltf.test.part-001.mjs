@@ -213,7 +213,7 @@ test('committed glTF fixture loads through GLTFLoader and renders', async () => 
   camera.updateProjectionMatrix()
 
   const scene = gltf.scene
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 3, 4)
   scene.add(light)
@@ -258,7 +258,7 @@ test('committed Khronos glTF Sample Assets Cube fixture loads canonical textured
   assert.equal(mesh.material.map.colorSpace, THREE.SRGBColorSpace)
   assert.equal(mesh.material.map.flipY, false)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.65 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -288,7 +288,7 @@ test('committed Khronos glTF Sample Assets Box fixture loads external buffer and
   camera.position.set(1.4, 1.1, 2.2)
   camera.lookAt(0, 0, 0)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)

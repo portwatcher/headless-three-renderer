@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_ANIMATED_MORPH_CUBE, SAMPLE_ASSET_FOX, SAMPLE_ASSET_MORPH_STRESS_TEST, SAMPLE_ASSET_RECURSIVE_SKELETONS, SAMPLE_ASSET_SIMPLE_INSTANCING, SAMPLE_ASSET_SIMPLE_MORPH, SAMPLE_ASSET_SIMPLE_SPARSE_ACCESSOR } from './gltf.test.part-001.mjs'
-import { findFirst, loadGltfFixture, nonBackgroundBounds, pngDimensions, vectorFromAttribute } from './gltf.test.part-028.mjs'
+import { findFirst, loadGltfFixture, nonBackgroundBounds, pngDimensions, useDielectricMaterials, vectorFromAttribute } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets Fox fixture loads textured multi-clip skinned animal animation', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_FOX, 'utf8'))
   assert.deepEqual(source.buffers, [{ uri: 'Fox.bin', byteLength: 119904 }])
@@ -92,7 +92,7 @@ test('committed Khronos glTF Sample Assets Fox fixture loads textured multi-clip
   assert.ok(tail.quaternion.z > 0.06, `Fox run pose should rotate the tail (${tail.quaternion.z})`)
   assert.ok(leftLeg.quaternion.z < -0.8, `Fox run pose should rotate the left leg (${leftLeg.quaternion.z})`)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.4))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.4 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -182,7 +182,8 @@ test('committed Khronos glTF Sample Assets RecursiveSkeletons fixture loads recu
   camera.position.set(0, 62, 180)
   camera.lookAt(0, 62, 0)
   camera.updateProjectionMatrix()
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -210,7 +211,8 @@ test('committed Khronos glTF Sample Assets SimpleMorph fixture applies morph wei
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
   camera.position.set(0.5, 0.5, 3.2)
   camera.lookAt(0.45, 0.4, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -260,7 +262,7 @@ test('committed Khronos glTF Sample Assets AnimatedMorphCube fixture applies ani
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 30)
   camera.position.set(3, 2.5, 5)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(3, 4, 5)
   gltf.scene.add(light)
@@ -373,7 +375,7 @@ test('committed Khronos glTF Sample Assets MorphStressTest fixture loads dense m
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
   light.position.set(3, 4, 5)
   gltf.scene.add(light)
@@ -409,7 +411,8 @@ test('committed Khronos glTF Sample Assets SimpleSparseAccessor fixture applies 
   const camera = new THREE.OrthographicCamera(-0.5, 6.5, 4.5, -0.5, 0.01, 10)
   camera.position.set(3, 2, 5)
   camera.lookAt(3, 2, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -449,7 +452,7 @@ test('committed Khronos glTF Sample Assets SimpleInstancing fixture loads EXT_me
   const camera = new THREE.OrthographicCamera(-1, 12, 12, -1, 0.01, 50)
   camera.position.set(6, 6, 20)
   camera.lookAt(6, 6, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.2)
   light.position.set(10, 12, 20)
   gltf.scene.add(light)

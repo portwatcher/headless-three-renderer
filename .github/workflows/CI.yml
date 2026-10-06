@@ -135,6 +135,10 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:mtoon
 
+      - name: Lighting parity tests
+        working-directory: packages/renderer
+        run: pnpm run test:lighting
+
       - name: GPU-native output tests
         working-directory: packages/renderer
         run: pnpm run test:gpu-output

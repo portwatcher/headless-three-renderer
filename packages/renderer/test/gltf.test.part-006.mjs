@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_COMPARE_METALLIC, SAMPLE_ASSET_COMPARE_ROUGHNESS, SAMPLE_ASSET_COMPARE_SHEEN, SAMPLE_ASSET_COMPARE_SPECULAR, SAMPLE_ASSET_IRIDESCENCE_SUZANNE } from './gltf.test.part-001.mjs'
-import { assertVectorClose, loadGltfFixture, pngDimensions } from './gltf.test.part-028.mjs'
+import { assertVectorClose, loadGltfFixture, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets IridescenceSuzanne fixture loads iridescence thickness texture and punctual light', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_IRIDESCENCE_SUZANNE, 'utf8'))
   assert.deepEqual(source.extensionsUsed, [
@@ -95,7 +95,8 @@ test('committed Khronos glTF Sample Assets IridescenceSuzanne fixture loads irid
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.35 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const camera = new THREE.PerspectiveCamera(40, 1.6, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, -7, 3))
   camera.lookAt(center)
@@ -164,7 +165,8 @@ test('committed Khronos glTF Sample Assets CompareMetallic fixture loads metalli
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -236,7 +238,7 @@ test('committed Khronos glTF Sample Assets CompareRoughness fixture loads roughn
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 2))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 2 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 6)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -324,7 +326,7 @@ test('committed Khronos glTF Sample Assets CompareSheen fixture loads sheen comp
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -400,7 +402,7 @@ test('committed Khronos glTF Sample Assets CompareSpecular fixture loads specula
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)

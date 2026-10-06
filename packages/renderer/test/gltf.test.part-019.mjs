@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_EMISSIVE_STRENGTH_TEST, SAMPLE_ASSET_ENVIRONMENT_TEST, SAMPLE_ASSET_SIMPLE_SKIN, SAMPLE_ASSET_SUNGLASSES_KHRONOS, SAMPLE_ASSET_TOY_CAR } from './gltf.test.part-001.mjs'
-import { findFirst, loadGltfFixture, meanRegion, nonBackgroundBounds, pngDimensions } from './gltf.test.part-028.mjs'
+import { findFirst, loadGltfFixture, meanRegion, neutralEnvironment, nonBackgroundBounds, pngDimensions, useDielectricMaterials } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets SunglassesKhronos fixture loads transmission, volume, IOR, and iridescence lenses', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_SUNGLASSES_KHRONOS, 'utf8'))
   assert.equal(source.extensionsRequired, undefined)
@@ -153,7 +153,7 @@ test('committed Khronos glTF Sample Assets SunglassesKhronos fixture loads trans
   const camera = new THREE.PerspectiveCamera(35, 1.4, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.25, Math.max(size.x, size.y, size.z) * 2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.copy(center).add(new THREE.Vector3(1, 2, 4))
   gltf.scene.add(light)
@@ -320,7 +320,7 @@ test('committed Khronos glTF Sample Assets ToyCar fixture loads clearcoat, fabri
   const camera = new THREE.PerspectiveCamera(35, 1.2, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.35, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -452,7 +452,8 @@ test('committed Khronos glTF Sample Assets EnvironmentTest fixture loads importe
 
   importedCamera.aspect = 1.5
   importedCamera.updateProjectionMatrix()
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
   light.position.set(1, 5, 10)
   gltf.scene.add(light)
@@ -483,7 +484,8 @@ test('committed Khronos glTF Sample Assets SimpleSkin fixture applies skin anima
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
   camera.position.set(0, 1, 4)
   camera.lookAt(0, 1, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 

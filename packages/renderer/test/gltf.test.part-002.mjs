@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_ANTIQUE_CAMERA, SAMPLE_ASSET_BOX_TEXTURED, SAMPLE_ASSET_BOX_TEXTURED_NPOT, SAMPLE_ASSET_BOX_WITH_SPACES, SAMPLE_ASSET_CORSET, SAMPLE_ASSET_SCIFI_HELMET, SAMPLE_ASSET_UNICODE_TEST } from './gltf.test.part-001.mjs'
-import { findFirst, loadGltfFixture, meanRegion, pngDimensions } from './gltf.test.part-028.mjs'
+import { findFirst, loadGltfFixture, meanRegion, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets Box With Spaces fixture resolves external paths with spaces', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_BOX_WITH_SPACES, 'utf8'))
   assert.equal(source.buffers[0].uri, 'Box With Spaces.bin')
@@ -44,7 +44,8 @@ test('committed Khronos glTF Sample Assets Box With Spaces fixture resolves exte
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
   camera.position.set(3, 2.1, 4.5)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.2)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -87,7 +88,7 @@ test('committed Khronos glTF Sample Assets Unicode❤♻Test fixture resolves Un
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 1.2, -1.2, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -146,7 +147,7 @@ test('committed Khronos glTF Sample Assets BoxTextured fixture loads POT texture
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
   camera.position.set(1.3, 1.1, 2.2)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -206,7 +207,7 @@ test('committed Khronos glTF Sample Assets BoxTexturedNonPowerOfTwo fixture load
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10)
   camera.position.set(1.3, 1.1, 2.2)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -296,7 +297,8 @@ test('committed Khronos glTF Sample Assets AntiqueCamera fixture loads multi-mes
   const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.45, 1).normalize().multiplyScalar(9))
   renderCamera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.9 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.6)
   light.position.copy(center).add(new THREE.Vector3(4, 6, 5))
   gltf.scene.add(light)
@@ -381,7 +383,7 @@ test('committed Khronos glTF Sample Assets Corset fixture loads tangent-space OR
   const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.001, 10)
   renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.35, 1).normalize().multiplyScalar(0.09))
   renderCamera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.copy(center).add(new THREE.Vector3(0.4, 0.6, 0.7))
   gltf.scene.add(light)
@@ -468,7 +470,7 @@ test('committed Khronos glTF Sample Assets SciFiHelmet fixture loads separate AO
   const renderCamera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   renderCamera.position.copy(center).add(new THREE.Vector3(0.8, 0.45, 1).normalize().multiplyScalar(4))
   renderCamera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.8)
   light.position.copy(center).add(new THREE.Vector3(3, 4, 5))
   gltf.scene.add(light)

@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_COMPARE_BASE_COLOR, SAMPLE_ASSET_COMPARE_CLEARCOAT, SAMPLE_ASSET_COMPARE_DISPERSION, SAMPLE_ASSET_COMPARE_EMISSIVE_STRENGTH, SAMPLE_ASSET_DISPERSION_TEST, SAMPLE_ASSET_DRAGON_DISPERSION } from './gltf.test.part-001.mjs'
-import { assertVectorClose, loadGltfFixture, pngDimensions } from './gltf.test.part-028.mjs'
+import { assertVectorClose, loadGltfFixture, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-color comparison variants', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_BASE_COLOR, 'utf8'))
   assert.deepEqual(source.extensionsUsed, ['KHR_texture_transform'])
@@ -79,7 +79,7 @@ test('committed Khronos glTF Sample Assets CompareBaseColor fixture loads base-c
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -163,7 +163,8 @@ test('committed Khronos glTF Sample Assets CompareClearcoat fixture loads clearc
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 4)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -252,7 +253,7 @@ test('committed Khronos glTF Sample Assets CompareDispersion fixture loads dispe
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 3)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -335,7 +336,7 @@ test('committed Khronos glTF Sample Assets DispersionTest fixture loads IOR and 
   const camera = new THREE.OrthographicCamera(-0.09, 0.09, 0.065, -0.055, 0.001, 5)
   camera.position.set(0, 0, 0.6)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2)
   light.position.set(1, 2, 3)
   gltf.scene.add(light)
@@ -429,7 +430,7 @@ test('committed Khronos glTF Sample Assets DragonDispersion fixture loads real d
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.12, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)

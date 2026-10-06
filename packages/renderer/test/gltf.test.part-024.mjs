@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_MORPH_PRIMITIVES_TEST, SAMPLE_ASSET_MULTIPLE_SCENES, SAMPLE_ASSET_NEGATIVE_SCALE_TEST, SAMPLE_ASSET_ORIENTATION_TEST, SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST, SAMPLE_ASSET_SIMPLE_MATERIAL, SAMPLE_ASSET_SIMPLE_MESHES, SAMPLE_ASSET_TRIANGLE, SAMPLE_ASSET_UNLIT_TEST } from './gltf.test.part-001.mjs'
-import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, pngDimensions, renderSingleObjectRatio, worldDeterminant } from './gltf.test.part-028.mjs'
+import { assertVectorClose, findFirst, loadGltfFixture, meanRegion, pngDimensions, renderSingleObjectRatio, useDielectricMaterials, worldDeterminant } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets PrimitiveModeNormalsTest fixture loads primitive modes with normals and colors', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_PRIMITIVE_MODE_NORMALS_TEST, 'utf8'))
   assert.deepEqual(source.buffers.map((buffer) => buffer.uri), [
@@ -89,7 +89,8 @@ test('committed Khronos glTF Sample Assets PrimitiveModeNormalsTest fixture load
   const camera = new THREE.OrthographicCamera(-7, 11, 8, -8, 0.01, 30)
   camera.position.set(0, 0, 12)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   const light = new THREE.DirectionalLight(0xffffff, 1.2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -187,7 +188,7 @@ test('committed Khronos glTF Sample Assets MorphPrimitivesTest fixture preserves
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
   camera.position.set(1.8, 1.4, 3.2)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 1.2)
   light.position.set(2, 3, 4)
   gltf.scene.add(light)
@@ -297,7 +298,8 @@ test('committed Khronos glTF Sample Assets OrientationTest fixture preserves qua
   assert.ok(arrowY2.quaternion.y < -0.10 && Math.abs(arrowY2.quaternion.x) < 1e-6 && Math.abs(arrowY2.quaternion.z) < 1e-6, 'ArrowY2 should decompose its matrix into a Y-axis rotation')
   assert.ok(arrowZ2.quaternion.z < -0.14 && Math.abs(arrowZ2.quaternion.x) < 1e-6 && Math.abs(arrowZ2.quaternion.y) < 1e-6, 'ArrowZ2 should decompose its matrix into a Z-axis rotation')
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   const light = new THREE.DirectionalLight(0xffffff, 1.0)
   light.position.set(4, 5, 6)
   gltf.scene.add(light)
@@ -378,7 +380,7 @@ test('committed Khronos glTF Sample Assets SimpleMaterial fixture loads scalar P
   const camera = new THREE.OrthographicCamera(-0.6, 0.6, 0.6, -0.6, 0.01, 10)
   camera.position.set(0, 0, 2)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -496,7 +498,8 @@ test('committed Khronos glTF Sample Assets Triangle fixture loads minimal indexe
   const camera = new THREE.OrthographicCamera(-0.2, 1.2, 1.2, -0.2, 0.01, 10)
   camera.position.set(0.5, 0.5, 2)
   camera.lookAt(0.5, 0.5, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
+  useDielectricMaterials(gltf.scene)
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 

@@ -263,7 +263,10 @@ export interface RenderScene {
   lights?: Array<SceneLight>
   /** Ambient light color `[r, g, b]` in 0..1 range. */
   ambientLight?: Array<number>
-  /** Ambient light intensity. Defaults to 0. */
+  /**
+   * Ambient light intensity. Defaults to 0. Any value, also 0, marks a visible AmbientLight
+   * and disables the lit-material fallback for scenes without light.
+   */
   ambientIntensity?: number
   /** Flattened LightProbe spherical-harmonics coefficients: 9 RGB triplets. */
   lightProbe?: Array<number>

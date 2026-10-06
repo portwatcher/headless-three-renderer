@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_NORMAL_TANGENT_MIRROR_TEST, SAMPLE_ASSET_NORMAL_TANGENT_TEST, SAMPLE_ASSET_SIMPLE_TEXTURE, SAMPLE_ASSET_TEXTURE_COORDINATE_TEST, SAMPLE_ASSET_TEXTURE_ENCODING_TEST, SAMPLE_ASSET_TEXTURE_LINEAR_INTERPOLATION_TEST, SAMPLE_ASSET_TEXTURE_SETTINGS_TEST, SAMPLE_ASSET_TWO_SIDED_PLANE } from './gltf.test.part-001.mjs'
-import { assertTextureSampler, findFirst, loadGltfFixture, meanRegion } from './gltf.test.part-028.mjs'
+import { assertTextureSampler, findFirst, loadGltfFixture, meanRegion, neutralEnvironment } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets SimpleTexture fixture loads sampler state and renders mirrored texture repeats', async () => {
   const gltf = await loadGltfFixture(SAMPLE_ASSET_SIMPLE_TEXTURE)
   const mesh = findFirst(gltf.scene, (object) => object.isMesh === true)
@@ -100,7 +100,7 @@ test('committed Khronos glTF Sample Assets TextureSettingsTest fixture loads wra
   assertTextureSampler(meshByName.get('TextureMirrorMeshT'), THREE.RepeatWrapping, THREE.MirroredRepeatWrapping)
   assertTextureSampler(meshByName.get('LabelMesh'), THREE.RepeatWrapping, THREE.RepeatWrapping)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
@@ -158,7 +158,7 @@ test('committed Khronos glTF Sample Assets TwoSidedPlane fixture renders mapped 
   assert.equal(material.metalnessMap, material.roughnessMap)
 
   const light = new THREE.DirectionalLight(0xffffff, 1.5)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.2 * Math.PI))
   gltf.scene.add(light)
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20)
   const renderer = new Renderer()
@@ -245,7 +245,8 @@ test('committed Khronos glTF Sample Assets TextureEncodingTest fixture preserves
   assert.equal(meshes[13].material.alphaTest, 0.5)
   assert.equal(meshes[13].material.side, THREE.DoubleSide)
 
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.7 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 1.3)
   light.position.set(0, 4, 8)
   gltf.scene.add(light)
@@ -310,7 +311,7 @@ test('committed Khronos glTF Sample Assets TextureLinearInterpolationTest fixtur
   const camera = new THREE.OrthographicCamera(-3.6, 3.6, 1.8, -2.3, 0.01, 10)
   camera.position.set(0, -0.35, 4)
   camera.lookAt(0, -0.35, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 
@@ -355,7 +356,8 @@ test('committed Khronos glTF Sample Assets NormalTangentTest fixture loads norma
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
   camera.position.set(0, 0, 4)
   camera.lookAt(0, -0.1, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.0)
   light.position.set(1, 2, 4)
   gltf.scene.add(light)
@@ -412,7 +414,8 @@ test('committed Khronos glTF Sample Assets NormalTangentMirrorTest fixture loads
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 20)
   camera.position.set(0, 0, 4)
   camera.lookAt(0, -0.05, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.0)
   light.position.set(1, 2, 4)
   gltf.scene.add(light)
@@ -447,7 +450,7 @@ test('committed Khronos glTF Sample Assets TextureCoordinateTest fixture renders
   const camera = new THREE.OrthographicCamera(-1.45, 1.45, 1.45, -1.45, 0.01, 10)
   camera.position.set(0, 0, 3)
   camera.lookAt(0, 0, 0)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1.0 * Math.PI))
   gltf.scene.updateMatrixWorld(true)
   camera.updateMatrixWorld(true)
 

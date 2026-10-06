@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import pkg from '../dist/index.js'
 import { meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { Renderer, SAMPLE_ASSET_COMPARE_IRIDESCENCE, SAMPLE_ASSET_IRIDESCENCE_ABALONE, SAMPLE_ASSET_IRIDESCENCE_DIELECTRIC_SPHERES, SAMPLE_ASSET_IRIDESCENCE_METALLIC_SPHERES, SAMPLE_ASSET_IRIDESCENT_DISH_WITH_OLIVES } from './gltf.test.part-001.mjs'
-import { loadGltfFixture, pngDimensions } from './gltf.test.part-028.mjs'
+import { loadGltfFixture, neutralEnvironment, pngDimensions } from './gltf.test.part-028.mjs'
 test('committed Khronos glTF Sample Assets CompareIridescence fixture loads iridescence comparison variants', async () => {
   const source = JSON.parse(await readFile(SAMPLE_ASSET_COMPARE_IRIDESCENCE, 'utf8'))
   assert.deepEqual(source.extensionsUsed, ['KHR_materials_iridescence'])
@@ -74,7 +74,7 @@ test('committed Khronos glTF Sample Assets CompareIridescence fixture loads irid
 
   const bounds = new THREE.Box3().setFromObject(gltf.scene)
   const center = bounds.getCenter(new THREE.Vector3())
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 1 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 4)
   light.position.set(2, 4, 5)
   gltf.scene.add(light)
@@ -167,7 +167,7 @@ test('committed Khronos glTF Sample Assets IridescenceAbalone fixture loads real
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.2, Math.max(size.x, size.y, size.z) * 2.2))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.75 * Math.PI))
   const light = new THREE.DirectionalLight(0xffffff, 2.6)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -355,7 +355,8 @@ test('committed Khronos glTF Sample Assets IridescentDishWithOlives fixture load
   const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100)
   camera.position.copy(center).add(new THREE.Vector3(0, size.y * 0.15, Math.max(size.x, size.y, size.z) * 2.4))
   camera.lookAt(center)
-  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+  gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+  gltf.scene.environment = neutralEnvironment()
   const light = new THREE.DirectionalLight(0xffffff, 2.8)
   light.position.copy(center).add(new THREE.Vector3(2, 3, 4))
   gltf.scene.add(light)
@@ -455,7 +456,8 @@ test('committed Khronos glTF Sample Assets iridescence sphere-grid fixtures load
     const bounds = new THREE.Box3().setFromObject(gltf.scene)
     const center = bounds.getCenter(new THREE.Vector3())
     const size = bounds.getSize(new THREE.Vector3())
-    gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+    gltf.scene.add(new THREE.AmbientLight(0xffffff, 0.8 * Math.PI))
+    gltf.scene.environment = neutralEnvironment()
     const light = new THREE.DirectionalLight(0xffffff, 2)
     light.position.set(2, 3, 4)
     gltf.scene.add(light)

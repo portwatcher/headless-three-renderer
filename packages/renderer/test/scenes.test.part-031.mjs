@@ -287,7 +287,8 @@ test('examples MD2 character helpers manage renderable synthetic parts', () => {
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x000000)
-  scene.add(new THREE.AmbientLight(0xffffff, 1), simple.root, complex.root)
+  // MD2CharacterComplex parts are Lambert-lit; ambient intensity PI shows their skins 1:1 (r155+ units).
+  scene.add(new THREE.AmbientLight(0xffffff, Math.PI), simple.root, complex.root)
 
   const camera = new THREE.OrthographicCamera(-1.2, 1.2, 0.75, -0.75, 0.01, 10)
   camera.position.set(0, 0, 4)
