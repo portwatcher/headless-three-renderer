@@ -114,7 +114,8 @@ The current release supports:
 - PBR metallic/roughness lighting, physical material extensions, alpha testing, alpha hash, alpha-to-coverage, wireframe output, fog, blending, stencil state, local and global clipping, and material render-state validation.
 - Raw texture data and encoded PNG/JPEG/WebP texture buffers, including common channel formats, color-space handling, UV transforms, selected UV channels, wrap modes, filters, generated mipmaps, explicit raw mipmaps on supported slots, anisotropy, canvas-like texture readback, and WebP helper probing.
 - Ambient, directional, point, spot, hemisphere, rect-area, and light-probe lighting in Three.js r155+ physical light units, plus directional, spot, point, and cascaded directional shadows within the documented native shadow-layer budget.
-- Image-based lighting from scene environments, reflection probes, and supported material `envMap` inputs, including equirectangular, six-face cube, CubeUV, and packed PMREM/CubeUV sources.
+- Image-based lighting from scene environments, reflection probes, and supported material `envMap` inputs, including equirectangular, six-face cube, CubeUV, and packed PMREM/CubeUV sources, through a CPU port of the Three.js r180 `PMREMGenerator` for standard and physical materials.
+- Lighting, sRGB output, and sRGB texture filtering follow Three.js r180 `WebGLRenderer`; a parity suite compares 42 scenes with Chrome WebGL output within 2-3 levels.
 - VRM and VRMA still-frame flows through the optional Pixiv loaders, CPU skinning, skeletal animation, and morph targets. Pixiv MToon surfaces retain authored shade colors, rim/matcap lighting, and extruded outlines; see the compatibility matrix for remaining limitations.
 - WebGLRenderer/CommonRenderer compatibility state for many high-level renderer properties and no-op lifecycle methods that existing Three.js integrations probe.
 - Custom WGSL fragment bodies through `material.userData.headlessThreeRenderer.fragmentWgsl`.
