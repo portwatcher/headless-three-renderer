@@ -139,6 +139,10 @@ jobs:
         working-directory: packages/renderer
         run: pnpm run test:lighting
 
+      - name: WebGL parity tests
+        working-directory: packages/renderer
+        run: pnpm run test:parity
+
       - name: GPU-native output tests
         working-directory: packages/renderer
         run: pnpm run test:gpu-output

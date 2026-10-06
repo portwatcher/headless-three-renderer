@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import * as THREE from 'three'
 import pkg from '../dist/index.js'
 
-// Expected values follow Three.js r155+ physical light units (checked against r180 and r183
-// WebGLRenderer output): ambient, hemisphere, LightProbe, and light-map irradiance reach lit
+// Expected values follow Three.js r155+ physical light units (checked against r180
+// WebGLRenderer output, see also parity.test.mjs): ambient, hemisphere, LightProbe, and light-map irradiance reach lit
 // materials as irradiance * BRDF_Lambert(diffuseColor), with diffuseColor = color * (1 - metalness).
 // Linear output compares the lighting itself; expected values are linear radiance x 255.
 const { Renderer } = pkg

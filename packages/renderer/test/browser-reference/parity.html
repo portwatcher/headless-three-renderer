@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>headless-three WebGL parity reference</title>
+    <!-- generate-parity.mjs serves the selected three and three-vrm builds at these paths. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/__three__/build/three.module.js",
+          "three/addons/": "/__three__/examples/jsm/",
+          "@pixiv/three-vrm": "/__three_vrm__/lib/three-vrm.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from 'three'
+      import { MToonMaterial } from '@pixiv/three-vrm'
+      import { createParityCases } from '/packages/renderer/test/parity-cases.mjs'
+
+      globalThis.__HEADLESS_THREE_PARITY_READY__ = (async () => {
+        const canvas = document.createElement('canvas')
+        document.body.append(canvas)
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, preserveDrawingBuffer: true })
+        renderer.setPixelRatio(1)
+        const gl = renderer.getContext()
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
+        const result = {
+          three: THREE.REVISION,
+          renderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+          userAgent: navigator.userAgent,
+          cases: {},
+        }
+        for (const entry of createParityCases({ THREE, MToonMaterial })) {
+          const built = entry.build()
+          renderer.setSize(entry.width, entry.height, false)
+          renderer.outputColorSpace = built.outputColorSpace ?? THREE.SRGBColorSpace
+          renderer.toneMapping = built.toneMapping ?? THREE.NoToneMapping
+          renderer.shadowMap.enabled = false
+          renderer.setClearColor(0x000000, 0)
+          built.scene.updateMatrixWorld(true)
+          built.scene.traverse((object) => {
+            for (const material of [object.material ?? []].flat()) {
+              if (material.isMToonMaterial) material.update(0)
+            }
+          })
+          renderer.render(built.scene, built.camera)
+          const pixels = new Uint8Array(entry.width * entry.height * 4)
+          gl.readPixels(0, 0, entry.width, entry.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
+          // readPixels rows start at the bottom; samples use top-left image coordinates.
+          result.cases[entry.name] = entry.samples.map(([x, y]) => {
+            const i = ((entry.height - 1 - y) * entry.width + x) * 4
+            return [pixels[i], pixels[i + 1], pixels[i + 2]]
+          })
+        }
+        renderer.dispose()
+        return result
+      })()
+    </script>
+  </body>
+</html>
