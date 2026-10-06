@@ -156,9 +156,14 @@ export function textureTransform(map: ThreeTextureLike | null | undefined, label
   ], flipY)
 }
 
+/**
+ * Converts a Three.js UV matrix to the shader convention: the fragment shader samples with
+ * (u, 1 - v), and texture rows are stored as given. flipY = true textures are flipped by the
+ * WebGL upload, so their sampled row is 1 - (M * uv).y.
+ */
 export function composeTextureTransformWithFlipY(transform: number[], flipY: boolean): number[] {
-  if (flipY) return transform
   const [a, c, tx, b, d, ty] = transform
+  if (flipY) return [a, -c, c + tx, -b, d, 1 - d - ty]
   return [a, -c, c + tx, b, -d, d + ty]
 }
 

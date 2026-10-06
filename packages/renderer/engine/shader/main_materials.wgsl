@@ -34,15 +34,17 @@ fn get_spot_attenuation(cone_cos: f32, penumbra_cos: f32, angle_cos: f32) -> f32
   return smoothstep(cone_cos, penumbra_cos, angle_cos);
 }
 
+// Three.js fog_fragment mixes after colorspace_fragment, with fogColor in the output color space.
 fn apply_fog(color: vec3<f32>, fog_distance: f32) -> vec3<f32> {
+  let fog_color = apply_output_color_space(uniforms.fog_color.rgb);
   if uniforms.fog_params.x == 1.0 {
     let fog_factor = smoothstep(uniforms.fog_params.y, uniforms.fog_params.z, fog_distance);
-    return mix(color, uniforms.fog_color.rgb, fog_factor);
+    return mix(color, fog_color, fog_factor);
   }
   if uniforms.fog_params.x == 2.0 {
     let fog_density_distance = uniforms.fog_params.w * fog_distance;
     let fog_factor = clamp(1.0 - exp2(-fog_density_distance * fog_density_distance * 1.442695), 0.0, 1.0);
-    return mix(color, uniforms.fog_color.rgb, fog_factor);
+    return mix(color, fog_color, fog_factor);
   }
   return color;
 }
@@ -363,7 +365,8 @@ fn bump_height(bump_uv: vec2<f32>) -> f32 {
   return uniforms.normal_map_params.x * textureSample(t_normal, s_normal, bump_uv).r;
 }
 
-fn perturb_normal_from_bump(surf_pos: vec3<f32>, surf_norm: vec3<f32>, bump_uv: vec2<f32>) -> vec3<f32> {
+// Three.js perturbNormalArb; the determinant carries faceDirection.
+fn perturb_normal_from_bump(surf_pos: vec3<f32>, surf_norm: vec3<f32>, bump_uv: vec2<f32>, face_direction: f32) -> vec3<f32> {
   let d_st_dx = dpdx(bump_uv);
   let d_st_dy = dpdy(bump_uv);
   let h_ll = bump_height(bump_uv);
@@ -374,7 +377,7 @@ fn perturb_normal_from_bump(surf_pos: vec3<f32>, surf_norm: vec3<f32>, bump_uv: 
   let sigma_y = normalize(dpdy(surf_pos));
   let r1 = cross(sigma_y, surf_norm);
   let r2 = cross(surf_norm, sigma_x);
-  let det = dot(sigma_x, r1);
+  let det = dot(sigma_x, r1) * face_direction;
   let grad = sign(det) * (d_h_dx * r1 + d_h_dy * r2);
   return normalize(abs(det) * surf_norm - grad);
 }
@@ -474,21 +477,36 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   var N = normalize(input.world_normal);
   // Flip normal when shading back-facing fragments (BackSide / DoubleSide).
   // For FrontSide meshes, back faces are culled so front_facing is always true.
+  // Three.js faceDirection is gl_FrontFacing, which is true for BackSide meshes: WebGL renders
+  // them with a flipped front-face winding (FLIP_SIDED flips their normals instead).
+  let face_direction = select(select(-1.0, 1.0, front_facing), 1.0, abs(uniforms.surface_params.y - 1.0) < 0.5);
   if !front_facing {
     N = -N;
   }
-  var tbn = tangent_basis(N, input.world_tangent, input.tangent_w);
+  // Three.js lights_physical_fragment: geometryRoughness from the non-perturbed view-space normal.
+  let geometry_view_normal = normalize((uniforms.view * vec4<f32>(N, 0.0)).xyz);
+  let geometry_normal_dxy = max(abs(dpdx(geometry_view_normal)), abs(dpdy(geometry_view_normal)));
+  let geometry_roughness = max(max(geometry_normal_dxy.x, geometry_normal_dxy.y), geometry_normal_dxy.z);
   let normal_mode = u32(uniforms.normal_map_params.z + 0.5);
+  // getTangentFrame uses the raw UV of the normal map (else the clearcoat normal map, else uv).
+  var frame_uv = input.uv;
+  if normal_mode == 1u {
+    frame_uv = select(input.uv, input.uv2, uniforms.map_transform_rows[1u].w > 0.5);
+  } else if uniforms.surface_params.z > 0.5 {
+    frame_uv = select(input.uv, input.uv2, uniforms.physical_map_transform_rows[5u].w > 0.5);
+  }
+  let tbn = surface_tangent_frame(input, N, face_direction, frame_uv);
+  // Three.js nonPerturbedNormal and its frame, used by clearcoat.
+  let geometry_normal = N;
+  let geometry_tbn = tbn;
   if normal_mode == 1u {
     let normal_sample = textureSample(t_normal, s_normal, transform_normal_map_uv(uv, uv2)).rgb;
     var tangent_normal = normal_sample * 2.0 - vec3<f32>(1.0);
     tangent_normal.x *= uniforms.normal_map_params.x;
     tangent_normal.y *= uniforms.normal_map_params.y;
     N = normalize(tbn * tangent_normal);
-    tbn = tangent_basis(N, tbn[0], input.tangent_w);
   } else if normal_mode == 2u {
-    N = perturb_normal_from_bump(input.world_pos, N, transform_normal_map_uv(uv, uv2));
-    tbn = tangent_basis(N, tbn[0], input.tangent_w);
+    N = perturb_normal_from_bump(input.world_pos, N, transform_normal_map_uv(uv, uv2), face_direction);
   } else if normal_mode == 3u {
     let normal_sample = textureSample(t_normal, s_normal, transform_normal_map_uv(uv, uv2)).rgb;
     var object_normal = normal_sample * 2.0 - vec3<f32>(1.0);
@@ -496,7 +514,6 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       object_normal = -object_normal;
     }
     N = normalize((uniforms.normal_matrix * vec4<f32>(object_normal, 0.0)).xyz);
-    tbn = tangent_basis(N, tbn[0], input.tangent_w);
   }
 
   if shading_model == 10u {
@@ -527,12 +544,12 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
     }
     let basic_env_mode = u32(uniforms.env_map_params.z + 0.5);
     if uniforms.normal_map_params.w > 0.5 && basic_env_mode > 0u {
-      let V_basic = normalize(uniforms.camera_pos.xyz - input.world_pos);
+      let V_basic = view_direction(input.world_pos);
       var env_dir_basic = reflect(-V_basic, N);
       if basic_env_mode == 2u {
         env_dir_basic = refract(-V_basic, N, uniforms.env_map_params.w);
       }
-      let env_color = textureSampleLevel(t_prefilter, s_ibl, env_dir_basic, 0.0).rgb * uniforms.ibl_params.x;
+      let env_color = legacy_environment_color(env_dir_basic);
       let reflectivity = uniforms.env_map_params.y;
       let combine = u32(uniforms.env_map_params.x + 0.5);
       if combine == 2u {
@@ -567,7 +584,10 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
       let matcap_map = decode_matcap_map_sample(textureSample(t_physical_sheen, s_physical_sheen_map, transform_matcap_color_map_uv(uv, uv2)));
       matcap_surface_color *= matcap_map.rgb;
     }
-    var matcap_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, matcap_uv)).rgb * matcap_surface_color;
+    // matcap_uv is a WebGL texture coordinate; flip it into the shader UV convention so the
+    // flipY-only transform of the matcap slot selects the same texel rows as WebGL.
+    let matcap_sample_uv = transform_map_uv(vec2<f32>(matcap_uv.x, 1.0 - matcap_uv.y), vec2<f32>(matcap_uv.x, 1.0 - matcap_uv.y));
+    var matcap_color = decode_color_map_sample(textureSample(t_diffuse, s_diffuse, matcap_sample_uv)).rgb * matcap_surface_color;
     let mapped_matcap = apply_output_color_space(apply_material_tone_mapping(matcap_color));
     let fogged_matcap = apply_fog(mapped_matcap, fog_depth(input.world_pos));
     return output_color(fogged_matcap, alpha);
@@ -607,8 +627,12 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let legacy_env_reflectivity = select(1.0, uniforms.env_map_params.y, legacy_material_env);
 
   let mr_sample = decode_metallic_roughness_map_sample(textureSample(t_metallic_roughness, s_metallic_roughness, transform_metallic_roughness_map_uv(uv, uv2)));
-  let metallic = uniforms.metallic * mr_sample.b;
-  let roughness = max(uniforms.roughness * mr_sample.g, 0.04);
+  // Like the separate Three.js roughnessMap (G) and metalnessMap (B) slots: 1 = G, 2 = B in use.
+  let mr_channels = u32(uniforms.surface_params.w + 0.5);
+  let metallic = uniforms.metallic * select(1.0, mr_sample.b, (mr_channels & 2u) != 0u);
+  let roughness_map_factor = select(1.0, mr_sample.g, (mr_channels & 1u) != 0u);
+  // Three.js: max(roughnessFactor, 0.0525) + geometryRoughness, at most 1.
+  let roughness = min(max(uniforms.roughness * roughness_map_factor, 0.0525) + geometry_roughness, 1.0);
   let clearcoat_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_clearcoat_map_uv(uv, uv2), 0).r;
   let clearcoat_roughness_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_clearcoat_roughness_map_uv(uv, uv2), 0).g;
   let transmission_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_transmission_map_uv(uv, uv2), 0).b;
@@ -621,8 +645,9 @@ fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @l
   let iridescence_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_iridescence_map_uv(uv, uv2), 2).r;
   let iridescence_thickness_sample = textureSample(t_physical_layers, s_physical_layers_map, transform_iridescence_thickness_map_uv(uv, uv2), 2).g;
   let clearcoat = clamp(uniforms.physical_params1.x * clearcoat_sample, 0.0, 1.0);
-  let clearcoat_roughness = max(uniforms.physical_params1.y * clearcoat_roughness_sample, 0.0525);
+  let clearcoat_roughness = min(max(uniforms.physical_params1.y * clearcoat_roughness_sample, 0.0525) + geometry_roughness, 1.0);
   let transmission = clamp(uniforms.physical_params1.z * transmission_sample, 0.0, 1.0);
   let ior = clamp(uniforms.physical_params1.w, 1.0, 2.333);
   let sheen_color = clamp(uniforms.physical_params2.rgb * sheen_color_sample, vec3<f32>(0.0), vec3<f32>(1.0));
-  let sheen_roughness = clamp(uniforms.physical_params2.w * sheen_roughness_sample, 0.0001, 1.0);
+  // Three.js clamps the factor to [0.07, 1] before the sheen roughness map multiplies it.
+  let sheen_roughness = clamp(uniforms.physical_params2.w, 0.07, 1.0) * sheen_roughness_sample;

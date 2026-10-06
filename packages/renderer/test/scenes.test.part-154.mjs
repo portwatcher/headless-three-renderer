@@ -264,6 +264,7 @@ test('render option texture backgrounds honor their own UV transforms', () => {
       width: 64,
       height: 64,
       background,
+      toneMapping: THREE.NoToneMapping,
     }))
   }
 

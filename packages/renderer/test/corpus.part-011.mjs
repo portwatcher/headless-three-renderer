@@ -25,7 +25,7 @@ export function equirectangularBackgroundCorpus() {
     name: 'equirectangular-background-rotation',
     scene,
     camera: makeCamera([0, 0, 0], [0, 0, -1]),
-    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba', toneMapping: THREE.NoToneMapping },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
     validate(rgba, { width }) {
@@ -48,7 +48,7 @@ export function cubeBackgroundTextureCorpus() {
     name: 'cube-background-texture-rotation',
     scene,
     camera: makeCamera([0, 0, 0], [0, 0, -1]),
-    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba', toneMapping: THREE.NoToneMapping },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
     validate(rgba, { width }) {
@@ -76,6 +76,7 @@ export function cubeBackgroundOptionRotationCorpus() {
       height: CORPUS_RENDER_SIZE,
       format: 'rgba',
       backgroundRotation: new THREE.Euler(0, Math.PI, 0),
+      toneMapping: THREE.NoToneMapping,
     },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
@@ -100,7 +101,7 @@ export function cubeUvBackgroundTextureCorpus() {
     name: 'cubeuv-cube-background-texture',
     scene,
     camera: makeCamera([0, 0, 0], [0, 0, -1]),
-    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba', toneMapping: THREE.NoToneMapping },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
     browserReference: false,
@@ -124,7 +125,7 @@ export function packedCubeUvBackgroundTextureCorpus() {
     name: 'packed-cubeuv-background-texture',
     scene,
     camera: makeCamera([0, 0, 0], [0, 0, -1]),
-    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba' },
+    options: { width: CORPUS_RENDER_SIZE, height: CORPUS_RENDER_SIZE, format: 'rgba', toneMapping: THREE.NoToneMapping },
     background: [0, 0, 0],
     minNonBackgroundRatio: 0.95,
     validate(rgba, { width }) {

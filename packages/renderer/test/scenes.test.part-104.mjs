@@ -204,13 +204,11 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { extractAmbientIntensity, extractLightProbe, extractLights, test } from './scenes.test.part-001.mjs'
-import { renderRgba, solidTexture } from './scenes.test.part-002.mjs'
+import { renderRgba, solidEnvironmentTexture } from './scenes.test.part-002.mjs'
 import { maxLuminance } from './scenes.test.part-003.mjs'
 test('LightProbe combines with scene environment across lit material models', () => {
   function makeGreenEnvironment() {
-    const texture = solidTexture(0, 255, 0)
-    texture.mapping = THREE.EquirectangularReflectionMapping
-    return texture
+    return solidEnvironmentTexture(0, 255, 0)
   }
 
   function makeRedProbe() {
@@ -253,7 +251,12 @@ test('LightProbe combines with scene environment across lit material models', ()
     const probeOnly = renderMaterial(makeMaterial(), { probe: true })
     const combined = renderMaterial(makeMaterial(), { environment: true, probe: true })
     assert.ok(combined.r > environmentOnly.r + 5, `${name} combined LightProbe/environment should add red probe diffuse lighting (${combined.r} vs ${environmentOnly.r})`)
-    assert.ok(combined.g > probeOnly.g + 80, `${name} combined LightProbe/environment should keep green environment lighting (${combined.g} vs ${probeOnly.g})`)
+    if (name === 'Standard' || name === 'Physical') {
+      assert.ok(combined.g > probeOnly.g + 80, `${name} combined LightProbe/environment should keep green environment lighting (${combined.g} vs ${probeOnly.g})`)
+    } else {
+      // Three.js r180 lights only standard and physical materials with scene.environment.
+      assert.ok(Math.abs(combined.g - probeOnly.g) <= 1, `${name} should ignore the scene environment like Three.js r180 (${combined.g} vs ${probeOnly.g})`)
+    }
   }
 })
 

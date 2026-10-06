@@ -251,14 +251,14 @@ test('metallicRoughness maps honor horizontal and vertical repeat wrapping', () 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
   const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
-  assert.ok(clamped < 10, `clamped roughnessMap U coordinates should sample the smooth edge texel (${clamped})`)
-  assert.ok(repeated > clamped + 20, `repeated roughnessMap U coordinates should wrap to the rough texel (${repeated} vs ${clamped})`)
-  assert.ok(mirrored < 10, `mirrored roughnessMap U coordinates should reflect to the smooth texel (${mirrored})`)
-  assert.ok(repeated > mirrored + 20, `mirrored roughnessMap U coordinates should differ from RepeatWrapping (${mirrored} vs ${repeated})`)
-  assert.ok(clampedVertical < 10, `clamped roughnessMap V coordinates should sample the smooth edge texel (${clampedVertical})`)
-  assert.ok(repeatedVertical > clampedVertical + 20, `repeated roughnessMap V coordinates should wrap to the rough texel (${repeatedVertical} vs ${clampedVertical})`)
-  assert.ok(mirroredVertical < 10, `mirrored roughnessMap V coordinates should reflect to the smooth texel (${mirroredVertical})`)
-  assert.ok(repeatedVertical > mirroredVertical + 20, `mirrored roughnessMap V coordinates should differ from RepeatWrapping (${mirroredVertical} vs ${repeatedVertical})`)
+  // Three.js r180: the smooth texel (roughness 0.0525) gives a saturated highlight peak, the
+  // rough texel about 41.
+  assert.ok(clamped > repeated + 100, `clamped roughnessMap U coordinates should sample the smooth edge texel (${clamped} vs ${repeated})`)
+  assert.ok(repeated < 80, `repeated roughnessMap U coordinates should wrap to the rough texel (${repeated})`)
+  assert.ok(mirrored > repeated + 100, `mirrored roughnessMap U coordinates should reflect to the smooth texel (${mirrored} vs ${repeated})`)
+  assert.ok(clampedVertical > repeatedVertical + 100, `clamped roughnessMap V coordinates should sample the smooth edge texel (${clampedVertical} vs ${repeatedVertical})`)
+  assert.ok(repeatedVertical < 80, `repeated roughnessMap V coordinates should wrap to the rough texel (${repeatedVertical})`)
+  assert.ok(mirroredVertical > repeatedVertical + 100, `mirrored roughnessMap V coordinates should reflect to the smooth texel (${mirroredVertical} vs ${repeatedVertical})`)
 })
 
 test('metallicRoughness metalnessMap honors horizontal and vertical repeat wrapping', () => {
@@ -288,7 +288,8 @@ test('metallicRoughness metalnessMap honors horizontal and vertical repeat wrapp
       }),
     ))
 
-    const light = new THREE.DirectionalLight(0xffffff, 12)
+    // Three.js r180: about 210 for the diffuse texel and 122 for the rough metal.
+    const light = new THREE.DirectionalLight(0xffffff, 2)
     light.position.set(0, 0, 3)
     scene.add(light)
 
@@ -303,17 +304,17 @@ test('metallicRoughness metalnessMap honors horizontal and vertical repeat wrapp
   const repeated = renderWithWrapping({ wrapS: THREE.RepeatWrapping })
   const mirrored = renderWithWrapping({ wrapS: THREE.MirroredRepeatWrapping })
   assert.ok(clamped > 180, `clamped metalnessMap U coordinates should sample the non-metal edge texel (${clamped})`)
-  assert.ok(repeated < clamped - 80, `repeated metalnessMap U coordinates should wrap to the metallic texel (${repeated} vs ${clamped})`)
+  assert.ok(repeated < clamped - 50, `repeated metalnessMap U coordinates should wrap to the metallic texel (${repeated} vs ${clamped})`)
   assert.ok(mirrored > 180, `mirrored metalnessMap U coordinates should reflect to the non-metal texel (${mirrored})`)
-  assert.ok(repeated < mirrored - 80, `mirrored metalnessMap U coordinates should differ from RepeatWrapping (${mirrored} vs ${repeated})`)
+  assert.ok(repeated < mirrored - 50, `mirrored metalnessMap U coordinates should differ from RepeatWrapping (${mirrored} vs ${repeated})`)
 
   const clampedVertical = renderWithWrapping({ wrapT: THREE.ClampToEdgeWrapping, vertical: true })
   const repeatedVertical = renderWithWrapping({ wrapT: THREE.RepeatWrapping, vertical: true })
   const mirroredVertical = renderWithWrapping({ wrapT: THREE.MirroredRepeatWrapping, vertical: true })
   assert.ok(clampedVertical > 180, `clamped metalnessMap V coordinates should sample the non-metal edge texel (${clampedVertical})`)
-  assert.ok(repeatedVertical < clampedVertical - 80, `repeated metalnessMap V coordinates should wrap to the metallic texel (${repeatedVertical} vs ${clampedVertical})`)
+  assert.ok(repeatedVertical < clampedVertical - 50, `repeated metalnessMap V coordinates should wrap to the metallic texel (${repeatedVertical} vs ${clampedVertical})`)
   assert.ok(mirroredVertical > 180, `mirrored metalnessMap V coordinates should reflect to the non-metal texel (${mirroredVertical})`)
-  assert.ok(repeatedVertical < mirroredVertical - 80, `mirrored metalnessMap V coordinates should differ from RepeatWrapping (${mirroredVertical} vs ${repeatedVertical})`)
+  assert.ok(repeatedVertical < mirroredVertical - 50, `mirrored metalnessMap V coordinates should differ from RepeatWrapping (${mirroredVertical} vs ${repeatedVertical})`)
 })
 
 test('base color maps honor texture flipY', () => {

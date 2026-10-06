@@ -407,14 +407,15 @@ test('color-space decoding composes with explicit texture matrices', () => {
       constantUvPlane(0.25, 0.5),
       new THREE.MeshPhysicalMaterial({
         color: 0x000000,
-        roughness: 0.05,
+        // Below saturation: a mirror-like highlight peak clips for both color spaces.
+        roughness: 0.4,
         metalness: 0,
         specularIntensity: 1,
         specularColor: new THREE.Color(1, 1, 1),
         specularColorMap: transformedGrayTexture(colorSpace),
       }),
     ))
-    const light = new THREE.PointLight(0xffffff, 450)
+    const light = new THREE.PointLight(0xffffff, 20)
     light.position.set(0, 0, 2)
     scene.add(light)
     return maxLuminance(renderRgba(scene, frontCamera(), { width: 64, height: 64 }))

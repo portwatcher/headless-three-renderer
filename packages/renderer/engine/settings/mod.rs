@@ -1,14 +1,16 @@
+use std::sync::Arc;
 use std::thread;
 
 use anyhow::{Result, bail};
 use glam::{Mat4, Vec3};
 
-use crate::ibl::{EnvMap, IblMaps, compute_ibl};
+use crate::ibl::{EnvMap, IblMaps, IblNeeds, compute_ibl};
 use crate::lights::{GpuLight, MAX_LIGHTS, prepare_lights};
 use crate::mesh::{
-    MipmapFilter, PreparedTexture, TextureFilter, WrapMode, decode_texture_with_label,
-    texture_anisotropy,
+    MipmapFilter, PreparedTexture, ShadingModel, TextureFilter, WrapMode,
+    decode_texture_with_label, texture_anisotropy,
 };
+use crate::pmrem::{EnvWrap, EquirectSampling, cube_face_size_has_atlas};
 use crate::types::{Camera, RenderScene};
 use crate::util::{
     finite_f32, finite_positive, parse_color, parse_mat4, parse_vec3, validate_dimension,
@@ -83,8 +85,12 @@ pub struct RenderSettings {
     pub has_ambient_light: bool,
     pub light_probe: [[f32; 3]; 9],
     pub has_light_probe: bool,
-    pub ibl: Option<IblMaps>,
+    pub ibl: Option<Arc<IblMaps>>,
     pub env_intensity: f32,
+    /// Columns of the Three.js envMapRotation matrix for environment lookups.
+    pub env_rotation: [[f32; 4]; 3],
+    /// Orthographic cameras use a constant view direction, as Three.js geometryViewDir.
+    pub is_orthographic: bool,
     pub fog: FogSettings,
     pub shadow: Option<ShadowMapSet>,
     pub post_processing: PostProcessingSettings,

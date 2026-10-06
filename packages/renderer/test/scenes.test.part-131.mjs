@@ -313,7 +313,7 @@ test('cube scene environments feed physical IBL', () => {
     [0, 255, 0],
     [0, 255, 0],
     [0, 255, 0],
-  ])), camera)
+  ], 16)), camera)
   const cubeUvEnvironment = cubeTexture([
     [0, 255, 0],
     [0, 255, 0],
@@ -332,7 +332,7 @@ test('cube scene environments feed physical IBL', () => {
     [0, 255, 0],
     [0, 255, 0],
   ])), camera)
-  const encodedCube = renderRgba(makeScene(encodedCubeTexture()), camera)
+  const encodedCube = renderRgba(makeScene(encodedCubeTexture(16)), camera)
 
   const rawDiff = meanAbsDiff(noEnvironment, rawCube)
   const cubeUvDiff = meanAbsDiff(noEnvironment, cubeUvCube)
@@ -372,7 +372,7 @@ test('cube reflection probes feed physical IBL', () => {
   ))
 
   const noProbe = renderRgba(withoutProbe, camera)
-  const withCubeProbe = renderRgba(makeScene(encodedCubeTexture()), camera)
+  const withCubeProbe = renderRgba(makeScene(encodedCubeTexture(16)), camera)
   const cubeUvProbe = cubeTexture([
     [0, 255, 0],
     [0, 255, 0],
@@ -422,9 +422,10 @@ test('scene environmentRotation rotates equirectangular IBL', () => {
   }
 
   const unrotated = renderWithRotation(0)
-  const rotated = renderWithRotation(-Math.PI / 2)
-  assert.ok(unrotated.r > unrotated.g + 15, `unrotated reflection should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
-  assert.ok(rotated.g > rotated.r + 15, `rotated reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+  const rotated = renderWithRotation(Math.PI)
+  // Three.js equirectUv maps the reflected +Z direction to u = 0.75, the green half.
+  assert.ok(unrotated.g > unrotated.r + 15, `unrotated reflection should sample the green environment half (${unrotated.g} vs ${unrotated.r})`)
+  assert.ok(rotated.r > rotated.g + 15, `half-turned reflection should sample the red environment half (${rotated.r} vs ${rotated.g})`)
 })
 
 test('options.environmentRotation overrides scene environmentRotation', () => {
@@ -451,11 +452,12 @@ test('options.environmentRotation overrides scene environmentRotation', () => {
     width: 64,
     height: 64,
     outputColorSpace: THREE.LinearSRGBColorSpace,
-    environmentRotation: new THREE.Euler(0, -Math.PI / 2, 0),
+    environmentRotation: new THREE.Euler(0, Math.PI, 0),
   }), 64, 64, 24, 24, 40, 40)
 
-  assert.ok(sceneRotation.r > sceneRotation.g + 15, `scene rotation should sample red environment half (${sceneRotation.r} vs ${sceneRotation.g})`)
-  assert.ok(optionRotation.g > optionRotation.r + 15, `options.environmentRotation should override to green half (${optionRotation.g} vs ${optionRotation.r})`)
+  // Three.js equirectUv maps the reflected +Z direction to u = 0.75, the green half.
+  assert.ok(sceneRotation.g > sceneRotation.r + 15, `scene rotation should sample green environment half (${sceneRotation.g} vs ${sceneRotation.r})`)
+  assert.ok(optionRotation.r > optionRotation.g + 15, `options.environmentRotation should override to red half (${optionRotation.r} vs ${optionRotation.g})`)
 })
 
 test('scene environmentRotation rotates cube IBL', () => {
@@ -466,7 +468,7 @@ test('scene environmentRotation rotates cube IBL', () => {
     [255, 255, 0],
     [255, 0, 255],
     [0, 255, 255],
-  ])
+  ], 16)
 
   function renderWithRotation(yRotation) {
     const scene = new THREE.Scene()

@@ -332,9 +332,10 @@ test('material envMapRotation rotates shared IBL', () => {
   }
 
   const unrotated = renderWithRotation(0)
-  const rotated = renderWithRotation(-Math.PI / 2)
-  assert.ok(unrotated.r > unrotated.g + 15, `unrotated material reflection should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
-  assert.ok(rotated.g > rotated.r + 15, `rotated material reflection should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+  const rotated = renderWithRotation(Math.PI)
+  // Three.js equirectUv maps the reflected +Z direction to u = 0.75, the green half.
+  assert.ok(unrotated.g > unrotated.r + 15, `unrotated material reflection should sample the green environment half (${unrotated.g} vs ${unrotated.r})`)
+  assert.ok(rotated.r > rotated.g + 15, `half-turned material reflection should sample the red environment half (${rotated.r} vs ${rotated.g})`)
 })
 
 test('material envMapRotation rotates Basic, Lambert, and Phong legacy env maps', () => {
@@ -388,9 +389,10 @@ test('material envMapRotation rotates Basic, Lambert, and Phong legacy env maps'
 
   for (const [name, makeMaterial] of cases) {
     const unrotated = renderWithRotation(makeMaterial, 0)
-    const rotated = renderWithRotation(makeMaterial, -Math.PI / 2)
-    assert.ok(unrotated.r > unrotated.g + 40, `${name} unrotated envMap should sample the red environment half (${unrotated.r} vs ${unrotated.g})`)
-    assert.ok(rotated.g > rotated.r + 30, `${name} rotated envMap should sample the green environment half (${rotated.g} vs ${rotated.r})`)
+    const rotated = renderWithRotation(makeMaterial, Math.PI)
+    // Three.js equirectUv maps the reflected +Z direction to u = 0.75, the green half.
+    assert.ok(unrotated.g > unrotated.r + 40, `${name} unrotated envMap should sample the green environment half (${unrotated.g} vs ${unrotated.r})`)
+    assert.ok(rotated.r > rotated.g + 30, `${name} half-turned envMap should sample the red environment half (${rotated.r} vs ${rotated.g})`)
   }
 })
 

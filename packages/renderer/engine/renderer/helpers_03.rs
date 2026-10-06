@@ -1,59 +1,5 @@
+#[cfg(test)]
 use super::*;
-
-pub(super) fn create_cubemap_with_mips(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    base_size: u32,
-    mip_levels: u32,
-    faces: &[Vec<u8>],
-) -> wgpu::Texture {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("prefiltered cubemap"),
-        size: wgpu::Extent3d {
-            width: base_size,
-            height: base_size,
-            depth_or_array_layers: 6,
-        },
-        mip_level_count: mip_levels,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: COLOR_FORMAT,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    for mip in 0..mip_levels {
-        let mip_size = (base_size >> mip).max(1);
-        for face in 0..6u32 {
-            let idx = (mip * 6 + face) as usize;
-            if idx < faces.len() {
-                queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture: &texture,
-                        mip_level: mip,
-                        origin: wgpu::Origin3d {
-                            x: 0,
-                            y: 0,
-                            z: face,
-                        },
-                        aspect: wgpu::TextureAspect::All,
-                    },
-                    &faces[idx],
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(4 * mip_size),
-                        rows_per_image: Some(mip_size),
-                    },
-                    wgpu::Extent3d {
-                        width: mip_size,
-                        height: mip_size,
-                        depth_or_array_layers: 1,
-                    },
-                );
-            }
-        }
-    }
-    texture
-}
 
 #[cfg(test)]
 mod tests {
@@ -87,6 +33,7 @@ mod tests {
             width,
             height,
             mipmaps: Vec::new(),
+            srgb: false,
             wrap_s: WrapMode::ClampToEdge,
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
@@ -97,15 +44,15 @@ mod tests {
     }
 
     pub(super) fn single_pixel_ibl_maps(red: u8) -> IblMaps {
-        let face = vec![red, 0, 0, 255];
+        let face = vec![red, 0, 0, 0, 0, 0, 0, 60];
         IblMaps {
-            irradiance_faces: vec![face.clone(); 6],
-            irradiance_size: 1,
-            prefilter_faces: vec![face; 6],
-            prefilter_base_size: 1,
-            prefilter_mip_levels: 1,
-            brdf_lut: vec![0, red, 0, 255],
-            brdf_lut_size: 1,
+            env_cube_faces: vec![face.clone(); 6],
+            env_cube_size: 1,
+            cube_uv: face,
+            cube_uv_width: 1,
+            cube_uv_height: 1,
+            cube_uv_max_mip: 0.0,
+            content_key: red as u64,
         }
     }
 
@@ -142,7 +89,7 @@ mod tests {
         let rgba = vec![
             0, 0, 0, 255, 10, 20, 30, 255, 200, 0, 0, 255, 210, 20, 30, 255,
         ];
-        let (mip, width, height) = downsample_rgba_mip(&rgba, 4, 1);
+        let (mip, width, height) = downsample_rgba_mip(&rgba, 4, 1, false);
         assert_eq!((width, height), (2, 1));
         assert_eq!(
             mip,
@@ -156,9 +103,36 @@ mod tests {
         let rgba = vec![
             0, 0, 0, 255, 60, 0, 0, 255, 120, 0, 0, 255, 180, 0, 0, 255, 240, 0, 0, 255,
         ];
-        let (mip, width, height) = downsample_rgba_mip(&rgba, 5, 1);
+        let (mip, width, height) = downsample_rgba_mip(&rgba, 5, 1, false);
         assert_eq!((width, height), (2, 1));
         assert_eq!(mip, vec![30, 0, 0, 255, 180, 0, 0, 255]);
+    }
+
+    #[test]
+    pub(super) fn downsample_rgba_mip_averages_srgb_texels_in_linear_light() {
+        // Black and white sRGB texels average to linear 0.5, which encodes to 188 like WebGL
+        // generateMipmap on SRGB8_ALPHA8 textures; alpha stays a linear average.
+        let rgba = vec![0, 0, 0, 0, 255, 255, 255, 255];
+        let (mip, _, _) = downsample_rgba_mip(&rgba, 2, 1, true);
+        assert_eq!(mip, vec![188, 188, 188, 128]);
+        let (linear, _, _) = downsample_rgba_mip(&rgba, 2, 1, false);
+        assert_eq!(
+            linear,
+            vec![128, 128, 128, 128],
+            "linear levels round to nearest"
+        );
+    }
+
+    #[test]
+    pub(super) fn texture_cache_keys_track_srgb_format() {
+        let linear = single_pixel_texture([200, 100, 50, 255]);
+        let mut srgb = single_pixel_texture([200, 100, 50, 255]);
+        srgb.srgb = true;
+        assert_ne!(
+            TextureCacheKey::from_texture(&linear),
+            TextureCacheKey::from_texture(&srgb),
+            "the sRGB upload format is part of the texture cache key",
+        );
     }
 
     #[test]
@@ -240,6 +214,7 @@ mod tests {
                 width: 1,
                 height: 1,
             }],
+            srgb: false,
             wrap_s: WrapMode::ClampToEdge,
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
@@ -258,6 +233,7 @@ mod tests {
                 width: 1,
                 height: 1,
             }],
+            srgb: false,
             wrap_s: WrapMode::ClampToEdge,
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
@@ -491,27 +467,19 @@ mod tests {
             IblBindGroupKey::from_maps(&same),
         );
 
-        let different_face = single_pixel_ibl_maps(64);
+        let different_content = single_pixel_ibl_maps(64);
         assert_ne!(
             IblBindGroupKey::from_maps(&base),
-            IblBindGroupKey::from_maps(&different_face),
-            "IBL face bytes are part of the uploaded resource cache key",
+            IblBindGroupKey::from_maps(&different_content),
+            "the environment content key is part of the uploaded resource cache key",
         );
 
-        let mut different_brdf = single_pixel_ibl_maps(32);
-        different_brdf.brdf_lut[1] = 96;
+        let mut different_size = single_pixel_ibl_maps(32);
+        different_size.cube_uv_max_mip = 4.0;
         assert_ne!(
             IblBindGroupKey::from_maps(&base),
-            IblBindGroupKey::from_maps(&different_brdf),
-            "BRDF LUT bytes are part of the uploaded resource cache key",
-        );
-
-        let mut different_mips = single_pixel_ibl_maps(32);
-        different_mips.prefilter_mip_levels = 2;
-        assert_ne!(
-            IblBindGroupKey::from_maps(&base),
-            IblBindGroupKey::from_maps(&different_mips),
-            "prefilter dimensions are part of the uploaded resource cache key",
+            IblBindGroupKey::from_maps(&different_size),
+            "atlas dimensions are part of the uploaded resource cache key",
         );
     }
 

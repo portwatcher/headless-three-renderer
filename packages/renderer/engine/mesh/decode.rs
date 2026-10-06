@@ -64,6 +64,7 @@ pub fn decode_texture_with_label(
             width: w,
             height: h,
             mipmaps,
+            srgb: false,
             wrap_s: WrapMode::ClampToEdge,
             wrap_t: WrapMode::ClampToEdge,
             mag_filter: TextureFilter::Linear,
@@ -81,6 +82,7 @@ pub fn decode_texture_with_label(
         height: rgba.height(),
         rgba: rgba.into_raw(),
         mipmaps: Vec::new(),
+        srgb: false,
         wrap_s: WrapMode::ClampToEdge,
         wrap_t: WrapMode::ClampToEdge,
         mag_filter: TextureFilter::Linear,
@@ -344,4 +346,18 @@ pub(super) fn prepare_surface_texture_inputs(
             common,
         })
     })
+}
+
+/// Marks an sRGB slot texture for an sRGB GPU format and returns the cleared shader decode flag.
+pub(super) fn upload_as_srgb(
+    texture: Option<PreparedTexture>,
+    is_srgb: bool,
+) -> (Option<PreparedTexture>, bool) {
+    match texture {
+        Some(mut texture) if is_srgb => {
+            texture.srgb = true;
+            (Some(texture), false)
+        }
+        other => (other, is_srgb),
+    }
 }

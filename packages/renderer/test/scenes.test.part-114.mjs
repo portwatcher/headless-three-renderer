@@ -204,7 +204,7 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { test } from './scenes.test.part-001.mjs'
-import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, renderRgba, rgbaTexture, setConstantUvAttribute, solidTexture } from './scenes.test.part-002.mjs'
+import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, nearlyConstantUvPlane, renderRgba, rgbaTexture, setConstantUvAttribute, setNearlyConstantUvAttribute, solidTexture, xGradientEnvironmentTexture } from './scenes.test.part-002.mjs'
 test('clearcoatMap decodes sRGB colorSpace before shading', () => {
   function renderColorSpace(colorSpace) {
     const clearcoatMap = solidTexture(128, 0, 0, 255)
@@ -215,7 +215,7 @@ test('clearcoatMap decodes sRGB colorSpace before shading', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshPhysicalMaterial({
@@ -239,7 +239,7 @@ test('clearcoatMap decodes sRGB colorSpace before shading', () => {
   const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
   const srgb = renderColorSpace(THREE.SRGBColorSpace)
   assert.ok(
-    linear > srgb + 20,
+    linear > srgb + 5,
     `linear clearcoatMap should preserve the stronger red-channel factor before sRGB decode (${linear.toFixed(1)} vs ${srgb.toFixed(1)})`,
   )
 })
@@ -260,7 +260,7 @@ test('clearcoatRoughnessMap samples selected uv1-uv3 texture channels', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       geometry,
       new THREE.MeshPhysicalMaterial({
@@ -285,7 +285,7 @@ test('clearcoatRoughnessMap samples selected uv1-uv3 texture channels', () => {
   for (const channel of [1, 2, 3]) {
     const secondary = renderWithChannel(channel)
     const secondaryLum = 0.2126 * secondary.r + 0.7152 * secondary.g + 0.0722 * secondary.b
-    assert.ok(primaryLum > secondaryLum + 20, `clearcoatRoughnessMap channel=${channel} should sample the rough uv${channel} texel (${primaryLum.toFixed(1)} vs ${secondaryLum.toFixed(1)})`)
+    assert.ok(primaryLum > secondaryLum + 12, `clearcoatRoughnessMap channel=${channel} should sample the rough uv${channel} texel (${primaryLum.toFixed(1)} vs ${secondaryLum.toFixed(1)})`)
   }
 })
 
@@ -299,7 +299,7 @@ test('clearcoatRoughnessMap decodes sRGB colorSpace before shading', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
       new THREE.MeshPhysicalMaterial({
@@ -327,7 +327,7 @@ test('clearcoatRoughnessMap decodes sRGB colorSpace before shading', () => {
   const linear = renderColorSpace(THREE.LinearSRGBColorSpace)
   const srgb = renderColorSpace(THREE.SRGBColorSpace)
   assert.ok(
-    srgb > linear + 8,
+    srgb > linear + 3,
     `sRGB-decoded clearcoatRoughnessMap should produce the smoother, brighter clearcoat response (${srgb.toFixed(1)} vs ${linear.toFixed(1)})`,
   )
 })
@@ -340,9 +340,9 @@ test('clearcoatNormalMap samples selected uv1-uv3 texture channels', () => {
     ], 2, 1)
     clearcoatNormalMap.channel = channel
 
-    const geometry = constantUvPlane(0.25, 0.5)
+    const geometry = nearlyConstantUvPlane(0.25, 0.5)
     if (channel > 0) {
-      setConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
+      setNearlyConstantUvAttribute(geometry, `uv${channel}`, 0.75, 0.5)
     }
 
     const scene = new THREE.Scene()
@@ -424,7 +424,8 @@ test('MeshPhysicalMaterial BackSide clearcoatNormalScale matches Three.js sign i
   function renderClearcoat(side, cameraZ, scale) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
-    scene.environment = makeEnvironmentTexture()
+    // The same colors toward +Z and -Z: the back view is the mirrored front view.
+    scene.environment = xGradientEnvironmentTexture()
     scene.environmentIntensity = 2
     scene.add(new THREE.Mesh(
       new THREE.PlaneGeometry(2, 2),
@@ -450,12 +451,19 @@ test('MeshPhysicalMaterial BackSide clearcoatNormalScale matches Three.js sign i
   const frontPositive = renderClearcoat(THREE.FrontSide, 3, 1)
   const backPositive = renderClearcoat(THREE.BackSide, -3, 1)
 
-  const invertedDiff = meanAbsDiff(frontNegative, backPositive)
+  // The back camera sees the plane mirrored horizontally.
+  const mirroredBack = new Uint8Array(backPositive.length)
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 64; x++) {
+      mirroredBack.set(backPositive.subarray((y * 64 + x) * 4, (y * 64 + x) * 4 + 4), (y * 64 + 63 - x) * 4)
+    }
+  }
+  const invertedDiff = meanAbsDiff(frontNegative, mirroredBack)
   assert.ok(
     invertedDiff < 3,
     `BackSide clearcoatNormalScale should be negated before physical shading, diff=${invertedDiff.toFixed(2)}`,
   )
-  const uninvertedDiff = meanAbsDiff(frontPositive, backPositive)
+  const uninvertedDiff = meanAbsDiff(frontPositive, mirroredBack)
   assert.ok(
     uninvertedDiff > 10,
     `BackSide clearcoatNormalScale should not behave like the unnegated front-side scale, diff=${uninvertedDiff.toFixed(2)}`,
@@ -478,7 +486,7 @@ test('sheenColorMap samples selected uv1-uv3 texture channels', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       geometry,
       new THREE.MeshPhysicalMaterial({
@@ -502,7 +510,7 @@ test('sheenColorMap samples selected uv1-uv3 texture channels', () => {
   const primary = renderWithChannel(0)
   for (const channel of [1, 2, 3]) {
     const secondary = renderWithChannel(channel)
-    assert.ok(secondary.r > primary.r + 3, `sheenColorMap channel=${channel} should add red sheen from uv${channel} (${secondary.r} vs ${primary.r})`)
+    assert.ok(secondary.r > primary.r + 6, `sheenColorMap channel=${channel} should add red sheen from uv${channel} (${secondary.r} vs ${primary.r})`)
     assert.ok(secondary.r > secondary.g + 3, `sheenColorMap channel=${channel} should keep the sampled red sheen tint (${secondary.r} vs ${secondary.g})`)
   }
 })

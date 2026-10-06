@@ -151,9 +151,12 @@ export function meshMatcapMaterialCorpus() {
     background: [39, 44, 48],
     minNonBackgroundRatio: 0.02,
     validate(rgba, { width }) {
-      const center = meanRegion(rgba, width, 32, 32, 64, 64)
-      if (!(center.b > center.r + 20 && center.g > center.r + 10)) {
-        throw new Error(`matcap corpus should sample the blue-green matcap blend, got ${JSON.stringify(center)}`)
+      // Three.js r180 WebGL: the left of the sphere samples the blue-green matcap column, the
+      // right the warm white one (decoded before filtering like SRGB8_ALPHA8).
+      const left = meanRegion(rgba, width, 24, 38, 36, 52)
+      const right = meanRegion(rgba, width, 56, 44, 68, 60)
+      if (!(left.b > left.r + 20 && left.g > left.r + 10 && right.r > 200 && right.r > right.b + 10)) {
+        throw new Error(`matcap corpus should sample the blue-green and warm matcap blends, got left=${JSON.stringify(left)} right=${JSON.stringify(right)}`)
       }
     },
   }

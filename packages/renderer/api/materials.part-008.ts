@@ -279,7 +279,8 @@ export function textureSamplerState(
     magFilter: filterModeToString(map?.magFilter),
     minFilter: minFilterModeToString(map),
     anisotropy: textureAnisotropy(map, label),
-    transform: options.includeTransform === false ? undefined : textureTransform(map, label),
+    // Slots without a UV transform (matcap) still keep the flipY orientation of the upload.
+    transform: options.includeTransform === false ? flipYTransform(map, label) : textureTransform(map, label),
     colorSpace: textureColorSpace(map),
     usesUv2: options.includeUvChannel === false ? false : textureUvChannel(map) > 0,
   }
@@ -287,6 +288,10 @@ export function textureSamplerState(
     context.textureStateCache?.set(map, { signature, state: copyTextureSamplerState(state) })
   }
   return state
+}
+
+export function flipYTransform(map: ThreeTextureLike | null | undefined, label: string): number[] | undefined {
+  return optionalTextureBoolean(map?.flipY, `${label}.flipY`) === false ? [1, 0, 0, 0, -1, 1] : undefined
 }
 
 export function textureStateSignature(
@@ -420,9 +425,13 @@ export function isCubeEnvironmentTexture(map: ThreeTextureLike, label = 'texture
 }
 
 export function extractCubeBackgroundTexture(map: ThreeTextureLike, label: string): TextureInfo {
-  const cube = cubeTextureToEquirectangular(map, label)
+  const { data, width, height } = cubeTextureToEquirectangular(map, label)
   return {
-    ...cube,
+    data,
+    width,
+    height,
+    // The converted rows start at the -Y pole, as a flipY = false equirectangular texture.
+    transform: [1, 0, 0, 0, -1, 1],
     wrapS: 'repeat',
     wrapT: 'clamp',
     magFilter: filterModeToString(map.magFilter),
@@ -433,7 +442,7 @@ export function extractCubeBackgroundTexture(map: ThreeTextureLike, label: strin
   }
 }
 
-export function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { data: Buffer; width: number; height: number } {
+export function cubeTextureToEquirectangular(map: ThreeTextureLike, label: string): { data: Buffer; width: number; height: number; faceSize: number } {
   textureUnpackAlignment(map, label)
   const faces = cubeFaceImages(map, label)
   if (!faces) {
@@ -449,13 +458,15 @@ export function cubeTextureToEquirectangular(map: ThreeTextureLike, label: strin
 
   const premultiplyAlpha = optionalTextureBoolean(map.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
   const faceTextures = faces.map((face, index) => imageToRgbaTexture(face, `${label}.image[${index}]`, map.type, map.format, { premultiplyAlpha }))
-  return cubeFaceTexturesToEquirectangular(faceTextures, label)
+  // Three.js samples cube textures that are not render targets with flipEnvMap = -1 (x mirrored).
+  return cubeFaceTexturesToEquirectangular(faceTextures, label, map.isRenderTargetTexture !== true)
 }
 
 export function cubeFaceTexturesToEquirectangular(
   faceTextures: Array<{ rgba: Uint8Array; width: number; height: number }>,
   label: string,
-): { data: Buffer; width: number; height: number } {
+  flipX = false,
+): { data: Buffer; width: number; height: number; faceSize: number } {
   const faceWidth = faceTextures[0].width
   const faceHeight = faceTextures[0].height
   if (faceWidth !== faceHeight) {
@@ -479,7 +490,7 @@ export function cubeFaceTexturesToEquirectangular(
       const u = (x + 0.5) / width
       const yaw = (u - 0.5) * Math.PI * 2
       const dir = [
-        Math.cos(yaw) * ring,
+        (flipX ? -1 : 1) * Math.cos(yaw) * ring,
         dirY,
         Math.sin(yaw) * ring,
       ] as const
@@ -492,12 +503,16 @@ export function cubeFaceTexturesToEquirectangular(
     data: Buffer.from(out.buffer, out.byteOffset, out.byteLength),
     width,
     height,
+    faceSize: faceWidth,
   }
 }
 
 export function cubeFaceImages(map: ThreeTextureLike, label = 'texture'): TextureImageInput[] | null {
   const sourceData = textureSourceData(map, label)
   const image = (map as any).image ?? sourceData
-  if (Array.isArray(image) && image.length >= 6) return image.slice(0, 6) as TextureImageInput[]
+  if (Array.isArray(image) && image.length >= 6) {
+    // WebGL uploads DataTexture faces through their image ({ data, width, height }).
+    return image.slice(0, 6).map((face) => (face?.isDataTexture === true && face.image ? face.image : face)) as TextureImageInput[]
+  }
   return null
 }

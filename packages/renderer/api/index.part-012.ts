@@ -261,6 +261,8 @@ export function assertCubeFaceCount(faces: unknown[], label: string): void {
 
 export function ensureCubeTargetAttachmentTexture(texture: RenderTargetTextureLike): void {
   texture.isCubeTexture = true
+  // Captured faces use the WebGL cube render target layout, which Three.js samples unmirrored.
+  texture.isRenderTargetTexture = true
   texture.needsPMREMUpdate = true
   texture.pmremVersion = (texture.pmremVersion ?? 0) + 1
 }

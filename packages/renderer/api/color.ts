@@ -61,10 +61,11 @@ export function validatedColorLikeToArray(value: unknown, label: string): Color4
     throw new TypeError(`${label} must be a color-like object, CSS color string, or [r, g, b].`)
   }
 
+  // Three.js colors are linear and may exceed 1 (HDR material, emissive, and light colors).
   return [
-    clamp01(assertFiniteColorComponent(color.r, `${label}.r`)),
-    clamp01(assertFiniteColorComponent(color.g, `${label}.g`)),
-    clamp01(assertFiniteColorComponent(color.b, `${label}.b`)),
+    Math.max(0, assertFiniteColorComponent(color.r, `${label}.r`)),
+    Math.max(0, assertFiniteColorComponent(color.g, `${label}.g`)),
+    Math.max(0, assertFiniteColorComponent(color.b, `${label}.b`)),
     clamp01(color.a === undefined ? 1 : assertFiniteColorComponent(color.a, `${label}.a`)),
   ]
 }

@@ -16,6 +16,9 @@ pub struct SceneMesh {
     pub indices: Option<Vec<u32>>,
     /// Optional per-vertex normals: `[nx0, ny0, nz0, ...]`.
     pub normals: Option<Vec<f64>>,
+    /// The source geometry has a tangent attribute (Three.js `USE_TANGENT`). Without it, normal
+    /// maps use the screen-space derivative frame of Three.js `getTangentFrame`.
+    pub has_vertex_tangents: Option<bool>,
     /// Optional per-vertex colors. Accepts one `[r,g,b,a]` color or one color per vertex.
     pub colors: Option<Vec<f64>>,
     /// Mesh material color used when `colors` is omitted.
@@ -54,6 +57,10 @@ pub struct SceneMesh {
     pub texture_uses_uv2: Option<bool>,
     /// Optional metallic-roughness texture (glTF convention: G=roughness, B=metallic).
     pub metallic_roughness_texture: Option<Buffer>,
+    /// Channels of the metallic-roughness texture to use, like the separate Three.js
+    /// `roughnessMap` and `metalnessMap` slots: 1 = roughness (G), 2 = metalness (B).
+    /// Defaults to 3 (both).
+    pub metallic_roughness_channels: Option<u32>,
     /// Metallic-roughness texture width (required when texture is raw RGBA8 bytes).
     pub metallic_roughness_texture_width: Option<u32>,
     /// Metallic-roughness texture height (required when texture is raw RGBA8 bytes).

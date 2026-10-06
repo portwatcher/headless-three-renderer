@@ -1,5 +1,7 @@
 import { NativeSceneLight } from './types.part-002'
 export interface NativeSceneMesh {
+  /** The source geometry has a tangent attribute; otherwise normal maps use derivative frames. */
+  hasVertexTangents?: boolean
   nativeMeshKey?: number
   nativeVertexCount?: number
   nativeIndexCount?: number
@@ -242,6 +244,8 @@ export interface NativeSceneMesh {
   displacementScale?: number
   displacementBias?: number
   metallicRoughnessTexture?: Buffer
+  /** Channels of metallicRoughnessTexture to use: 1 = roughness (G), 2 = metalness (B); 3 by default. */
+  metallicRoughnessChannels?: number
   metallicRoughnessTextureWidth?: number
   metallicRoughnessTextureHeight?: number
   metallicRoughnessTextureWrapS?: string
@@ -411,6 +415,11 @@ export interface NativeRenderScene {
   environmentMapIntensity?: number
   environmentMapColorSpace?: string
   environmentMapRotation?: number[]
+  environmentMapFlipY?: boolean
+  environmentMapFilter?: string
+  environmentMapWrapS?: string
+  environmentMapWrapT?: string
+  environmentMapCubeFaceSize?: number
   fogType?: string
   fogColor?: number[]
   fogNear?: number

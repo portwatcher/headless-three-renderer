@@ -213,7 +213,7 @@ test('options.environmentRotation overrides scene environmentRotation for cube I
     [255, 255, 0],
     [255, 0, 255],
     [0, 255, 255],
-  ])
+  ], 16)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -247,13 +247,10 @@ test('options.environmentRotation overrides scene environmentRotation for cube I
 
 test('scene environment colorSpace controls RGBA8 IBL decode', () => {
   function renderColorSpace(colorSpace) {
-    const data = new Uint8Array([
-      128, 128, 128, 255,
-      128, 128, 128, 255,
-      128, 128, 128, 255,
-      128, 128, 128, 255,
-    ])
-    const environment = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+    // 64x32: Three.js gives no image-based light for narrower equirectangular maps.
+    const data = new Uint8Array(64 * 32 * 4)
+    for (let i = 0; i < data.length; i += 4) data.set([128, 128, 128, 255], i)
+    const environment = new THREE.DataTexture(data, 64, 32, THREE.RGBAFormat)
     environment.colorSpace = colorSpace
     environment.mapping = THREE.EquirectangularReflectionMapping
     environment.needsUpdate = true
@@ -292,7 +289,7 @@ test('cube environment and reflection probe colorSpace controls IBL decode', () 
       [128, 128, 128],
       [128, 128, 128],
       [128, 128, 128],
-    ])
+    ], 16)
     environment.colorSpace = colorSpace
     return environment
   }

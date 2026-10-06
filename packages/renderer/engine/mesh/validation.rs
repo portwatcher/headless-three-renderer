@@ -66,6 +66,25 @@ pub(super) fn parse_optional_clamped_color3(
     ])
 }
 
+/// An optional non-negative RGB color that may exceed 1, as Three.js emissive and specular colors.
+pub(super) fn parse_optional_hdr_color3(
+    values: Option<&[f64]>,
+    default: [f32; 3],
+    field: &str,
+) -> Result<[f32; 3]> {
+    let Some(values) = values else {
+        return Ok(default);
+    };
+    if values.len() != 3 {
+        bail!("{field} must be an array of 3 numbers");
+    }
+    Ok([
+        finite_f32(values[0], field)?.max(0.0),
+        finite_f32(values[1], field)?.max(0.0),
+        finite_f32(values[2], field)?.max(0.0),
+    ])
+}
+
 pub(super) fn finite_clamp01(value: f64, field: &str) -> Result<f32> {
     Ok(finite_f32(value, field)?.clamp(0.0, 1.0))
 }

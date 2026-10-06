@@ -374,7 +374,9 @@ impl GpuRenderer {
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: COLOR_FORMAT,
+            // Only the Phong specular / MToon rim map layer can be sRGB; the other layers keep
+            // their defaults, which are unused by those materials.
+            format: sampled_texture_format(scalar.srgb),
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
@@ -385,6 +387,7 @@ impl GpuRenderer {
             scalar.width,
             scalar.height,
             mip_level_count,
+            scalar.srgb,
         );
 
         let mut default_anisotropy = Vec::new();
@@ -407,6 +410,7 @@ impl GpuRenderer {
             scalar.width,
             scalar.height,
             mip_level_count,
+            scalar.srgb,
         );
 
         let mut default_iridescence = Vec::new();
@@ -429,6 +433,7 @@ impl GpuRenderer {
             scalar.width,
             scalar.height,
             mip_level_count,
+            scalar.srgb,
         );
         gpu_texture
     }
@@ -441,6 +446,7 @@ impl GpuRenderer {
         width: u32,
         height: u32,
         mip_level_count: u32,
+        srgb: bool,
     ) {
         self.write_texture_mip(gpu_texture, 0, array_layer, rgba, width, height);
         if mip_level_count <= 1 {
@@ -452,7 +458,7 @@ impl GpuRenderer {
         let mut previous_height = height;
         for mip_level in 1..mip_level_count {
             let (next, next_width, next_height) =
-                downsample_rgba_mip(&previous, previous_width, previous_height);
+                downsample_rgba_mip(&previous, previous_width, previous_height, srgb);
             self.write_texture_mip(
                 gpu_texture,
                 mip_level,
@@ -491,7 +497,7 @@ impl GpuRenderer {
             let mut previous_height = texture.height;
             for mip_level in 1..mip_level_count {
                 let (next, next_width, next_height) =
-                    downsample_rgba_mip(&previous, previous_width, previous_height);
+                    downsample_rgba_mip(&previous, previous_width, previous_height, texture.srgb);
                 self.write_texture_mip(
                     gpu_texture,
                     mip_level,

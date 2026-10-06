@@ -278,10 +278,30 @@ export interface RenderScene {
   environmentMapHeight?: number
   /** Environment map intensity multiplier. Defaults to 1. */
   environmentMapIntensity?: number
-  /** Environment map color space. `"srgb"` is decoded to linear; omitted defaults to sRGB for 8-bit inputs. */
+  /**
+   * Environment map color space. `"srgb"` is decoded to linear; omitted keeps the data linear
+   * (Three.js NoColorSpace).
+   */
   environmentMapColorSpace?: string
   /** Environment map direction rotation matrix columns, flattened 3x3. */
   environmentMapRotation?: Array<number>
+  /**
+   * Three.js `texture.flipY` of the environment map: true when data row 0 is the image top.
+   * Defaults to true, the encoded-image convention.
+   */
+  environmentMapFlipY?: boolean
+  /** Environment map sampling filter: `"linear"` (default) or `"nearest"`. */
+  environmentMapFilter?: string
+  /** Environment map horizontal wrap mode: `"clamp"` (default), `"repeat"`, or `"mirror"`. */
+  environmentMapWrapS?: string
+  /** Environment map vertical wrap mode: `"clamp"` (default), `"repeat"`, or `"mirror"`. */
+  environmentMapWrapT?: string
+  /**
+   * Face size of a six-face cube environment, converted to equirectangular data. Three.js
+   * `PMREMGenerator.fromCubemap` uses it as the cube size and gives no image-based light
+   * below 16 px.
+   */
+  environmentMapCubeFaceSize?: number
   /** Scene fog mode: `"linear"` for THREE.Fog or `"exp2"` for THREE.FogExp2. */
   fogType?: string
   /** Fog color `[r, g, b]` in 0..1 range. */
@@ -375,6 +395,11 @@ export interface SceneMesh {
   indices?: Array<number>
   /** Optional per-vertex normals: `[nx0, ny0, nz0, ...]`. */
   normals?: Array<number>
+  /**
+   * The source geometry has a tangent attribute (Three.js `USE_TANGENT`). Without it, normal
+   * maps use the screen-space derivative frame of Three.js `getTangentFrame`.
+   */
+  hasVertexTangents?: boolean
   /** Optional per-vertex colors. Accepts one `[r,g,b,a]` color or one color per vertex. */
   colors?: Array<number>
   /** Mesh material color used when `colors` is omitted. */
@@ -413,6 +438,12 @@ export interface SceneMesh {
   textureUsesUv2?: boolean
   /** Optional metallic-roughness texture (glTF convention: G=roughness, B=metallic). */
   metallicRoughnessTexture?: Buffer
+  /**
+   * Channels of the metallic-roughness texture to use, like the separate Three.js
+   * `roughnessMap` and `metalnessMap` slots: 1 = roughness (G), 2 = metalness (B).
+   * Defaults to 3 (both).
+   */
+  metallicRoughnessChannels?: number
   /** Metallic-roughness texture width (required when texture is raw RGBA8 bytes). */
   metallicRoughnessTextureWidth?: number
   /** Metallic-roughness texture height (required when texture is raw RGBA8 bytes). */

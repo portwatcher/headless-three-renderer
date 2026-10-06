@@ -76,10 +76,24 @@ pub struct RenderScene {
     pub environment_map_height: Option<u32>,
     /// Environment map intensity multiplier. Defaults to 1.
     pub environment_map_intensity: Option<f64>,
-    /// Environment map color space. `"srgb"` is decoded to linear; omitted defaults to sRGB for 8-bit inputs.
+    /// Environment map color space. `"srgb"` is decoded to linear; omitted keeps the data linear
+    /// (Three.js NoColorSpace).
     pub environment_map_color_space: Option<String>,
     /// Environment map direction rotation matrix columns, flattened 3x3.
     pub environment_map_rotation: Option<Vec<f64>>,
+    /// Three.js `texture.flipY` of the environment map: true when data row 0 is the image top.
+    /// Defaults to true, the encoded-image convention.
+    pub environment_map_flip_y: Option<bool>,
+    /// Environment map sampling filter: `"linear"` (default) or `"nearest"`.
+    pub environment_map_filter: Option<String>,
+    /// Environment map horizontal wrap mode: `"clamp"` (default), `"repeat"`, or `"mirror"`.
+    pub environment_map_wrap_s: Option<String>,
+    /// Environment map vertical wrap mode: `"clamp"` (default), `"repeat"`, or `"mirror"`.
+    pub environment_map_wrap_t: Option<String>,
+    /// Face size of a six-face cube environment, converted to equirectangular data. Three.js
+    /// `PMREMGenerator.fromCubemap` uses it as the cube size and gives no image-based light
+    /// below 16 px.
+    pub environment_map_cube_face_size: Option<u32>,
     /// Scene fog mode: `"linear"` for THREE.Fog or `"exp2"` for THREE.FogExp2.
     pub fog_type: Option<String>,
     /// Fog color `[r, g, b]` in 0..1 range.

@@ -24,10 +24,27 @@ pub(super) fn texture_upload_mip_level_count(texture: &PreparedTexture) -> u32 {
     }
 }
 
-pub(super) fn downsample_rgba_mip(source: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {
+/// Texture format of a sampled material texture: sRGB textures decode in the sampler.
+pub(super) fn sampled_texture_format(srgb: bool) -> wgpu::TextureFormat {
+    if srgb {
+        wgpu::TextureFormat::Rgba8UnormSrgb
+    } else {
+        COLOR_FORMAT
+    }
+}
+
+/// Box-filters one mip level, rounding to nearest. sRGB levels average decoded (linear) RGB,
+/// as WebGL `generateMipmap` does for SRGB8_ALPHA8 textures; alpha is always linear.
+pub(super) fn downsample_rgba_mip(
+    source: &[u8],
+    width: u32,
+    height: u32,
+    srgb: bool,
+) -> (Vec<u8>, u32, u32) {
     let next_width = (width / 2).max(1);
     let next_height = (height / 2).max(1);
     let mut output = vec![0u8; (next_width * next_height * 4) as usize];
+    let decode = srgb_decode_table();
 
     for y in 0..next_height {
         let source_y0 = y * height / next_height;
@@ -35,27 +52,60 @@ pub(super) fn downsample_rgba_mip(source: &[u8], width: u32, height: u32) -> (Ve
         for x in 0..next_width {
             let source_x0 = x * width / next_width;
             let source_x1 = ((x + 1) * width / next_width).max(source_x0 + 1);
-            let mut sum = [0u32; 4];
+            let mut sum = [0f32; 4];
             let mut count = 0u32;
             for source_y in source_y0..source_y1.min(height) {
                 for source_x in source_x0..source_x1.min(width) {
                     let source_index = ((source_y * width + source_x) * 4) as usize;
-                    sum[0] += source[source_index] as u32;
-                    sum[1] += source[source_index + 1] as u32;
-                    sum[2] += source[source_index + 2] as u32;
-                    sum[3] += source[source_index + 3] as u32;
+                    for channel in 0..4 {
+                        let value = source[source_index + channel];
+                        sum[channel] += if srgb && channel < 3 {
+                            decode[value as usize]
+                        } else {
+                            value as f32 / 255.0
+                        };
+                    }
                     count += 1;
                 }
             }
             let output_index = ((y * next_width + x) * 4) as usize;
-            output[output_index] = (sum[0] / count) as u8;
-            output[output_index + 1] = (sum[1] / count) as u8;
-            output[output_index + 2] = (sum[2] / count) as u8;
-            output[output_index + 3] = (sum[3] / count) as u8;
+            for channel in 0..4 {
+                let average = sum[channel] / count as f32;
+                let encoded = if srgb && channel < 3 {
+                    linear_to_srgb_channel(average)
+                } else {
+                    average
+                };
+                output[output_index + channel] = (encoded.clamp(0.0, 1.0) * 255.0).round() as u8;
+            }
         }
     }
 
     (output, next_width, next_height)
+}
+
+fn srgb_decode_table() -> &'static [f32; 256] {
+    static TABLE: std::sync::OnceLock<[f32; 256]> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut table = [0f32; 256];
+        for (value, entry) in table.iter_mut().enumerate() {
+            let channel = value as f32 / 255.0;
+            *entry = if channel <= 0.04045 {
+                channel / 12.92
+            } else {
+                ((channel + 0.055) / 1.055).powf(2.4)
+            };
+        }
+        table
+    })
+}
+
+fn linear_to_srgb_channel(value: f32) -> f32 {
+    if value <= 0.0031308 {
+        value * 12.92
+    } else {
+        1.055 * value.powf(1.0 / 2.4) - 0.055
+    }
 }
 
 pub(super) fn side_index(side: MeshSide) -> usize {

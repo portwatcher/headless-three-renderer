@@ -221,21 +221,22 @@ impl<'a> ColorMode<'a> {
     pub(super) fn color(&self, vertex_index: usize) -> [f32; 4] {
         match self {
             Self::Uniform(color) => *color,
+            // Three.js vertex colors are not clamped; only alpha stays in 0..1.
             Self::RgbPerVertex(colors) => {
                 let base = vertex_index * 3;
                 [
-                    clamp01(colors[base]) as f32,
-                    clamp01(colors[base + 1]) as f32,
-                    clamp01(colors[base + 2]) as f32,
+                    colors[base].max(0.0) as f32,
+                    colors[base + 1].max(0.0) as f32,
+                    colors[base + 2].max(0.0) as f32,
                     1.0,
                 ]
             }
             Self::RgbaPerVertex(colors) => {
                 let base = vertex_index * 4;
                 [
-                    clamp01(colors[base]) as f32,
-                    clamp01(colors[base + 1]) as f32,
-                    clamp01(colors[base + 2]) as f32,
+                    colors[base].max(0.0) as f32,
+                    colors[base + 1].max(0.0) as f32,
+                    colors[base + 2].max(0.0) as f32,
                     clamp01(colors[base + 3]) as f32,
                 ]
             }

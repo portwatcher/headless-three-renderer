@@ -222,6 +222,14 @@ export interface EnvironmentMapInfo {
   height: number
   intensity: number
   colorSpace?: string
+  /** Three.js texture.flipY: true when data row 0 is the top of the image. */
+  flipY?: boolean
+  /** Sampling filter of the equirectangular data: 'nearest' or 'linear'. */
+  filter?: string
+  wrapS?: string
+  wrapT?: string
+  /** Face size of a six-face cube input, the cube size of Three.js PMREMGenerator.fromCubemap. */
+  cubeFaceSize?: number
 }
 
 export interface MaterialExtractionContext {

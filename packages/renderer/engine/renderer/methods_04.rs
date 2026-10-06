@@ -320,8 +320,23 @@ impl GpuRenderer {
                 settings.camera_pos.z,
                 0.0,
             ],
-            rotation1: background.rotation[0],
-            rotation2: background.rotation[1],
+            // Three.js sets toneMapped = false for backgrounds with the sRGB transfer.
+            rotation1: [
+                background.rotation[0][0],
+                background.rotation[0][1],
+                background.rotation[0][2],
+                if background.texture.srgb {
+                    0.0
+                } else {
+                    settings.tone_mapping
+                },
+            ],
+            rotation2: [
+                background.rotation[1][0],
+                background.rotation[1][1],
+                background.rotation[1][2],
+                settings.tone_mapping_exposure,
+            ],
             rotation3: background.rotation[2],
         };
         let key = BackgroundBindGroupKey::new(&background.texture);
@@ -437,7 +452,7 @@ impl GpuRenderer {
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: COLOR_FORMAT,
+            format: sampled_texture_format(tex.srgb),
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });

@@ -78,6 +78,8 @@ export function signedRawTextureCorpus() {
       height: CORPUS_RENDER_SIZE,
       format: 'rgba',
       outputColorSpace: THREE.LinearSRGBColorSpace,
+      // Raw texture backgrounds are tone mapped like Three.js; check the decoded values.
+      toneMapping: THREE.NoToneMapping,
     },
     background: [0, 96, 255],
     minNonBackgroundRatio: 0.08,

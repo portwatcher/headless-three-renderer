@@ -156,7 +156,10 @@ pub(super) fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 24]
         mesh.clearcoat_map_transform,
         mesh.clearcoat_roughness_map_transform,
         mesh.clearcoat_normal_map_transform,
-        if matches!(mesh.shading_model, ShadingModel::Matcap | ShadingModel::Mtoon) {
+        if matches!(
+            mesh.shading_model,
+            ShadingModel::Matcap | ShadingModel::Mtoon
+        ) {
             mesh.matcap_map_transform
         } else {
             mesh.sheen_color_map_transform
@@ -176,7 +179,10 @@ pub(super) fn physical_map_transform_rows(mesh: &PreparedMesh) -> [[f32; 4]; 24]
         rows[row] = [transform[0], transform[1], transform[2], 0.0];
         rows[row + 1] = [transform[3], transform[4], transform[5], 0.0];
     }
-    if matches!(mesh.shading_model, ShadingModel::Matcap | ShadingModel::Mtoon) {
+    if matches!(
+        mesh.shading_model,
+        ShadingModel::Matcap | ShadingModel::Mtoon
+    ) {
         rows[7][3] = if mesh.matcap_map_uses_uv2 { 1.0 } else { 0.0 };
     } else {
         rows[7][3] = if mesh.sheen_color_map_uses_uv2 {
@@ -325,75 +331,16 @@ pub(super) fn create_default_ibl_bind_group(
     layout: &wgpu::BindGroupLayout,
     sampler: &wgpu::Sampler,
 ) -> wgpu::BindGroup {
-    // 1x1 black cubemap for irradiance and prefilter
-    let black_cube = create_cubemap(device, queue, 1, 1, &[&[0u8, 0, 0, 255] as &[u8]; 6]);
-    let irradiance_view = black_cube.create_view(&wgpu::TextureViewDescriptor {
+    // Black 1x1 environment cube and CubeUV atlas for meshes without image-based lighting.
+    let black = [0u8; 8];
+    let env_cube = create_rgba16f_cubemap(device, queue, 1, &[&black[..]; 6]);
+    let env_cube_view = env_cube.create_view(&wgpu::TextureViewDescriptor {
         dimension: Some(wgpu::TextureViewDimension::Cube),
         ..Default::default()
     });
-    let prefilter_view = black_cube.create_view(&wgpu::TextureViewDescriptor {
-        dimension: Some(wgpu::TextureViewDimension::Cube),
-        ..Default::default()
-    });
-
-    // 1x1 BRDF LUT with (0, 0, 0, 255)
-    let brdf_tex = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("default brdf lut"),
-        size: wgpu::Extent3d {
-            width: 1,
-            height: 1,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: COLOR_FORMAT,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    queue.write_texture(
-        wgpu::TexelCopyTextureInfo {
-            texture: &brdf_tex,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        &[0u8, 0, 0, 255],
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(4),
-            rows_per_image: Some(1),
-        },
-        wgpu::Extent3d {
-            width: 1,
-            height: 1,
-            depth_or_array_layers: 1,
-        },
-    );
-    let brdf_view = brdf_tex.create_view(&wgpu::TextureViewDescriptor::default());
-
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("default ibl bind group"),
-        layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&irradiance_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::TextureView(&prefilter_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::TextureView(&brdf_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::Sampler(sampler),
-            },
-        ],
-    })
+    let cube_uv = create_rgba16f_texture(device, queue, "default cube uv atlas", 1, 1, &black);
+    let cube_uv_view = cube_uv.create_view(&wgpu::TextureViewDescriptor::default());
+    create_ibl_bind_group_from_views(device, layout, sampler, &env_cube_view, &cube_uv_view)
 }
 
 pub(super) fn create_ibl_bind_group(
@@ -403,117 +350,117 @@ pub(super) fn create_ibl_bind_group(
     sampler: &wgpu::Sampler,
     ibl: &IblMaps,
 ) -> wgpu::BindGroup {
-    // Irradiance cubemap
-    let irradiance_tex = create_cubemap(
-        device,
-        queue,
-        ibl.irradiance_size,
-        1,
-        &ibl.irradiance_faces
-            .iter()
-            .map(|f| f.as_slice())
-            .collect::<Vec<_>>(),
-    );
-    let irradiance_view = irradiance_tex.create_view(&wgpu::TextureViewDescriptor {
+    let faces = ibl
+        .env_cube_faces
+        .iter()
+        .map(|face| face.as_slice())
+        .collect::<Vec<_>>();
+    let env_cube = create_rgba16f_cubemap(device, queue, ibl.env_cube_size, &faces);
+    let env_cube_view = env_cube.create_view(&wgpu::TextureViewDescriptor {
         dimension: Some(wgpu::TextureViewDimension::Cube),
         ..Default::default()
     });
-
-    // Prefiltered specular cubemap with mip levels
-    let prefilter_tex = create_cubemap_with_mips(
+    let cube_uv = create_rgba16f_texture(
         device,
         queue,
-        ibl.prefilter_base_size,
-        ibl.prefilter_mip_levels,
-        &ibl.prefilter_faces,
+        "pmrem cube uv atlas",
+        ibl.cube_uv_width,
+        ibl.cube_uv_height,
+        &ibl.cube_uv,
     );
-    let prefilter_view = prefilter_tex.create_view(&wgpu::TextureViewDescriptor {
-        dimension: Some(wgpu::TextureViewDimension::Cube),
-        ..Default::default()
-    });
+    let cube_uv_view = cube_uv.create_view(&wgpu::TextureViewDescriptor::default());
+    create_ibl_bind_group_from_views(device, layout, sampler, &env_cube_view, &cube_uv_view)
+}
 
-    // BRDF LUT
-    let brdf_tex = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("brdf lut"),
-        size: wgpu::Extent3d {
-            width: ibl.brdf_lut_size,
-            height: ibl.brdf_lut_size,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: COLOR_FORMAT,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    queue.write_texture(
-        wgpu::TexelCopyTextureInfo {
-            texture: &brdf_tex,
-            mip_level: 0,
-            origin: wgpu::Origin3d::ZERO,
-            aspect: wgpu::TextureAspect::All,
-        },
-        &ibl.brdf_lut,
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(4 * ibl.brdf_lut_size),
-            rows_per_image: Some(ibl.brdf_lut_size),
-        },
-        wgpu::Extent3d {
-            width: ibl.brdf_lut_size,
-            height: ibl.brdf_lut_size,
-            depth_or_array_layers: 1,
-        },
-    );
-    let brdf_view = brdf_tex.create_view(&wgpu::TextureViewDescriptor::default());
-
+fn create_ibl_bind_group_from_views(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    sampler: &wgpu::Sampler,
+    env_cube_view: &wgpu::TextureView,
+    cube_uv_view: &wgpu::TextureView,
+) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("ibl bind group"),
         layout,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::TextureView(&irradiance_view),
+                resource: wgpu::BindingResource::TextureView(env_cube_view),
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: wgpu::BindingResource::TextureView(&prefilter_view),
+                resource: wgpu::BindingResource::TextureView(cube_uv_view),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
-                resource: wgpu::BindingResource::TextureView(&brdf_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
                 resource: wgpu::BindingResource::Sampler(sampler),
             },
         ],
     })
 }
 
-pub(super) fn create_cubemap(
+fn create_rgba16f_texture(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    label: &'static str,
+    width: u32,
+    height: u32,
+    bytes: &[u8],
+) -> wgpu::Texture {
+    let size = wgpu::Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba16Float,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+    queue.write_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        bytes,
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(8 * width),
+            rows_per_image: Some(height),
+        },
+        size,
+    );
+    texture
+}
+
+pub(super) fn create_rgba16f_cubemap(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     size: u32,
-    mip_levels: u32,
     faces: &[&[u8]],
 ) -> wgpu::Texture {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("cubemap"),
+        label: Some("environment cubemap"),
         size: wgpu::Extent3d {
             width: size,
             height: size,
             depth_or_array_layers: 6,
         },
-        mip_level_count: mip_levels,
+        mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: COLOR_FORMAT,
+        format: wgpu::TextureFormat::Rgba16Float,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    for (face, data) in faces.iter().enumerate() {
+    for (face, data) in faces.iter().enumerate().take(6) {
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: &texture,
@@ -528,7 +475,7 @@ pub(super) fn create_cubemap(
             data,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * size),
+                bytes_per_row: Some(8 * size),
                 rows_per_image: Some(size),
             },
             wgpu::Extent3d {

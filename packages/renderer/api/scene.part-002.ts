@@ -280,6 +280,7 @@ export function appendMesh(
     uvChannels,
     uvs,
     normalAttribute,
+    hasTangents,
     vertexColors,
     index,
     groups,
@@ -375,6 +376,7 @@ export function appendMesh(
           positions: expandedPositions,
           indices: expandedIndices,
           normals: expandedNormals,
+          hasVertexTangents: hasTangents || undefined,
           color,
           colors: useVertexColors
             ? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, 0, position.count, instancedGeometryCount)
@@ -438,6 +440,7 @@ export function appendMesh(
           positions: expandedGroupPositions,
           indices: expandedGroupIndices,
           normals: expandedGroupNormals,
+          hasVertexTangents: hasTangents || undefined,
           color,
           colors: useVertexColors
             ? expandColorAttributeForInstancesWithCache(cache, geometry, vertexColors!, color, group.start, group.count, instancedGeometryCount)

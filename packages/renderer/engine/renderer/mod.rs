@@ -267,6 +267,7 @@ struct SamplerKey {
 struct TextureCacheKey {
     width: u32,
     height: u32,
+    srgb: bool,
     mipmap_filter: MipmapFilter,
     rgba_len: usize,
     rgba_hash: u64,
@@ -311,13 +312,11 @@ struct BackgroundBindGroupKey {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct IblBindGroupKey {
-    irradiance_size: u32,
-    irradiance_faces: Vec<BufferCacheKey>,
-    prefilter_base_size: u32,
-    prefilter_mip_levels: u32,
-    prefilter_faces: Vec<BufferCacheKey>,
-    brdf_lut_size: u32,
-    brdf_lut: BufferCacheKey,
+    env_cube_size: u32,
+    cube_uv_width: u32,
+    cube_uv_height: u32,
+    cube_uv_max_mip: u32,
+    content_key: u64,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -460,6 +459,7 @@ impl TextureCacheKey {
         Self {
             width: texture.width,
             height: texture.height,
+            srgb: texture.srgb,
             mipmap_filter: texture.mipmap_filter,
             rgba_len: texture.rgba.len(),
             rgba_hash: hash_bytes(&texture.rgba),
@@ -522,21 +522,11 @@ impl BackgroundBindGroupKey {
 impl IblBindGroupKey {
     fn from_maps(ibl: &IblMaps) -> Self {
         Self {
-            irradiance_size: ibl.irradiance_size,
-            irradiance_faces: ibl
-                .irradiance_faces
-                .iter()
-                .map(|face| BufferCacheKey::from_bytes(face))
-                .collect(),
-            prefilter_base_size: ibl.prefilter_base_size,
-            prefilter_mip_levels: ibl.prefilter_mip_levels,
-            prefilter_faces: ibl
-                .prefilter_faces
-                .iter()
-                .map(|face| BufferCacheKey::from_bytes(face))
-                .collect(),
-            brdf_lut_size: ibl.brdf_lut_size,
-            brdf_lut: BufferCacheKey::from_bytes(&ibl.brdf_lut),
+            env_cube_size: ibl.env_cube_size,
+            cube_uv_width: ibl.cube_uv_width,
+            cube_uv_height: ibl.cube_uv_height,
+            cube_uv_max_mip: f32_key(ibl.cube_uv_max_mip),
+            content_key: ibl.content_key,
         }
     }
 }
@@ -782,7 +772,6 @@ pub use native_output::{GpuFrame, GpuOutputCapabilities};
 
 use helpers_01::*;
 use helpers_02::*;
-use helpers_03::*;
 use init_defaults::*;
 use init_layouts::*;
 use init_pipelines::*;

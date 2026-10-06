@@ -113,6 +113,12 @@ impl RenderSettings {
                 scene.environment_map_intensity.unwrap_or(1.0),
                 "scene.environmentIntensity",
             )?;
+            let env_rotation = parse_rotation_columns(
+                scene.environment_map_rotation.as_deref(),
+                "scene.environmentMapRotation",
+            )?;
+            // A perspective projection has -1 in the w row of its z column; orthographic has 0.
+            let is_orthographic = (view_projection * view.inverse()).z_axis.w.abs() < 1.0e-6;
 
             let fog = FogSettings::from_scene(scene, background)?;
             let shadow = resolve_shadow_maps(scene, shadow_map_type)?;
@@ -150,6 +156,8 @@ impl RenderSettings {
                 has_light_probe,
                 ibl,
                 env_intensity,
+                env_rotation,
+                is_orthographic,
                 fog,
                 shadow,
                 post_processing,
@@ -189,16 +197,19 @@ pub(super) fn prepare_background_texture(
                 scene.background_texture_anisotropy,
                 "scene.backgroundTextureAnisotropy",
             )?;
+            // sRGB backgrounds use an sRGB texture format (decode before filtering).
+            texture.srgb = matches!(
+                scene.background_texture_color_space.as_deref(),
+                Some("srgb")
+            );
             Ok(Some(BackgroundTexture {
                 texture,
                 transform: parse_texture_transform(
                     scene.background_texture_transform.as_deref(),
                     "scene.backgroundTextureTransform",
                 )?,
-                is_srgb: matches!(
-                    scene.background_texture_color_space.as_deref(),
-                    Some("srgb")
-                ),
+                // The sRGB texture format decodes; the background shader must not decode again.
+                is_srgb: false,
                 mapping: BackgroundTextureMapping::from_scene(
                     scene.background_texture_mapping.as_deref(),
                 )?,
@@ -239,23 +250,52 @@ pub(super) fn validate_transmission_resolution_scale(
     Ok(())
 }
 
-pub(super) fn prepare_scene_ibl(scene: &RenderScene) -> Result<Option<IblMaps>> {
+pub(super) fn prepare_scene_ibl(scene: &RenderScene) -> Result<Option<Arc<IblMaps>>> {
     match &scene.environment_map {
         Some(data) if !data.is_empty() => {
-            let rotation = parse_rotation_columns(
-                scene.environment_map_rotation.as_deref(),
-                "scene.environmentMapRotation",
-            )?;
             let env_map = EnvMap::from_bytes(
                 data,
                 scene.environment_map_width,
                 scene.environment_map_height,
                 parse_environment_color_space(scene.environment_map_color_space.as_deref())?,
             )?;
-            Ok(Some(compute_ibl(&env_map, rotation)))
+            let sampling = EquirectSampling {
+                flip_y: scene.environment_map_flip_y.unwrap_or(true),
+                linear: !matches!(scene.environment_map_filter.as_deref(), Some("nearest")),
+                wrap_s: EnvWrap::from_str_opt(scene.environment_map_wrap_s.as_deref()),
+                wrap_t: EnvWrap::from_str_opt(scene.environment_map_wrap_t.as_deref()),
+            };
+            let mut needs = environment_needs(scene);
+            if scene
+                .environment_map_cube_face_size
+                .is_some_and(|size| !cube_face_size_has_atlas(size))
+            {
+                needs.cube_uv = false;
+            }
+            Ok(Some(compute_ibl(&env_map, sampling, needs)))
         }
         _ => Ok(None),
     }
+}
+
+/// Three.js samples the PMREM (CubeUV) map for MeshStandardMaterial/MeshPhysicalMaterial and
+/// the unblurred cube map for the legacy MeshBasic/Lambert/Phong envMap combine.
+fn environment_needs(scene: &RenderScene) -> IblNeeds {
+    let mut needs = IblNeeds {
+        cube_uv: false,
+        env_cube: false,
+    };
+    for mesh in scene.meshes.iter().flatten() {
+        let model = ShadingModel::from_str_opt(mesh.shading_model.as_deref());
+        match (model, mesh.use_environment_map) {
+            (ShadingModel::Standard, Some(true) | None) => needs.cube_uv = true,
+            (ShadingModel::Basic | ShadingModel::Lambert | ShadingModel::Phong, Some(true)) => {
+                needs.env_cube = true
+            }
+            _ => {}
+        }
+    }
+    needs
 }
 
 pub(super) fn parse_viewport_rect(

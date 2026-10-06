@@ -228,6 +228,8 @@ export interface PbrProperties {
   displacementScale?: number
   displacementBias?: number
   metallicRoughnessTexture?: Buffer
+  /** Channels of metallicRoughnessTexture to use: 1 = roughness (G), 2 = metalness (B); 3 by default. */
+  metallicRoughnessChannels?: number
   metallicRoughnessTextureWidth?: number
   metallicRoughnessTextureHeight?: number
   metallicRoughnessTextureWrapS?: string

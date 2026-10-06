@@ -7,6 +7,7 @@ pub struct Uniforms {
     pub view: [[f32; 4]; 4],
     pub model: [[f32; 4]; 4],
     pub normal_matrix: [[f32; 4]; 4],
+    /// xyz = camera world position, w = 1 for orthographic cameras.
     pub camera_pos: [f32; 4],
     pub base_color: [f32; 4],
     pub emissive: [f32; 4],
@@ -85,6 +86,14 @@ pub struct Uniforms {
     pub lights: [GpuLight; MAX_LIGHTS],
     /// Shade + shift; rim + power; matcap + lift; toony + shift texture scale + VRM0 clamp.
     pub mtoon: [[f32; 4]; 6],
+    /// Columns of the Three.js envMapRotation matrix for environment lookups.
+    pub env_rotation: [[f32; 4]; 3],
+    /// x = CubeUV max mip (log2 of the PMREM cube size), y = 1 when the scene has an environment.
+    pub env_params: [f32; 4],
+    /// x = 1 when the geometry has vertex tangents, y = side (0 front, 1 back, 2 double),
+    /// z = 1 when the mesh has a clearcoat normal map, w = metallic-roughness map channels
+    /// in use (1 = roughness G, 2 = metalness B).
+    pub surface_params: [f32; 4],
 }
 
 #[repr(C)]

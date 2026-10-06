@@ -9,6 +9,8 @@ struct BackgroundUniforms {
   inverse_view_projection: mat4x4<f32>,
   // xyz = camera world position.
   camera_params: vec4<f32>,
+  // Columns of the background rotation; rotation1.w = tone-mapping mode (0 = none),
+  // rotation2.w = tone-mapping exposure.
   rotation1: vec4<f32>,
   rotation2: vec4<f32>,
   rotation3: vec4<f32>,
@@ -79,11 +81,13 @@ fn background_flag_enabled(bit: f32) -> bool {
   return flag > 0.5;
 }
 
+// Three.js sRGBTransferOETF: the piecewise sRGB curve, not a 2.2 gamma.
 fn apply_background_output_color_space(color: vec3<f32>) -> vec3<f32> {
   if background_output_is_linear() {
     return color;
   }
-  return pow(color, vec3<f32>(1.0 / 2.2));
+  let encoded = pow(max(color, vec3<f32>(0.0)), vec3<f32>(0.41666)) * 1.055 - vec3<f32>(0.055);
+  return select(encoded, color * 12.92, color <= vec3<f32>(0.0031308));
 }
 
 fn background_blur_amount() -> f32 {
@@ -95,9 +99,11 @@ fn equirect_background_uv(screen_uv: vec2<f32>) -> vec2<f32> {
   let world = uniforms.inverse_view_projection * vec4<f32>(ndc, 1.0, 1.0);
   let world_pos = world.xyz / world.w;
   let dir = rotate_background_direction(normalize(world_pos - uniforms.camera_params.xyz));
+  // Three.js equirectUv is a WebGL texture coordinate (v = 0 at the -Y pole); the texture
+  // transform expects the flipped shader convention, like mesh UVs.
   let equirect_uv = vec2<f32>(
     atan2(dir.z, dir.x) * 0.15915494309189535 + 0.5,
-    asin(clamp(dir.y, -1.0, 1.0)) * 0.3183098861837907 + 0.5,
+    0.5 - asin(clamp(dir.y, -1.0, 1.0)) * 0.3183098861837907,
   );
   return transform_background_uv(equirect_uv);
 }
@@ -147,6 +153,8 @@ fn fs_background(input: BackgroundVertexOutput) -> @location(0) vec4<f32> {
     color = background_srgb_to_linear(color);
   }
   color *= uniforms.transform1.w;
+  // Three.js tone maps texture backgrounds unless their color space has the sRGB transfer.
+  color = tone_map(color, uniforms.rotation1.w, uniforms.rotation2.w);
   color = apply_background_output_color_space(color);
   return vec4<f32>(color, sample.a);
 }

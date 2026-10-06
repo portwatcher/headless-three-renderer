@@ -2,10 +2,10 @@ import type { Color4, ThreeMaterialLike, PbrProperties, TextureInfo, ThreeTextur
 import { clamp01 } from './math'
 import { strictColorLikeToArray, validatedColorLikeToArray } from './color'
 import { objectChildren } from './objects'
-import { AddOperation, EnvironmentMapInfo, FloatType, HalfFloatType, MaterialExtractionContext, MixOperation, MultiplyOperation, UnsignedByteType } from './materials.part-001'
+import { AddOperation, CubeUVReflectionMapping, EnvironmentMapInfo, FloatType, HalfFloatType, MaterialExtractionContext, MixOperation, MultiplyOperation, UnsignedByteType } from './materials.part-001'
 import { optionalFiniteNumber } from './materials.part-005'
 import { copyShaderMaterialInfo, cubeTextureToEquirectangular, isCubeEnvironmentTexture } from './materials.part-008'
-import { canvasLikeImageToRgba, premultiplyRgbaAlpha, requiredEnvironmentTexture, textureLike, textureSourceData } from './materials.part-009'
+import { canvasLikeImageToRgba, filterModeToString, premultiplyRgbaAlpha, requiredEnvironmentTexture, textureLike, textureSourceData, wrapModeToString } from './materials.part-009'
 import { assertNoEncodedPremultiplyAlpha, assertSupportedEnvironmentTexture, assertSupportedRawTextureType, isRefractionEnvironmentMapping, rawFloatTextureDataToRgba, rawHalfFloatTextureDataToRgba, unsupportedRawTextureDataError, unsupportedTextureImageError } from './materials.part-010'
 import { optionalTextureBoolean, textureColorSpace, textureUnpackAlignment, toRgba8 } from './materials.part-011'
 export function supportsNativeMaterialEnvironmentMap(material: ThreeMaterialLike): boolean {
@@ -49,9 +49,32 @@ export function extractEnvironmentMapFromTexture(
   const premultiplyAlpha = optionalTextureBoolean(envTex.premultiplyAlpha, `${label}.premultiplyAlpha`) === true
   if (isCubeEnvironmentTexture(envTex, label)) {
     const cube = cubeTextureToEquirectangular(envTex, label)
-    return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex) }
+    // Three.js converts six-face cubes with PMREMGenerator.fromCubemap (cube size = face size)
+    // and samples CubeUV inputs as they are.
+    const cubeFaceSize = envTex.mapping === CubeUVReflectionMapping ? undefined : cube.faceSize
+    // The converted equirectangular rows start at the -Y pole and wrap around the seam.
+    return { data: cube.data, width: cube.width, height: cube.height, intensity, colorSpace: textureColorSpace(envTex), flipY: false, filter: 'linear', wrapS: 'repeat', cubeFaceSize }
   }
+  return { ...extractEquirectangularEnvironmentData(envTex, label, intensity, premultiplyAlpha), ...environmentSampling(envTex, label) }
+}
 
+/** The WebGL sampling state of an equirectangular environment texture (PMREM input). */
+export function environmentSampling(envTex: ThreeTextureLike, label: string): Pick<EnvironmentMapInfo, 'flipY' | 'filter' | 'wrapS' | 'wrapT'> {
+  return {
+    // Texture defaults to flipY = true; DataTexture sets false.
+    flipY: optionalTextureBoolean(envTex.flipY, `${label}.flipY`) !== false,
+    filter: filterModeToString(envTex.magFilter),
+    wrapS: wrapModeToString(envTex.wrapS),
+    wrapT: wrapModeToString(envTex.wrapT),
+  }
+}
+
+function extractEquirectangularEnvironmentData(
+  envTex: ThreeTextureLike,
+  label: string,
+  intensity: number,
+  premultiplyAlpha: boolean,
+): EnvironmentMapInfo {
   const sourceData = textureSourceData(envTex, label)
   const image = (envTex as any).image ?? sourceData
   if (!image) throw unsupportedTextureImageError(label, 'environment map rendering')

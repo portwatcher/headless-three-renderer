@@ -22,6 +22,7 @@ struct Uniforms {
   view: mat4x4<f32>,
   model: mat4x4<f32>,
   normal_matrix: mat4x4<f32>,
+  // xyz = camera world position, w = 1 for orthographic cameras.
   camera_pos: vec4<f32>,
   base_color: vec4<f32>,
   emissive: vec4<f32>,  // xyz = emissive color, w = alpha test cutoff
@@ -123,6 +124,14 @@ struct Uniforms {
   iridescence_params: vec4<f32>,
   lights: array<GpuLight, 64>,
   mtoon: array<vec4<f32>, 6>,
+  // Columns of the Three.js envMapRotation matrix for environment lookups.
+  env_rotation: array<vec4<f32>, 3>,
+  // x = CubeUV max mip (log2 of the PMREM cube size), y = the scene has an environment map.
+  env_params: vec4<f32>,
+  // x = the geometry has vertex tangents, y = side (0 front, 1 back, 2 double),
+  // z = the mesh has a clearcoat normal map, w = metallic-roughness map channels in use
+  // (1 = roughness G, 2 = metalness B).
+  surface_params: vec4<f32>,
 };
 
 @group(0) @binding(0)
@@ -148,13 +157,12 @@ var t_emissive: texture_2d<f32>;
 @group(4) @binding(1)
 var s_emissive: sampler;
 
+// Unblurred environment cube (WebGLCubeMaps) and the PMREM CubeUV atlas (WebGLCubeUVMaps).
 @group(5) @binding(0)
-var t_irradiance: texture_cube<f32>;
+var t_env_cube: texture_cube<f32>;
 @group(5) @binding(1)
-var t_prefilter: texture_cube<f32>;
+var t_env_cube_uv: texture_2d<f32>;
 @group(5) @binding(2)
-var t_brdf_lut: texture_2d<f32>;
-@group(5) @binding(3)
 var s_ibl: sampler;
 
 @group(6) @binding(0)
@@ -237,7 +245,9 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   }
   output.world_pos = world_pos.xyz;
   output.world_normal = normalize((uniforms.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz);
-  output.world_tangent = normalize((uniforms.model * vec4<f32>(input.tangent.xyz, 0.0)).xyz);
+  // Meshes without tangents keep a zero tangent; normalize(0) would be NaN.
+  let world_tangent = (uniforms.model * vec4<f32>(input.tangent.xyz, 0.0)).xyz;
+  output.world_tangent = select(vec3<f32>(0.0), normalize(world_tangent), dot(world_tangent, world_tangent) > 0.0);
   output.tangent_w = input.tangent.w;
   output.color = input.color;
   output.uv = input.uv;
@@ -466,120 +476,40 @@ fn sample_combined_shadow(world_pos: vec3<f32>, world_normal: vec3<f32>) -> f32 
   return visibility;
 }
 
-// GGX/Trowbridge-Reitz normal distribution
-fn distribution_ggx(n_dot_h: f32, roughness: f32) -> f32 {
-  let a = roughness * roughness;
-  let a2 = a * a;
-  let d = n_dot_h * n_dot_h * (a2 - 1.0) + 1.0;
-  return a2 / (PI * d * d + 0.0001);
-}
-
-// Schlick-GGX geometry function
-fn geometry_schlick_ggx(n_dot_v: f32, roughness: f32) -> f32 {
-  let r = roughness + 1.0;
-  let k = (r * r) / 8.0;
-  return n_dot_v / (n_dot_v * (1.0 - k) + k + 0.0001);
-}
-
-fn geometry_smith(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
-  return geometry_schlick_ggx(n_dot_v, roughness) * geometry_schlick_ggx(n_dot_l, roughness);
-}
-
-fn geometry_smith_correlated_anisotropic(
-  alpha_t: f32,
-  alpha_b: f32,
-  dot_tv: f32,
-  dot_bv: f32,
-  dot_tl: f32,
-  dot_bl: f32,
-  n_dot_v: f32,
-  n_dot_l: f32,
-) -> f32 {
-  let gv = n_dot_l * length(vec3<f32>(alpha_t * dot_tv, alpha_b * dot_bv, n_dot_v));
-  let gl = n_dot_v * length(vec3<f32>(alpha_t * dot_tl, alpha_b * dot_bl, n_dot_l));
-  return 0.5 / max(gv + gl, 0.0001);
-}
-
-fn distribution_ggx_anisotropic(
-  alpha_t: f32,
-  alpha_b: f32,
-  n_dot_h: f32,
-  dot_th: f32,
-  dot_bh: f32,
-) -> f32 {
-  let a2 = alpha_t * alpha_b;
-  let v = vec3<f32>(alpha_b * dot_th, alpha_t * dot_bh, a2 * n_dot_h);
-  let v2 = max(dot(v, v), 0.0001);
-  let w2 = a2 / v2;
-  return (a2 * w2 * w2) / PI;
-}
-
-// Schlick Fresnel approximation
-fn fresnel_schlick(cos_theta: f32, f0: vec3<f32>) -> vec3<f32> {
-  return f0 + (vec3<f32>(1.0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
-}
-
-fn fresnel_schlick_f90(cos_theta: f32, f0: vec3<f32>, f90: f32) -> vec3<f32> {
-  return f0 + (vec3<f32>(f90) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
-}
-
-// Schlick Fresnel with roughness for IBL
-fn fresnel_schlick_roughness(cos_theta: f32, f0: vec3<f32>, roughness: f32) -> vec3<f32> {
-  return f0 + (max(vec3<f32>(1.0 - roughness), f0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
-}
-
-fn fresnel_schlick_roughness_f90(cos_theta: f32, f0: vec3<f32>, f90: f32, roughness: f32) -> vec3<f32> {
-  return f0 + (max(vec3<f32>(f90 * (1.0 - roughness)), f0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
-}
-
-// Estevez/Kulla Charlie distribution and Neubelt visibility for cloth sheen.
-fn distribution_charlie(roughness: f32, n_dot_h: f32) -> f32 {
-  let alpha = max(roughness * roughness, 0.0001);
-  let inv_alpha = 1.0 / alpha;
-  let cos2h = n_dot_h * n_dot_h;
-  let sin2h = max(1.0 - cos2h, 0.0078125);
-  return (2.0 + inv_alpha) * pow(sin2h, inv_alpha * 0.5) / (2.0 * PI);
-}
-
-fn visibility_neubelt(n_dot_v: f32, n_dot_l: f32) -> f32 {
-  return saturate(1.0 / max(4.0 * (n_dot_l + n_dot_v - n_dot_l * n_dot_v), 0.0001));
-}
-
-fn brdf_sheen(
-  L: vec3<f32>,
-  V: vec3<f32>,
-  N: vec3<f32>,
-  sheen_color: vec3<f32>,
-  sheen_roughness: f32,
-) -> vec3<f32> {
-  let H = normalize(V + L);
-  let n_dot_l = max(dot(N, L), 0.0);
-  let n_dot_v = max(dot(N, V), 0.0);
-  let n_dot_h = max(dot(N, H), 0.0);
-  let D = distribution_charlie(sheen_roughness, n_dot_h);
-  let Vis = visibility_neubelt(n_dot_v, n_dot_l);
-  return sheen_color * (D * Vis);
-}
-
-fn ibl_sheen_brdf(N: vec3<f32>, V: vec3<f32>, roughness: f32) -> f32 {
-  let n_dot_v = max(dot(N, V), 0.0);
-  let r2 = roughness * roughness;
-  let r_inv = 1.0 / (roughness + 0.1);
-  let a = -1.9362 + 1.0678 * roughness + 0.4573 * r2 - 0.8469 * r_inv;
-  let b = -0.6014 + 0.5538 * roughness - 0.4670 * r2 - 0.1255 * r_inv;
-  return saturate(exp(a * n_dot_v + b));
-}
-
-fn tangent_basis(N: vec3<f32>, tangent: vec3<f32>, tangent_w: f32) -> mat3x3<f32> {
-  var T = tangent;
-  if dot(T, T) < 0.0001 {
-    let up = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(N.y) > 0.999);
-    T = normalize(cross(up, N));
-  } else {
-    T = normalize(T - N * dot(N, T));
+// Three.js normal_fragment_begin tangent frame. N is the shading normal after the face flip.
+// With vertex tangents (USE_TANGENT), vBitangent = cross(vNormal, vTangent) * w; FLIP_SIDED
+// negates the normal and the tangent in the vertex shader, so the bitangent keeps its sign.
+// Without vertex tangents, getTangentFrame builds the frame from screen-space derivatives.
+// DOUBLE_SIDED then flips the tangent and the bitangent of back faces.
+fn surface_tangent_frame(input: VertexOutput, N: vec3<f32>, face_direction: f32, frame_uv: vec2<f32>) -> mat3x3<f32> {
+  // getTangentFrame, evaluated in uniform control flow. WGSL dpdy points down the
+  // framebuffer and WebGL dFdy points up.
+  let q0 = dpdx(input.world_pos);
+  let q1 = -dpdy(input.world_pos);
+  let st0 = dpdx(frame_uv);
+  let st1 = -dpdy(frame_uv);
+  let q1perp = cross(q1, N);
+  let q0perp = cross(N, q0);
+  var t = q1perp * st0.x + q0perp * st1.x;
+  var b = q1perp * st0.y + q0perp * st1.y;
+  let det = max(dot(t, t), dot(b, b));
+  let scale = select(inverseSqrt(det), 0.0, det == 0.0);
+  t *= scale;
+  b *= scale;
+  let side = uniforms.surface_params.y;
+  if uniforms.surface_params.x > 0.5 && dot(input.world_tangent, input.world_tangent) > 0.0 {
+    t = normalize(input.world_tangent);
+    let w = select(1.0, input.tangent_w, abs(input.tangent_w) > 0.0);
+    b = normalize(cross(normalize(input.world_normal), t) * w);
+    if side > 0.5 && side < 1.5 {
+      t = -t;
+    }
   }
-  let B = normalize(cross(N, T) * select(1.0, tangent_w, abs(tangent_w) > 0.0));
-  return mat3x3<f32>(T, B, N);
+  if side > 1.5 {
+    t *= face_direction;
+    b *= face_direction;
+  }
+  return mat3x3<f32>(t, b, N);
 }
 
 fn volume_attenuation(distance: f32, attenuation_color: vec3<f32>, attenuation_distance: f32) -> vec3<f32> {

@@ -3,6 +3,7 @@ mod lights;
 mod media_output;
 mod mesh;
 mod native_output;
+mod pmrem;
 mod renderer;
 mod settings;
 mod shader;

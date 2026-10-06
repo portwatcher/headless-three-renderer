@@ -87,6 +87,7 @@ export function readMeshGeometryExtraction(
   const uvChannels = readUvChannels(geometry)
   const normalAttribute = getAttribute(geometry, 'normal')
   const normals = normalAttribute ? readVec3Attribute(normalAttribute, 'geometry.attributes.normal') : null
+  const hasTangents = getAttribute(geometry, 'tangent') != null
   const vertexColors = getAttribute(geometry, 'color')
   const index = geometry.index ? readIndexAttribute(geometry.index, 'geometry.index', position.count) : null
   const sourceIndex = index ?? rangeIndices(position.count)
@@ -102,6 +103,7 @@ export function readMeshGeometryExtraction(
     uvs: uvChannels[0]?.values ?? null,
     normalAttribute,
     normals,
+    hasTangents,
     vertexColors,
     index,
     sourceIndex,
@@ -133,6 +135,7 @@ export function meshGeometrySignature(
     groups: geometryGroupsSignature(geometry.groups),
     position: attributeSignature(position),
     normal: attributeSignature(getAttribute(geometry, 'normal')),
+    tangent: attributeSignature(getAttribute(geometry, 'tangent')),
     color: attributeSignature(getAttribute(geometry, 'color')),
     index: attributeSignature(geometry.index),
     uv: attributeSignature(getAttribute(geometry, 'uv')),
@@ -254,6 +257,7 @@ export function sameMeshGeometrySignature(a: MeshGeometrySignature, b: MeshGeome
     && a.instancedPositionScaleName === b.instancedPositionScaleName
     && sameAttributeSignature(a.position, b.position)
     && sameAttributeSignature(a.normal, b.normal)
+    && sameAttributeSignature(a.tangent, b.tangent)
     && sameAttributeSignature(a.color, b.color)
     && sameAttributeSignature(a.index, b.index)
     && sameAttributeSignature(a.uv, b.uv)

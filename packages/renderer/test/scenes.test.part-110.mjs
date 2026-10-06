@@ -204,7 +204,7 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { test } from './scenes.test.part-001.mjs'
-import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, renderRgba, rgbaTexture, setTextureMatrixOffset } from './scenes.test.part-002.mjs'
+import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, nearlyConstantUvPlane, renderRgba, rgbaTexture, setTextureMatrixOffset } from './scenes.test.part-002.mjs'
 import { maxLuminance } from './scenes.test.part-003.mjs'
 test('physical extension maps honor explicit texture matrices', () => {
   function makeMap(data, matrixOffsetX = 0) {
@@ -341,7 +341,7 @@ test('physical extension maps honor explicit texture matrices', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.25, 0.5),
       new THREE.MeshPhysicalMaterial({
@@ -357,7 +357,8 @@ test('physical extension maps honor explicit texture matrices', () => {
   }
 
   assert.ok(
-    luminance(renderClearcoat(0.5)) > luminance(renderClearcoat(0)) + 80,
+    // Three.js r180 clearcoat (F0 0.04) under the 64x32 environment at intensity 12: a gap of about 52.
+    luminance(renderClearcoat(0.5)) > luminance(renderClearcoat(0)) + 25,
     'explicit clearcoatMap matrix should enable stronger clearcoat IBL',
   )
 
@@ -370,7 +371,7 @@ test('physical extension maps honor explicit texture matrices', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.25, 0.5),
       new THREE.MeshPhysicalMaterial({
@@ -386,7 +387,7 @@ test('physical extension maps honor explicit texture matrices', () => {
   }
 
   assert.ok(
-    luminance(renderClearcoatRoughness(0)) > luminance(renderClearcoatRoughness(0.5)) + 20,
+    luminance(renderClearcoatRoughness(0)) > luminance(renderClearcoatRoughness(0.5)) + 12,
     'explicit clearcoatRoughnessMap matrix should sample the rougher shifted texel',
   )
 
@@ -399,9 +400,10 @@ test('physical extension maps honor explicit texture matrices', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
-      constantUvPlane(0.25, 0.5),
+      // UV derivatives give the clearcoat normal map its tangent frame.
+      nearlyConstantUvPlane(0.25, 0.5),
       new THREE.MeshPhysicalMaterial({
         color: 0x000000,
         roughness: 1,
@@ -429,7 +431,7 @@ test('physical extension maps honor explicit texture matrices', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.25, 0.5),
       new THREE.MeshPhysicalMaterial({
@@ -465,7 +467,7 @@ test('physical extension maps honor explicit texture matrices', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.25, 0.5),
       new THREE.MeshPhysicalMaterial({

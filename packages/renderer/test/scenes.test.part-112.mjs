@@ -204,7 +204,7 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { test } from './scenes.test.part-001.mjs'
-import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, renderRgba, rgbaTexture, solidTexture } from './scenes.test.part-002.mjs'
+import { makeEnvironmentTexture, meanAbsDiff, nearlyConstantUvPlane, renderRgba, rgbaTexture, solidTexture } from './scenes.test.part-002.mjs'
 test('physical extension maps honor horizontal and vertical repeat wrapping', () => {
   function wrappedTexture(active, inactive = [0, 0, 0, 255]) {
     const texture = rgbaTexture([
@@ -234,7 +234,7 @@ test('physical extension maps honor horizontal and vertical repeat wrapping', ()
     scene.background = new THREE.Color(0, 0, 0)
     if (config.environment) {
       scene.environment = makeEnvironmentTexture()
-      scene.environmentIntensity = 2
+      scene.environmentIntensity = 12
     }
 
     if (config.backdrop != null) {
@@ -247,7 +247,8 @@ test('physical extension maps honor horizontal and vertical repeat wrapping', ()
     }
 
     scene.add(new THREE.Mesh(
-      constantUvPlane(...uv),
+      // UV derivatives give the clearcoat normal map its tangent frame.
+      nearlyConstantUvPlane(...uv),
       new THREE.MeshPhysicalMaterial({
         ...config.material,
         [config.slot]: texture,

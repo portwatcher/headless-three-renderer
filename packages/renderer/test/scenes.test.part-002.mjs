@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { deflateSync } from 'node:zlib'
 import * as THREE from 'three'
 import { PMREMGenerator } from 'three'
 import * as THREE_WEBGPU from 'three/webgpu'
@@ -241,14 +242,46 @@ export function renderRgbaIsolated(scene, camera, options = {}) {
   return new Renderer().render(scene, camera, { width: SIZE, height: SIZE, format: 'rgba', ...options })
 }
 
+// Three.js r180 PMREMGenerator needs equirectangular environments at least 64 px wide (and cube
+// faces of at least 16 px): smaller inputs give no image-based light in WebGLRenderer, and the
+// native renderer does the same. Image-based light helpers therefore build 64x32 maps.
+const IBL_WIDTH = 64
+const IBL_HEIGHT = 32
+
+// A 2x2 sky/ground palette, resampled with bilinear filtering into a 64x32 equirectangular map.
 export function makeEnvironmentTexture() {
-  const data = new Uint8Array([
-    255, 255, 255, 255,
-    64, 128, 255, 255,
-    255, 180, 96, 255,
-    18, 24, 36, 255,
-  ])
-  const texture = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+  const palette = [
+    [255, 255, 255, 255],
+    [64, 128, 255, 255],
+    [255, 180, 96, 255],
+    [18, 24, 36, 255],
+  ]
+  const data = new Uint8Array(IBL_WIDTH * IBL_HEIGHT * 4)
+  for (let y = 0; y < IBL_HEIGHT; y++) {
+    const v = Math.min(Math.max(((y + 0.5) / IBL_HEIGHT) * 2 - 0.5, 0), 1)
+    for (let x = 0; x < IBL_WIDTH; x++) {
+      const u = Math.min(Math.max(((x + 0.5) / IBL_WIDTH) * 2 - 0.5, 0), 1)
+      for (let channel = 0; channel < 4; channel++) {
+        const row0 = palette[0][channel] * (1 - u) + palette[1][channel] * u
+        const row1 = palette[2][channel] * (1 - u) + palette[3][channel] * u
+        data[(y * IBL_WIDTH + x) * 4 + channel] = Math.round(row0 * (1 - v) + row1 * v)
+      }
+    }
+  }
+  const texture = new THREE.DataTexture(data, IBL_WIDTH, IBL_HEIGHT, THREE.RGBAFormat)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.needsUpdate = true
+  return texture
+}
+
+// A uniform equirectangular map that is large enough for image-based light.
+export function solidEnvironmentTexture(r, g, b, a = 255) {
+  const data = new Uint8Array(IBL_WIDTH * IBL_HEIGHT * 4)
+  for (let i = 0; i < IBL_WIDTH * IBL_HEIGHT; i++) {
+    data.set([r, g, b, a], i * 4)
+  }
+  const texture = new THREE.DataTexture(data, IBL_WIDTH, IBL_HEIGHT, THREE.RGBAFormat)
+  texture.mapping = THREE.EquirectangularReflectionMapping
   texture.needsUpdate = true
   return texture
 }
@@ -293,26 +326,48 @@ export function unsignedFloatToNumber(bits, mantissaBits) {
 
 export function splitEnvironmentTexture() {
   const data = []
-  for (let y = 0; y < 2; y++) {
-    for (let x = 0; x < 8; x++) {
-      if (x < 4) {
+  for (let y = 0; y < IBL_HEIGHT; y++) {
+    for (let x = 0; x < IBL_WIDTH; x++) {
+      if (x < IBL_WIDTH / 2) {
         data.push(255, 0, 0, 255)
       } else {
         data.push(0, 255, 0, 255)
       }
     }
   }
-  const texture = rgbaTexture(data, 8, 2)
+  const texture = rgbaTexture(data, IBL_WIDTH, IBL_HEIGHT)
   texture.mapping = THREE.EquirectangularReflectionMapping
   return texture
 }
 
-export function cubeTexture(faceColors) {
-  const faces = faceColors.map(([r, g, b, a = 255]) => ({
-    data: new Uint8Array([r, g, b, a]),
-    width: 1,
-    height: 1,
-  }))
+// Solid-color cube faces; image-based light needs size >= 16 (see IBL_WIDTH).
+// Red toward +X and green toward -X, the same toward +Z and -Z, so front and back views of a
+// plane see mirrored reflections of the same colors.
+export function xGradientEnvironmentTexture() {
+  const data = new Uint8Array(IBL_WIDTH * IBL_HEIGHT * 4)
+  for (let y = 0; y < IBL_HEIGHT; y++) {
+    const latitude = ((y + 0.5) / IBL_HEIGHT - 0.5) * Math.PI
+    for (let x = 0; x < IBL_WIDTH; x++) {
+      // Three.js equirectUv: u = atan(dir.z, dir.x) / (2 * PI) + 0.5.
+      const longitude = ((x + 0.5) / IBL_WIDTH - 0.5) * 2 * Math.PI
+      const dirX = Math.cos(longitude) * Math.cos(latitude)
+      data.set([Math.round(127.5 + 127.5 * dirX), Math.round(127.5 - 127.5 * dirX), 64, 255], (y * IBL_WIDTH + x) * 4)
+    }
+  }
+  const texture = new THREE.DataTexture(data, IBL_WIDTH, IBL_HEIGHT, THREE.RGBAFormat)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.needsUpdate = true
+  return texture
+}
+
+export function cubeTexture(faceColors, size = 1) {
+  const faces = faceColors.map(([r, g, b, a = 255]) => {
+    const data = new Uint8Array(size * size * 4)
+    for (let i = 0; i < size * size; i++) {
+      data.set([r, g, b, a], i * 4)
+    }
+    return { data, width: size, height: size }
+  })
   const texture = new THREE.CubeTexture(faces)
   texture.needsUpdate = true
   return texture
@@ -343,7 +398,47 @@ export function packedCubeUvTexture(faceColors, faceSize = 16) {
   return texture
 }
 
-export function encodedCubeTexture() {
+const ENCODED_CUBE_FACE_COLORS = [[0, 0, 255], [255, 255, 0], [255, 0, 255], [0, 255, 255], [0, 255, 0], [255, 0, 0]]
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+  return c >>> 0
+})
+
+function pngChunk(type, data) {
+  const chunk = Buffer.alloc(12 + data.length)
+  chunk.writeUInt32BE(data.length, 0)
+  chunk.write(type, 4, 'ascii')
+  data.copy(chunk, 8)
+  let crc = 0xffffffff
+  for (const byte of chunk.subarray(4, 8 + data.length)) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+  chunk.writeUInt32BE((crc ^ 0xffffffff) >>> 0, 8 + data.length)
+  return chunk
+}
+
+function solidPng(size, [r, g, b]) {
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(size, 0)
+  header.writeUInt32BE(size, 4)
+  header[8] = 8
+  header[9] = 6
+  const row = Buffer.alloc(1 + size * 4)
+  for (let x = 0; x < size; x++) row.set([r, g, b, 255], 1 + x * 4)
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', deflateSync(Buffer.concat(Array(size).fill(row)))),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+// Encoded PNG cube faces. Image-based light needs size >= 16; size 1 keeps the original bytes.
+export function encodedCubeTexture(size = 1) {
+  if (size !== 1) {
+    const texture = new THREE.CubeTexture(ENCODED_CUBE_FACE_COLORS.map((color) => solidPng(size, color)))
+    texture.needsUpdate = true
+    return texture
+  }
   const faces = [
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==',
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4/5/hPwAH/QL+ppTFtAAAAABJRU5ErkJggg==',
@@ -373,6 +468,25 @@ export function constantUvPlane(u, v) {
   }
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
   return geometry
+}
+
+// UVs within +-0.005 of (u, v): like constantUvPlane it samples one texel, but the UV
+// derivatives give normal maps the tangent frame of Three.js getTangentFrame. A constant-UV
+// plane has a zero tangent frame, so WebGL ignores its tangent-space normal maps.
+export function nearlyConstantUvPlane(u, v) {
+  const geometry = new THREE.PlaneGeometry(2, 2)
+  setNearlyConstantUvAttribute(geometry, 'uv', u, v)
+  return geometry
+}
+
+export function setNearlyConstantUvAttribute(geometry, name, u, v) {
+  const position = geometry.getAttribute('position')
+  const uv = new Float32Array(position.count * 2)
+  for (let i = 0; i < position.count; i++) {
+    uv[i * 2] = u + position.getX(i) * 0.005
+    uv[i * 2 + 1] = v + position.getY(i) * 0.005
+  }
+  geometry.setAttribute(name, new THREE.BufferAttribute(uv, 2))
 }
 
 export function foldedIndexedGeometry() {

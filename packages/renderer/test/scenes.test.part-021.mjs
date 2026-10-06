@@ -361,7 +361,8 @@ test('examples RollerCoaster geometries render generated track, lifter, and shad
       'RollerCoasterLiftersGeometry should render orange support pixels',
     )
     assert.ok(
-      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 20 && r < 80 && g > 20 && g < 80 && b > 20 && b < 80) > 120,
+      // 0x222222 renders 16 with ACES and the exact sRGB transfer (23 with the old 2.2 gamma).
+      countRegionPixels(rgba, width, height, 0, 0, width, height, (r, g, b) => r > 10 && r < 80 && g > 10 && g < 80 && b > 10 && b < 80) > 120,
       'RollerCoasterShadowGeometry should render dark projected pixels',
     )
   } finally {

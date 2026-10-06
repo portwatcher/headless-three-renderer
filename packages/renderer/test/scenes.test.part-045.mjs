@@ -204,7 +204,7 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { test } from './scenes.test.part-001.mjs'
-import { constantUvPlane, renderRgba, rgbaTexture, setConstantUvAttribute, setTextureMatrixOffset, solidTexture } from './scenes.test.part-002.mjs'
+import { constantUvPlane, nearlyConstantUvPlane, renderRgba, rgbaTexture, setConstantUvAttribute, setTextureMatrixOffset, solidTexture } from './scenes.test.part-002.mjs'
 import { maxLuminance } from './scenes.test.part-003.mjs'
 test('normalMap honors nearest texture filters', () => {
   function renderWithFilter(filter) {
@@ -218,7 +218,7 @@ test('normalMap honors nearest texture filters', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.add(new THREE.Mesh(
-      constantUvPlane(0.45, 0.5),
+      nearlyConstantUvPlane(0.45, 0.5),
       new THREE.MeshNormalMaterial({ normalMap }),
     ))
 
@@ -254,7 +254,7 @@ test('normalMap honors horizontal and vertical repeat wrapping', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.add(new THREE.Mesh(
-      constantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
+      nearlyConstantUvPlane(vertical ? 0.5 : 1.25, vertical ? 1.25 : 0.5),
       new THREE.MeshNormalMaterial({ normalMap }),
     ))
 

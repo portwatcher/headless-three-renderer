@@ -2,6 +2,8 @@ pub const SHADER: &str = concat!(
     include_str!("shader/main_bindings.wgsl"),
     include_str!("shader/main_materials.wgsl"),
     include_str!("shader/main_output.wgsl"),
+    include_str!("shader/ibl.wgsl"),
+    include_str!("shader/tone_mapping.wgsl"),
     include_str!("shader/mtoon.wgsl"),
 );
 
@@ -13,4 +15,7 @@ const CUSTOM_FRAGMENT_SHADER: &str = include_str!("shader/custom_fragment_shader
 
 pub const POST_SHADER: &str = include_str!("shader/post_shader.wgsl");
 
-pub const BACKGROUND_SHADER: &str = include_str!("shader/background_shader.wgsl");
+pub const BACKGROUND_SHADER: &str = concat!(
+    include_str!("shader/background_shader.wgsl"),
+    include_str!("shader/tone_mapping.wgsl"),
+);

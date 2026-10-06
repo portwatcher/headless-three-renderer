@@ -285,7 +285,7 @@ pub(super) fn create_renderer_layouts(device: &wgpu::Device) -> RendererLayouts 
         ],
     });
 
-    // IBL bind group: irradiance cubemap, prefiltered cubemap, BRDF LUT, sampler
+    // IBL bind group: environment cube (legacy envMap), PMREM CubeUV atlas, sampler.
     let ibl_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("headless-three-renderer ibl layout"),
         entries: &[
@@ -304,23 +304,13 @@ pub(super) fn create_renderer_layouts(device: &wgpu::Device) -> RendererLayouts 
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::Cube,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
                     view_dimension: wgpu::TextureViewDimension::D2,
                     sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 },
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 3,
+                binding: 2,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,

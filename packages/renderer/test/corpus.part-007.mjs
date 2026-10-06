@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { CORPUS_RENDER_SIZE, countRegionPixels, cubeTexture, cubeUvGreenCubeTexture, makeCamera, meanAbsDiff, meanRegion, packedCubeUvGreenTexture, pixelAt } from './corpus.part-001.mjs'
+import { CORPUS_RENDER_SIZE, countRegionPixels, cubeTexture, cubeUvGreenCubeTexture, equirectTexture, makeCamera, meanAbsDiff, meanRegion, packedCubeUvGreenTexture, pixelAt } from './corpus.part-001.mjs'
 export function rendererClippingStateCorpus() {
   const globalScene = new THREE.Scene()
   globalScene.background = new THREE.Color(0, 0, 1)
@@ -234,12 +234,7 @@ export function materialEnvMapBasicLambertCorpus() {
 }
 
 export function materialEnvMapPbrCorpus() {
-  const envMap = new THREE.DataTexture(new Uint8Array([
-    0, 255, 0, 255,
-    0, 255, 0, 255,
-  ]), 2, 1, THREE.RGBAFormat)
-  envMap.mapping = THREE.EquirectangularReflectionMapping
-  envMap.needsUpdate = true
+  const envMap = equirectTexture([0, 255, 0, 255])
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.02, 0.02, 0.025)
@@ -366,7 +361,7 @@ export function cubeEnvironmentOptionRotationCorpus() {
     [255, 255, 0],
     [255, 0, 255],
     [0, 255, 255],
-  ])
+  ], 16)
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -414,10 +409,8 @@ export function cubeEnvironmentOptionRotationCorpus() {
 }
 
 export function narrowRawIblCorpus() {
-  const environment = new THREE.DataTexture(new Uint8Array([220, 64]), 1, 1, THREE.RGFormat)
+  const environment = equirectTexture([220, 64], THREE.RGFormat)
   environment.colorSpace = THREE.LinearSRGBColorSpace
-  environment.mapping = THREE.EquirectangularReflectionMapping
-  environment.needsUpdate = true
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0.015, 0.015, 0.02)

@@ -242,6 +242,9 @@ export function extractPbrProperties(
   const mrMapInfo = textureFromSlot(mrMap, mrMapLabel)
   if (mrMapInfo) {
     props.metallicRoughnessTexture = mrMapInfo.data
+    // Three.js samples roughnessMap.g and metalnessMap.b from separate slots, so a single map
+    // modulates only its own factor. Two different maps still share the metalnessMap texture.
+    props.metallicRoughnessChannels = (material.roughnessMap ? 1 : 0) | (material.metalnessMap ? 2 : 0)
     props.metallicRoughnessTextureWidth = mrMapInfo.width
     props.metallicRoughnessTextureHeight = mrMapInfo.height
     textureStateFromSlot('metallicRoughnessTexture', mrMap, mrMapLabel)

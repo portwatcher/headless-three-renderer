@@ -207,7 +207,7 @@ pub(super) fn prepare_common_texture_inputs(
         let mut normal_map = join_texture_worker(normal_map, "normal map worker")?;
         if matches!(mesh.normal_map_color_space.as_deref(), Some("srgb")) {
             if let Some(texture) = normal_map.as_mut() {
-                decode_texture_rgb_srgb_to_linear(texture);
+                texture.srgb = true;
             }
         }
         let normal_map_type =
@@ -217,7 +217,7 @@ pub(super) fn prepare_common_texture_inputs(
         let mut bump_map = join_texture_worker(bump_map, "bump map worker")?;
         if matches!(mesh.bump_map_color_space.as_deref(), Some("srgb")) {
             if let Some(texture) = bump_map.as_mut() {
-                decode_texture_rgb_srgb_to_linear(texture);
+                texture.srgb = true;
             }
         }
         let bump_scale = finite_f32(mesh.bump_scale.unwrap_or(1.0), "mesh bumpScale")?;
@@ -496,7 +496,7 @@ pub(super) fn prepare_physical_texture_inputs(
                     Some("srgb")
                 ) {
                     if let Some(texture) = texture.as_mut() {
-                        decode_texture_rgb_srgb_to_linear(texture);
+                        texture.srgb = true;
                     }
                 }
                 texture

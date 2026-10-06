@@ -297,7 +297,7 @@ test('MeshPhongMaterial specularMap honors horizontal and vertical repeat wrappi
   assert.ok(repeatedVertical.r > mirroredVertical.r + 80, `mirrored specularMap V coordinates should differ from RepeatWrapping (${mirroredVertical.r} vs ${repeatedVertical.r})`)
 })
 
-test('MeshPhongMaterial scene environment feeds specular reflection', () => {
+test('MeshPhongMaterial ignores scene environment like Three.js r180', () => {
   function renderPhongEnvironment(specularMap, useEnvironment) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
@@ -325,12 +325,14 @@ test('MeshPhongMaterial scene environment feeds specular reflection', () => {
   const noEnvironment = maxLuminance(renderPhongEnvironment(null, false))
   const environment = maxLuminance(renderPhongEnvironment(null, true))
   const maskedEnvironment = maxLuminance(renderPhongEnvironment(solidTexture(0, 0, 0), true))
-  assert.ok(environment > noEnvironment + 40, `scene environment should add a Phong reflection (${environment} vs ${noEnvironment})`)
-  assert.ok(environment > maskedEnvironment + 40, `specularMap should suppress Phong environment reflection (${environment} vs ${maskedEnvironment})`)
+  // Three.js r180 lights only standard and physical materials with scene.environment (r181
+  // added Lambert/Phong); the scene environment counts as a light source, so no fallback light.
+  assert.ok(Math.abs(environment - maskedEnvironment) <= 1, `specularMap should not matter without a Phong environment reflection (${environment} vs ${maskedEnvironment})`)
+  assert.ok(environment <= noEnvironment, `scene environment should not add a Phong reflection (${environment} vs ${noEnvironment})`)
 })
 
 test('MeshPhongMaterial material envMap feeds specular reflection', () => {
-  function renderPhongMaterialEnvironment(intensity) {
+  function renderPhongMaterialEnvironment(reflectivity) {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     const envMap = solidTexture(255, 255, 255)
@@ -340,8 +342,10 @@ test('MeshPhongMaterial material envMap feeds specular reflection', () => {
       specular: 0xffffff,
       shininess: 120,
       envMap,
+      // A black base color multiplied by the environment stays black: add the reflection.
+      combine: THREE.AddOperation,
+      reflectivity,
     })
-    if (intensity != null) material.envMapIntensity = intensity
     scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), material))
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100)
@@ -362,8 +366,9 @@ test('MeshPhongMaterial material envMap honors legacy combine and reflectivity',
     const envMap = solidTexture(0, 255, 0)
     envMap.mapping = THREE.EquirectangularReflectionMapping
     const material = new THREE.MeshPhongMaterial({
-      color: 0x000000,
-      specular: 0xffffff,
+      color: 0x808080,
+      // No highlight: a white specular peak saturates every combine mode.
+      specular: 0x000000,
       shininess: 120,
       envMap,
       combine,
@@ -371,6 +376,10 @@ test('MeshPhongMaterial material envMap honors legacy combine and reflectivity',
     })
     material.envMapIntensity = 0.5
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
+    // Three.js multiplies the lit color with the environment; a black or unlit base stays black.
+    const light = new THREE.DirectionalLight(0xffffff, 2)
+    light.position.set(0, 0, 3)
+    scene.add(light)
 
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10)
     camera.position.set(0, 0, 3)
@@ -386,7 +395,7 @@ test('MeshPhongMaterial material envMap honors legacy combine and reflectivity',
   const multiply = renderPhongMaterialEnvironment(THREE.MultiplyOperation)
   const add = renderPhongMaterialEnvironment(THREE.AddOperation)
 
-  assert.ok(multiply.g > disabled.g + 10, `reflectivity should scale Phong env reflection (${multiply.g} vs ${disabled.g})`)
+  assert.ok(multiply.r < disabled.r - 10, `reflectivity should scale the Phong env multiply toward green (${multiply.r} vs ${disabled.r})`)
   assert.ok(add.g > multiply.g + 10, `AddOperation should add extra Phong env reflection (${add.g} vs ${multiply.g})`)
 })
 

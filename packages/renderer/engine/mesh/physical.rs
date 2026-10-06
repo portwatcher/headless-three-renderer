@@ -277,6 +277,7 @@ pub(super) fn packed_texture(
         width,
         height,
         mipmaps: Vec::new(),
+        srgb: false,
         wrap_s: sampler.wrap_s,
         wrap_t: sampler.wrap_t,
         mag_filter: sampler.mag_filter,
@@ -330,20 +331,5 @@ pub(super) fn srgb_u8_to_linear_f32(value: u8) -> f32 {
         channel / 12.92
     } else {
         ((channel + 0.055) / 1.055).powf(2.4)
-    }
-}
-
-pub(super) fn decode_texture_rgb_srgb_to_linear(texture: &mut PreparedTexture) {
-    for pixel in texture.rgba.chunks_exact_mut(4) {
-        pixel[0] = srgb_u8_to_linear_u8(pixel[0]);
-        pixel[1] = srgb_u8_to_linear_u8(pixel[1]);
-        pixel[2] = srgb_u8_to_linear_u8(pixel[2]);
-    }
-    for mipmap in &mut texture.mipmaps {
-        for pixel in mipmap.rgba.chunks_exact_mut(4) {
-            pixel[0] = srgb_u8_to_linear_u8(pixel[0]);
-            pixel[1] = srgb_u8_to_linear_u8(pixel[1]);
-            pixel[2] = srgb_u8_to_linear_u8(pixel[2]);
-        }
     }
 }

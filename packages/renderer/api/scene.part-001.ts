@@ -343,6 +343,8 @@ export interface MeshGeometryExtraction {
   uvs: number[] | null
   normalAttribute?: ThreeBufferAttributeLike
   normals: number[] | null
+  /** The geometry has a tangent attribute (Three.js USE_TANGENT for normal maps). */
+  hasTangents: boolean
   vertexColors?: ThreeBufferAttributeLike
   index: number[] | null
   sourceIndex: number[]
@@ -363,6 +365,7 @@ export interface MeshGeometrySignature {
   groups: string
   position: AttributeSignature
   normal: AttributeSignature
+  tangent: AttributeSignature
   color: AttributeSignature
   index: AttributeSignature
   uv: AttributeSignature

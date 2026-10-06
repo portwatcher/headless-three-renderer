@@ -84,9 +84,11 @@ impl OutputColorSpace {
     }
 }
 
+/// Whether 8-bit environment data is sRGB-encoded. Like Three.js NoColorSpace, an omitted color
+/// space keeps the data linear.
 pub(super) fn parse_environment_color_space(value: Option<&str>) -> Result<bool> {
     let Some(color_space) = value else {
-        return Ok(true);
+        return Ok(false);
     };
 
     match color_space.to_ascii_lowercase().as_str() {

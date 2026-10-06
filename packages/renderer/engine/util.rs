@@ -34,7 +34,7 @@ pub fn parse_color(values: Option<&[f64]>, default: [f64; 4], field: &str) -> Re
             finite_color(values[0], field)?,
             finite_color(values[1], field)?,
             finite_color(values[2], field)?,
-            finite_color(values[3], field)?,
+            clamp01(finite_color(values[3], field)?),
         ]),
         _ => bail!("{field} must be `[r, g, b]` or `[r, g, b, a]`"),
     }
@@ -75,11 +75,13 @@ pub fn finite_f32(value: f64, field: &str) -> Result<f32> {
     Ok(value as f32)
 }
 
+/// A finite, non-negative color component. Like Three.js colors, RGB may exceed 1 (HDR);
+/// alpha components are clamped by their callers.
 pub fn finite_color(value: f64, field: &str) -> Result<f64> {
     if !value.is_finite() {
         bail!("{field} must contain finite numbers");
     }
-    Ok(clamp01(value))
+    Ok(value.max(0.0))
 }
 
 pub fn color_to_f32(color: [f64; 4]) -> [f32; 4] {

@@ -292,7 +292,7 @@ export function ensureCubeTargetTexture(target: RenderTargetLike): RenderTargetT
   const texture = cubeTargetTexture(target)
   if (texture) return texture
   const images = Array.from({ length: CUBE_FACE_COUNT }, () => ({}))
-  const created: RenderTargetTextureLike = { image: images, source: { data: images }, isCubeTexture: true }
+  const created: RenderTargetTextureLike = { image: images, source: { data: images }, isCubeTexture: true, isRenderTargetTexture: true }
   target.texture = created
   return created
 }

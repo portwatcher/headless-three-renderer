@@ -1,47 +1,47 @@
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 
 use anyhow::{Context, Result};
 
-/// IBL data precomputed on the CPU from an equirectangular HDR/LDR environment map.
+use crate::pmrem::{Equirect, EquirectSampling, equirect_to_cube_uv};
+
+/// Image-based lighting data, prepared on the CPU from an equirectangular HDR/LDR environment as
+/// Three.js r180 WebGLRenderer does:
+/// 1. the PMREM CubeUV atlas (`PMREMGenerator.fromEquirectangular`) that MeshStandardMaterial and
+///    MeshPhysicalMaterial sample with `textureCubeUV` for diffuse and specular light, and
+/// 2. the unblurred cube map (`WebGLCubeMaps`) for the legacy MeshBasic/Lambert/Phong envMap.
 ///
-/// We produce:
-/// 1. A diffuse irradiance cubemap (low-res, one color per face direction)
-/// 2. A prefiltered specular cubemap with roughness mip levels
-/// 3. A BRDF integration LUT (2D texture, NdotV vs roughness)
-///
-/// The split-sum approximation is:
-///   L_specular ≈ prefilteredColor(R, roughness) * (F0 * brdf.x + brdf.y)
-///   L_diffuse  ≈ irradiance(N) * albedo
+/// Both hold linear RGBA16F texels, so HDR values above 1 survive.
+const MAX_ENV_CUBE_SIZE: u32 = 512;
+const MAX_IBL_CACHE_ENTRIES: usize = 8;
 
-const BRDF_LUT_SIZE: u32 = 128;
-const IRRADIANCE_SIZE: u32 = 32;
-const PREFILTER_BASE_SIZE: u32 = 128;
-const PREFILTER_MIP_LEVELS: u32 = 5;
-type RotationColumns = [[f32; 4]; 3];
+static IBL_MAPS: OnceLock<Mutex<HashMap<IblCacheKey, Arc<IblMaps>>>> = OnceLock::new();
 
-static BRDF_LUT: OnceLock<Vec<u8>> = OnceLock::new();
-static IBL_MAPS: OnceLock<Mutex<HashMap<IblCacheKey, IblMaps>>> = OnceLock::new();
-
-#[derive(Clone)]
 pub struct IblMaps {
-    /// Diffuse irradiance cubemap: 6 faces, IRRADIANCE_SIZE x IRRADIANCE_SIZE, RGBA32F stored as RGBA8.
-    pub irradiance_faces: Vec<Vec<u8>>,
-    pub irradiance_size: u32,
-    /// Prefiltered specular cubemap: 6 faces × mip_levels, RGBA8.
-    /// Indexed as [mip * 6 + face].
-    pub prefilter_faces: Vec<Vec<u8>>,
-    pub prefilter_base_size: u32,
-    pub prefilter_mip_levels: u32,
-    /// BRDF integration LUT: BRDF_LUT_SIZE × BRDF_LUT_SIZE, RG stored in RGBA8 (b=0, a=255).
-    pub brdf_lut: Vec<u8>,
-    pub brdf_lut_size: u32,
+    /// Legacy environment cube: 6 faces of RGBA16F texels (little-endian bytes), WebGPU face order.
+    pub env_cube_faces: Vec<Vec<u8>>,
+    pub env_cube_size: u32,
+    /// PMREM CubeUV atlas as RGBA16F bytes; row 0 is the bottom row of the WebGL render target.
+    pub cube_uv: Vec<u8>,
+    pub cube_uv_width: u32,
+    pub cube_uv_height: u32,
+    /// `CUBEUV_MAX_MIP`: log2 of the PMREM cube face size.
+    pub cube_uv_max_mip: f32,
+    /// Hash of the source pixels and sampling state, for GPU upload caches.
+    pub content_key: u64,
 }
 
-/// An HDR equirect environment map stored as linear f32 RGB pixels.
+/// Which environment representations the scene's materials sample.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct IblNeeds {
+    pub cube_uv: bool,
+    pub env_cube: bool,
+}
+
+/// An HDR equirect environment map stored as linear f32 RGB pixels in data order.
 pub struct EnvMap {
     pub pixels: Vec<[f32; 3]>,
     pub width: u32,
@@ -52,13 +52,13 @@ pub struct EnvMap {
 struct IblCacheKey {
     width: u32,
     height: u32,
-    pixels_len: usize,
     pixels_hash: u64,
-    rotation: [[u32; 3]; 3],
+    sampling: EquirectSampling,
+    needs: IblNeeds,
 }
 
 impl IblCacheKey {
-    fn new(env_map: &EnvMap, rotation: RotationColumns) -> Self {
+    fn new(env_map: &EnvMap, sampling: EquirectSampling, needs: IblNeeds) -> Self {
         let mut hasher = DefaultHasher::new();
         for pixel in &env_map.pixels {
             for channel in pixel {
@@ -68,26 +68,16 @@ impl IblCacheKey {
         Self {
             width: env_map.width,
             height: env_map.height,
-            pixels_len: env_map.pixels.len(),
             pixels_hash: hasher.finish(),
-            rotation: [
-                [
-                    f32_key(rotation[0][0]),
-                    f32_key(rotation[0][1]),
-                    f32_key(rotation[0][2]),
-                ],
-                [
-                    f32_key(rotation[1][0]),
-                    f32_key(rotation[1][1]),
-                    f32_key(rotation[1][2]),
-                ],
-                [
-                    f32_key(rotation[2][0]),
-                    f32_key(rotation[2][1]),
-                    f32_key(rotation[2][2]),
-                ],
-            ],
+            sampling,
+            needs,
         }
+    }
+
+    fn content_key(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -194,24 +184,6 @@ impl EnvMap {
             height: h,
         })
     }
-
-    /// Sample the equirectangular map at a world-space direction.
-    fn sample(&self, dir: [f32; 3]) -> [f32; 3] {
-        let (dx, dy, dz) = (dir[0], dir[1], dir[2]);
-        // Equirectangular: u = atan2(dx, dz) / (2π) + 0.5, v = asin(dy) / π + 0.5
-        let u = dx.atan2(dz) * (0.5 / std::f32::consts::PI) + 0.5;
-        let v = (-dy).asin() * (1.0 / std::f32::consts::PI) + 0.5;
-        self.sample_uv(u, v)
-    }
-
-    fn sample_uv(&self, u: f32, v: f32) -> [f32; 3] {
-        let u = u.fract();
-        let u = if u < 0.0 { u + 1.0 } else { u };
-        let v = v.clamp(0.0, 1.0);
-        let x = (u * self.width as f32) as u32 % self.width;
-        let y = (v * self.height as f32).min(self.height as f32 - 1.0) as u32;
-        self.pixels[(y * self.width + x) as usize]
-    }
 }
 
 fn decode_ldr_environment_channel(value: u8, is_srgb: bool) -> f32 {
@@ -223,10 +195,10 @@ fn decode_ldr_environment_channel(value: u8, is_srgb: bool) -> f32 {
     }
 }
 
-pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
-    let key = IblCacheKey::new(env_map, rotation);
-    if let Some(maps) = IBL_MAPS
-        .get_or_init(|| Mutex::new(HashMap::new()))
+pub fn compute_ibl(env_map: &EnvMap, sampling: EquirectSampling, needs: IblNeeds) -> Arc<IblMaps> {
+    let key = IblCacheKey::new(env_map, sampling, needs);
+    let cache = IBL_MAPS.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(maps) = cache
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .get(&key)
@@ -235,365 +207,151 @@ pub fn compute_ibl(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
         return maps;
     }
 
-    let maps = compute_ibl_uncached(env_map, rotation);
-    IBL_MAPS
-        .get_or_init(|| Mutex::new(HashMap::new()))
+    let maps = Arc::new(compute_ibl_uncached(
+        env_map,
+        sampling,
+        needs,
+        key.content_key(),
+    ));
+    let mut guard = cache
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .entry(key)
-        .or_insert_with(|| maps.clone())
-        .clone()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if guard.len() >= MAX_IBL_CACHE_ENTRIES && !guard.contains_key(&key) {
+        guard.clear();
+    }
+    guard.entry(key).or_insert_with(|| maps.clone()).clone()
 }
 
-fn compute_ibl_uncached(env_map: &EnvMap, rotation: RotationColumns) -> IblMaps {
+fn compute_ibl_uncached(
+    env_map: &EnvMap,
+    sampling: EquirectSampling,
+    needs: IblNeeds,
+    content_key: u64,
+) -> IblMaps {
+    let source = Equirect {
+        pixels: &env_map.pixels,
+        width: env_map.width,
+        height: env_map.height,
+        sampling,
+    };
+    // Without an atlas (no standard material uses it, or an input narrower than 64 px like
+    // Three.js) a 1x1 black atlas gives no image-based light.
+    let atlas = if needs.cube_uv {
+        equirect_to_cube_uv(&source)
+    } else {
+        None
+    };
+    let (cube_uv, cube_uv_width, cube_uv_height, cube_uv_max_mip) = match atlas {
+        Some(atlas) => (
+            rgba16f_bytes(&atlas.texels),
+            atlas.width,
+            atlas.height,
+            atlas.lod_max as f32,
+        ),
+        None => (rgba16f_bytes(&[[0.0; 3]]), 1, 1, 0.0),
+    };
+    let (env_cube_faces, env_cube_size) = if needs.env_cube {
+        let size = env_map.height.clamp(1, MAX_ENV_CUBE_SIZE);
+        (equirect_to_cube_faces(&source, size), size)
+    } else {
+        (vec![rgba16f_bytes(&[[0.0; 3]]); 6], 1)
+    };
+    IblMaps {
+        env_cube_faces,
+        env_cube_size,
+        cube_uv,
+        cube_uv_width,
+        cube_uv_height,
+        cube_uv_max_mip,
+        content_key,
+    }
+}
+
+/// `WebGLCubeRenderTarget.fromEquirectangularTexture`: each cube texel samples the equirect in
+/// its direction. Faces follow the WebGPU order +X, -X, +Y, -Y, +Z, -Z.
+fn equirect_to_cube_faces(source: &Equirect<'_>, size: u32) -> Vec<Vec<u8>> {
     thread::scope(|scope| {
-        let irradiance_faces = scope.spawn(|| compute_irradiance(env_map, rotation));
-        let prefilter_faces = scope.spawn(|| compute_prefiltered_env(env_map, rotation));
-        let brdf_lut = scope.spawn(cached_brdf_lut);
-
-        IblMaps {
-            irradiance_faces: irradiance_faces
-                .join()
-                .expect("IBL irradiance precompute worker panicked"),
-            irradiance_size: IRRADIANCE_SIZE,
-            prefilter_faces: prefilter_faces
-                .join()
-                .expect("IBL prefilter precompute worker panicked"),
-            prefilter_base_size: PREFILTER_BASE_SIZE,
-            prefilter_mip_levels: PREFILTER_MIP_LEVELS,
-            brdf_lut: brdf_lut
-                .join()
-                .expect("IBL BRDF LUT precompute worker panicked"),
-            brdf_lut_size: BRDF_LUT_SIZE,
-        }
-    })
-}
-
-fn cached_brdf_lut() -> Vec<u8> {
-    BRDF_LUT.get_or_init(compute_brdf_lut).clone()
-}
-
-fn sample_rotated(env_map: &EnvMap, rotation: RotationColumns, dir: [f32; 3]) -> [f32; 3] {
-    env_map.sample(rotate_direction(rotation, dir))
-}
-
-fn rotate_direction(rotation: RotationColumns, dir: [f32; 3]) -> [f32; 3] {
-    normalize([
-        rotation[0][0] * dir[0] + rotation[1][0] * dir[1] + rotation[2][0] * dir[2],
-        rotation[0][1] * dir[0] + rotation[1][1] * dir[1] + rotation[2][1] * dir[2],
-        rotation[0][2] * dir[0] + rotation[1][2] * dir[1] + rotation[2][2] * dir[2],
-    ])
-}
-
-// ── Irradiance cubemap ──────────────────────────────────────────────
-
-fn compute_irradiance(env_map: &EnvMap, rotation: RotationColumns) -> Vec<Vec<u8>> {
-    let size = IRRADIANCE_SIZE;
-    thread::scope(|scope| {
-        let handles = (0..6)
-            .map(|face| scope.spawn(move || compute_irradiance_face(env_map, rotation, face, size)))
+        let handles = (0..6u32)
+            .map(|face| {
+                scope.spawn(move || {
+                    let mut texels = Vec::with_capacity((size * size) as usize);
+                    for y in 0..size {
+                        for x in 0..size {
+                            texels.push(source.sample_direction(cube_dir(face, x, y, size)));
+                        }
+                    }
+                    rgba16f_bytes(&texels)
+                })
+            })
             .collect::<Vec<_>>();
         handles
             .into_iter()
-            .map(|handle| handle.join().expect("IBL irradiance worker panicked"))
+            .map(|handle| handle.join().expect("environment cube worker panicked"))
             .collect()
     })
 }
 
-fn compute_irradiance_face(
-    env_map: &EnvMap,
-    rotation: RotationColumns,
-    face: u32,
-    size: u32,
-) -> Vec<u8> {
-    let mut rgba = vec![0u8; (size * size * 4) as usize];
-    for y in 0..size {
-        for x in 0..size {
-            let dir = cube_dir(face, x, y, size);
-            let color = convolve_diffuse(env_map, dir, rotation);
-            let idx = ((y * size + x) * 4) as usize;
-            rgba[idx] = linear_to_srgb8(color[0]);
-            rgba[idx + 1] = linear_to_srgb8(color[1]);
-            rgba[idx + 2] = linear_to_srgb8(color[2]);
-            rgba[idx + 3] = 255;
-        }
-    }
-    rgba
-}
-
-fn convolve_diffuse(env_map: &EnvMap, normal: [f32; 3], rotation: RotationColumns) -> [f32; 3] {
-    // Hemisphere convolution with cosine weighting.
-    // Use a modest sample count for CPU perf.
-    let n = normalize(normal);
-    let (up, right) = make_tangent_frame(n);
-    let sample_count = 128u32;
-    let mut result = [0.0f32; 3];
-    let mut total_weight = 0.0f32;
-
-    for i in 0..sample_count {
-        // Cosine-weighted hemisphere sampling using Hammersley sequence
-        let xi = hammersley(i, sample_count);
-        let (sin_theta, cos_theta) = cosine_sample_hemisphere(xi);
-        let phi = 2.0 * std::f32::consts::PI * xi[0];
-        let sample_dir = [
-            right[0] * phi.cos() * sin_theta + up[0] * phi.sin() * sin_theta + n[0] * cos_theta,
-            right[1] * phi.cos() * sin_theta + up[1] * phi.sin() * sin_theta + n[1] * cos_theta,
-            right[2] * phi.cos() * sin_theta + up[2] * phi.sin() * sin_theta + n[2] * cos_theta,
-        ];
-        let sample_dir = normalize(sample_dir);
-        let n_dot_l = dot(n, sample_dir).max(0.0);
-        let color = sample_rotated(env_map, rotation, sample_dir);
-        result[0] += color[0] * n_dot_l;
-        result[1] += color[1] * n_dot_l;
-        result[2] += color[2] * n_dot_l;
-        total_weight += n_dot_l;
-    }
-
-    if total_weight > 0.0 {
-        result[0] /= total_weight;
-        result[1] /= total_weight;
-        result[2] /= total_weight;
-    }
-    result
-}
-
-// ── Prefiltered specular cubemap ────────────────────────────────────
-
-fn compute_prefiltered_env(env_map: &EnvMap, rotation: RotationColumns) -> Vec<Vec<u8>> {
-    let mut all_faces = Vec::with_capacity((PREFILTER_MIP_LEVELS * 6) as usize);
-    for mip in 0..PREFILTER_MIP_LEVELS {
-        let roughness = mip as f32 / (PREFILTER_MIP_LEVELS - 1).max(1) as f32;
-        let size = (PREFILTER_BASE_SIZE >> mip).max(1);
-        let mip_faces = thread::scope(|scope| {
-            let handles = (0..6)
-                .map(|face| {
-                    scope.spawn(move || {
-                        compute_prefiltered_face(env_map, rotation, face, size, roughness)
-                    })
-                })
-                .collect::<Vec<_>>();
-            handles
-                .into_iter()
-                .map(|handle| handle.join().expect("IBL prefilter worker panicked"))
-                .collect::<Vec<_>>()
-        });
-        all_faces.extend(mip_faces);
-    }
-    all_faces
-}
-
-fn compute_prefiltered_face(
-    env_map: &EnvMap,
-    rotation: RotationColumns,
-    face: u32,
-    size: u32,
-    roughness: f32,
-) -> Vec<u8> {
-    let mut rgba = vec![0u8; (size * size * 4) as usize];
-    for y in 0..size {
-        for x in 0..size {
-            let dir = cube_dir(face, x, y, size);
-            let color = prefilter_env_sample(env_map, dir, roughness, rotation);
-            let idx = ((y * size + x) * 4) as usize;
-            rgba[idx] = linear_to_srgb8(color[0]);
-            rgba[idx + 1] = linear_to_srgb8(color[1]);
-            rgba[idx + 2] = linear_to_srgb8(color[2]);
-            rgba[idx + 3] = 255;
-        }
-    }
-    rgba
-}
-
-fn prefilter_env_sample(
-    env_map: &EnvMap,
-    reflection: [f32; 3],
-    roughness: f32,
-    rotation: RotationColumns,
-) -> [f32; 3] {
-    let n = normalize(reflection);
-    let v = n; // Assume V = N for prefiltering (split-sum assumption)
-    let (up, right) = make_tangent_frame(n);
-
-    let sample_count = if roughness < 0.05 { 32u32 } else { 128 };
-    let mut result = [0.0f32; 3];
-    let mut total_weight = 0.0f32;
-
-    for i in 0..sample_count {
-        let xi = hammersley(i, sample_count);
-        let h = importance_sample_ggx(xi, n, up, right, roughness);
-        let l = reflect_over(v, h);
-        let n_dot_l = dot(n, l).max(0.0);
-        if n_dot_l > 0.0 {
-            let color = sample_rotated(env_map, rotation, l);
-            result[0] += color[0] * n_dot_l;
-            result[1] += color[1] * n_dot_l;
-            result[2] += color[2] * n_dot_l;
-            total_weight += n_dot_l;
-        }
-    }
-
-    if total_weight > 0.0 {
-        result[0] /= total_weight;
-        result[1] /= total_weight;
-        result[2] /= total_weight;
-    }
-    result
-}
-
-// ── BRDF Integration LUT ───────────────────────────────────────────
-
-fn compute_brdf_lut() -> Vec<u8> {
-    let size = BRDF_LUT_SIZE;
-    let mut rgba = vec![0u8; (size * size * 4) as usize];
-    let sample_count = 256u32;
-
-    for y in 0..size {
-        for x in 0..size {
-            let n_dot_v = (x as f32 + 0.5) / size as f32;
-            let roughness = (y as f32 + 0.5) / size as f32;
-            let n_dot_v = n_dot_v.max(0.001);
-            let (scale, bias) = integrate_brdf(n_dot_v, roughness, sample_count);
-            let idx = ((y * size + x) * 4) as usize;
-            rgba[idx] = (scale.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
-            rgba[idx + 1] = (bias.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
-            rgba[idx + 2] = 0;
-            rgba[idx + 3] = 255;
-        }
-    }
-    rgba
-}
-
-fn integrate_brdf(n_dot_v: f32, roughness: f32, sample_count: u32) -> (f32, f32) {
-    let v = [(1.0 - n_dot_v * n_dot_v).sqrt(), 0.0, n_dot_v];
-    let n = [0.0f32, 0.0, 1.0];
-    let (up, right) = ([0.0f32, 1.0, 0.0], [1.0, 0.0, 0.0]);
-
-    let mut a = 0.0f32;
-    let mut b = 0.0f32;
-
-    for i in 0..sample_count {
-        let xi = hammersley(i, sample_count);
-        let h = importance_sample_ggx(xi, n, up, right, roughness);
-        let l = reflect_over(v, h);
-        let n_dot_l = l[2].max(0.0);
-        let n_dot_h = h[2].max(0.0);
-        let v_dot_h = dot(v, h).max(0.0);
-
-        if n_dot_l > 0.0 {
-            let g = geometry_smith_ibl(n_dot_v, n_dot_l, roughness);
-            let g_vis = (g * v_dot_h) / (n_dot_h * n_dot_v + 0.0001);
-            let fc = (1.0 - v_dot_h).powi(5);
-            a += (1.0 - fc) * g_vis;
-            b += fc * g_vis;
-        }
-    }
-
-    (a / sample_count as f32, b / sample_count as f32)
-}
-
-fn geometry_smith_ibl(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
-    let a = roughness;
-    let k = (a * a) / 2.0;
-    let ggx_v = n_dot_v / (n_dot_v * (1.0 - k) + k + 0.0001);
-    let ggx_l = n_dot_l / (n_dot_l * (1.0 - k) + k + 0.0001);
-    ggx_v * ggx_l
-}
-
-// ── Cubemap direction helper ────────────────────────────────────────
-
-/// Convert a face index (0..5) and pixel coordinate to a world-space direction.
-/// Face order: +X, -X, +Y, -Y, +Z, -Z (same as WebGL cubemap convention).
+/// Direction of texel (x, y) on a WebGPU cube face.
 fn cube_dir(face: u32, x: u32, y: u32, size: u32) -> [f32; 3] {
     let u = (x as f32 + 0.5) / size as f32 * 2.0 - 1.0;
     let v = (y as f32 + 0.5) / size as f32 * 2.0 - 1.0;
-    let dir = match face {
-        0 => [1.0, -v, -u],  // +X
-        1 => [-1.0, -v, u],  // -X
-        2 => [u, 1.0, v],    // +Y
-        3 => [u, -1.0, -v],  // -Y
-        4 => [u, -v, 1.0],   // +Z
-        _ => [-u, -v, -1.0], // -Z
-    };
-    normalize(dir)
-}
-
-// ── Math helpers ────────────────────────────────────────────────────
-
-fn normalize(v: [f32; 3]) -> [f32; 3] {
-    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if len < 1e-8 {
-        return [0.0, 1.0, 0.0];
+    match face {
+        0 => [1.0, -v, -u],
+        1 => [-1.0, -v, u],
+        2 => [u, 1.0, v],
+        3 => [u, -1.0, -v],
+        4 => [u, -v, 1.0],
+        _ => [-u, -v, -1.0],
     }
-    [v[0] / len, v[1] / len, v[2] / len]
 }
 
-fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+fn rgba16f_bytes(texels: &[[f32; 3]]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(texels.len() * 8);
+    for texel in texels {
+        for value in [texel[0], texel[1], texel[2], 1.0] {
+            bytes.extend_from_slice(&f32_to_f16(value).to_le_bytes());
+        }
+    }
+    bytes
 }
 
-fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
+/// IEEE 754 binary16 with round-to-nearest-even.
+pub(crate) fn f32_to_f16(value: f32) -> u16 {
+    let bits = value.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exponent = ((bits >> 23) & 0xff) as i32;
+    let mantissa = bits & 0x7f_ffff;
+    if exponent == 0xff {
+        return sign | 0x7c00 | if mantissa != 0 { 0x200 } else { 0 };
+    }
+    let half_exponent = exponent - 127 + 15;
+    if half_exponent >= 0x1f {
+        return sign | 0x7c00;
+    }
+    if half_exponent <= 0 {
+        if half_exponent < -10 {
+            return sign;
+        }
+        let full = mantissa | 0x80_0000;
+        let shift = (14 - half_exponent) as u32;
+        let truncated = full >> shift;
+        let remainder = full & ((1 << shift) - 1);
+        let halfway = 1 << (shift - 1);
+        let rounded = if remainder > halfway || (remainder == halfway && truncated & 1 == 1) {
+            truncated + 1
+        } else {
+            truncated
+        };
+        return sign | rounded as u16;
+    }
+    let truncated = mantissa >> 13;
+    let remainder = mantissa & 0x1fff;
+    let mut result = ((half_exponent as u32) << 10) | truncated;
+    if remainder > 0x1000 || (remainder == 0x1000 && truncated & 1 == 1) {
+        result += 1;
+    }
+    sign | result as u16
 }
-
-fn reflect_over(v: [f32; 3], h: [f32; 3]) -> [f32; 3] {
-    let d = 2.0 * dot(v, h);
-    normalize([d * h[0] - v[0], d * h[1] - v[1], d * h[2] - v[2]])
-}
-
-fn make_tangent_frame(n: [f32; 3]) -> ([f32; 3], [f32; 3]) {
-    let up = if n[1].abs() < 0.999 {
-        [0.0, 1.0, 0.0]
-    } else {
-        [1.0, 0.0, 0.0]
-    };
-    let right = normalize(cross(up, n));
-    let up = cross(n, right);
-    (up, right)
-}
-
-fn hammersley(i: u32, n: u32) -> [f32; 2] {
-    [i as f32 / n as f32, radical_inverse_vdc(i)]
-}
-
-fn radical_inverse_vdc(mut bits: u32) -> f32 {
-    bits = (bits << 16) | (bits >> 16);
-    bits = ((bits & 0x55555555) << 1) | ((bits & 0xAAAAAAAA) >> 1);
-    bits = ((bits & 0x33333333) << 2) | ((bits & 0xCCCCCCCC) >> 2);
-    bits = ((bits & 0x0F0F0F0F) << 4) | ((bits & 0xF0F0F0F0) >> 4);
-    bits = ((bits & 0x00FF00FF) << 8) | ((bits & 0xFF00FF00) >> 8);
-    bits as f32 * 2.3283064365386963e-10
-}
-
-fn cosine_sample_hemisphere(xi: [f32; 2]) -> (f32, f32) {
-    let cos_theta = (1.0 - xi[1]).sqrt();
-    let sin_theta = xi[1].sqrt();
-    (sin_theta, cos_theta)
-}
-
-fn importance_sample_ggx(
-    xi: [f32; 2],
-    n: [f32; 3],
-    up: [f32; 3],
-    right: [f32; 3],
-    roughness: f32,
-) -> [f32; 3] {
-    let a = roughness * roughness;
-    let phi = 2.0 * std::f32::consts::PI * xi[0];
-    let cos_theta = ((1.0 - xi[1]) / (1.0 + (a * a - 1.0) * xi[1])).sqrt();
-    let sin_theta = (1.0 - cos_theta * cos_theta).sqrt().max(0.0);
-    let h = [
-        right[0] * phi.cos() * sin_theta + up[0] * phi.sin() * sin_theta + n[0] * cos_theta,
-        right[1] * phi.cos() * sin_theta + up[1] * phi.sin() * sin_theta + n[1] * cos_theta,
-        right[2] * phi.cos() * sin_theta + up[2] * phi.sin() * sin_theta + n[2] * cos_theta,
-    ];
-    normalize(h)
-}
-
-// ── Color space ─────────────────────────────────────────────────────
 
 fn srgb_to_linear(c: f32) -> f32 {
     if c <= 0.04045 {
@@ -601,16 +359,6 @@ fn srgb_to_linear(c: f32) -> f32 {
     } else {
         ((c + 0.055) / 1.055).powf(2.4)
     }
-}
-
-fn linear_to_srgb8(c: f32) -> u8 {
-    let c = c.max(0.0);
-    let s = if c <= 0.0031308 {
-        c * 12.92
-    } else {
-        1.055 * c.powf(1.0 / 2.4) - 0.055
-    };
-    (s.clamp(0.0, 1.0) * 255.0 + 0.5) as u8
 }
 
 fn half_to_f32(h: u16) -> f32 {
@@ -645,63 +393,68 @@ fn half_to_f32(h: u16) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{BRDF_LUT_SIZE, EnvMap, IblCacheKey, cached_brdf_lut};
+    use super::{EnvMap, IblCacheKey, IblNeeds, f32_to_f16, half_to_f32};
+    use crate::pmrem::{EnvWrap, EquirectSampling};
+
+    const SAMPLING: EquirectSampling = EquirectSampling {
+        flip_y: false,
+        linear: true,
+        wrap_s: EnvWrap::Clamp,
+        wrap_t: EnvWrap::Clamp,
+    };
+    const NEEDS: IblNeeds = IblNeeds {
+        cube_uv: true,
+        env_cube: false,
+    };
 
     #[test]
-    fn cached_brdf_lut_is_stable() {
-        let first = cached_brdf_lut();
-        let second = cached_brdf_lut();
-
-        assert_eq!(first, second);
-        assert_eq!(first.len(), (BRDF_LUT_SIZE * BRDF_LUT_SIZE * 4) as usize);
-        assert!(
-            first
-                .chunks_exact(4)
-                .all(|texel| texel[2] == 0 && texel[3] == 255)
-        );
-    }
-
-    #[test]
-    fn ibl_cache_keys_track_pixels_and_rotation() {
+    fn ibl_cache_keys_track_pixels_and_sampling() {
         let env = EnvMap {
             pixels: vec![[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
             width: 2,
             height: 1,
         };
-        let identity = [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-        ];
-        let mut rotated = identity;
-        rotated[0][0] = 0.0;
-        rotated[0][2] = 1.0;
-
         assert_eq!(
-            IblCacheKey::new(&env, identity),
-            IblCacheKey::new(
-                &env,
-                [
-                    [1.0, -0.0, 0.0, 42.0],
-                    [0.0, 1.0, -0.0, 42.0],
-                    [0.0, 0.0, 1.0, 42.0],
-                ]
-            ),
-            "unused rotation lanes and signed zero should not split the cache",
+            IblCacheKey::new(&env, SAMPLING, NEEDS),
+            IblCacheKey::new(&env, SAMPLING, NEEDS)
         );
+        let flipped = EquirectSampling {
+            flip_y: true,
+            ..SAMPLING
+        };
         assert_ne!(
-            IblCacheKey::new(&env, identity),
-            IblCacheKey::new(&env, rotated)
+            IblCacheKey::new(&env, SAMPLING, NEEDS),
+            IblCacheKey::new(&env, flipped, NEEDS)
         );
-
+        let both = IblNeeds {
+            cube_uv: true,
+            env_cube: true,
+        };
+        assert_ne!(
+            IblCacheKey::new(&env, SAMPLING, NEEDS),
+            IblCacheKey::new(&env, SAMPLING, both)
+        );
         let changed_env = EnvMap {
             pixels: vec![[0.1, 0.2, 0.35], [0.4, 0.5, 0.6]],
             width: 2,
             height: 1,
         };
         assert_ne!(
-            IblCacheKey::new(&env, identity),
-            IblCacheKey::new(&changed_env, identity),
+            IblCacheKey::new(&env, SAMPLING, NEEDS),
+            IblCacheKey::new(&changed_env, SAMPLING, NEEDS)
         );
+    }
+
+    #[test]
+    fn half_float_conversion_round_trips_hdr_values() {
+        for value in [0.0f32, 1.0, 0.5, 0.001, 12.0, 1000.0, -3.25, 6.0e-6] {
+            let round_trip = half_to_f32(f32_to_f16(value));
+            assert!(
+                (round_trip - value).abs() <= value.abs() * 1e-3 + 1e-7,
+                "{value} -> {round_trip}"
+            );
+        }
+        assert_eq!(f32_to_f16(1.0), 0x3c00);
+        assert_eq!(f32_to_f16(65520.0), 0x7c00);
     }
 }

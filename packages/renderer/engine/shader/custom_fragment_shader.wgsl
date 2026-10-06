@@ -107,7 +107,8 @@ fn vs_main(input: VertexInput) -> VertexOutput {
   output.position = uniforms.mvp * vec4<f32>(input.position, 1.0);
   output.world_pos = world_pos.xyz;
   output.world_normal = normalize((uniforms.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz);
-  output.world_tangent = normalize((uniforms.model * vec4<f32>(input.tangent.xyz, 0.0)).xyz);
+  let world_tangent = (uniforms.model * vec4<f32>(input.tangent.xyz, 0.0)).xyz;
+  output.world_tangent = select(vec3<f32>(0.0), normalize(world_tangent), dot(world_tangent, world_tangent) > 0.0);
   output.tangent_w = input.tangent.w;
   output.color = input.color;
   output.uv = input.uv;

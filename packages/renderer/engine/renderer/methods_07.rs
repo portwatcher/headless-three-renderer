@@ -46,7 +46,12 @@ impl GpuRenderer {
         ]);
         let distance_near = mesh.distance_near.unwrap_or(settings.near);
         let distance_far = mesh.distance_far.unwrap_or(settings.far);
-        let mesh_has_ibl = settings.ibl.is_some() && mesh.use_environment_map.unwrap_or(true);
+        // Three.js applies scene.environment only to MeshStandardMaterial/MeshPhysicalMaterial;
+        // the legacy MeshBasic/Lambert/Phong envMap path is selected by env_map_params.z.
+        let mesh_has_ibl = settings.ibl.is_some()
+            && mesh
+                .use_environment_map
+                .unwrap_or(mesh.shading_model == ShadingModel::Standard);
         let mesh_env_intensity = mesh
             .environment_map_intensity
             .unwrap_or(settings.env_intensity);
@@ -64,7 +69,7 @@ impl GpuRenderer {
                 settings.camera_pos.x,
                 settings.camera_pos.y,
                 settings.camera_pos.z,
-                0.0,
+                if settings.is_orthographic { 1.0 } else { 0.0 },
             ],
             base_color: mesh.base_color,
             emissive: [
@@ -264,7 +269,10 @@ impl GpuRenderer {
                 mesh.clearcoat_normal_scale[0],
                 mesh.clearcoat_normal_scale[1],
                 mesh.light_map_intensity,
-                if matches!(mesh.shading_model, ShadingModel::Matcap | ShadingModel::Mtoon) {
+                if matches!(
+                    mesh.shading_model,
+                    ShadingModel::Matcap | ShadingModel::Mtoon
+                ) {
                     if mesh.matcap_map_is_srgb { 1.0 } else { 0.0 }
                 } else if mesh.shading_model == ShadingModel::Toon {
                     if mesh.gradient_map_is_srgb { 1.0 } else { 0.0 }
@@ -303,6 +311,27 @@ impl GpuRenderer {
             ],
             lights,
             mtoon,
+            env_rotation: settings.env_rotation,
+            env_params: [
+                settings.ibl.as_ref().map_or(0.0, |ibl| ibl.cube_uv_max_mip),
+                if settings.ibl.is_some() { 1.0 } else { 0.0 },
+                0.0,
+                0.0,
+            ],
+            surface_params: [
+                if mesh.has_vertex_tangents { 1.0 } else { 0.0 },
+                match mesh.side {
+                    MeshSide::Front => 0.0,
+                    MeshSide::Back => 1.0,
+                    MeshSide::Double => 2.0,
+                },
+                if mesh.clearcoat_normal_map.is_some() {
+                    1.0
+                } else {
+                    0.0
+                },
+                mesh.metallic_roughness_channels as f32,
+            ],
         };
         let CachedUniformBindGroup {
             buffer: uniform_buffer,

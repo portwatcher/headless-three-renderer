@@ -258,6 +258,8 @@ export interface RenderTargetTextureLike {
   }
   userData?: Record<string, any>
   isCubeTexture?: boolean
+  /** Three.js render target textures; cube render targets are not mirrored (flipEnvMap = 1). */
+  isRenderTargetTexture?: boolean
   isFramebufferTexture?: boolean
   isDepthTexture?: boolean
   isStorageTexture?: boolean

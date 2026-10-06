@@ -271,7 +271,9 @@ test('committed Khronos glTF Sample Assets CompareDispersion fixture loads dispe
     outputColorSpace: THREE.SRGBColorSpace,
   })
 
-  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.6, 'CompareDispersion should render visible dispersion comparison geometry')
+  // Like Three.js r180 (0.40 of the frame with an opaque black clear), the transmissive spheres
+  // show the black background through their refraction, apart from highlights.
+  assert.ok(nonBackgroundRatio(rgba, [0, 0, 0], 3) > 0.3, 'CompareDispersion should render visible dispersion comparison geometry')
 })
 
 test('committed Khronos glTF Sample Assets DispersionTest fixture loads IOR and dispersion prism grid', async () => {

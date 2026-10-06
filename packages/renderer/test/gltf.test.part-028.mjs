@@ -250,9 +250,11 @@ export function worldDeterminant(object) {
 // As in Three.js r155+, AmbientLight does not light metals (glTF metallicFactor defaults to 1):
 // only specular light and an environment map do. Visibility checks of metallic assets use this
 // neutral sky-to-ground environment.
+// 64x32: Three.js r180 PMREMGenerator gives no image-based light for equirectangular maps
+// narrower than 64 px, and the renderer does the same.
 export function neutralEnvironment() {
-  const width = 32
-  const height = 16
+  const width = 64
+  const height = 32
   const data = new Uint8Array(width * height * 4)
   for (let y = 0; y < height; y += 1) {
     const level = Math.round(255 * (0.75 - 0.4 * y / (height - 1)))

@@ -427,7 +427,7 @@ test('background textures honor vertical wrap modes', () => {
 
     const scene = new THREE.Scene()
     scene.background = background
-    return meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+    return meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64, toneMapping: THREE.NoToneMapping }))
   }
 
   const clamped = renderWrap(undefined)
@@ -445,7 +445,7 @@ test('background texture anisotropy renders with native sampler settings', () =>
 
   const scene = new THREE.Scene()
   scene.background = background
-  const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64 }))
+  const mean = meanRgba(renderRgba(scene, makeCamera(), { width: 64, height: 64, toneMapping: THREE.NoToneMapping }))
   assert.ok(mean.g > mean.r + 80 && mean.g > mean.b + 80, `anisotropic background texture should render green (${mean.r}, ${mean.g}, ${mean.b})`)
 })
 

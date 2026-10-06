@@ -123,6 +123,10 @@ pub struct PreparedMesh {
     pub side: MeshSide,
     pub shadow_side: MeshSide,
     pub shading_model: ShadingModel,
+    /// Vertex tangents are present; otherwise the shader derives the normal-map frame.
+    pub has_vertex_tangents: bool,
+    /// Metallic-roughness texture channels in use: 1 = roughness (G), 2 = metalness (B).
+    pub metallic_roughness_channels: u32,
     pub mtoon: [[f32; 4]; 6],
     pub use_environment_map: Option<bool>,
     pub environment_map_intensity: Option<f32>,
@@ -511,6 +515,9 @@ pub struct PreparedTexture {
     pub width: u32,
     pub height: u32,
     pub mipmaps: Vec<PreparedTextureMipLevel>,
+    /// The RGB channels are sRGB-encoded: the GPU texture uses an sRGB format, so sampling
+    /// decodes before filtering and mipmaps average linear values, as WebGL SRGB8_ALPHA8 does.
+    pub srgb: bool,
     pub wrap_s: WrapMode,
     pub wrap_t: WrapMode,
     pub mag_filter: TextureFilter,

@@ -350,6 +350,20 @@ pub(super) fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<Pr
         alpha_map,
     } = common;
 
+    // sRGB slot textures use an sRGB GPU format; the shader decode flags are then cleared.
+    let (texture, texture_is_srgb) = upload_as_srgb(texture, texture_is_srgb);
+    let (alpha_map, alpha_map_is_srgb) = upload_as_srgb(alpha_map, alpha_map_is_srgb);
+    let (matcap_map, matcap_map_is_srgb) = upload_as_srgb(matcap_map, matcap_map_is_srgb);
+    let (gradient_map, gradient_map_is_srgb) = upload_as_srgb(gradient_map, gradient_map_is_srgb);
+    let (emissive_map, emissive_map_is_srgb) = upload_as_srgb(emissive_map, emissive_map_is_srgb);
+    let (ao_map, ao_map_is_srgb) = upload_as_srgb(ao_map, ao_map_is_srgb);
+    let (light_map, light_map_is_srgb) = upload_as_srgb(light_map, light_map_is_srgb);
+    let (specular_map, specular_map_is_srgb) = upload_as_srgb(specular_map, specular_map_is_srgb);
+    let (metallic_roughness_texture, metallic_roughness_texture_is_srgb) = upload_as_srgb(
+        metallic_roughness_texture,
+        metallic_roughness_texture_is_srgb,
+    );
+
     let PhysicalTextureInputs {
         clearcoat_map,
         clearcoat_roughness_map,
@@ -490,7 +504,7 @@ pub(super) fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<Pr
         .distance_far
         .map(|value| finite_f32(value, "mesh distanceFar"))
         .transpose()?;
-    let specular_color = parse_optional_clamped_color3(
+    let specular_color = parse_optional_hdr_color3(
         mesh.specular_color.as_deref(),
         [17.0 / 255.0, 17.0 / 255.0, 17.0 / 255.0],
         "mesh specular",
@@ -511,12 +525,12 @@ pub(super) fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<Pr
         }
     }
 
-    // Compute tangents when normal/bump mapping or anisotropic shading needs a frame.
+    // Like Three.js, only geometries with a tangent attribute use vertex tangents (computed here
+    // from the UVs); the shader derives the frame from screen-space derivatives otherwise.
+    let has_vertex_tangents = mesh.has_vertex_tangents.unwrap_or(false);
     if !cached_native_mesh
-        && (normal_map.is_some()
-            || bump_map.is_some()
-            || clearcoat_normal_map.is_some()
-            || anisotropy > 0.0)
+        && has_vertex_tangents
+        && (normal_map.is_some() || clearcoat_normal_map.is_some() || anisotropy > 0.0)
         && has_uvs
         && topology == Topology::Triangles
     {
@@ -528,7 +542,7 @@ pub(super) fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<Pr
         "mesh emissiveIntensity",
     )?;
     let emissive_color =
-        parse_optional_clamped_color3(mesh.emissive.as_deref(), [0.0, 0.0, 0.0], "mesh emissive")?;
+        parse_optional_hdr_color3(mesh.emissive.as_deref(), [0.0, 0.0, 0.0], "mesh emissive")?;
     let emissive = [
         emissive_color[0] * emissive_intensity,
         emissive_color[1] * emissive_intensity,
@@ -700,6 +714,8 @@ pub(super) fn prepare_mesh((mesh_index, mesh): (usize, &SceneMesh)) -> Result<Pr
         side,
         shadow_side,
         shading_model,
+        has_vertex_tangents,
+        metallic_roughness_channels: mesh.metallic_roughness_channels.unwrap_or(3) & 3,
         mtoon: super::mtoon::prepare_mtoon(mesh.mtoon.as_ref())?,
         use_environment_map: mesh.use_environment_map,
         environment_map_intensity,

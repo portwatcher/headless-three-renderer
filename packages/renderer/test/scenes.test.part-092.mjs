@@ -204,7 +204,7 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { LuminanceAlphaFormat, UnsignedInt101111Type, extractEnvironmentMap, test } from './scenes.test.part-001.mjs'
-import { halfFloatToNumber, makeCamera, meanAbsDiff, meanRegion, renderRgba, solidTexture } from './scenes.test.part-002.mjs'
+import { halfFloatToNumber, makeCamera, meanAbsDiff, meanRegion, renderRgba, solidEnvironmentTexture, solidTexture } from './scenes.test.part-002.mjs'
 import { packR11G11B10F, packRgb9E5 } from './scenes.test.part-003.mjs'
 test('float raw environment textures decode for IBL', () => {
   function byteEnvironmentTexture() {
@@ -375,9 +375,8 @@ test('float raw environment textures honor premultiplyAlpha before IBL upload', 
 
 test('raw environment textures honor premultiplyAlpha for IBL', () => {
   function environmentTexture(premultiplyAlpha) {
-    const texture = solidTexture(220, 120, 60, 128)
+    const texture = solidEnvironmentTexture(220, 120, 60, 128)
     texture.colorSpace = THREE.LinearSRGBColorSpace
-    texture.mapping = THREE.EquirectangularReflectionMapping
     texture.premultiplyAlpha = premultiplyAlpha
     return texture
   }

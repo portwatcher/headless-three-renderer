@@ -1,10 +1,15 @@
 // MToon lighting follows Pixiv three-vrm 3.4.4's WebGL shader (MIT).
 // https://github.com/pixiv/three-vrm/tree/v3.4.4/packages/three-vrm-materials-mtoon
 // Authored shade colors are a separate surface, not a multiplier on lit albedo.
-fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2<f32>, uv2: vec2<f32>) -> vec3<f32> {
-  if uniforms.mtoon[5].x > 0.5 && uniforms.mtoon[4].w == 0.0 {
+fn mtoon_lighting(input: VertexOutput, surface_normal: vec3<f32>, albedo: vec3<f32>, uv: vec2<f32>, uv2: vec2<f32>) -> vec3<f32> {
+  let is_outline = uniforms.mtoon[5].x > 0.5;
+  if is_outline && uniforms.mtoon[4].w == 0.0 {
     return uniforms.mtoon[4].rgb;
   }
+  // Outlines draw back faces, so N points inward here; three-vrm negates the normal again
+  // (`normal *= -1.0` for OUTLINE) and lights the outline with the outward normal. A normal
+  // map rebuilds the normal from the unflipped frame in both renderers.
+  let N = select(surface_normal, -surface_normal, is_outline && u32(uniforms.normal_map_params.z + 0.5) == 0u);
   let shade = uniforms.mtoon[0].rgb * input.color.rgb * decode_matcap_map_sample(textureSample(
     t_physical_sheen, s_physical_sheen_map, transform_matcap_color_map_uv(uv, uv2)
   )).rgb;
@@ -62,9 +67,11 @@ fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2
   );
   let x = normalize(vec3<f32>(V.z, 0.0, -V.x));
   let y = cross(V, x);
+  // Three.js sphereUv is a WebGL texture coordinate; the slot transform expects flipped UVs.
   let matcap_uv = 0.5 + 0.5 * vec2<f32>(dot(x, view_normal), -dot(y, view_normal));
+  let matcap_shader_uv = vec2<f32>(matcap_uv.x, 1.0 - matcap_uv.y);
   let matcap = uniforms.mtoon[2].rgb * decode_light_map_sample(textureSample(
-    t_light_map, s_light_map, transform_light_map_uv(matcap_uv, matcap_uv)
+    t_light_map, s_light_map, transform_light_map_uv(matcap_shader_uv, matcap_shader_uv)
   )).rgb;
   var rim_texture = textureSample(t_physical_layers, s_specular_map, transform_specular_map_uv(uv, uv2), 0).rgb;
   if uniforms.map_transform_rows[10u].w > 0.5 {
@@ -75,7 +82,7 @@ fn mtoon_lighting(input: VertexOutput, N: vec3<f32>, albedo: vec3<f32>, uv: vec2
   color += uniforms.emissive.rgb * decode_emissive_map_sample(textureSample(
     t_emissive, s_emissive, transform_emissive_map_uv(uv, uv2)
   )).rgb;
-  if uniforms.mtoon[5].x > 0.5 {
+  if is_outline {
     color = uniforms.mtoon[4].rgb * mix(vec3<f32>(1.0), color, uniforms.mtoon[4].w);
   }
   return color;

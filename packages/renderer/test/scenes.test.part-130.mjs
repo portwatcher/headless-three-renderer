@@ -207,8 +207,8 @@ import { Renderer, test } from './scenes.test.part-001.mjs'
 import { addLights, makeCamera, makeEnvironmentTexture, meanAbsDiff, meanRegion, renderRgba } from './scenes.test.part-002.mjs'
 test('reusable renderer reflects mutated reflection-probe texture bytes', () => {
   const renderer = new Renderer()
-  const data = new Uint8Array(2 * 2 * 4)
-  const texture = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+  const data = new Uint8Array(64 * 32 * 4)
+  const texture = new THREE.DataTexture(data, 64, 32, THREE.RGBAFormat)
   texture.mapping = THREE.EquirectangularReflectionMapping
   texture.colorSpace = THREE.LinearSRGBColorSpace
   texture.needsUpdate = true

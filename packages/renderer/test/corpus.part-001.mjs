@@ -197,6 +197,42 @@ export function environmentTexture() {
   return texture
 }
 
+// Three.js r180 PMREMGenerator needs equirectangular inputs at least 64 px wide: narrower
+// environments give no image-based light in WebGLRenderer, and this renderer does the same.
+// Image-based light fixtures therefore use 64x32 inputs.
+export function equirectTexture(texel, format = THREE.RGBAFormat, width = 64, height = 32) {
+  const data = new Uint8Array(width * height * texel.length)
+  for (let i = 0; i < width * height; i += 1) {
+    data.set(texel, i * texel.length)
+  }
+  const texture = new THREE.DataTexture(data, width, height, format)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.needsUpdate = true
+  return texture
+}
+
+// environmentTexture() resampled with bilinear filtering into a 64x32 equirectangular map.
+export function iblEnvironmentTexture(width = 64, height = 32) {
+  const source = environmentTexture().image.data
+  const texel = (x, y, channel) => source[(y * 2 + x) * 4 + channel]
+  const data = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    const v = Math.min(Math.max(((y + 0.5) / height) * 2 - 0.5, 0), 1)
+    for (let x = 0; x < width; x += 1) {
+      const u = Math.min(Math.max(((x + 0.5) / width) * 2 - 0.5, 0), 1)
+      for (let channel = 0; channel < 4; channel += 1) {
+        const row0 = texel(0, 0, channel) * (1 - u) + texel(1, 0, channel) * u
+        const row1 = texel(0, 1, channel) * (1 - u) + texel(1, 1, channel) * u
+        data[(y * width + x) * 4 + channel] = Math.round(row0 * (1 - v) + row1 * v)
+      }
+    }
+  }
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat)
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  texture.needsUpdate = true
+  return texture
+}
+
 export function gradientTexture() {
   const texture = new THREE.DataTexture(new Uint8Array([
     88, 88, 120, 255,
@@ -217,12 +253,16 @@ export function constantUvPlane(u, v, width = 2, height = 2) {
   return geometry
 }
 
-export function cubeTexture(faceColors) {
-  const faces = faceColors.map(([r, g, b, a = 255]) => ({
-    data: new Uint8Array([r, g, b, a]),
-    width: 1,
-    height: 1,
-  }))
+// Solid-color cube faces. Image-based light needs faces of at least 16 px: Three.js r180
+// PMREMGenerator.fromCubemap gives no light for smaller cubes.
+export function cubeTexture(faceColors, size = 1) {
+  const faces = faceColors.map(([r, g, b, a = 255]) => {
+    const data = new Uint8Array(size * size * 4)
+    for (let i = 0; i < size * size; i += 1) {
+      data.set([r, g, b, a], i * 4)
+    }
+    return { data, width: size, height: size }
+  })
   const texture = new THREE.CubeTexture(faces)
   texture.needsUpdate = true
   return texture

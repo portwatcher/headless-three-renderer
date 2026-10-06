@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { CORPUS_RENDER_SIZE, constantUvPlane, countRegionPixels, makeCamera, meanRegion, pixelAt, setTextureMatrixOffset, solidTexture } from './corpus.part-001.mjs'
+import { CORPUS_RENDER_SIZE, constantUvPlane, countRegionPixels, equirectTexture, makeCamera, meanRegion, pixelAt, setTextureMatrixOffset } from './corpus.part-001.mjs'
 export function lightProbeMaterialModelsCorpus() {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0, 0, 0)
@@ -53,9 +53,7 @@ export function lightProbeMaterialModelsCorpus() {
 
 export function lightProbeEnvironmentMaterialModelsCorpus() {
   function makeGreenEnvironment() {
-    const texture = solidTexture(0, 255, 0)
-    texture.mapping = THREE.EquirectangularReflectionMapping
-    return texture
+    return equirectTexture([0, 255, 0, 255])
   }
 
   function makeRedProbe() {
@@ -104,8 +102,13 @@ export function lightProbeEnvironmentMaterialModelsCorpus() {
       for (const [index, [label]] of materials.entries()) {
         const x = sampleXs[index]
         const mean = meanRegion(rgba, width, x - 4, 30, x + 4, 66)
-        if (!(mean.r > 180 && mean.g > 200 && mean.g > mean.b + 65)) {
-          throw new Error(`LightProbe/environment corpus should light ${label} with red probe plus green environment, got ${JSON.stringify(mean)}`)
+        // As in Three.js r180, scene.environment lights only standard and physical materials.
+        if (label === 'standard' || label === 'physical') {
+          if (!(mean.r > 180 && mean.g > 200 && mean.g > mean.b + 65)) {
+            throw new Error(`LightProbe/environment corpus should light ${label} with red probe plus green environment, got ${JSON.stringify(mean)}`)
+          }
+        } else if (!(mean.r > 180 && mean.g < 40 && mean.b < 40)) {
+          throw new Error(`LightProbe/environment corpus should light ${label} with the red probe only, got ${JSON.stringify(mean)}`)
         }
       }
     },

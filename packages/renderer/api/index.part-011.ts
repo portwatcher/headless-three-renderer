@@ -337,6 +337,11 @@ export function toNativeInput(
     environmentMapIntensity: envMap?.intensity,
     environmentMapColorSpace: envMap?.colorSpace,
     environmentMapRotation,
+    environmentMapFlipY: envMap?.flipY,
+    environmentMapFilter: envMap?.filter,
+    environmentMapWrapS: envMap?.wrapS,
+    environmentMapWrapT: envMap?.wrapT,
+    environmentMapCubeFaceSize: envMap?.cubeFaceSize,
     ...(colorMode ? fogToNative(scene.fog) : {}),
     ...(colorMode ? postProcessingToNative(options.postProcessing) : {}),
   }

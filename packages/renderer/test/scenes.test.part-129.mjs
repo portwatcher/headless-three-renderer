@@ -381,8 +381,8 @@ test('reusable renderer reuses cached BatchedMesh geometry views until packed at
 
 test('reusable renderer reflects mutated scene environment texture bytes', () => {
   const renderer = new Renderer()
-  const data = new Uint8Array(2 * 2 * 4)
-  const environment = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+  const data = new Uint8Array(64 * 32 * 4)
+  const environment = new THREE.DataTexture(data, 64, 32, THREE.RGBAFormat)
   environment.mapping = THREE.EquirectangularReflectionMapping
   environment.colorSpace = THREE.LinearSRGBColorSpace
   environment.needsUpdate = true
@@ -433,8 +433,8 @@ test('reusable renderer reflects mutated scene environment texture bytes', () =>
 
 test('reusable renderer reflects mutated material envMap texture bytes', () => {
   const renderer = new Renderer()
-  const data = new Uint8Array(2 * 2 * 4)
-  const envMap = new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat)
+  const data = new Uint8Array(64 * 32 * 4)
+  const envMap = new THREE.DataTexture(data, 64, 32, THREE.RGBAFormat)
   envMap.mapping = THREE.EquirectangularReflectionMapping
   envMap.colorSpace = THREE.LinearSRGBColorSpace
   envMap.needsUpdate = true

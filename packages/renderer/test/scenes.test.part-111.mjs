@@ -204,7 +204,7 @@ import lightsApi from '../dist/lights.js'
 import materialsApi from '../dist/materials.js'
 import { assertValidPng, meanRgba, nonBackgroundRatio } from './helpers.mjs'
 import { test } from './scenes.test.part-001.mjs'
-import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, renderRgba, rgbaTexture } from './scenes.test.part-002.mjs'
+import { constantUvPlane, makeEnvironmentTexture, meanAbsDiff, nearlyConstantUvPlane, renderRgba, rgbaTexture } from './scenes.test.part-002.mjs'
 import { maxLuminance } from './scenes.test.part-003.mjs'
 test('physical extension maps honor nearest texture filters', () => {
   function filteredTexture(data, filter) {
@@ -223,7 +223,7 @@ test('physical extension maps honor nearest texture filters', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.45, 0.5),
       new THREE.MeshPhysicalMaterial({
@@ -251,7 +251,7 @@ test('physical extension maps honor nearest texture filters', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.45, 0.5),
       new THREE.MeshPhysicalMaterial({
@@ -279,7 +279,7 @@ test('physical extension maps honor nearest texture filters', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.45, 0.5),
       new THREE.MeshPhysicalMaterial({
@@ -398,9 +398,9 @@ test('physical extension maps honor nearest texture filters', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
-      constantUvPlane(0.45, 0.5),
+      nearlyConstantUvPlane(0.45, 0.5),
       new THREE.MeshPhysicalMaterial({
         color: 0x000000,
         roughness: 1,
@@ -427,7 +427,7 @@ test('physical extension maps honor nearest texture filters', () => {
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0, 0, 0)
     scene.environment = makeEnvironmentTexture()
-    scene.environmentIntensity = 2
+    scene.environmentIntensity = 12
     scene.add(new THREE.Mesh(
       constantUvPlane(0.45, 0.5),
       new THREE.MeshPhysicalMaterial({
